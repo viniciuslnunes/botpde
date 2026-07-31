@@ -219,7 +219,12 @@ export const getSedesDaTorcidaOnboarding = cache(
     const descendentes = await getDescendantTenantIds(tenantId)
     const tenantIds = [tenantId, ...descendentes]
     const sedes: SedeOnboardingRow[] = await db.sede.findMany({
-      where: { tenantId: { in: tenantIds }, ativa: true },
+      where: {
+        tenantId: { in: tenantIds },
+        ativa: true,
+        // Portal próprio desativado (Tenant.ativo=false) não entra no passo Unidade.
+        tenant: { ativo: true },
+      },
       select: SEDE_ONBOARDING_SELECT,
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
     })

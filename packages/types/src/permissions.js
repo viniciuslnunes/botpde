@@ -405,10 +405,15 @@ export function permissionsDoPacoteDepartamento(departamento, papelNoDepartament
 /**
  * Permissões concedidas por um Unique Role, com herança ao vivo do departamento.
  *
- * - Com departamento: pacote (membro/gestor) ∪ permissionsExtras
- * - Sem departamento (transversal): permissions (legado) ∪ permissionsExtras
+ * - Cargo de sistema (`owner` / `admin` / `vice` / `member`): pacote =
+ *   `SYSTEM_ROLE_PERMISSIONS[nome]`. Não lê o array gravado no `Role`
+ *   (Achado 1 — a próxima permissão nova passa a valer sem
+ *   `db:repair-system-roles`; o repair vira higiene de UI/bootstrap).
+ * - Com departamento (perfil de área): pacote (membro/gestor) ∪ permissionsExtras
+ * - Sem departamento (transversal custom): permissions (legado) ∪ permissionsExtras
  *
  * @param {{
+ *   nome?: string | null,
  *   permissions?: string[],
  *   permissionsExtras?: string[],
  *   departamentoId?: string | null,
@@ -418,6 +423,14 @@ export function permissionsDoPacoteDepartamento(departamento, papelNoDepartament
  * @returns {string[]}
  */
 export function permissionsOfRole(role, departamento) {
+  const pacoteSistema =
+    role.nome != null
+      ? /** @type {Record<string, string[] | undefined>} */ (SYSTEM_ROLE_PERMISSIONS)[role.nome]
+      : undefined
+  if (pacoteSistema) {
+    return [...pacoteSistema]
+  }
+
   const result = new Set()
 
   if (role.departamentoId) {
@@ -478,6 +491,60 @@ export const WILDCARD_PERMISSION = '*'
  */
 export function hasPermission(effectivePermissions, permission) {
   return effectivePermissions.includes(WILDCARD_PERMISSION) || effectivePermissions.includes(permission)
+}
+
+/**
+ * Regra de delegação: **ninguém concede o que não tem**.
+ *
+ * Devolve as permissões de `desejadas` que estão fora do conjunto efetivo do
+ * ator — vazio quando a delegação é legítima. Serve tanto para conceder
+ * permissão avulsa (override) quanto para atribuir um cargo inteiro (basta
+ * passar o pacote do cargo como `desejadas`).
+ *
+ * Sem isso, `roles:manage` equivale a owner na prática: quem administra cargos
+ * fabrica um cargo com qualquer permissão do catálogo, veste, e escala. Isso
+ * derruba uma fronteira que o próprio código desenha — `SYSTEM_ROLE_PERMISSIONS`
+ * tira `settings:manage` de `admin` e `vice` de propósito. Ver
+ * `docs/ops/auditoria-funcional-2026-07.md` §Achado 6.
+ *
+ * O ator com `'*'` (owner) delega tudo. Super-admin não passa por aqui — ele
+ * opera fora do RBAC por tenant.
+ *
+ * @param {string[]} atorEfetivas - conjunto efetivo de quem está delegando
+ * @param {string[]} desejadas - permissões que a operação quer conceder
+ * @returns {string[]} subconjunto de `desejadas` fora do alcance do ator
+ */
+export function permissoesForaDoAlcance(atorEfetivas, desejadas) {
+  if (atorEfetivas.includes(WILDCARD_PERMISSION)) return []
+  const efetivas = new Set(atorEfetivas)
+  return Array.from(new Set(desejadas)).filter((p) => !efetivas.has(p))
+}
+
+/**
+ * Rótulos de permissões que existem no catálogo mas NÃO aparecem em
+ * `PERMISSION_GROUPS` — o formulário de cargos não as oferece porque são
+ * exclusivas do Presidente. Ainda assim precisam de nome legível: é
+ * exatamente o que a recusa de delegação (Achado 6) mostra ao usuário.
+ */
+const PERMISSION_LABELS_FORA_DO_FORMULARIO = {
+  [PERMISSIONS.SETTINGS_MANAGE]: 'Configurações da torcida',
+}
+
+/**
+ * Rótulo legível de uma permissão (o mesmo do formulário de cargos). Cai na
+ * própria chave quando a permissão não está catalogada — mensagem de erro
+ * nunca deve cuspir `undefined`.
+ *
+ * @param {string} permission
+ * @returns {string}
+ */
+export function labelPermission(permission) {
+  for (const group of PERMISSION_GROUPS) {
+    for (const item of group.items) {
+      if (item.key === permission) return item.label
+    }
+  }
+  return PERMISSION_LABELS_FORA_DO_FORMULARIO[permission] ?? permission
 }
 
 /**

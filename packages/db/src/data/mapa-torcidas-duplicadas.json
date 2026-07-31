@@ -1,0 +1,21 @@
+{
+  "geradoEm": "2026-07-31T02:41:13.316Z",
+  "criterio": {
+    "escopo": "Duplicata só no mesmo clube. Homônimo entre clubes ignorado. Variantes com/sem prefixo Torcida/Movimento/… colapsam na mesma chave (ex.: Torcida Tricolor Independente = Tricolor Independente).",
+    "chave": "normalizeNome + strip PREFIXOS_TORCIDA + strip artigos + colapsar hífen/espaço (alvi-verde ≈ alviverde)",
+    "score": "aliancas*100 + rivalidades*100 + sedes*50 + (filhas?30) + membros*5 + socios*3 + posts + recomendacoes*10 + logo*40 + catalogo*10 + ativo",
+    "manter": "maior score (dados dos fluxos + logo); empate: membros, logo, slug. Se nomes divergem, sugerir renomear o keeper para o nome formal (mais longo)."
+  },
+  "resumo": {
+    "tenantsNaoSinteticos": 557,
+    "gruposNomeDuplicadoNoMesmoClube": 0,
+    "gruposComVarianteDeNome": 0,
+    "tenantsEmGruposDuplicados": 0,
+    "clubesAfetados": 0,
+    "torcidasNosClubesAfetados": 0,
+    "catalogoGruposDuplicadosNoMesmoClube": 0
+  },
+  "gruposDuplicados": [],
+  "clubesAfetados": [],
+  "catalogoDuplicado": []
+}

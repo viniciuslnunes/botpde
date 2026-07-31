@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Beer, Boxes, CupSoda, HandCoins, ReceiptText, Store, TrendingUp } from 'lucide-react'
+import { Beer, Boxes, CupSoda, ReceiptText, Store, TrendingUp } from 'lucide-react'
 import { db } from '@torcida/db'
-import { PERMISSIONS, hasPermission } from '@torcida/types'
+import { PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { getTurnoAbertoBar, resolveUnidadeBar } from '@/lib/bar'
@@ -31,32 +31,28 @@ export default async function BarModuloLayout({ children }: { children: ReactNod
   }
 
   const permissoes = await permissoesEfetivasNoAdmin()
-  // Operador do PDV não gere catálogo/estoque; margem/CMV pede bar:manage ou finance:view.
-  const podeGerir = hasPermission(permissoes, PERMISSIONS.BAR_MANAGE)
 
   const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
 
-  const [turno, fiadosPendentes]: [Awaited<ReturnType<typeof getTurnoAbertoBar>>, number] =
+  const [turno, comandasDebito]: [Awaited<ReturnType<typeof getTurnoAbertoBar>>, number] =
     await Promise.all([
       getTurnoAbertoBar(tenant.id, unidade.id),
-      podeGerir
-        ? db.barFiado.count({
-            where: {
-              tenantId: tenant.id,
-              sedeId: unidade.id,
-              status: { in: ['PENDENTE', 'VENCIDA'] },
-            },
-          })
-        : Promise.resolve(0),
+      db.barComanda.count({
+        where: {
+          tenantId: tenant.id,
+          sedeId: unidade.id,
+          status: { in: ['FECHADA_COM_DEBITO', 'VENCIDA'] },
+        },
+      }),
     ])
 
   // Estrutura vem de ADMIN_MODULOS; aqui só ícone e contagem.
   const tabs = montarTabsModulo('bar', permissoes, {
     balcao: { icon: <Store className={ICONE} /> },
     vendas: { icon: <ReceiptText className={ICONE} /> },
-    fiado: {
-      icon: <HandCoins className={ICONE} />,
-      count: fiadosPendentes,
+    comandas: {
+      icon: <ReceiptText className={ICONE} />,
+      count: comandasDebito,
       countClass: 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
     produtos: { icon: <CupSoda className={ICONE} /> },

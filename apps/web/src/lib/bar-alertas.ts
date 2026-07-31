@@ -113,9 +113,73 @@ export async function dispatchAlertasFiadoVencidoBar(now = new Date()): Promise<
       tipo: 'BAR_FIADO_VENCIDO',
       titulo: 'Fiado vencido no Bar',
       corpo: `${devedor} — ${valorFmt} venceu sem pagamento.`,
-      link: '/admin/bar/fiado',
+      link: '/admin/bar/comandas',
     })
   }
 
   return { processados: vencidos.length, notificados }
+}
+
+type ComandaVencidaLite = {
+  id: string
+  tenantId: string
+  codigo: string
+  total: Prisma.Decimal
+  totalPago: Prisma.Decimal
+  desconto: Prisma.Decimal
+  titularNome: string
+}
+
+/**
+ * Vence comandas com débito do Bar (cron) e notifica `bar:manage`.
+ * Transição FECHADA_COM_DEBITO → VENCIDA é o gatilho único (não re-notifica).
+ */
+export async function dispatchAlertasComandaVencidaBar(now = new Date()): Promise<{
+  processados: number
+  notificados: number
+}> {
+  const vencidas: ComandaVencidaLite[] = await db.barComanda.findMany({
+    where: {
+      status: 'FECHADA_COM_DEBITO',
+      vencimento: { lt: now },
+      tenant: { ativo: true, sintetico: false },
+    },
+    select: {
+      id: true,
+      tenantId: true,
+      codigo: true,
+      total: true,
+      totalPago: true,
+      desconto: true,
+      titularNome: true,
+    },
+  })
+
+  if (vencidas.length === 0) return { processados: 0, notificados: 0 }
+
+  await db.barComanda.updateMany({
+    where: { id: { in: vencidas.map((c) => c.id) } },
+    data: { status: 'VENCIDA' },
+  })
+
+  let notificados = 0
+  for (const comanda of vencidas) {
+    const saldo =
+      Math.round(
+        (Number(comanda.total) - Number(comanda.desconto) - Number(comanda.totalPago)) * 100,
+      ) / 100
+    const valorFmt = saldo.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+    notificados += await notificarUsuariosComPermissao(PERMISSIONS.BAR_MANAGE, {
+      tenantId: comanda.tenantId,
+      tipo: 'BAR_COMANDA_VENCIDA',
+      titulo: 'Comanda vencida no Bar',
+      corpo: `${comanda.titularNome} · ${comanda.codigo} — ${valorFmt} venceu sem pagamento.`,
+      link: '/admin/bar/comandas',
+    })
+  }
+
+  return { processados: vencidas.length, notificados }
 }

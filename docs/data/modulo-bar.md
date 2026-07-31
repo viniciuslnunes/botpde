@@ -3,11 +3,14 @@
 > PDV simples para o bar da torcida: catálogo com estoque, venda rápida com PIX real,
 > Dinheiro/Cartão manual ou Fiado, e integração automática com o livro-caixa (categoria `BAR`).
 
-> **Fiado → Comanda (spec 2026-07-30):** o fluxo de Fiado descrito aqui será
+> **Fiado → Comanda (spec 2026-07-30):** o fluxo de Fiado descrito aqui foi
 > substituído por **Comanda** (conta aberta, N lançamentos, fechamento com N
-> pagamentos; sair devendo vira desfecho do fechamento). Regras fechadas em
-> [`modulo-bar-comanda.md`](./modulo-bar-comanda.md) — ainda **não implementado**.
-> Este documento descreve o comportamento em produção hoje.
+> pagamentos; sair devendo vira desfecho do fechamento). Regras em
+> [`modulo-bar-comanda.md`](./modulo-bar-comanda.md) — **fases 1–5 implementadas**
+> (núcleo, PDV, `/admin/bar/comandas`, portal `/portal/bar`, métricas
+> Recebido × Consumo em aberto). A rota `/admin/bar/fiado` redireciona
+> permanentemente para `/admin/bar/comandas`. `BarFiado` permanece no schema até
+> dropar pós-migração em produção.
 
 ## Escopo MVP
 
@@ -109,22 +112,22 @@ Enums:
    ativos com `estoqueMinimo` definido e estoque no limite ou abaixo, notificando
    `bar:manage`; idempotente por 24h via `link` estável (não duplica alerta do mesmo
    produto).
-10. **Caveat de margem/relatórios (fiado)** — `resumirVendasBar`, `resumirMargemBar`,
-   `resumirTurnoBar` (`totalPago`), `listarMaisVendidosBar` e `compararVendasBarPeriodo`
-   contam toda `BarVenda` com `status: PAGA`, incluindo vendas fiado ainda não
-   quitadas (fiado nasce `PAGA` para fins de estoque/relatório de vendas). Ou seja,
-   "vendido"/"receita" nesses relatórios pode divergir do que efetivamente entrou no
-   livro-caixa (`FinanceiroLancamento`, que só existe para fiado após a quitação). O
-   cálculo de `dinheiroEsperado` no fechamento de turno não sofre esse problema —
-   filtra explicitamente `metodoPagamento: DINHEIRO`, então fiado nunca infla a
-   conferência de caixa físico. Não há correção prevista nesta rodada; é um
-   comportamento aceito e documentado — telas que exibem "Vendido (pago)" devem ser
-   lidas como "concluído para estoque", não "dinheiro em caixa".
+10. **Recebido × Consumo em aberto (comanda, fase 5)** — relatórios e desempenho
+   separam as métricas: **Recebido** = vendas rápidas `PAGA` sem `comandaId` +
+   `BarComandaPagamento` `CONFIRMADO` (`recebidoEm`); **Consumo em aberto** =
+   soma de `total − desconto` das comandas `ABERTA` (snapshot). **Margem/CMV**
+   conta lançamentos `PAGA` **e** `EM_COMANDA` (produto saiu) — o campo
+   `receita` da margem é consumo, não Recebido. Helpers: `resumirRecebidoBar`,
+   `resumirConsumoEmAbertoBar`, `resumirMargemBar`. Corrige o caveat antigo do
+   fiado ("vendido" ≠ dinheiro em caixa). Ver `modulo-bar-comanda.md` §5.8.33.
 11. **RBAC**
    - `bar:operate` — operar PDV / registrar vendas (exceto fiado); ver histórico
    - `bar:manage` — catálogo, estoque, fornecedores, fiado (conceder/quitar/cancelar),
      cancelar/estornar, abrir/fechar turno; inclui operate (cascata). Nenhuma
      permissão nova foi criada — decisão de design deste conjunto de features.
+   - Pacote canônico: sob o departamento **Financeiro** (`bar:operate` no
+     colaborador, `bar:manage` no gestor). Sem departamento “Bar” próprio.
+     Presidência/admin já têm via cargo de sistema.
 12. **Multi-tenant + unidade** — toda query filtra `tenantId` e `sedeId` (exceto
    `BarFornecedor`, que é por tenant, sem `sedeId` — reusável entre unidades).
    Cada torcida tem seu bar; dentro dela, cada SEDE / SUBSEDE / PDE tem
@@ -138,11 +141,13 @@ Enums:
 
 ## Superfícies
 
-- Portal: `/portal/bar` (cardápio da unidade do membro) e `/portal/balanco` (se flag ativa)
-- Admin: `/admin/bar` (hub, com atalhos e contador de fiados pendentes), `/admin/bar/pdv`,
+- Portal: `/portal/bar` (cardápio + **Minha comanda** / débitos em leitura; unidade do membro) e `/portal/balanco` (se flag ativa)
+- Admin: `/admin/bar` (hub, com atalhos), `/admin/bar/pdv`,
   `/admin/bar/produtos`, `/admin/bar/estoque`, `/admin/bar/vendas`,
-  `/admin/bar/fornecedores` (CRUD, `bar:manage`), `/admin/bar/fiado` (lista +
-  quitação/cancelamento, `bar:manage`), `/admin/bar/estornos` (tabela + agregações por
+  `/admin/bar/fornecedores` (CRUD, `bar:manage`), `/admin/bar/comandas`
+  (substitui fiado: abertas / débito / histórico; quit/cancel débito com
+  `bar:manage`), `/admin/bar/fiado` → permanentRedirect para comandas,
+  `/admin/bar/estornos` (tabela + agregações por
   operador/produto com sinalização de padrão anômalo, `bar:manage`)
 - Cron: `/api/cron/bar-alertas` (`GET`, guard `CRON_SECRET` Bearer — mesmo padrão de
   `/api/cron/eventos-lembretes`) dispara `dispatchAlertasEstoqueBaixoBar` e
@@ -178,8 +183,8 @@ caixa no fechamento de turno (com preview ao vivo antes de confirmar), fiado
 vinculado a membro (concessão exige `bar:manage`; receita só entra no livro-caixa
 na quitação) e auditoria de estornos anômalos por operador (limiar 3 estornos em 30
 dias, configurável em `lib/bar.ts`). Nenhuma permissão nova foi criada — todas as
-novas mutações usam `bar:manage` existente. Ver caveat de margem/relatórios (regra
-10 acima): "vendido" pode divergir de "recebido" enquanto houver fiado pendente.
+novas mutações usam `bar:manage` existente. Comanda (fase 5) separa Recebido ×
+Consumo em aberto na UI/métricas (regra 10 acima).
 
 **Relatório de estornos** (`/admin/bar/estornos` → `listarEstornosBar`): o período
 "últimos 30 dias" filtra por `estornadoEm` (não por `criadoEm` da venda), alinhado
@@ -189,27 +194,29 @@ hoje aparece no relatório do período corrente.
 ## Layout do PDV — frame por container query (2026-07-30)
 
 O PDV é um **frame imersivo** (fora do shell admin: sem topbar/sidebar) com três
-zonas: trilha de turno, cardápio e comanda. Decisão fechada: **quem dita o layout
+zonas: trilha de turno, cardápio e **Pedido** (coluna do carrinho da venda atual).
+A **comanda** (`BarComanda`) é o contexto de conta aberta — seletor/chip no topbar,
+não a coluna lateral. Decisão fechada: **quem dita o layout
 interno é a largura real do frame, não a da viewport**. A raiz é
 `@container/pdv` e todos os cortes internos usam `@[Nrem]/pdv:` — nunca `lg:`/`xl:`.
 Motivo: as duas colunas laterais comem 40–43rem, então a viewport "dizia" que
 cabiam 3 colunas de produto quando cabia 1; e `lg:` (media query, `rem` sobre a
 fonte inicial do browser) divergia de `w-[19rem]` (`rem` sobre a fonte raiz)
-sempre que havia zoom ou fonte padrão custom — a comanda empilhava embaixo do
+sempre que havia zoom ou fonte padrão custom — o Pedido empilhava embaixo do
 cardápio em vez de virar coluna.
 
-Cortes: comanda vira coluna em ≥60rem (21rem → 23rem em 76rem → 25rem em 100rem);
-trilha de turno entra em ≥82rem (16rem, 18rem em 100rem). **A comanda tem
+Cortes: Pedido vira coluna em ≥60rem (21rem → 23rem em 76rem → 25rem em 100rem);
+trilha de turno entra em ≥82rem (16rem, 18rem em 100rem). **O Pedido tem
 prioridade sobre a trilha** — abaixo de 82rem o turno vira drawer pelo chip do
 topbar, e o topbar passa a mostrar `turnoResumo` (vendido + nº de vendas) para o
-caixa não ficar invisível. Abaixo de 60rem a comanda vira bottom sheet.
+caixa não ficar invisível. Abaixo de 60rem o Pedido vira bottom sheet.
 
 Cardápio: **linha compacta** de ~4rem (thumb 44px + nome + preço·estoque + zona de
 ação de 4.25rem fixa) em `repeat(auto-fill, minmax(min(15.5rem,100%),1fr))` — o
 card alto com foto grande cabia ~3 itens na tela, a linha cabe ~8 por coluna.
 A zona de ação tem largura fixa de propósito: a linha não reflui ao lançar item.
-Toque na linha lança +1; com item na comanda a linha mostra `−` + badge, e o
-stepper completo vive na comanda (fonte única de edição de quantidade). A linha é
+Toque na linha lança +1; com item no Pedido a linha mostra `−` + badge, e o
+stepper completo vive no Pedido (fonte única de edição de quantidade). A linha é
 `div` com `role=button` + Enter/Espaço — `<button>` aninhado fecha o externo cedo
 e estilhaça a grade. Faixa de PIX pendente é chip de uma linha (h-9), não card.
 

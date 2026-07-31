@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
@@ -33,11 +33,18 @@ import {
   buscarSedesDaTorcida,
 } from './actions'
 import { ComboboxRegiao } from './combobox-regiao'
-import { agruparSedesPorRegiao, normalizarTexto, type SedeOnboardingComDistancia } from '@/lib/onboarding-unidade'
+import {
+  agruparSedesPorRegiao,
+  exigeDepartamentoDaSede,
+  normalizarTexto,
+  type SedeOnboardingComDistancia,
+} from '@/lib/onboarding-unidade'
 import {
   buildGoogleMapsUrl,
   enrichSedesComCoordenadas,
   forwardGeocodeRegion,
+  isGoogleMapsConfigured,
+  reverseGeocodeEndereco,
   reverseGeocodeRegion,
   type GoogleMapsRegion,
 } from '@/lib/google-maps'
@@ -125,6 +132,13 @@ export function OnboardingWizard({
   const [uf, setUf] = useState('')
   const [cidade, setCidade] = useState('')
   const [localizacaoPrecisa, setLocalizacaoPrecisa] = useState<GoogleMapsRegion | null>(null)
+  /**
+   * Coordenadas vindas do GPS do dispositivo (não do centróide da cidade) —
+   * habilitam o preenchimento do endereço por localização no passo Vínculo.
+   */
+  const [coordsDispositivo, setCoordsDispositivo] = useState<{ lat: number; lng: number } | null>(
+    null,
+  )
   const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(null)
   const [unidadeId, setUnidadeId] = useState<string | null>(null)
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
@@ -437,11 +451,18 @@ export function OnboardingWizard({
                   setUf(ufSel)
                   setCidade(cidadeSel)
                   setLocalizacaoPrecisa(null)
+                  setCoordsDispositivo(null)
                 }}
-                onLocalizacao={(regiao) => {
+                onLocalizacao={(regiao, origem) => {
                   setUf(regiao.estado)
                   setCidade(regiao.cidade)
                   setLocalizacaoPrecisa(regiao)
+                  // Só o GPS aponta para o endereço do usuário; o geocode da
+                  // cidade devolve o centróide do município e preencheria uma
+                  // rua aleatória no passo de Endereço.
+                  setCoordsDispositivo(
+                    origem === 'gps' ? { lat: regiao.lat, lng: regiao.lng } : null,
+                  )
                 }}
                 pending={pending}
                 onVoltar={voltarHistorico}
@@ -519,6 +540,7 @@ export function OnboardingWizard({
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
                 regiaoUf={uf}
                 regiaoCidade={cidade}
+                coordsDispositivo={coordsDispositivo}
                 userId={userId}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
@@ -701,7 +723,8 @@ function PassoRegiao({
   uf: string
   cidade: string
   onRegiao: (cidade: string, uf: string) => void
-  onLocalizacao: (regiao: GoogleMapsRegion) => void
+  /** `origem` distingue GPS do dispositivo (preciso) do centróide da cidade. */
+  onLocalizacao: (regiao: GoogleMapsRegion, origem: 'gps' | 'cidade') => void
   pending: boolean
   onVoltar: () => void
   onContinuar: () => void
@@ -722,7 +745,7 @@ function PassoRegiao({
     const seq = ++geocodeSeq.current
     void forwardGeocodeRegion(m.cidade, m.uf).then((regiao) => {
       if (seq !== geocodeSeq.current || !regiao) return
-      onLocalizacao(regiao)
+      onLocalizacao(regiao, 'cidade')
     })
   }
 
@@ -752,7 +775,7 @@ function PassoRegiao({
         const nomeCanonico = cidadesDaUf.find((c) => normalizarTexto(c) === alvo)
         setLocalizando(false)
         if (nomeCanonico) {
-          onLocalizacao({ ...regiao, cidade: nomeCanonico })
+          onLocalizacao({ ...regiao, cidade: nomeCanonico }, 'gps')
           setLocalizacaoDetectada(true)
         } else {
           setLocalizacaoDetectada(false)
@@ -821,7 +844,7 @@ function PassoRegiao({
             className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-success-fg))]"
           >
             <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Detectado pela sua localização
+            Detectado pela sua localização — dá para reaproveitar no seu endereço
           </p>
         )}
         {erroLocalizacao && (
@@ -1662,6 +1685,7 @@ function PassoVinculo({
   regiao,
   regiaoUf,
   regiaoCidade,
+  coordsDispositivo,
   unidadeId,
   unidadeNaoListada,
   userId,
@@ -1677,6 +1701,8 @@ function PassoVinculo({
   regiao: string | undefined
   regiaoUf: string
   regiaoCidade: string
+  /** GPS confirmado no passo Região; null = só temos cidade/UF. */
+  coordsDispositivo: { lat: number; lng: number } | null
   unidadeId: string | null
   unidadeNaoListada: boolean
   userId: string
@@ -1702,6 +1728,7 @@ function PassoVinculo({
   const [numeroAssociado, setNumeroAssociado] = useState('')
   const [anosSocio, setAnosSocio] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
+  const [departamentoSedeId, setDepartamentoSedeId] = useState('')
   const [imagemProva, setImagemProva] = useState<string | undefined>()
   const cropComprovante = useCroppedImageUpload({
     aspect: 4 / 3,
@@ -1766,6 +1793,64 @@ function PassoVinculo({
     }
   }
 
+  // ─── Endereço por localização (reaproveita o GPS do passo Região) ───────────
+  const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false)
+  const [erroLocalizacaoEndereco, setErroLocalizacaoEndereco] = useState<string | null>(null)
+  const [enderecoPorLocalizacao, setEnderecoPorLocalizacao] = useState(false)
+
+  function coordsAtuais(): Promise<{ lat: number; lng: number } | null> {
+    // Já temos GPS confirmado no passo Região: não pede permissão de novo.
+    if (coordsDispositivo) return Promise.resolve(coordsDispositivo)
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return Promise.resolve(null)
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+      )
+    })
+  }
+
+  async function preencherEnderecoPelaLocalizacao() {
+    setBuscandoLocalizacao(true)
+    setErroLocalizacaoEndereco(null)
+    setEnderecoPorLocalizacao(false)
+    setErroCepLocal(null)
+    try {
+      const coords = await coordsAtuais()
+      if (!coords) {
+        setErroLocalizacaoEndereco(
+          'Não conseguimos acessar sua localização. Preencha pelo CEP.',
+        )
+        return
+      }
+      const achado = await reverseGeocodeEndereco(coords)
+      if (!achado) {
+        setErroLocalizacaoEndereco(
+          'Não conseguimos resolver um endereço aqui. Preencha pelo CEP.',
+        )
+        return
+      }
+      // Preenche só o que veio — não apaga o que o usuário já digitou à mão.
+      if (achado.cep) setCep(maskCep(achado.cep))
+      if (achado.logradouro) setLogradouro(achado.logradouro)
+      if (achado.numero) setNumero(achado.numero)
+      if (achado.bairro) setBairro(achado.bairro)
+      if (achado.cidade) setCidadeEndereco(achado.cidade)
+      if (achado.estado) setUfEndereco(achado.estado)
+      setErrosCampo((prev) => {
+        const next = { ...prev }
+        for (const campo of ['cep', 'logradouro', 'bairro', 'cidade', 'uf']) delete next[campo]
+        return next
+      })
+      setEnderecoPorLocalizacao(true)
+    } finally {
+      setBuscandoLocalizacao(false)
+    }
+  }
+
   // ─── Documentos (RG / residência) ───────────────────────────────────────────
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | undefined>()
   const cropFotoDocumento = useCroppedImageUpload({
@@ -1803,17 +1888,29 @@ function PassoVinculo({
   const [termoAceito, setTermoAceito] = useState(false)
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
+  const [departamentosSede, setDepartamentosSede] = useState<DepartamentoOnboarding[] | null>(null)
   // getDepartamentosDoTenant já exclui legados; filtro defensivo no client.
   const departamentosSelecionaveis =
     departamentos === null
       ? null
       : departamentos.filter((d) => !isDepartamentoLegado(d))
+  const departamentosSedeSelecionaveis =
+    departamentosSede === null
+      ? null
+      : departamentosSede.filter((d) => !isDepartamentoLegado(d))
 
   const unidadeSelecionada = unidadeId
     ? torcida.sedes.find((s) => s.id === unidadeId)
     : null
   const unidadePendente =
     !unidadeNaoListada && torcida.sedes.length > 1 && !unidadeId
+
+  const vinculoEmUnidadePropria = exigeDepartamentoDaSede(
+    unidadeSelecionada?.tenantId,
+    torcida.id,
+  )
+  const nomeUnidade = unidadeSelecionada?.nome ?? 'sua unidade'
+  const nomeTorcidaSede = torcida.nome
 
   const nomeClube = clube?.apelido?.trim() || clube?.nome || 'seu clube'
 
@@ -1846,6 +1943,7 @@ function PassoVinculo({
         numeroAssociado: string
         anosSocio: string
         departamentoId: string
+        departamentoSedeId: string
         imagemProva?: string
         dataNascimento: string
         sexo: string
@@ -1878,6 +1976,8 @@ function PassoVinculo({
       if (typeof saved.numeroAssociado === 'string') setNumeroAssociado(saved.numeroAssociado)
       if (typeof saved.anosSocio === 'string') setAnosSocio(saved.anosSocio)
       if (typeof saved.departamentoId === 'string') setDepartamentoId(saved.departamentoId)
+      if (typeof saved.departamentoSedeId === 'string')
+        setDepartamentoSedeId(saved.departamentoSedeId)
       if (typeof saved.imagemProva === 'string' || saved.imagemProva === undefined)
         setImagemProva(saved.imagemProva)
 
@@ -1927,6 +2027,15 @@ function PassoVinculo({
     })
   }, [modo, departamentos, torcida.id, unidadeSelecionada?.tenantId])
 
+  // Áreas da sede: só quando o vínculo nasce num tenant-filho.
+  useEffect(() => {
+    if (modo !== 'socio' || !vinculoEmUnidadePropria || departamentosSede !== null) return
+    startTransition(async () => {
+      const deps = await buscarDepartamentos(torcida.id)
+      setDepartamentosSede(deps)
+    })
+  }, [modo, vinculoEmUnidadePropria, departamentosSede, torcida.id])
+
   useEffect(() => {
     if (!draftRestored) return
     if (typeof window === 'undefined') return
@@ -1943,6 +2052,7 @@ function PassoVinculo({
         numeroAssociado,
         anosSocio,
         departamentoId,
+        departamentoSedeId,
         imagemProva,
         dataNascimento,
         sexo,
@@ -1987,6 +2097,7 @@ function PassoVinculo({
     numeroAssociado,
     anosSocio,
     departamentoId,
+    departamentoSedeId,
     imagemProva,
     dataNascimento,
     sexo,
@@ -2136,6 +2247,9 @@ function PassoVinculo({
           anosSocio: anosSocio || undefined,
           imagemProva,
           departamentoId: departamentoId || undefined,
+          departamentoSedeId: vinculoEmUnidadePropria
+            ? departamentoSedeId || undefined
+            : undefined,
           sedeId: unidadeId ?? undefined,
           unidadeNaoListada,
           dataNascimento: dataNascimento || undefined,
@@ -2189,7 +2303,7 @@ function PassoVinculo({
     cropComprovante.open(file)
   }
 
-  // ─── Fluxo guiado das abas (Identificação → Endereço → Documentos) ───────────
+  // ─── Fluxo guiado (Identificação → Endereço → Associação → Documentos) ─────
   const errosValidacao = modo === 'socio' ? validarCamposSocio() : {}
   const abasCompletas = new Set(
     TABS_FORMULARIO_SOCIO.filter(
@@ -2388,7 +2502,7 @@ function PassoVinculo({
           unidadeNaoListada={unidadeNaoListada}
         />
 
-        {/* ─── Abas: Identificação / Endereço / Documentos ─────────────────── */}
+        {/* ─── Abas: Identificação / Endereço / Associação / Documentos ────── */}
         <div ref={abasRef} className="scroll-mt-6">
           <TabsFormularioSocio
             ativa={tabAtiva}
@@ -2604,6 +2718,44 @@ function PassoVinculo({
             </p>
           )}
 
+          {isGoogleMapsConfigured() && (
+            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3">
+              <button
+                type="button"
+                onClick={() => void preencherEnderecoPelaLocalizacao()}
+                disabled={buscandoLocalizacao}
+                className="inline-flex items-center gap-2 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:underline disabled:opacity-50"
+              >
+                {buscandoLocalizacao ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <LocateFixed className="h-4 w-4" aria-hidden="true" />
+                )}
+                {buscandoLocalizacao ? 'Buscando endereço…' : 'Preencher pela minha localização'}
+              </button>
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                {coordsDispositivo
+                  ? 'Usa a localização que você já confirmou na etapa Região. Confira e ajuste o número.'
+                  : 'Completa CEP, logradouro, bairro, cidade e UF. Confira e ajuste o número.'}
+              </p>
+              {enderecoPorLocalizacao && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-success-fg))]"
+                >
+                  <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Endereço preenchido pela localização — confira antes de seguir
+                </p>
+              )}
+              {erroLocalizacaoEndereco && (
+                <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  {erroLocalizacaoEndereco}
+                </p>
+              )}
+            </div>
+          )}
+
           <Campo
             name="cep"
             label="CEP"
@@ -2697,7 +2849,10 @@ function PassoVinculo({
               />
             </Campo>
           </div>
+        </SecaoFormulario>
 
+        {/* ─── Associação ────────────────────────────────────────────────── */}
+        <SecaoFormulario titulo="Associação" oculta={tabAtiva !== 'associacao'}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Campo
               name="numeroAssociado"
@@ -2742,7 +2897,11 @@ function PassoVinculo({
           {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
             <Campo
               name="departamentoId"
-              label="Departamento pretendido"
+              label={
+                vinculoEmUnidadePropria
+                  ? `Departamento na sua unidade — ${nomeUnidade}`
+                  : 'Departamento pretendido'
+              }
               erros={errosCampo.departamentoId}
             >
               <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
@@ -2758,6 +2917,36 @@ function PassoVinculo({
               </p>
             </Campo>
           )}
+
+          {/* Cada nível da hierarquia tem seus próprios departamentos: quem
+              entra por uma unidade com portal próprio declara a área nos dois,
+              e o papel (membro ou gestor) é decidido por cada diretoria. */}
+          {vinculoEmUnidadePropria &&
+            departamentosSedeSelecionaveis !== null &&
+            departamentosSedeSelecionaveis.length > 0 && (
+              <Campo
+                name="departamentoSedeId"
+                label={`Departamento na sede — ${nomeTorcidaSede}`}
+                erros={errosCampo.departamentoSedeId}
+              >
+                <Select
+                  value={departamentoSedeId}
+                  onChange={(e) => setDepartamentoSedeId(e.target.value)}
+                >
+                  <option value="">Selecione (opcional)</option>
+                  {departamentosSedeSelecionaveis.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nome}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                  Você pode atuar em áreas diferentes em cada nível — por exemplo, da
+                  bateria na sede e gestor da bateria na sua unidade. Deixe em branco se
+                  atua só na unidade.
+                </p>
+              </Campo>
+            )}
         </SecaoFormulario>
 
         {/* ─── Documentos ────────────────────────────────────────────────── */}
@@ -2997,7 +3186,7 @@ const TIPO_SEDE_LABEL: Record<string, string> = {
 }
 
 /** Info-box da unidade escolhida (ou pendente de cadastro), com link para o mapa. */
-/** Sub-seção visual do passo Vínculo (Identificação, Endereço, Documentos…). */
+/** Sub-seção visual do passo Vínculo (Identificação, Endereço, Associação…). */
 function SecaoFormulario({
   titulo,
   oculta,
@@ -3017,11 +3206,12 @@ function SecaoFormulario({
   )
 }
 
-type TabFormularioSocio = 'identificacao' | 'endereco' | 'documentos'
+type TabFormularioSocio = 'identificacao' | 'endereco' | 'associacao' | 'documentos'
 
 const TABS_FORMULARIO_SOCIO: { id: TabFormularioSocio; label: string; icon: typeof User }[] = [
   { id: 'identificacao', label: 'Identificação', icon: User },
   { id: 'endereco', label: 'Endereço', icon: MapPin },
+  { id: 'associacao', label: 'Associação', icon: BadgeCheck },
   { id: 'documentos', label: 'Documentos', icon: FileText },
 ]
 
@@ -3049,9 +3239,10 @@ const CAMPO_TAB: Record<string, TabFormularioSocio> = {
   cidade: 'endereco',
   bairro: 'endereco',
   uf: 'endereco',
-  numeroAssociado: 'endereco',
-  anosSocio: 'endereco',
-  departamentoId: 'endereco',
+  numeroAssociado: 'associacao',
+  anosSocio: 'associacao',
+  departamentoId: 'associacao',
+  departamentoSedeId: 'associacao',
   imagemProva: 'documentos',
   fotoDocumentoUrl: 'documentos',
   comprovanteResidenciaUrl: 'documentos',
@@ -3089,7 +3280,9 @@ function TabsFormularioSocio({
     <div
       role="tablist"
       aria-label="Seções do formulário"
-      className="flex gap-1 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1"
+      // 4 abas não cabem lado a lado em telas estreitas: rola em vez de
+      // espremer o rótulo até virar reticência.
+      className="flex gap-1 overflow-x-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible"
     >
       {TABS_FORMULARIO_SOCIO.map((tab) => {
         const Icon = tab.icon
@@ -3105,7 +3298,7 @@ function TabsFormularioSocio({
             role="tab"
             aria-selected={ativaAgora}
             onClick={() => onMudar(tab.id)}
-            className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-medium transition-colors ${
+            className={`relative flex flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors sm:px-2 ${
               ativaAgora
                 ? 'bg-[rgb(var(--color-primary))] text-white'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]'

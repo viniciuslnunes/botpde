@@ -344,6 +344,8 @@ model Tenant {
 
   barFiados               BarFiado[]
 
+  barComandas             BarComanda[]
+
   solicitacoesUnidade     SolicitacaoUnidade[]     @relation("TenantSolicitacoesUnidade")
 
 
@@ -535,6 +537,14 @@ model User {
   barFiadosDevidos             BarFiado[]             @relation("BarFiadoDevedor")
 
   barFiadosCriados             BarFiado[]             @relation("BarFiadoCriadoPor")
+
+  barComandasTitular           BarComanda[]           @relation("BarComandaTitular")
+
+  barComandasAbertas           BarComanda[]           @relation("BarComandaAbertaPor")
+
+  barComandasFechadas          BarComanda[]           @relation("BarComandaFechadaPor")
+
+  barComandaPagamentos         BarComandaPagamento[]  @relation("BarComandaPagamentoOperador")
 
   solicitacoesUnidadeFeitas    SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeSolicitante")
 
@@ -742,7 +752,11 @@ model Departamento {
 
   /// Preferência de área no cadastro (SaasMembro) — sem membership até APROVADO.
 
-  solicitacoesMembros SaasMembro[]
+  solicitacoesMembros SaasMembro[] @relation("MembroDepartamentoPreferido")
+
+  /// Preferência de área na SEDE declarada por quem entrou por uma unidade.
+
+  solicitacoesSede    SaasMembro[] @relation("MembroDepartamentoSede")
 
 
 
@@ -988,9 +1002,29 @@ model SaasMembro {
 
   /// nem perfil de área enquanto status ≠ APROVADO — só após aprovarMembro.
 
+  /// Sempre do MESMO tenant desta linha: numa origem em Subsede/PDE promovida
+
+  /// é a área na unidade; no espelho da Sede, a área na Sede.
+
   departamentoId String?       @map("departamento_id")
 
-  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+  departamento   Departamento? @relation("MembroDepartamentoPreferido", fields: [departamentoId], references: [id], onDelete: SetNull)
+
+
+
+  /// Só na linha de ORIGEM de um vínculo que nasceu em tenant-filho (Caso B):
+
+  /// área pretendida na SEDE raiz, declarada no onboarding. Carrega a
+
+  /// preferência até o espelho existir — `sincronizarSocioNaSedeRaiz` a copia
+
+  /// para o `departamentoId` do espelho. Departamento é por tenant, então o
+
+  /// sócio pode ser da Bateria nos dois níveis com papéis diferentes em cada.
+
+  departamentoSedeId String?       @map("departamento_sede_id")
+
+  departamentoSede   Departamento? @relation("MembroDepartamentoSede", fields: [departamentoSedeId], references: [id], onDelete: SetNull)
 
 
 
@@ -1056,6 +1090,8 @@ model SaasMembro {
 
   barFiados BarFiado[]
 
+  barComandas BarComanda[]
+
 
 
   @@unique([tenantId, userId])
@@ -1065,6 +1101,8 @@ model SaasMembro {
   @@index([sedeId])
 
   @@index([departamentoId])
+
+  @@index([departamentoSedeId])
 
   @@index([importacaoId])
 
@@ -1575,6 +1613,8 @@ model Sede {
   barCaixaTurnos          BarCaixaTurno[]
 
   barFiados               BarFiado[]
+
+  barComandas             BarComanda[]
 
 
   @@index([tenantId])
@@ -3459,6 +3499,8 @@ enum TipoNotificacao {
 
   BAR_FIADO_VENCIDO
 
+  BAR_COMANDA_VENCIDA
+
   BAR_TURNO_DIVERGENCIA
 
   BAR_ESTORNO_ANOMALO
@@ -4563,6 +4605,10 @@ model BarVenda {
 
 
 
+  /// Comanda à qual este lançamento pertence (null = venda avulsa / legado).
+  comandaId String?     @map("comanda_id")
+  comanda   BarComanda? @relation(fields: [comandaId], references: [id], onDelete: SetNull)
+
   /// Turno de caixa em que a venda foi registrada (null = legado / sem turno).
   turnoId String?       @map("turno_id")
   turno   BarCaixaTurno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
@@ -4581,9 +4627,10 @@ model BarVenda {
 
 
 
-  metodoPagamento MetodoPagamentoBar @map("metodo_pagamento")
+  /// Null em lançamentos EM_COMANDA — quem paga é a comanda.
+  metodoPagamento MetodoPagamentoBar? @map("metodo_pagamento")
 
-  status          StatusVendaBar     @default(PENDENTE)
+  status          StatusVendaBar      @default(PENDENTE)
 
 
 
@@ -4630,6 +4677,8 @@ model BarVenda {
   @@index([tenantId, sedeId, criadoEm])
 
   @@index([tenantId, sedeId, status])
+
+  @@index([comandaId])
 
   @@index([turnoId])
   @@index([gatewayExternalId])
@@ -4812,6 +4861,9 @@ enum StatusVendaBar {
 
   PAGA
 
+  /// Lançamento em comanda: estoque baixado, receita ainda não gerada.
+  EM_COMANDA
+
   CANCELADA
 
   ESTORNADA
@@ -4864,8 +4916,234 @@ model BarCaixaTurno {
 
   vendas BarVenda[]
 
+  comandasAbertura   BarComanda[]          @relation("BarComandaTurnoAbertura")
+  comandasFechamento BarComanda[]          @relation("BarComandaTurnoFechamento")
+  comandaPagamentos  BarComandaPagamento[]
+
   @@index([tenantId, sedeId, fechadoEm])
   @@map("saas_bar_caixa_turnos")
+}
+
+
+
+/// Conta aberta do bar (comanda) — acumula lançamentos (BarVenda EM_COMANDA)
+/// e fecha com um ou mais pagamentos. Substitui o fluxo de Fiado.
+/// Ver docs/data/modulo-bar-comanda.md.
+model BarComanda {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+
+
+  sedeId String @map("sede_id")
+
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+
+
+  /// Nº da comanda física / mesa / apelido. Unicidade entre ABERTA da unidade
+  /// é checagem de aplicação (índice parcial opcional).
+  codigo String
+
+
+
+  titularUserId String? @map("titular_user_id")
+
+  titularUser   User?   @relation("BarComandaTitular", fields: [titularUserId], references: [id], onDelete: SetNull)
+
+  titularMembroId String?     @map("titular_membro_id")
+
+  titularMembro   SaasMembro? @relation(fields: [titularMembroId], references: [id], onDelete: SetNull)
+
+  /// Snapshot do nome (membro ou avulso). Sempre preenchido.
+  titularNome String @map("titular_nome")
+
+  tipo TipoTitularComandaBar
+
+
+
+  status StatusComandaBar
+
+
+
+  /// Teto de consumo; null = usa o padrão da unidade.
+  limite Decimal? @db.Decimal(10, 2)
+
+  total     Decimal @default(0) @db.Decimal(10, 2)
+
+  totalPago Decimal @default(0) @map("total_pago") @db.Decimal(10, 2)
+
+  desconto  Decimal @default(0) @db.Decimal(10, 2)
+
+
+
+  turnoAberturaId String?       @map("turno_abertura_id")
+
+  turnoAbertura   BarCaixaTurno? @relation("BarComandaTurnoAbertura", fields: [turnoAberturaId], references: [id], onDelete: SetNull)
+
+  turnoFechamentoId String?       @map("turno_fechamento_id")
+
+  turnoFechamento   BarCaixaTurno? @relation("BarComandaTurnoFechamento", fields: [turnoFechamentoId], references: [id], onDelete: SetNull)
+
+
+
+  abertaEm    DateTime @map("aberta_em")
+
+  abertaPorId String   @map("aberta_por_id")
+
+  abertaPor   User     @relation("BarComandaAbertaPor", fields: [abertaPorId], references: [id], onDelete: Cascade)
+
+  fechadaEm    DateTime? @map("fechada_em")
+
+  fechadaPorId String?   @map("fechada_por_id")
+
+  fechadaPor   User?     @relation("BarComandaFechadaPor", fields: [fechadaPorId], references: [id], onDelete: SetNull)
+
+
+
+  vencimento DateTime?
+
+  pagoEm     DateTime? @map("pago_em")
+
+  canceladaEm         DateTime? @map("cancelada_em")
+
+  motivoCancelamento  String?   @map("motivo_cancelamento")
+
+  observacao String?
+
+
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  vendas     BarVenda[]
+
+  pagamentos BarComandaPagamento[]
+
+
+
+  @@index([tenantId, sedeId, status])
+
+  @@index([tenantId, sedeId, codigo])
+
+  @@index([titularUserId])
+
+  @@index([titularMembroId])
+
+  @@map("saas_bar_comandas")
+
+}
+
+
+
+model BarComandaPagamento {
+
+  id String @id @default(uuid())
+
+
+
+  comandaId String     @map("comanda_id")
+
+  comanda   BarComanda @relation(fields: [comandaId], references: [id], onDelete: Cascade)
+
+
+
+  metodoPagamento MetodoPagamentoBar @map("metodo_pagamento")
+
+  valor           Decimal            @db.Decimal(10, 2)
+
+
+
+  recebidoEm DateTime @map("recebido_em")
+
+
+
+  turnoId String?       @map("turno_id")
+
+  turno   BarCaixaTurno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
+
+  operadorId String @map("operador_id")
+
+  operador   User   @relation("BarComandaPagamentoOperador", fields: [operadorId], references: [id], onDelete: Cascade)
+
+
+
+  gatewayProvider   String?   @map("gateway_provider")
+
+  gatewayExternalId String?   @map("gateway_external_id")
+
+  pixCopiaCola      String?   @map("pix_copia_cola")
+
+  pagoEm            DateTime? @map("pago_em")
+
+
+
+  status StatusPagamentoComandaBar @default(PENDENTE)
+
+
+
+  /// Lançamento RECEITA categoria BAR — um por pagamento confirmado.
+  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
+
+
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  @@index([comandaId])
+
+  @@index([turnoId])
+
+  @@index([gatewayExternalId])
+
+  @@map("saas_bar_comanda_pagamentos")
+
+}
+
+
+
+enum StatusComandaBar {
+
+  ABERTA
+
+  FECHADA_PAGA
+
+  FECHADA_COM_DEBITO
+
+  QUITADA
+
+  VENCIDA
+
+  CANCELADA
+
+}
+
+
+
+enum StatusPagamentoComandaBar {
+
+  PENDENTE
+
+  CONFIRMADO
+
+  CANCELADO
+
+}
+
+
+
+enum TipoTitularComandaBar {
+
+  MEMBRO
+
+  AVULSO
+
 }
 
 

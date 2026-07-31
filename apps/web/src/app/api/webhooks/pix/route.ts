@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { confirmarVendaBarPaga } from '@/lib/bar'
+import {
+  confirmarPagamentoComandaBar,
+  resolverPagamentoComandaBar,
+} from '@/lib/bar-comanda'
 import { baixarCobrancaComoPaga } from '@/lib/cobrancas'
-import { getPixProvider, verificarWebhookMock, verificarWebhookMockBar } from '@/lib/pix-gateway'
+import {
+  getPixProvider,
+  verificarWebhookMock,
+  verificarWebhookMockBar,
+  verificarWebhookMockComandaBar,
+} from '@/lib/pix-gateway'
 
 const mockSchema = z.object({
   cobrancaId: z.string().uuid(),
@@ -13,6 +22,12 @@ const mockSchema = z.object({
 const mockBarSchema = z.object({
   tipo: z.literal('bar'),
   vendaId: z.string().uuid(),
+  signature: z.string().min(1),
+})
+
+const mockComandaSchema = z.object({
+  tipo: z.literal('bar_comanda'),
+  pagamentoId: z.string().uuid(),
   signature: z.string().min(1),
 })
 
@@ -85,6 +100,47 @@ async function processarPagamentoBar(vendaId: string, tenantId: string) {
   return { ok: true as const }
 }
 
+async function processarPagamentoComanda(pagamentoId: string, tenantId: string) {
+  const result = await confirmarPagamentoComandaBar({
+    tenantId,
+    pagamentoId,
+    atorId: null,
+  })
+  if (!result.ok) return { ok: false as const, error: result.error }
+
+  await db.auditLog.create({
+    data: {
+      tenantId,
+      atorId: null,
+      acao: 'BAR_COMANDA_PAGAMENTO',
+      entidade: 'BarComandaPagamento',
+      entidadeId: pagamentoId,
+      detalhes: { webhook: true, comandaId: result.comandaId },
+    },
+  })
+
+  // Se o webhook completou o fechamento (último PIX), registra FECHADA.
+  type St = { status: string }
+  const apos: St | null = await db.barComanda.findFirst({
+    where: { id: result.comandaId },
+    select: { status: true },
+  })
+  if (apos?.status === 'FECHADA_PAGA') {
+    await db.auditLog.create({
+      data: {
+        tenantId,
+        atorId: null,
+        acao: 'BAR_COMANDA_FECHADA',
+        entidade: 'BarComanda',
+        entidadeId: result.comandaId,
+        detalhes: { via: 'pix_webhook' },
+      },
+    })
+  }
+
+  return { ok: true as const }
+}
+
 async function resolverVendaBar(ref: string): Promise<{ id: string; tenantId: string } | null> {
   type Row = { id: string; tenantId: string }
   const byId: Row | null = await db.barVenda.findFirst({
@@ -102,6 +158,21 @@ async function resolverVendaBar(ref: string): Promise<{ id: string; tenantId: st
 export async function POST(request: NextRequest) {
   const json = await request.json().catch(() => null)
   if (!json) return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
+
+  const mockComandaParsed = mockComandaSchema.safeParse(json)
+  if (mockComandaParsed.success) {
+    const { pagamentoId, signature } = mockComandaParsed.data
+    if (!verificarWebhookMockComandaBar(pagamentoId, signature)) {
+      return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 })
+    }
+
+    const pag = await resolverPagamentoComandaBar(pagamentoId)
+    if (!pag) return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 })
+
+    const res = await processarPagamentoComanda(pag.id, pag.tenantId)
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+    return NextResponse.json({ ok: true })
+  }
 
   const mockBarParsed = mockBarSchema.safeParse(json)
   if (mockBarParsed.success) {
@@ -164,11 +235,28 @@ export async function POST(request: NextRequest) {
       const payment = (await payRes.json()) as {
         status?: string
         external_reference?: string
-        metadata?: { tipo?: string; cobrancaId?: string; vendaId?: string }
+        metadata?: {
+          tipo?: string
+          cobrancaId?: string
+          vendaId?: string
+          pagamentoId?: string
+        }
       }
 
       if (payment.status !== 'approved') {
         return NextResponse.json({ ok: true, ignored: true })
+      }
+
+      if (payment.metadata?.tipo === 'bar_comanda') {
+        const ref =
+          payment.metadata?.pagamentoId ?? payment.external_reference ?? paymentId
+        const pag = await resolverPagamentoComandaBar(ref)
+        if (!pag) {
+          return NextResponse.json({ error: 'Pagamento de comanda não mapeado' }, { status: 404 })
+        }
+        const res = await processarPagamentoComanda(pag.id, pag.tenantId)
+        if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+        return NextResponse.json({ ok: true })
       }
 
       if (payment.metadata?.tipo === 'bar') {

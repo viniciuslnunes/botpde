@@ -8,6 +8,7 @@ import {
   calculateEffectivePermissions,
   capabilityPorSlug,
   hasPermission,
+  formatNomeTorcida,
   hrefModuloPortal,
   hrefOperacaoAdmin,
   isDepartamentoLegado,
@@ -27,6 +28,11 @@ import {
   DepartamentoFilaMembros,
   type PendenteLite,
 } from '../_components/departamento-fila-membros'
+import {
+  DepartamentoFilaArea,
+  type PedidoAreaLite,
+} from '../_components/departamento-fila-area'
+import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import {
   DepartamentoDiretoriaKpis,
   type DiretoriaKpis,
@@ -299,6 +305,76 @@ export default async function DepartamentoHomePage({
   let totalPendentes = 0
   let kpis: DiretoriaKpis | null = null
 
+  /**
+   * Pedidos para ESTA área: sócios já aprovados que a escolheram no onboarding
+   * e ainda não entraram. Fluxo separado do vínculo — o vínculo é first-wins na
+   * torcida, a área é decidida por cada nível no seu próprio portal.
+   */
+  let pedidosArea: PedidoAreaLite[] = []
+  if (isGestor && podeAprovar) {
+    type CandidatoRow = {
+      id: string
+      userId: string
+      nome: string
+      cidade: string | null
+      aprovadoNaUnidadeTenantId: string | null
+      user: { nome: string | null; email: string }
+    }
+    const candidatos: CandidatoRow[] = await db.saasMembro.findMany({
+      where: {
+        tenantId: tenant.id,
+        tipo: 'SOCIO',
+        status: 'APROVADO',
+        desligadoEm: null,
+        departamentoId: depto.id,
+      },
+      orderBy: { aprovadoEm: 'asc' },
+      take: 20,
+      select: {
+        id: true,
+        userId: true,
+        nome: true,
+        cidade: true,
+        aprovadoNaUnidadeTenantId: true,
+        user: { select: { nome: true, email: true } },
+      },
+    })
+
+    if (candidatos.length > 0) {
+      const efetivadas = await getAreasEfetivadasPorUser(
+        tenant.id,
+        candidatos.map((c) => c.userId),
+      )
+      const naoEfetivados = candidatos.filter(
+        (c) => !efetivadas.get(c.userId)?.has(depto.id),
+      )
+      const nomesUnidade = new Map<string, string>()
+      const unidadeIds = [
+        ...new Set(
+          naoEfetivados
+            .map((c) => c.aprovadoNaUnidadeTenantId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ]
+      if (unidadeIds.length > 0) {
+        const tenants: Array<{ id: string; nome: string }> = await db.tenant.findMany({
+          where: { id: { in: unidadeIds } },
+          select: { id: true, nome: true },
+        })
+        for (const t of tenants) nomesUnidade.set(t.id, formatNomeTorcida(t.nome))
+      }
+      pedidosArea = naoEfetivados.map((c) => ({
+        membroId: c.id,
+        nome: c.nome,
+        cidade: c.cidade,
+        viaUnidade: c.aprovadoNaUnidadeTenantId
+          ? (nomesUnidade.get(c.aprovadoNaUnidadeTenantId) ?? null)
+          : null,
+        user: c.user,
+      }))
+    }
+  }
+
   if (panel === 'diretoria' && isGestor) {
     const agora = new Date()
     const [porStatus, sociosAtivos, carteirinhasVencidas]: [
@@ -540,6 +616,13 @@ export default async function DepartamentoHomePage({
                 pendentes={pendentes}
                 totalPendentes={totalPendentes}
               />
+            </div>
+          )}
+          {/* Vale para qualquer área (não só Diretoria): a decisão de entrada
+              na área é do gestor dela, no portal do seu próprio nível. */}
+          {isGestor && podeAprovar && pedidosArea.length > 0 && (
+            <div id="pedidos-area" className="scroll-mt-20">
+              <DepartamentoFilaArea nomeArea={depto.nome} pedidos={pedidosArea} />
             </div>
           )}
           <div id="equipe" className="scroll-mt-20">

@@ -5,10 +5,17 @@ import { assertAnyPermission } from '@/lib/authz'
 import {
   listarMaisVendidosBar,
   resolveUnidadeBar,
+  resumirConsumoEmAbertoBar,
   resumirMargemBar,
+  resumirRecebidoBar,
   resumirVendasBarPorDia,
 } from '@/lib/bar'
-import type { BarMaisVendido, BarMargemResumo } from '@/lib/bar'
+import type {
+  BarConsumoEmAbertoResumo,
+  BarMaisVendido,
+  BarMargemResumo,
+  BarVendasResumo,
+} from '@/lib/bar'
 import {
   diasDoPeriodo,
   PERIODO_LABEL,
@@ -41,9 +48,14 @@ function InsightsSkeleton() {
 }
 
 async function BarInsights({ tenantId, sedeId }: { tenantId: string; sedeId: string }) {
-  const [serie, maisVendidos]: [SerieTemporal, BarMaisVendido[]] = await Promise.all([
+  const [serie, maisVendidos, consumoAberto]: [
+    SerieTemporal,
+    BarMaisVendido[],
+    BarConsumoEmAbertoResumo,
+  ] = await Promise.all([
     resumirVendasBarPorDia(tenantId, diasDoPeriodo(PERIODO_PADRAO), sedeId),
     listarMaisVendidosBar(tenantId, PERIODO_PADRAO, sedeId),
+    resumirConsumoEmAbertoBar(tenantId, sedeId),
   ])
 
   const totalPeriodo = serie.reduce((acc, ponto) => acc + ponto.valor, 0)
@@ -52,21 +64,39 @@ async function BarInsights({ tenantId, sedeId }: { tenantId: string; sedeId: str
   return (
     <InsightSection
       title={periodoLabel}
-      description="Vendas pagas da unidade e produtos que mais saíram."
+      description="Recebido da unidade (venda rápida + pagamentos de comanda) e produtos mais consumidos."
     >
-      {totalPeriodo === 0 && maisVendidos.length === 0 ? (
+      {totalPeriodo === 0 && maisVendidos.length === 0 && consumoAberto.total === 0 ? (
         <div className="sm:col-span-2 lg:col-span-3">
           <MotionEmptyState
-            title={`Sem vendas nos últimos ${PERIODO_LABEL_CURTO[PERIODO_PADRAO]}`}
-            description="Registre vendas no PDV para acompanhar a evolução da unidade aqui."
+            title={`Sem movimento nos últimos ${PERIODO_LABEL_CURTO[PERIODO_PADRAO]}`}
+            description="Registre vendas no PDV e feche comandas para acompanhar a evolução aqui."
           />
         </div>
       ) : (
         <>
+          <StatCard
+            label="Recebido no período"
+            value={formatarPreco(totalPeriodo)}
+            tone="success"
+          />
+          <StatCard
+            label="Consumo em aberto"
+            value={formatarPreco(consumoAberto.total)}
+            tone={consumoAberto.total > 0 ? 'warning' : 'default'}
+            badge={
+              consumoAberto.quantidade > 0
+                ? `${consumoAberto.quantidade} comanda${consumoAberto.quantidade === 1 ? '' : 's'}`
+                : undefined
+            }
+            badgeTone="default"
+            href="/admin/bar/comandas"
+          />
+
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Vendas por dia
+                Recebido por dia
               </h3>
               <p className="text-sm font-bold tabular-nums text-[rgb(var(--foreground))]">
                 {formatarPreco(totalPeriodo)}
@@ -77,7 +107,7 @@ async function BarInsights({ tenantId, sedeId }: { tenantId: string; sedeId: str
 
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Mais vendidos
+              Mais consumidos
             </h3>
             {maisVendidos.length === 0 ? (
               <p className="text-sm text-[rgb(var(--foreground-muted))]">Sem itens no período.</p>
@@ -112,9 +142,15 @@ export default async function AdminBarDesempenhoPage() {
   const inicioDoDia = new Date()
   inicioDoDia.setHours(0, 0, 0, 0)
 
-  const margemHoje: BarMargemResumo = await resumirMargemBar(tenant.id, unidade.id, {
-    desde: inicioDoDia,
-  })
+  const [margemHoje, recebidoHoje, consumoAberto]: [
+    BarMargemResumo,
+    BarVendasResumo,
+    BarConsumoEmAbertoResumo,
+  ] = await Promise.all([
+    resumirMargemBar(tenant.id, unidade.id, { desde: inicioDoDia }),
+    resumirRecebidoBar(tenant.id, unidade.id, { desde: inicioDoDia }),
+    resumirConsumoEmAbertoBar(tenant.id, unidade.id),
+  ])
 
   return (
     <>
@@ -123,16 +159,26 @@ export default async function AdminBarDesempenhoPage() {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Hoje
           </h2>
-          <KpiGrid cols={3}>
-            <StatCard label="Receita" value={formatarPreco(margemHoje.receita)} />
-            <StatCard label="CMV estimado" value={formatarPreco(margemHoje.custo)} />
+          <KpiGrid cols={4}>
+            <StatCard label="Recebido" value={formatarPreco(recebidoHoje.totalPago)} tone="success" />
+            <StatCard
+              label="Consumo em aberto"
+              value={formatarPreco(consumoAberto.total)}
+              tone={consumoAberto.total > 0 ? 'warning' : 'default'}
+            />
+            <StatCard
+              label="Consumo (margem)"
+              value={formatarPreco(margemHoje.receita)}
+              badge="PAGA + EM_COMANDA"
+              badgeTone="default"
+            />
             <StatCard
               label="Margem estimada"
               value={formatarPreco(margemHoje.margem)}
               tone={margemHoje.margem >= 0 ? 'success' : 'danger'}
-              badge={`${margemHoje.quantidadeVendas} venda${
+              badge={`${margemHoje.quantidadeVendas} lançamento${
                 margemHoje.quantidadeVendas === 1 ? '' : 's'
-              } · custo médio dos itens`}
+              }`}
               badgeTone="default"
             />
           </KpiGrid>

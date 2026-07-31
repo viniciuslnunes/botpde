@@ -121,11 +121,9 @@ describe('permissões efetivas (getUserPermissionsInTenant, código real)', () =
   })
 
   it('Role rows de cargo de sistema estão em dia com SYSTEM_ROLE_PERMISSIONS', async () => {
-    // Cargo de sistema resolve permissão pelo ARRAY GRAVADO no `Role`, não
-    // pela constante do código (`permissionsOfRole` lê `role.permissions` /
-    // `permissionsExtras`). Toda permissão nova precisa de
-    // `db:repair-system-roles` para chegar às torcidas existentes — sem isso o
-    // Presidente fica sem a capacidade nova, em silêncio.
+    // Higiene: o runtime já resolve pela constante (`permissionsOfRole` /
+    // Achado 1). Manter o array gravado alinhado evita surpresa em scripts
+    // de bootstrap/repair e em UIs que ainda leem o Role cru.
     const { SYSTEM_ROLE_PERMISSIONS } = await import('@torcida/types')
     const roles = await ctx.db.role.findMany({
       where: { isSystem: true },
@@ -154,7 +152,7 @@ describe('permissões efetivas (getUserPermissionsInTenant, código real)', () =
       houve = true
       erro(
         'permissões',
-        `Cargo '${nome}': ${agg.stale}/${agg.total} torcidas com Role DESATUALIZADO — falta ${[...agg.faltantes].join(', ')} (rodar db:repair-system-roles)`,
+        `Cargo '${nome}': ${agg.stale}/${agg.total} torcidas com Role DESATUALIZADO — falta ${[...agg.faltantes].join(', ')} (rodar db:repair-system-roles; runtime já usa a constante)`,
       )
     }
     expect(houve || porNome.size > 0).toBe(true)

@@ -68,24 +68,30 @@ Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` 
 
 | Departamento | Colaborador (portal) | Gestor+ (portal + operação admin) |
 |---|---|---|
-| **Diretoria** | Relatórios; ver financeiro/patrimônio; salas; DMs/grupos; postar | Ver/aprovar/reprovar/advertir/bloquear membros; auditoria; comunicados; eventos; mural/moderação/notícias; sedes; pedidos; gerir financeiro |
-| **Financeiro** | Ver financeiro e relatórios; DMs | Gerir financeiro; comunicados; salas/grupos |
-| **Social e eventos** | Postar; DMs/grupos/salas | Criar/gerir eventos; comunicados; mural/moderação/notícias; sedes; ver financeiro/relatórios/pedidos |
+| **Diretoria** | Relatórios; ver financeiro/patrimônio; salas; DMs/grupos; postar | Ver/aprovar/reprovar/advertir/bloquear/importar membros; LGE; auditoria; comunicados; eventos; mural/moderação/notícias; sedes; pedidos; gerir financeiro |
+| **Financeiro** | Ver financeiro e relatórios; operar PDV do bar; DMs | Gerir financeiro e catálogo/estoque do bar; comunicados; salas/grupos |
+| **Social e eventos** | Postar; DMs/grupos/salas | Criar/gerir eventos; comunicados; mural/moderação/notícias; ver financeiro/relatórios/pedidos |
 | **Materiais / Loja** | DMs/grupos; postar; relatórios | Ver/gerir pedidos e catálogo; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
-| **Comunicação** | Postar; salas/grupos; DMs | Curar notícias; comunicados; mural/moderação/canais; moderar msgs; eventos; relatórios; ver pedidos |
-| **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos | Gerir patrimônio e sedes; eventos; loja; ver financeiro; comunicados; salas/canais |
-| **Bateria** | Postar; grupos/salas; ver patrimônio | Criar/gerir eventos; canais/mural/notícias; comunicados; gerir patrimônio e sedes; ver pedidos |
-| **Caravanas** | DMs/grupos/salas; postar; ver financeiro/relatórios | Criar/gerir eventos; canais/mural; comunicados; gerir loja e financeiro; sedes; advertir |
-| **Feminino** | Postar; DMs/grupos/salas | Eventos; notícias; mural/moderação/canais; comunicados; sedes; relatórios; advertir; ver pedidos |
-| **Carnaval** | Postar; salas/grupos; ver financeiro/patrimônio/relatórios | Eventos; mural/loja/financeiro/patrimônio/sedes; canais; moderação; notícias; comunicados; advertir |
+| **Comunicação** | Postar; salas/grupos; DMs | Curar notícias; comunicados; mural/moderação/canais; post nacional; moderar msgs; eventos; relatórios; ver pedidos |
+| **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos | Gerir patrimônio; eventos; ver financeiro; comunicados; salas/canais |
+| **Bateria** | Postar; grupos/salas; ver patrimônio | Criar/gerir eventos; canais/mural/notícias; comunicados; gerir patrimônio (instrumentos) |
+| **Caravanas** | DMs/grupos/salas; postar; ver financeiro/relatórios | Criar/gerir eventos; canais/mural; comunicados; advertir |
+| **Feminino** | Postar; DMs/grupos/salas | Eventos; notícias; mural/moderação/canais; comunicados; relatórios; advertir |
+| **Carnaval** | Postar; salas/grupos; ver financeiro/patrimônio/relatórios | Eventos; mural/moderação/notícias; comunicados; canais; advertir |
 
 **Princípio Fase 2:** colaborador **não** recebe permissões que abrem o menu `/admin`
-(`members:view`, `events:manage`, `store:*`, `news:curate`, `finance:manage`, etc.).
+(`members:view`, `events:manage`, `store:*`, `news:curate`, `finance:manage`, etc.),
+exceto o PDV do Bar (`bar:operate` no colaborador Financeiro — a tela vive em
+`/admin/bar`).
 `finance:view` / `patrimony:view` / `events:create` ficam no portal ou no pacote gestor;
-itens admin de Financeiro/Patrimônio/Eventos exigem `*:manage`.
+itens admin de Financeiro/Patrimônio/Eventos/Bar-catálogo exigem `*:manage`.
 
-**Presidência** (`settings:manage`, `roles:manage`, `torcida:global_view`, `alliances:manage`)
-entra via extras de `owner` / `vice` (Diretoria + GESTOR), não no pacote base da área.
+**Presidência** (`settings:manage`, `roles:manage`, `torcida:global_view`,
+`alliances:manage`, e `community:post_nacional` via cargo de sistema) entra via
+`owner` / `vice` (Diretoria + GESTOR). `post_nacional` também no gestor de
+Comunicação. Bar (`bar:*`) fica sob Financeiro — sem departamento canônico próprio.
+Gestores de área operacional **não** levam `finance:manage` / `store:manage` /
+`sedes:manage` fora da missão da área.
 
 Após deploy em tenants existentes:
 
@@ -119,7 +125,88 @@ o status for `PENDENTE` ou `REPROVADO`.
 | `aprovarMembro(id, { incluirDepartamento: false })` | Aprova vínculo **sem** entrar na equipe — botão **Sem área** no admin |
 | `reprovarMembro` / `reverterMembro` | `limparMembershipDepartamentos` (roles de área + UD + gestores) |
 
+### Área na sede × área na unidade (2026-07-30)
+
+`Departamento` é **por tenant**. Quem entra por uma Subsede/PDE promovida a
+tenant próprio (Caso B) ganha **duas** linhas de `SaasMembro` — a origem na
+unidade e o espelho na Sede — e pode atuar em áreas (e papéis) diferentes em
+cada nível: membro da bateria na sede, gestor da bateria na unidade.
+
+| Campo | Onde vive | Significa |
+|---|---|---|
+| `SaasMembro.departamentoId` | Toda linha | Área pretendida **neste tenant**: na origem, a área na unidade; no espelho, a área na Sede |
+| `SaasMembro.departamentoSedeId` | Só na origem em tenant-filho | Área pretendida **na Sede**, declarada no onboarding. Carrega a preferência até o espelho existir |
+
+- O wizard só mostra os dois selects quando `exigeDepartamentoDaSede(sede.tenantId,
+  torcida.id)` (`lib/onboarding-unidade.ts`) — unidade do mesmo tenant, ou a
+  própria Sede, compartilha um único conjunto de áreas e mantém um select só.
+- `solicitarVinculo` valida `departamentoId` contra `tenantDestino` e
+  `departamentoSedeId` contra a **raiz** (`resolverTenantRaizId`); recusa
+  `departamentoSedeId` quando o vínculo já nasce na raiz.
+- `criarOuAtualizarPendenciaEspelhoNaSede` e `sincronizarSocioNaSedeRaiz` semeiam
+  o `departamentoId` do espelho a partir de `departamentoSedeId`
+  (`departamentoSedeParaEspelho`), **só quando o espelho ainda não tem área** —
+  re-sincronização nunca reverte decisão já tomada pela Sede. O departamento da
+  origem nunca é copiado: é id de outro tenant.
+- Continua valendo preferência ≠ membership: nenhum `UserDepartamento` sai daqui.
+
+### Quem aprova a área é o próprio nível (2026-07-30)
+
+> Regra: **a Sede aprova sua hierarquia nos departamentos da Sede; a Subsede/PDE
+> aprova a dela nos departamentos da unidade.** Ninguém monta a equipe do outro.
+
+O **vínculo de sócio** segue first-wins na torcida — a solicitação feita numa
+unidade cai nas duas filas e quem decidir primeiro encerra a análise nos dois
+lados. A **área não acompanha**: o departamento pedido para a Sede só entra em
+vigor quando a Sede decide, e o da unidade só quando a unidade decide.
+
+| Quem aprova | Vínculo | Área que entra em vigor |
+|---|---|---|
+| Unidade (linha de origem) | APROVADO nos dois níveis | Só a da **unidade** (`departamentoId` da origem) |
+| Sede (espelho, exceção R1) | APROVADO nos dois níveis | Só a da **Sede** (`departamentoId` do espelho, semeado de `departamentoSedeId`) |
+
+O nível que **não** decidiu fica com a área pretendida pendente e a coloca em
+vigor depois com **`efetivarAreaPretendida(membroId)`**
+(`app/admin/membros/actions.ts`): `assertPermission(MEMBERS_APPROVE)` resolve no
+tenant ativo e a query filtra por ele, então o isolamento é estrutural — não há
+como efetivar área fora do próprio nível. É idempotente e grava `AuditLog`
+(`MEMBRO_AREA_EFETIVADA`).
+
+Na UI, `getAreasEfetivadasPorUser` (`lib/area-efetivada.ts`) distingue
+**pretendida** de **em vigor** — lê `UserDepartamento` **e** os `Role` de área,
+porque `aplicarDepartamentoPreferido` prefere o Role e só cai em
+`UserDepartamento` quando a torcida não tem esse Role; checar um só daria falso
+"pendente". Dois pontos de entrada:
+
+| Onde | O quê |
+|---|---|
+| `/portal/departamentos/[slug]` → **Pedidos para esta área** (`DepartamentoFilaArea`) | Fila própria do fluxo: sócios já aprovados que pediram **esta** área e não entraram. Para gestor da área com `MEMBERS_APPROVE`, em qualquer painel — a decisão é do gestor da área, no portal do seu nível |
+| `MemberActions` → **Incluir em {área}** | Fila de Membros e detalhe de Membros/Sócios; aparece inclusive sobre o espelho já aprovado — efetivar a área local não é mutação do espelho |
+
+A fila de admissão (`DepartamentoFilaMembros`, sócios `PENDENTE`) é **outro**
+fluxo e fica vazia depois do first-wins; sem a fila de área, o pedido do outro
+nível ficaria invisível.
+
+**Anti-padrão crítico (era um bug, corrigido em 2026-07-30):** `aprovarMembro`
+chamado pela Sede aplicava `aplicarDepartamentoPreferido(origem.tenantId, …)` —
+a Sede efetivava a área **dentro da unidade**, montando a equipe da Subsede/PDE
+sem a diretoria dela decidir.
+
+**Exibição já resolve sozinha.** `getBadgesPorAutorTenant`
+(`lib/autor-badges.ts`) chaveia por `(autorId, tenantId-do-post)`, então o badge
+de cargo/área de um post reflete o tenant onde ele nasceu — post no canal da
+unidade mostra a hierarquia da unidade; na sede, a da sede. A cascata
+`resolverDepartamentoBadge` (membership real → área do cargo → preferência) faz
+o resto: enquanto a Sede não efetivar, aparece a preferência semeada no espelho;
+depois de efetivar, o cargo real. Não existe (nem deve existir) regra de canal
+separada para isso — publicar é sempre no tenant ativo
+(`podePublicarNoCanal` corta `canal.tenantId !== viewerTenantId`), e trocar de
+nível é o `TorcidaContextSwitcher`.
+
 **Anti-padrões (não reintroduzir):**
+- Efetivar área de um tenant a partir da decisão de outro (ver acima).
+- Copiar `departamentoId` da origem para o espelho (id de outro tenant).
+- Resolver badge de cargo/área pelo usuário em vez de por `(autor, tenant do post)`.
 - Upsert de `UserDepartamento` / `UserRole` de área em `solicitarVinculo`.
 - `deleteMany` de órfãos no GET da página de equipe (cura só via script ou nas actions).
 - Aprovar na fila sem mostrar o departamento pretendido.

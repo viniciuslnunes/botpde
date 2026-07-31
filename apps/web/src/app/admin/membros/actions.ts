@@ -18,7 +18,11 @@ import {
   validarNumeroAssociadoUnicoNaTorcida,
   type DadosReprovacaoEspelho,
 } from '@/lib/membros-sede'
-import { notificarSafe, emitNotificacaoPingCnDoSolicitante } from '@/lib/notificacoes'
+import {
+  notificarSafe,
+  emitNotificacaoPingCnDoSolicitante,
+  reconciliarNotificacoesDoEvento,
+} from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
@@ -165,25 +169,22 @@ const membroDecisaoSelect = {
   responsavelDocumento: true,
   autorizacaoMenorAceitaEm: true,
   termoResponsabilidadeAceitoEm: true,
+  departamentoSedeId: true,
 } as const
 
+/**
+ * A solicitação foi decidida — o badge cai para TODA a equipe que a recebeu,
+ * não só para quem decidiu (Achado 10).
+ */
 async function marcarSolicitacoesLidas(
-  atorUserId: string,
   solicitanteUserId: string,
   tenantIds: string[],
 ): Promise<void> {
   for (const tenantId of tenantIds) {
-    const { count } = await db.notificacao.updateMany({
-      where: {
-        userId: atorUserId,
-        tenantId,
-        atorId: solicitanteUserId,
-        tipo: 'MEMBRO_SOLICITADO',
-        lida: false,
-      },
-      data: { lida: true },
+    await reconciliarNotificacoesDoEvento(tenantId, {
+      tipo: 'MEMBRO_SOLICITADO',
+      atorId: solicitanteUserId,
     })
-    if (count > 0) emitNotificacaoPing(tenantId, atorUserId)
   }
 }
 /**
@@ -300,6 +301,74 @@ async function limparMembershipDepartamentos(
   }
 }
 
+/**
+ * Coloca em vigor a área pretendida **deste tenant** para um sócio já APROVADO.
+ *
+ * Existe porque o vínculo de sócio é first-wins na torcida (quem decidir
+ * primeiro aprova nos dois níveis), mas a área não: o departamento pedido para
+ * a Sede só vale quando a Sede decide, e o da unidade só quando a unidade
+ * decide. Quem aprovou primeiro já efetivou a sua na hora — o outro nível usa
+ * esta ação. O gate é estrutural: `assertPermission` resolve no tenant ativo e
+ * a query filtra por ele, então ninguém efetiva área fora do próprio nível.
+ *
+ * Idempotente: `aplicarDepartamentoPreferido` faz upsert.
+ */
+export async function efetivarAreaPretendida(
+  membroId: string,
+): Promise<{ error: string } | void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
+
+  try {
+    const resultado = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const membro: {
+        id: string
+        userId: string
+        tipo: string
+        status: string
+        departamentoId: string | null
+      } | null = await tx.saasMembro.findFirst({
+        where: { id: membroId, tenantId: tenant.id },
+        select: { id: true, userId: true, tipo: true, status: true, departamentoId: true },
+      })
+      if (!membro) throw new ExpectedError('Membro não encontrado.')
+      if (membro.tipo !== 'SOCIO') {
+        throw new ExpectedError('Só sócio entra em departamento.')
+      }
+      if (membro.status !== 'APROVADO') {
+        throw new ExpectedError('Aprove o vínculo antes de incluir na área.')
+      }
+      if (!membro.departamentoId) {
+        throw new ExpectedError('Este cadastro não pediu área neste nível.')
+      }
+
+      await aplicarDepartamentoPreferido(tenant.id, membro.userId, membro.departamentoId, tx)
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: tenant.id,
+          atorId: session.user.id,
+          acao: 'MEMBRO_AREA_EFETIVADA',
+          entidade: 'SaasMembro',
+          entidadeId: membro.id,
+          detalhes: { departamentoId: membro.departamentoId },
+        },
+      })
+
+      return { userId: membro.userId }
+    })
+
+    invalidatePermissionsCache(resultado.userId, tenant.id)
+  } catch (error) {
+    if (isExpectedError(error)) return { error: error.message }
+    console.error('[efetivarAreaPretendida]', error)
+    return { error: 'Não foi possível incluir na área. Tente novamente.' }
+  }
+
+  revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
+  revalidatePath('/portal/departamentos')
+}
+
 export type AprovarMembroOpts = {
   /** Default true: aplica SaasMembro.departamentoId como membership. */
   incluirDepartamento?: boolean
@@ -400,20 +469,35 @@ export async function aprovarMembro(
             origemFresh.tenantId,
             tx,
           )
-          if (incluirDepartamento && origemAtualizada.departamentoId) {
-            await aplicarDepartamentoPreferido(
-              origemFresh.tenantId,
-              origemAtualizada.userId,
-              origemAtualizada.departamentoId,
-              tx,
-            )
-          }
+          // O vínculo de sócio é first-wins e propaga para os dois níveis, mas
+          // a ÁREA não: cada nível efetiva a sua. Aqui quem decide é a Sede, e
+          // `origemFresh.tenantId` é a unidade — aplicar o departamento dela
+          // daria à Sede o poder de montar a equipe da Subsede/PDE. A unidade
+          // efetiva a sua depois, por `efetivarAreaPretendida`.
           await sincronizarSocioNaSedeRaiz(tx, {
             tenantOrigemId: origemFresh.tenantId,
             membro: origemAtualizada,
             aprovadoPorUserId: aprovadoPorId,
             aprovadoPorNome,
           })
+          // Área NA SEDE: é esta decisão que a coloca em vigor. Lê do espelho
+          // (já sincronizado acima), cujo `departamentoId` veio de
+          // `departamentoSedeId` declarado no onboarding.
+          if (incluirDepartamento) {
+            const espelhoSede: { departamentoId: string | null } | null =
+              await tx.saasMembro.findFirst({
+                where: { id: existente.id, tenantId: tenant.id },
+                select: { departamentoId: true },
+              })
+            if (espelhoSede?.departamentoId) {
+              await aplicarDepartamentoPreferido(
+                tenant.id,
+                origemAtualizada.userId,
+                espelhoSede.departamentoId,
+                tx,
+              )
+            }
+          }
         }
 
         const unidadeTenant: { nome: string } | null = await tx.tenant.findFirst({
@@ -521,7 +605,7 @@ export async function aprovarMembro(
       tenantIdsNotif.push(espelhoTenant.tenantId)
     }
   }
-  await marcarSolicitacoesLidas(aprovadoPorId, origem.userId, tenantIdsNotif)
+  await marcarSolicitacoesLidas(origem.userId, tenantIdsNotif)
 
   await vincularMembroCanaisAposAprovacao({
     tenantId: origem.tenantId,
@@ -791,7 +875,7 @@ export async function reprovarMembro(
       tenantIdsNotif.push(espelhoTenant.tenantId)
     }
   }
-  await marcarSolicitacoesLidas(aprovadoPorId, origem.userId, tenantIdsNotif)
+  await marcarSolicitacoesLidas(origem.userId, tenantIdsNotif)
 
   const detalhesAudit = {
     categoria,

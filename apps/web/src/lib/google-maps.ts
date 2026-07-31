@@ -610,15 +610,21 @@ export async function reverseGeocodeRegion(
 }
 
 export type GoogleMapsEnderecoReverso = {
+  /** "Rua X, 120" — formato de campo único (sedes/eventos). */
   endereco: string
+  /** Só o logradouro, sem número — formulários com campo Número separado. */
+  logradouro: string
+  numero: string
+  bairro: string
   cidade: string
   estado: string
   cep: string
 }
 
 /**
- * Resolve endereço completo (rua+número, cidade, UF, CEP) a partir de lat/lng.
- * Usado para preencher os campos de endereço ao colar um link do Maps/arrastar o pin.
+ * Resolve endereço completo (rua+número, bairro, cidade, UF, CEP) a partir de
+ * lat/lng. Usado para preencher os campos de endereço ao colar um link do
+ * Maps/arrastar o pin, e no onboarding a partir da localização do dispositivo.
  */
 export async function reverseGeocodeEndereco(
   coords: { lat: number; lng: number },
@@ -641,6 +647,13 @@ export async function reverseGeocodeEndereco(
 
   const rua = componente(componentes, 'route') ?? ''
   const numero = componente(componentes, 'street_number') ?? ''
+  // No Brasil o Google devolve o bairro ora como `sublocality_level_1`, ora
+  // como `neighborhood` — e `sublocality` genérico em algumas capitais.
+  const bairro =
+    componente(componentes, 'sublocality_level_1') ??
+    componente(componentes, 'neighborhood') ??
+    componente(componentes, 'sublocality') ??
+    ''
   const cidade =
     componente(componentes, 'administrative_area_level_2') ??
     componente(componentes, 'locality') ??
@@ -652,6 +665,9 @@ export async function reverseGeocodeEndereco(
   if (!rua && !cidade) return null
   return {
     endereco: [rua, numero].filter(Boolean).join(', '),
+    logradouro: rua,
+    numero,
+    bairro,
     cidade,
     estado,
     cep,

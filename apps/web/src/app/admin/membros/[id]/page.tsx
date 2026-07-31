@@ -59,6 +59,7 @@ export default async function MembroDetalhePage({ params }: Props) {
     aprovadoEm: Date | null
     planoAssociacao: { nome: string } | null
     departamento: { id: string; nome: string } | null
+    departamentoSede: { nome: string } | null
     user: { email: string | null }
   }
 
@@ -95,6 +96,7 @@ export default async function MembroDetalhePage({ params }: Props) {
         aprovadoEm: true,
         planoAssociacao: { select: { nome: true } },
         departamento: { select: { id: true, nome: true } },
+        departamentoSede: { select: { nome: true } },
         user: { select: { email: true } },
       },
     }),
@@ -141,6 +143,11 @@ export default async function MembroDetalhePage({ params }: Props) {
         description={[
           membro.tipo,
           membro.departamento?.nome,
+          // Área na Sede de quem entrou por uma unidade com portal próprio —
+          // rotulada para não se confundir com a área local.
+          membro.departamentoSede?.nome
+            ? `${membro.departamentoSede.nome} (sede)`
+            : null,
           membro.planoAssociacao?.nome,
           membro.user.email,
         ]

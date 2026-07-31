@@ -119,6 +119,38 @@ describe('permissionsOfRole (perfil ↔ departamento)', () => {
     expect(perms).toContain(PERMISSIONS.COMMUNITY_POST)
     expect(perms).toContain(PERMISSIONS.MESSAGES_SEND)
   })
+
+  it('cargo de sistema ignora array gravado defasado (Achado 1)', () => {
+    const perms = permissionsOfRole(
+      {
+        nome: SYSTEM_ROLES.OWNER,
+        permissions: [],
+        permissionsExtras: [PERMISSIONS.COMMUNITY_POST],
+        departamentoId: 'd1',
+        papelNoDepartamento: 'GESTOR',
+      },
+      {
+        permissions: [PERMISSIONS.FINANCE_VIEW],
+        permissionsGestor: [PERMISSIONS.FINANCE_MANAGE],
+      },
+    )
+    expect(perms).toEqual(expect.arrayContaining(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER]))
+    expect(perms).toContain(PERMISSIONS.BAR_MANAGE)
+    expect(perms).toContain(PERMISSIONS.SETTINGS_MANAGE)
+  })
+
+  it('member de sistema usa a constante mesmo com permissions vazias no Role', () => {
+    const perms = permissionsOfRole(
+      {
+        nome: SYSTEM_ROLES.MEMBER,
+        permissions: [],
+        permissionsExtras: [],
+        departamentoId: null,
+      },
+      null,
+    )
+    expect(perms).toEqual(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER])
+  })
 })
 
 describe('permissões de departamento (base = perfis ∪ departamentos)', () => {
@@ -308,15 +340,11 @@ describe('filterMenuByPermissions com OR', () => {
     expect(soMsgMod.map((i) => i.id)).toContain('comunidade')
   })
 
-  it('ADMIN_MENU: pacote Financeiro (membro) não abre operação — só Dashboard + Relatórios (leitura)', () => {
-    const financePerms = [
-      PERMISSIONS.FINANCE_VIEW,
-      PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.MESSAGES_SEND,
-    ]
-    const ids = filterMenuByPermissions(ADMIN_MENU, financePerms).map((i) => i.id)
-    // reports:view abre /admin/relatorios (leitura de indicadores) — nunca operação.
-    expect(ids).toEqual(['dashboard', 'relatorios'])
+  it('ADMIN_MENU: pacote Financeiro (membro) abre Bar/PDV e Relatórios — não o livro-caixa', () => {
+    const financeiro = DEPARTAMENTOS_CANONICOS.find((a) => a.nome === 'Financeiro')
+    expect(financeiro).toBeTruthy()
+    const ids = filterMenuByPermissions(ADMIN_MENU, financeiro!.permissions).map((i) => i.id)
+    expect(ids).toEqual(expect.arrayContaining(['dashboard', 'relatorios', 'bar', 'bar-pdv']))
     expect(ids).not.toContain('financeiro')
     expect(ids).not.toContain('membros')
   })
@@ -352,14 +380,19 @@ describe('filterMenuByPermissions com OR', () => {
     expect(groups.find((g) => g.id === 'financas')?.label).toBe('Finanças')
   })
 
-  it('Fase 2: pacote colaborador de área canônica não abre operação admin (no máx. Relatórios)', () => {
+  it('Fase 2: pacote colaborador de área canônica não abre operação admin (exceto Bar/PDV e Relatórios)', () => {
     for (const area of DEPARTAMENTOS_CANONICOS) {
       const ids = filterMenuByPermissions(ADMIN_MENU, area.permissions).map((i) => i.id)
-      // reports:view (pacote colaborador de várias áreas) abre só a leitura de
-      // /admin/relatorios — nenhum item de operação (membros, financeiro, loja...).
-      const temRelatorios = area.permissions.includes(PERMISSIONS.REPORTS_VIEW)
-      expect(ids, area.nome).toEqual(temRelatorios ? ['dashboard', 'relatorios'] : ['dashboard'])
-      expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(temRelatorios)
+      // reports:view → leitura de indicadores; bar:operate → PDV (caixa do Financeiro).
+      // Nenhum item de operação transversal (membros, financeiro manage, loja...).
+      const esperado = new Set(['dashboard'])
+      if (area.permissions.includes(PERMISSIONS.REPORTS_VIEW)) esperado.add('relatorios')
+      if (area.permissions.includes(PERMISSIONS.BAR_OPERATE)) {
+        esperado.add('bar')
+        esperado.add('bar-pdv')
+      }
+      expect(new Set(ids), area.nome).toEqual(esperado)
+      expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(esperado.size > 1)
     }
   })
 
@@ -369,6 +402,26 @@ describe('filterMenuByPermissions com OR', () => {
       expect(hasAdminAreaAccess(efetivas), area.nome).toBe(true)
       const ids = filterMenuByPermissions(ADMIN_MENU, efetivas).map((i) => i.id)
       expect(ids.length, area.nome).toBeGreaterThan(1)
+    }
+  })
+
+  it('matriz: Bar no Financeiro; import na Diretoria; post_nacional na Comunicação', () => {
+    const porNome = Object.fromEntries(DEPARTAMENTOS_CANONICOS.map((a) => [a.nome, a]))
+    expect(porNome.Financeiro.permissions).toContain(PERMISSIONS.BAR_OPERATE)
+    expect(porNome.Financeiro.permissionsGestor).toContain(PERMISSIONS.BAR_MANAGE)
+    expect(porNome.Diretoria.permissionsGestor).toContain(PERMISSIONS.MEMBERS_IMPORT)
+    expect(porNome.Comunicação.permissionsGestor).toContain(PERMISSIONS.COMMUNITY_POST_NACIONAL)
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER]).toContain(
+      PERMISSIONS.COMMUNITY_POST_NACIONAL,
+    )
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE]).toContain(
+      PERMISSIONS.COMMUNITY_POST_NACIONAL,
+    )
+    // Gestores operacionais não são mini-admin transversais
+    for (const nome of ['Caravanas', 'Carnaval', 'Patrimônio', 'Bateria', 'Feminino']) {
+      expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.SEDES_MANAGE)
+      expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.STORE_MANAGE)
+      expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.FINANCE_MANAGE)
     }
   })
 })

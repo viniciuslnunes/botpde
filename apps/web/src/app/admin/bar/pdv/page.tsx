@@ -4,14 +4,15 @@ import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import {
   getTurnoAbertoBar,
   listarCategoriasBar,
-  listarMembrosParaFiado,
+  listarMembrosParaComanda,
   listarProdutosBar,
   listarVendasBar,
   resolveUnidadeBar,
   resumirTurnoBar,
 } from '@/lib/bar'
 import type { BarCategoriaLite, BarMembroParaFiadoLite, BarProdutoLite, BarVendaLite } from '@/lib/bar'
-import { serializeProdutoBar, serializeVendaBar } from '@/lib/bar-serialize'
+import { listarComandasAbertasBar, type BarComandaAbertaLite } from '@/lib/bar-comanda'
+import { serializeComandaBar, serializeProdutoBar, serializeVendaBar } from '@/lib/bar-serialize'
 import { BarPdv } from '@/components/admin/bar/bar-pdv'
 import { BarTurnoPainel } from '@/components/admin/bar/bar-turno-painel'
 import type { Metadata } from 'next'
@@ -32,24 +33,26 @@ export default async function AdminBarPdvPage() {
     await assertPermission(PERMISSIONS.BAR_MANAGE)
     podeGerir = true
   } catch {
-    // Operador do PDV sem gestão — não cancela/estorna/fecha turno.
+    // Operador do PDV sem gestão — não cancela/estorna/fecha turno/libera limite.
   }
 
   const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
   const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
 
-  const [produtos, categorias, pendentesLista, resumoTurno, membrosFiado]: [
+  const [produtos, categorias, pendentesLista, resumoTurno, membrosComanda, comandasAbertas]: [
     BarProdutoLite[],
     BarCategoriaLite[],
     Awaited<ReturnType<typeof listarVendasBar>>,
     Awaited<ReturnType<typeof resumirTurnoBar>> | null,
     BarMembroParaFiadoLite[],
+    BarComandaAbertaLite[],
   ] = await Promise.all([
     listarProdutosBar(tenant.id, unidade.id, { apenasAtivos: true }),
     listarCategoriasBar(tenant.id, unidade.id),
     listarVendasBar(tenant.id, unidade.id, { status: 'PENDENTE', pageSize: 8 }),
     turno ? resumirTurnoBar(tenant.id, turno.id) : Promise.resolve(null),
-    podeGerir ? listarMembrosParaFiado(tenant.id, unidade.id) : Promise.resolve([]),
+    listarMembrosParaComanda(tenant.id, unidade.id),
+    listarComandasAbertasBar(tenant.id, unidade.id),
   ])
 
   const categoriasAtivas = categorias
@@ -69,7 +72,8 @@ export default async function AdminBarPdvPage() {
       unidadeNome={unidade.nome}
       podeCancelar={podeGerir}
       podeGerir={podeGerir}
-      membrosFiado={membrosFiado.map((m) => ({ id: m.membroId, nome: m.nome }))}
+      membrosComanda={membrosComanda.map((m) => ({ id: m.membroId, nome: m.nome }))}
+      comandasAbertas={comandasAbertas.map(serializeComandaBar)}
       turnoAberto={Boolean(turno)}
       turnoResumo={resumoTurno}
       turnoPainel={
@@ -86,6 +90,11 @@ export default async function AdminBarPdvPage() {
           }
           resumo={resumoTurno}
           podeGerir={podeGerir}
+          comandasAbertas={comandasAbertas.map((c) => ({
+            id: c.id,
+            codigo: c.codigo,
+            total: Number(c.total),
+          }))}
         />
       }
     />

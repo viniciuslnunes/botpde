@@ -1754,6 +1754,7 @@ export function EditarSedeForm({
 /**
  * Menu de ações destrutivas/status na lista de Estrutura.
  * Desativar: confirmável e reversível. Excluir: modal definitivo + remanejamento.
+ * Portal próprio com liderança vinculada: só desativar (excluir bloqueado).
  */
 export function SedeAcoesMenu({
   sedeId,
@@ -1761,12 +1762,17 @@ export function SedeAcoesMenu({
   ativa,
   destinos,
   podeExcluir,
+  portalProprio = false,
+  bloqueioExcluir = null,
 }: {
   sedeId: string
   sedeNome: string
   ativa: boolean
   destinos: { id: string; nome: string; tipo: string }[]
   podeExcluir: boolean
+  portalProprio?: boolean
+  /** Motivo exibido no menu quando Excluir não está disponível. */
+  bloqueioExcluir?: string | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [excluirAberto, setExcluirAberto] = useState(false)
@@ -1781,25 +1787,30 @@ export function SedeAcoesMenu({
     if (ativa) {
       void confirmAction({
         titulo: `Desativar “${sedeNome}”?`,
-        descricao:
-          'A unidade será desativada e deixa de aparecer como ativa na estrutura. Você pode reativá-la a qualquer momento.',
+        descricao: portalProprio
+          ? 'A unidade e o portal próprio saem do onboarding e deixam de aparecer como ativos. Você pode reativá-los a qualquer momento.'
+          : 'A unidade será desativada e deixa de aparecer como ativa na estrutura. Você pode reativá-la a qualquer momento.',
         labelConfirmar: 'Desativar',
         labelCancelar: 'Manter ativa',
         cancelled: false,
         run: () => alterarStatusSede(sedeId, false),
-        success: 'Unidade desativada. Você pode reativá-la a qualquer momento.',
+        success: portalProprio
+          ? 'Unidade e portal desativados. Você pode reativá-los a qualquer momento.'
+          : 'Unidade desativada. Você pode reativá-la a qualquer momento.',
       })
       return
     }
 
     void confirmAction({
       titulo: `Reativar “${sedeNome}”?`,
-      descricao: 'A unidade volta a aparecer como ativa na estrutura.',
+      descricao: portalProprio
+        ? 'A unidade e o portal próprio voltam a aparecer no onboarding e na estrutura.'
+        : 'A unidade volta a aparecer como ativa na estrutura.',
       labelConfirmar: 'Reativar',
       variante: 'success',
       cancelled: false,
       run: () => alterarStatusSede(sedeId, true),
-      success: 'Unidade reativada.',
+      success: portalProprio ? 'Unidade e portal reativados.' : 'Unidade reativada.',
     })
   }
 
@@ -1868,6 +1879,12 @@ export function SedeAcoesMenu({
                 Excluir
               </button>
             )}
+
+            {!podeMostrarExcluir && bloqueioExcluir ? (
+              <p className="border-t border-[rgb(var(--border))] px-3 py-2 text-[10px] leading-snug text-[rgb(var(--foreground-muted))]">
+                {bloqueioExcluir}
+              </p>
+            ) : null}
           </div>
         </>
       )}

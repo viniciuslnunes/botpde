@@ -25,7 +25,11 @@ import {
 } from '@/lib/social'
 import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
-import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
+import {
+  criarNotificacao,
+  notificarSafe,
+  reconciliarNotificacoesDoEvento,
+} from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
@@ -2463,17 +2467,12 @@ export async function decidirPedidoGrupo(
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
 
-  const { count: pedidosLidos } = await db.notificacao.updateMany({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      atorId: parsed.data.userId,
-      tipo: 'GRUPO_PEDIDO',
-      lida: false,
-    },
-    data: { lida: true },
+  // O pedido foi decidido — o badge cai para TODOS os administradores do grupo
+  // que o receberam, não só para quem decidiu (Achado 10).
+  await reconciliarNotificacoesDoEvento(tenant.id, {
+    tipo: 'GRUPO_PEDIDO',
+    atorId: parsed.data.userId,
   })
-  if (pedidosLidos > 0) emitNotificacaoPing(tenant.id, session.user.id)
 
   if (parsed.data.aprovar) {
     const ativos: number = await db.membroConversa.count({
@@ -3321,17 +3320,11 @@ export async function decidirPedidoCanal(
     await assertElegibilidadeMembroCanal(canal.id, parsed.data.userId, 'ATIVO')
   }
 
-  const { count: pedidosLidos } = await db.notificacao.updateMany({
-    where: {
-      userId: session.user.id,
-      tenantId: canal.tenantId,
-      atorId: parsed.data.userId,
-      tipo: 'CANAL_PEDIDO',
-      lida: false,
-    },
-    data: { lida: true },
+  // Idem ao grupo: a fila do canal foi resolvida para a equipe inteira.
+  await reconciliarNotificacoesDoEvento(canal.tenantId, {
+    tipo: 'CANAL_PEDIDO',
+    atorId: parsed.data.userId,
   })
-  if (pedidosLidos > 0) emitNotificacaoPing(canal.tenantId, session.user.id)
 
   if (parsed.data.aprovar) {
     await db.membroConversa.update({

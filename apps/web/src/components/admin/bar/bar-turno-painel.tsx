@@ -18,6 +18,12 @@ function formatarHora(iso: string) {
   }).format(new Date(iso))
 }
 
+export type BarTurnoComandaAbertaResumo = {
+  id: string
+  codigo: string
+  total: number
+}
+
 export type BarTurnoPainelProps = {
   turno: {
     id: string
@@ -32,6 +38,8 @@ export type BarTurnoPainelProps = {
   } | null
   podeGerir: boolean
   compact?: boolean
+  /** Comandas ABERTA da unidade — ciência obrigatória no fechamento se houver. */
+  comandasAbertas?: BarTurnoComandaAbertaResumo[]
 }
 
 export function BarTurnoPainel({
@@ -39,6 +47,7 @@ export function BarTurnoPainel({
   resumo,
   podeGerir,
   compact = false,
+  comandasAbertas = [],
 }: BarTurnoPainelProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -49,6 +58,7 @@ export function BarTurnoPainel({
   const [dinheiroContado, setDinheiroContado] = useState('')
   const [sangria, setSangria] = useState('0')
   const [observacao, setObservacao] = useState('')
+  const [cienciaComandas, setCienciaComandas] = useState(false)
 
   const diferenca = useMemo(() => {
     if (!resumo || dinheiroContado.trim() === '') return null
@@ -63,6 +73,8 @@ export function BarTurnoPainel({
       ? Math.abs(diferenca) > Math.max(LIMIAR_DIVERGENCIA_ABS, resumo.dinheiroEsperado * LIMIAR_DIVERGENCIA_PCT)
       : false
 
+  const exigeCiencia = comandasAbertas.length > 0
+
   function abrir() {
     startTransition(async () => {
       const result = await abrirTurnoBar()
@@ -76,11 +88,16 @@ export function BarTurnoPainel({
   }
 
   function fechar() {
+    if (exigeCiencia && !cienciaComandas) {
+      toast.error('Confirme ciência das comandas abertas antes de fechar.')
+      return
+    }
     startTransition(async () => {
       const result = await fecharTurnoBar({
         dinheiroContado: Number(dinheiroContado),
         sangria: Number(sangria) || 0,
         observacao: observacao.trim() || undefined,
+        cienciaComandasAbertas: exigeCiencia ? cienciaComandas : undefined,
       })
       if (result.error) {
         toast.error(result.error)
@@ -88,6 +105,7 @@ export function BarTurnoPainel({
       }
       toast.success('Turno fechado')
       setFechando(false)
+      setCienciaComandas(false)
       router.refresh()
     })
   }
@@ -151,7 +169,10 @@ export function BarTurnoPainel({
         {podeGerir && !fechando && (
           <button
             type="button"
-            onClick={() => setFechando(true)}
+            onClick={() => {
+              setFechando(true)
+              setCienciaComandas(false)
+            }}
             className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Fechar turno
@@ -226,6 +247,36 @@ export function BarTurnoPainel({
             />
           </label>
 
+          {exigeCiencia && (
+            <div className="space-y-2 rounded-lg border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.08)] px-3 py-2">
+              <p className="text-xs font-medium text-[rgb(var(--color-warning-fg))]">
+                {comandasAbertas.length} comanda
+                {comandasAbertas.length !== 1 ? 's' : ''} ainda aberta
+                {comandasAbertas.length !== 1 ? 's' : ''} — o fechamento não as encerra.
+              </p>
+              <ul className="max-h-28 space-y-1 overflow-y-auto text-xs text-[rgb(var(--foreground-muted))]">
+                {comandasAbertas.map((c) => (
+                  <li key={c.id} className="flex justify-between gap-2">
+                    <span>{c.codigo}</span>
+                    <span className="tabular-nums">{formatarPreco(c.total)}</span>
+                  </li>
+                ))}
+              </ul>
+              <label className="flex items-start gap-2 text-xs text-[rgb(var(--foreground))]">
+                <input
+                  type="checkbox"
+                  checked={cienciaComandas}
+                  onChange={(e) => setCienciaComandas(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Estou ciente de que estas comandas permanecem abertas após o fechamento do
+                  turno.
+                </span>
+              </label>
+            </div>
+          )}
+
           {diferenca != null && (
             <p
               className={[
@@ -249,7 +300,11 @@ export function BarTurnoPainel({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={pending || dinheiroContado.trim() === ''}
+              disabled={
+                pending ||
+                dinheiroContado.trim() === '' ||
+                (exigeCiencia && !cienciaComandas)
+              }
               onClick={fechar}
               className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
@@ -258,7 +313,10 @@ export function BarTurnoPainel({
             <button
               type="button"
               disabled={pending}
-              onClick={() => setFechando(false)}
+              onClick={() => {
+                setFechando(false)
+                setCienciaComandas(false)
+              }}
               className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
             >
               Voltar

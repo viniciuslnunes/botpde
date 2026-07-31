@@ -9,6 +9,11 @@
  * Fora do escopo de departamento (só Presidência / owner):
  *   settings:manage, roles:manage, torcida:global_view, alliances:manage
  *
+ * Distribuição deliberada (2026-07-30):
+ *   bar:* → Financeiro; members:import → Diretoria gestor;
+ *   community:post_nacional → Presidência (cargo de sistema) + Comunicação gestor.
+ *   Gestores de área operacional não levam finance/store/sedes transversais.
+ *
  * Vocabulário real: docs/knowledge/estrutura-governanca.md
  * Matriz de produto: docs/data/modulo-departamentos.md
  */
@@ -78,6 +83,7 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.MEMBERS_REJECT,
       PERMISSIONS.MEMBERS_WARN,
       PERMISSIONS.MEMBERS_BLOCK,
+      PERMISSIONS.MEMBERS_IMPORT,
       PERMISSIONS.MEMBERS_DISMISS,
       PERMISSIONS.MEMBERS_EXPORT_LGE,
       PERMISSIONS.AUDIT_VIEW,
@@ -94,18 +100,20 @@ export const DEPARTAMENTOS_CANONICOS = [
     ],
   },
   {
-    // Mensalidades, inadimplência, prestação de contas, caixa
-    // Escopo: portal (view); admin financeiro só com finance:manage (gestor).
+    // Mensalidades, inadimplência, prestação de contas, caixa + Bar (PDV).
+    // Escopo: portal (view / operar PDV); admin financeiro e catálogo do bar = gestor.
     nome: 'Financeiro',
     cor: '#047857',
     moduloPortal: 'financeiro',
     permissions: [
       PERMISSIONS.FINANCE_VIEW,
+      PERMISSIONS.BAR_OPERATE,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.MESSAGES_SEND,
     ],
     permissionsGestor: [
       PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.BAR_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.GROUPS_CREATE,
@@ -130,7 +138,6 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.COMMUNITY_MODERATE,
       PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.CHANNELS_MANAGE,
-      PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.STORE_VIEW_ORDERS,
@@ -160,6 +167,7 @@ export const DEPARTAMENTOS_CANONICOS = [
   },
   {
     // Mídia, mural, comunicados — membro posta no portal; curadoria = gestor.
+    // post_nacional: Presidência (owner/vice via cargo de sistema) E Comunicação.
     nome: 'Comunicação',
     cor: '#0369a1',
     moduloPortal: 'comunidade',
@@ -174,6 +182,7 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.COMMUNITY_POST_NACIONAL,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.MESSAGES_MODERATE,
       PERMISSIONS.EVENTS_CREATE,
@@ -184,6 +193,7 @@ export const DEPARTAMENTOS_CANONICOS = [
   },
   {
     // Sede, instrumentos, bandeirões — ver no portal; gerir no admin (gestor).
+    // Sem loja/sedes territoriais: missão é inventário, não mini-admin.
     nome: 'Patrimônio',
     cor: '#57534e',
     moduloPortal: 'patrimonio',
@@ -195,10 +205,8 @@ export const DEPARTAMENTOS_CANONICOS = [
     ],
     permissionsGestor: [
       PERMISSIONS.PATRIMONY_MANAGE,
-      PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.STORE_MANAGE,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.MEETINGS_HOST,
@@ -207,6 +215,7 @@ export const DEPARTAMENTOS_CANONICOS = [
   },
   {
     // Bateria / ensaios — membro no portal; criar/gerir ensaios = gestor.
+    // Instrumentos via patrimony:manage; sem sedes/loja transversais.
     nome: 'Bateria',
     cor: '#be123c',
     moduloPortal: 'bateria',
@@ -226,12 +235,11 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.COMMUNITY_MODERATE,
       PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.PATRIMONY_MANAGE,
-      PERMISSIONS.SEDES_MANAGE,
-      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
     // Viagens / jogos fora — membro no portal; operação = gestor.
+    // Caixa/loja/sedes ficam com Financeiro, Materiais e Diretoria.
     nome: 'Caravanas',
     cor: '#c2410c',
     moduloPortal: 'caravanas',
@@ -249,9 +257,6 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.COMMUNITY_MANAGE,
-      PERMISSIONS.STORE_MANAGE,
-      PERMISSIONS.FINANCE_MANAGE,
-      PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.MEMBERS_WARN,
     ],
   },
@@ -275,14 +280,13 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.COMMUNITY_MODERATE,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.MESSAGES_MODERATE,
-      PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.MEMBERS_WARN,
-      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
-    // Escola de samba — membro no portal; operação ampla = gestor.
+    // Escola de samba — membro no portal; operação da festa = gestor.
+    // Sem loja/financeiro/patrimônio/sedes: missão é eventos e comunicação.
     nome: 'Carnaval',
     cor: '#4d7c0f',
     moduloPortal: 'eventos',
@@ -304,10 +308,6 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.MESSAGES_MODERATE,
-      PERMISSIONS.STORE_MANAGE,
-      PERMISSIONS.FINANCE_MANAGE,
-      PERMISSIONS.PATRIMONY_MANAGE,
-      PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.MEMBERS_WARN,
     ],
   },

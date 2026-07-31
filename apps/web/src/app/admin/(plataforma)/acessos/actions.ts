@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { notificarSafe } from '@/lib/notificacoes'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, assertPodeDelegar } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import {
   ALL_PERMISSIONS,
@@ -109,7 +109,8 @@ async function assertMembroElegivelParaDepartamento(
  * Membership de departamento é projeção dos perfis vinculados (sync).
  */
 export async function salvarAcessoUsuario(userId: string, formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const entrada = SalvarAcessoSchema.safeParse({
     userId,
@@ -202,7 +203,27 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     for (const p of permissionsOfRole(role, depto)) cobertoPorPerfis.add(p)
   }
 
+  // ── Limite de delegação (Achado 6) ────────────────────────────────────────
+  // Atribuir cargo é conceder o pacote inteiro dele. Sem este limite, um
+  // `admin` (que por desenho não tem `settings:manage`) se atribuía o cargo de
+  // sistema `owner` — a única guarda aqui era a de `vice` — e passava até em
+  // `assertTenantOwner`. Só o que está sendo ACRESCENTADO é checado: retirar
+  // acesso nunca é escalada, e quem já tinha um cargo continua editável.
+  const perfisAcrescentados = rolesTenant.filter(
+    (role) => perfilIds.has(role.id) && !roleIdsAtuais.has(role.id),
+  )
+  for (const role of perfisAcrescentados) {
+    const depto = role.departamentoId ? (deptoById.get(role.departamentoId) ?? null) : null
+    assertPodeDelegar(ctx, permissionsOfRole(role, depto), `o cargo "${role.nome}" com`)
+  }
+
   const overridesAtuais = new Map(userPermissionsAtuais.map((p) => [p.permission, p.granted]))
+
+  // Override CONCEDIDO segue a mesma regra; override NEGADO (tirar acesso) não.
+  const overridesConcedidos = [...permissoesEfetivas].filter(
+    (p) => !cobertoPorPerfis.has(p) && overridesAtuais.get(p) !== true,
+  )
+  assertPodeDelegar(ctx, overridesConcedidos, 'como permissão avulsa')
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     if (atribuiPerfilDepartamento) {

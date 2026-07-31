@@ -126,7 +126,12 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   BAR_FIADO_VENCIDO: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
-    rota: '/admin/bar/fiado',
+    rota: '/admin/bar/comandas',
+  },
+  BAR_COMANDA_VENCIDA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.BAR_MANAGE,
+    rota: '/admin/bar/comandas',
   },
   BAR_TURNO_DIVERGENCIA: {
     escopo: 'admin',

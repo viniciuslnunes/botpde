@@ -7,10 +7,12 @@ import {
   getTurnoAbertoBar,
   listarEstoqueBaixo,
   resolveUnidadeBar,
+  resumirConsumoEmAbertoBar,
+  resumirRecebidoBar,
   resumirTurnoBar,
-  resumirVendasBar,
 } from '@/lib/bar'
-import type { BarProdutoLite, BarVendasResumo } from '@/lib/bar'
+import type { BarConsumoEmAbertoResumo, BarProdutoLite, BarVendasResumo } from '@/lib/bar'
+import { listarComandasAbertasBar, type BarComandaAbertaLite } from '@/lib/bar-comanda'
 import { BarTurnoPainel } from '@/components/admin/bar/bar-turno-painel'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
@@ -48,14 +50,18 @@ export default async function AdminBarPage() {
 
   const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
 
-  const [resumoHoje, estoqueBaixo, resumoTurno]: [
+  const [resumoHoje, estoqueBaixo, resumoTurno, comandasAbertas, consumoAberto]: [
     BarVendasResumo,
     BarProdutoLite[],
     Awaited<ReturnType<typeof resumirTurnoBar>> | null,
+    BarComandaAbertaLite[],
+    BarConsumoEmAbertoResumo,
   ] = await Promise.all([
-    resumirVendasBar(tenant.id, unidade.id, { desde: inicioDoDia }),
+    resumirRecebidoBar(tenant.id, unidade.id, { desde: inicioDoDia }),
     listarEstoqueBaixo(tenant.id, unidade.id),
     turno ? resumirTurnoBar(tenant.id, turno.id) : Promise.resolve(null),
+    listarComandasAbertasBar(tenant.id, unidade.id),
+    resumirConsumoEmAbertoBar(tenant.id, unidade.id),
   ])
 
   return (
@@ -73,21 +79,39 @@ export default async function AdminBarPage() {
           }
           resumo={resumoTurno}
           podeGerir={podeGerir}
+          comandasAbertas={comandasAbertas.map((c) => ({
+            id: c.id,
+            codigo: c.codigo,
+            total: Number(c.total),
+          }))}
         />
       </MotionReveal>
 
       <MotionReveal index={1}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">Vendido hoje (pago)</p>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">Recebido hoje</p>
             <p className="mt-1 text-2xl font-bold text-[rgb(var(--color-success-fg))]">
               {formatarPreco(resumoHoje.totalPago)}
             </p>
           </div>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">Vendas pagas hoje</p>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">Eventos recebidos hoje</p>
             <p className="mt-1 text-2xl font-bold text-[rgb(var(--foreground))]">
               {resumoHoje.quantidade}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">Consumo em aberto</p>
+            <p
+              className={[
+                'mt-1 text-2xl font-bold',
+                consumoAberto.total > 0
+                  ? 'text-[rgb(var(--color-warning-fg))]'
+                  : 'text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              {formatarPreco(consumoAberto.total)}
             </p>
           </div>
         </div>

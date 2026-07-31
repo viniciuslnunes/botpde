@@ -8,6 +8,7 @@ import {
   membroDetalheSelect,
   type MembroDetalheRow,
 } from '@/lib/admin-membro-map'
+import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import {
   calculateEffectivePermissions,
   hasPermission,
@@ -243,9 +244,10 @@ export default async function SociosPage({
     elegiveisDetalhe = rows
     totalLista = total
 
-    const nomesUnidade = await resolverNomesUnidade(
-      rows.map((m) => m.aprovadoNaUnidadeTenantId),
-    )
+    const [nomesUnidade, areasEfetivadas] = await Promise.all([
+      resolverNomesUnidade(rows.map((m) => m.aprovadoNaUnidadeTenantId)),
+      getAreasEfetivadasPorUser(tenant.id, rows.map((m) => m.userId)),
+    ])
     for (const m of rows) {
       detalhePorUserId.set(
         m.userId,
@@ -253,6 +255,7 @@ export default async function SociosPage({
           aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
             ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
             : null,
+          areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
         }),
       )
     }
@@ -311,9 +314,10 @@ export default async function SociosPage({
         },
         select: membroDetalheSelect,
       })) as MembroDetalheRow[]
-      const nomesUnidade = await resolverNomesUnidade(
-        membrosPagina.map((m) => m.aprovadoNaUnidadeTenantId),
-      )
+      const [nomesUnidade, areasEfetivadas] = await Promise.all([
+        resolverNomesUnidade(membrosPagina.map((m) => m.aprovadoNaUnidadeTenantId)),
+        getAreasEfetivadasPorUser(tenant.id, membrosPagina.map((m) => m.userId)),
+      ])
       for (const m of membrosPagina) {
         numeroAssociadoPorUserId.set(m.userId, m.numeroAssociado?.trim() || null)
         detalhePorUserId.set(
@@ -322,6 +326,7 @@ export default async function SociosPage({
             aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
               ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
               : null,
+            areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
           }),
         )
       }

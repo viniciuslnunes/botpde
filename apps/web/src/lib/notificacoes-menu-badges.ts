@@ -25,7 +25,8 @@ export const ROTA_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
   PEDIDO_RECEBIDO: '/admin/loja/pedidos',
   SOLICITACAO_UNIDADE_CRIADA: '/admin/afiliacoes',
   BAR_ESTOQUE_BAIXO: '/admin/bar/estoque',
-  BAR_FIADO_VENCIDO: '/admin/bar/fiado',
+  BAR_FIADO_VENCIDO: '/admin/bar/comandas',
+  BAR_COMANDA_VENCIDA: '/admin/bar/comandas',
   BAR_TURNO_DIVERGENCIA: '/admin/bar/pdv',
   BAR_ESTORNO_ANOMALO: '/admin/bar/estornos',
 }

@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@torcida/db'
+import type { Prisma } from '@torcida/db'
 import { wouldCreateSedeCycle, invalidateHierarchyCache } from '@/lib/hierarquia'
 import {
   validarHierarquiaSede,
@@ -17,6 +18,7 @@ import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { ensureCanalOficialParaSede, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
 import { notificarSafe } from '@/lib/notificacoes'
+import { assertPodeMutarSedeNaArvore } from '@/lib/sede-acesso-mae'
 import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
@@ -355,29 +357,32 @@ export async function editarSede(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const existing = await db.sede.findUnique({
-    where: { id: sedeId },
-    select: {
-      tenantId: true,
-      sedeId: true,
-      tipo: true,
-      canalConversaId: true,
-      responsavelUserId: true,
-      filhos: { select: { tipo: true } },
-    },
-  })
-  if (!existing || existing.tenantId !== tenant.id) {
-    return { message: 'Sede não encontrada.' }
+  let existing: Awaited<ReturnType<typeof assertPodeMutarSedeNaArvore>>
+  try {
+    existing = await assertPodeMutarSedeNaArvore(session, tenant, sedeId)
+  } catch (e) {
+    return { message: e instanceof Error ? e.message : 'Sede não encontrada.' }
   }
+
+  const tenantDaUnidade = existing.tenantId ?? tenant.id
+  const filhosDaUnidade: { tipo: string }[] = await db.sede.findMany({
+    where: { sedeId },
+    select: { tipo: true },
+  })
 
   const { nome, tipo, sedeId: sedePaiIdForm, responsavelUserId, responsavel, ...rest } = parsed.data
 
-  // Caso B: pai na torcida principal — trava tipo + sedeId (não se altera aqui).
+  // Caso B (editado pela mãe ou unidade com pai herdado): trava tipo + sedeId.
   let tipoFinal: TipoSede = tipo
   let sedePaiId: string | null = sedePaiIdForm
   let permitirPaiExternoId: string | null = null
 
-  if (existing.sedeId) {
+  if (existing.portalProprio) {
+    // Mãe edita portal filho: não reparenta nem muda tipo pela lista da mãe.
+    sedePaiId = existing.sedeId
+    tipoFinal = existing.tipo as TipoSede
+    if (existing.sedeId) permitirPaiExternoId = existing.sedeId
+  } else if (existing.sedeId) {
     const paiAtual: { tenantId: string | null } | null = await db.sede.findUnique({
       where: { id: existing.sedeId },
       select: { tenantId: true },
@@ -402,7 +407,7 @@ export async function editarSede(
     }
   }
 
-  const { pai, error: paiError } = await resolverPai(sedePaiId, tenant.id, {
+  const { pai, error: paiError } = await resolverPai(sedePaiId, tenantDaUnidade, {
     permitirPaiExternoId,
   })
   if (paiError) return { errors: { sedeId: [paiError] } }
@@ -414,13 +419,13 @@ export async function editarSede(
 
   const rebaixamentoErro = validarRebaixamentoComFilhos(
     tipoFinal,
-    existing.filhos.map((f: { tipo: string }) => f.tipo as TipoSede),
+    filhosDaUnidade.map((f) => f.tipo as TipoSede),
   )
   if (rebaixamentoErro) {
     return { errors: { tipo: [rebaixamentoErro] } }
   }
 
-  const resp = await resolverResponsavelUser(tenant.id, responsavelUserId)
+  const resp = await resolverResponsavelUser(tenantDaUnidade, responsavelUserId)
   if (resp.error) return { errors: { responsavelUserId: [resp.error] } }
 
   await db.sede.update({
@@ -462,6 +467,17 @@ export async function editarSede(
     })
   }
 
+  // Portal próprio: nome/logo do tenant filho acompanham a unidade.
+  if (existing.portalProprio && existing.tenantId) {
+    await db.tenant.update({
+      where: { id: existing.tenantId },
+      data: {
+        nome,
+        ...(typeof rest.fotoUrl === 'string' ? { logoUrl: rest.fotoUrl } : {}),
+      },
+    })
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -473,6 +489,7 @@ export async function editarSede(
         tipo: tipoFinal,
         temCoords: rest.lat != null && rest.lng != null,
         ...(permitirPaiExternoId ? { paiHerdado: true } : {}),
+        ...(existing.portalProprio ? { portalProprio: true, tenantFilhoId: existing.tenantId } : {}),
       },
     },
   })
@@ -480,7 +497,7 @@ export async function editarSede(
   if (resp.userId && resp.userId !== existing.responsavelUserId) {
     await notificarSafe({
       userId: resp.userId,
-      tenantId: tenant.id,
+      tenantId: tenantDaUnidade,
       tipo: 'SEDE_RESPONSAVEL_DEFINIDO',
       titulo: 'Você foi definido responsável por uma unidade',
       corpo: `Você é responsável por ${nome}.`,
@@ -494,12 +511,12 @@ export async function editarSede(
   revalidatePath(`/admin/sedes/${sedeId}`)
   revalidatePath('/admin/afiliacoes')
   revalidatePath('/super-admin/afiliacoes')
-  // Header admin/portal usa Sede.fotoUrl da raiz como logo (resolveTenantLogoUrl)
-  // — sem revalidar os layouts, a foto nova só aparece depois que o router
-  // cache do cliente expira sozinho.
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
+  if (existing.portalProprio && existing.tenantId) {
+    invalidateHierarchyCache(existing.tenantId)
+  }
   redirect('/admin/sedes')
 }
 
@@ -529,11 +546,12 @@ export async function salvarFotoSede(
 
   const url = parsed.data?.trim() ? parsed.data.trim() : null
 
-  const existing: { id: string; canalConversaId: string | null } | null = await db.sede.findFirst({
-    where: { id: sedeId, tenantId: tenant.id },
-    select: { id: true, canalConversaId: true },
-  })
-  if (!existing) return { ok: false, message: 'Sede não encontrada.' }
+  let existing: Awaited<ReturnType<typeof assertPodeMutarSedeNaArvore>>
+  try {
+    existing = await assertPodeMutarSedeNaArvore(session, tenant, sedeId)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Sede não encontrada.' }
+  }
 
   await db.sede.update({
     where: { id: sedeId },
@@ -550,6 +568,13 @@ export async function salvarFotoSede(
     })
   }
 
+  if (existing.portalProprio && existing.tenantId) {
+    await db.tenant.update({
+      where: { id: existing.tenantId },
+      data: { logoUrl: url },
+    })
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -557,7 +582,10 @@ export async function salvarFotoSede(
       acao: 'SEDE_FOTO_ATUALIZADA',
       entidade: 'Sede',
       entidadeId: sedeId,
-      detalhes: { temFoto: url != null },
+      detalhes: {
+        temFoto: url != null,
+        ...(existing.portalProprio ? { portalProprio: true } : {}),
+      },
     },
   })
 
@@ -576,15 +604,17 @@ export async function salvarFotoSede(
 export async function alterarStatusSede(sedeId: string, ativa: boolean) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
 
-  const existing = await db.sede.findUnique({
-    where: { id: sedeId },
-    select: { tenantId: true },
-  })
-  if (!existing || existing.tenantId !== tenant.id) throw new Error('Sede não encontrada')
+  const existing = await assertPodeMutarSedeNaArvore(session, tenant, sedeId)
 
   if (!ativa) {
     const filhosAtivos = await db.sede.count({
-      where: { sedeId, ativa: true, tenantId: tenant.id },
+      where: {
+        sedeId,
+        ativa: true,
+        ...(existing.portalProprio && existing.tenantId
+          ? { tenantId: existing.tenantId }
+          : { tenantId: tenant.id }),
+      },
     })
     if (filhosAtivos > 0) {
       throw new Error(
@@ -595,6 +625,14 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
 
   await db.sede.update({ where: { id: sedeId }, data: { ativa } })
 
+  // Portal próprio: o tenant filho acompanha o status da unidade na árvore.
+  if (existing.portalProprio && existing.tenantId) {
+    await db.tenant.update({
+      where: { id: existing.tenantId },
+      data: { ativo: ativa },
+    })
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -602,12 +640,23 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
       acao: ativa ? 'SEDE_ATIVADA' : 'SEDE_DESATIVADA',
       entidade: 'Sede',
       entidadeId: sedeId,
+      ...(existing.portalProprio
+        ? {
+            detalhes: {
+              portalProprio: true,
+              tenantFilhoId: existing.tenantId,
+            },
+          }
+        : {}),
     },
   })
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   invalidateHierarchyCache(tenant.id)
+  if (existing.portalProprio && existing.tenantId) {
+    invalidateHierarchyCache(existing.tenantId)
+  }
 }
 
 /**
@@ -710,16 +759,13 @@ export type ExcluirSedeResult =
   { ok: true; membrosRemanejados: number; message: string } | { ok: false; error: string }
 
 /**
- * Exclui uma Sede/Subsede/PDE, remanejando membros e eventos vinculados para
- * outra unidade do mesmo tenant. Ação destrutiva com dois níveis de poder:
- * - **Super-admin**: pode excluir qualquer unidade.
- * - **Presidente/Vice da sede principal**: só pode excluir uma Sede
- *   (`tipo: 'SEDE'`) duplicada — isto é, quando existe MAIS DE UMA Sede
- *   `tipo: 'SEDE'` no tenant. Fora desse caso de limpeza de duplicidade, a
- *   remoção de unidades (incluindo Subsede/PDE) é exclusiva do super-admin.
- * Bloqueia se houver unidades filhas (reatribua antes) ou dados do Bar
- * (catálogo/estoque/vendas têm `onDelete: Cascade` por `sedeId` — apagar
- * silenciosamente destruiria histórico financeiro/estoque).
+ * Exclui uma Sede/Subsede/PDE, remanejando membros e eventos vinculados.
+ * - **Local** (mesmo tenant): super-admin qualquer unidade; Presidente/Vice só
+ *   Sede duplicada (`tipo: 'SEDE'` com mais de uma no tenant).
+ * - **Portal próprio (Caso B)**: sede principal com `affiliation:manage` pode
+ *   excluir só se **não** houver liderança vinculada (`responsavelUserId`).
+ *   Com liderança + portal, use desativar.
+ * Bloqueia se houver unidades filhas ou dados do Bar.
  */
 export async function excluirSede(
   sedeId: string,
@@ -735,24 +781,44 @@ export async function excluirSede(
   const [sede, destino] = await Promise.all([
     db.sede.findUnique({
       where: { id: sedeId },
-      select: { tenantId: true, nome: true, tipo: true, canalConversaId: true },
+      select: {
+        tenantId: true,
+        nome: true,
+        tipo: true,
+        canalConversaId: true,
+        responsavelUserId: true,
+      },
     }),
     db.sede.findUnique({ where: { id: destinoSedeId }, select: { tenantId: true, tipo: true } }),
   ])
-  if (!sede || sede.tenantId !== tenant.id) {
+  if (!sede) {
     return { ok: false, error: 'Unidade não encontrada.' }
   }
   if (!destino || destino.tenantId !== tenant.id) {
     return { ok: false, error: 'Unidade de destino não encontrada.' }
   }
-  // Sócio de Subsede/PDE já conta como sócio da Sede (o número agrega na
-  // hierarquia) — remanejar só faz sentido Sede → Sede, nunca pra uma
-  // unidade territorial menor.
   if (destino.tipo !== 'SEDE') {
     return { ok: false, error: 'O destino do remanejamento precisa ser uma Sede.' }
   }
 
-  if (!isSuperAdmin) {
+  const portalProprio = Boolean(sede.tenantId && sede.tenantId !== tenant.id)
+
+  if (portalProprio) {
+    try {
+      await assertPodeMutarSedeNaArvore(session, tenant, sedeId)
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Sem permissão.' }
+    }
+    if (sede.responsavelUserId) {
+      return {
+        ok: false,
+        error:
+          'Esta unidade tem liderança vinculada. Remova a liderança ou apenas desative — exclusão não é permitida com portal e liderança.',
+      }
+    }
+  } else if (sede.tenantId !== tenant.id) {
+    return { ok: false, error: 'Unidade não encontrada.' }
+  } else if (!isSuperAdmin) {
     if (sede.tipo !== 'SEDE') {
       return {
         ok: false,
@@ -763,13 +829,15 @@ export async function excluirSede(
     if (sedesTipoSede <= 1) {
       return {
         ok: false,
-        error: 'Só é possível excluir quando há Sede duplicada. Para os demais casos, peça ao super-admin.',
+        error:
+          'Só é possível excluir quando há Sede duplicada. Para os demais casos, peça ao super-admin.',
       }
     }
   }
 
+  const tenantDaUnidade = sede.tenantId ?? tenant.id
   const [filhos, dadosBar] = await Promise.all([
-    db.sede.count({ where: { sedeId, tenantId: tenant.id } }),
+    db.sede.count({ where: { sedeId, tenantId: tenantDaUnidade } }),
     db.barProduto.count({ where: { sedeId } }),
   ])
   if (filhos > 0) {
@@ -786,17 +854,73 @@ export async function excluirSede(
     }
   }
 
-  const [{ count: membrosRemanejados }] = await db.$transaction([
-    db.saasMembro.updateMany({
-      where: { tenantId: tenant.id, sedeId },
-      data: { sedeId: destinoSedeId },
-    }),
-    db.evento.updateMany({
-      where: { tenantId: tenant.id, sedeId },
-      data: { sedeId: destinoSedeId },
-    }),
-    db.sede.delete({ where: { id: sedeId } }),
-  ])
+  let membrosRemanejados = 0
+
+  if (portalProprio && sede.tenantId) {
+    const membrosFilho: {
+      userId: string
+      nome: string
+      status: string
+      tipo: string
+    }[] = await db.saasMembro.findMany({
+      where: { tenantId: sede.tenantId, sedeId },
+      select: { userId: true, nome: true, status: true, tipo: true },
+    })
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      for (const m of membrosFilho) {
+        const naMae: { id: string } | null = await tx.saasMembro.findUnique({
+          where: { tenantId_userId: { tenantId: tenant.id, userId: m.userId } },
+          select: { id: true },
+        })
+        if (naMae) {
+          await tx.saasMembro.update({
+            where: { id: naMae.id },
+            data: { sedeId: destinoSedeId },
+          })
+        } else {
+          await tx.saasMembro.create({
+            data: {
+              tenantId: tenant.id,
+              userId: m.userId,
+              nome: m.nome,
+              tipo: m.tipo as 'SOCIO' | 'TORCEDOR',
+              status: (m.status === 'APROVADO' ? 'APROVADO' : 'PENDENTE') as 'APROVADO' | 'PENDENTE',
+              sedeId: destinoSedeId,
+            },
+          })
+        }
+        membrosRemanejados += 1
+      }
+
+      await tx.saasMembro.updateMany({
+        where: { tenantId: sede.tenantId!, sedeId },
+        data: { sedeId: null },
+      })
+      await tx.evento.updateMany({
+        where: { tenantId: sede.tenantId!, sedeId },
+        data: { sedeId: null },
+      })
+      await tx.sede.delete({ where: { id: sedeId } })
+      await tx.tenant.update({
+        where: { id: sede.tenantId! },
+        data: { ativo: false },
+      })
+    })
+  } else {
+    const [{ count }] = await db.$transaction([
+      db.saasMembro.updateMany({
+        where: { tenantId: tenant.id, sedeId },
+        data: { sedeId: destinoSedeId },
+      }),
+      db.evento.updateMany({
+        where: { tenantId: tenant.id, sedeId },
+        data: { sedeId: destinoSedeId },
+      }),
+      db.sede.delete({ where: { id: sedeId } }),
+    ])
+    membrosRemanejados = count
+  }
 
   await db.auditLog.create({
     data: {
@@ -805,7 +929,12 @@ export async function excluirSede(
       acao: 'SEDE_EXCLUIDA',
       entidade: 'Sede',
       entidadeId: sedeId,
-      detalhes: { nome: sede.nome, destinoSedeId, membrosRemanejados },
+      detalhes: {
+        nome: sede.nome,
+        destinoSedeId,
+        membrosRemanejados,
+        ...(portalProprio ? { portalProprio: true, tenantFilhoId: sede.tenantId } : {}),
+      },
     },
   })
 
@@ -814,11 +943,16 @@ export async function excluirSede(
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
+  if (portalProprio && sede.tenantId) {
+    invalidateHierarchyCache(sede.tenantId)
+  }
 
   return {
     ok: true,
     membrosRemanejados,
-    message: `“${sede.nome}” excluída. ${membrosRemanejados} membro(s) remanejado(s).`,
+    message: portalProprio
+      ? `“${sede.nome}” excluída e portal desativado. ${membrosRemanejados} membro(s) remanejado(s).`
+      : `“${sede.nome}” excluída. ${membrosRemanejados} membro(s) remanejado(s).`,
   }
 }
 

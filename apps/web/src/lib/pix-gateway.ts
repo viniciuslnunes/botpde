@@ -86,6 +86,35 @@ export async function criarCobrancaPixBar(input: {
   })
 }
 
+/**
+ * Cobrança Pix para `BarComandaPagamento`. Metadata `{ tipo: 'bar_comanda',
+ * pagamentoId }` — o webhook confirma o pagamento (não a venda avulsa).
+ */
+export async function criarCobrancaPixComandaBar(input: {
+  pagamentoId: string
+  tenantSlug: string
+  valor: number
+  descricao: string
+  payerEmail?: string | null
+}): Promise<PixChargeResult> {
+  const provider = getPixProvider()
+  if (provider === 'mercadopago') {
+    return criarPixMercadoPago({
+      referencia: input.pagamentoId,
+      valor: input.valor,
+      descricao: input.descricao,
+      payerEmail: input.payerEmail,
+      externalReference: input.pagamentoId,
+      metadata: { tipo: 'bar_comanda', pagamentoId: input.pagamentoId },
+    })
+  }
+  return criarPixMock({
+    referencia: input.pagamentoId,
+    tenantSlug: input.tenantSlug,
+    valor: input.valor,
+  })
+}
+
 function criarPixMock(input: {
   referencia: string
   tenantSlug: string
@@ -172,6 +201,20 @@ export function assinarWebhookMockBar(vendaId: string): string {
 
 export function verificarWebhookMockBar(vendaId: string, signature: string): boolean {
   return compararAssinatura(assinarWebhookMockBar(vendaId), signature)
+}
+
+/** Token opaco para webhook mock de pagamento de comanda: HMAC(pagamentoId). */
+export function assinarWebhookMockComandaBar(pagamentoId: string): string {
+  return createHmac('sha256', env.AUTH_SECRET)
+    .update(`pix-mock-bar-comanda:${pagamentoId}`)
+    .digest('hex')
+}
+
+export function verificarWebhookMockComandaBar(
+  pagamentoId: string,
+  signature: string,
+): boolean {
+  return compararAssinatura(assinarWebhookMockComandaBar(pagamentoId), signature)
 }
 
 function compararAssinatura(expected: string, signature: string): boolean {

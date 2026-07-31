@@ -291,10 +291,12 @@ export async function mesmaAfiliacaoComunidade(userA: string, userB: string): Pr
  * Sócio aprovado **ou** cargo em TO real (owner/admin legado sem SaasMembro).
  * Usado no gate de solicitação de DM — presidente sem linha de membro ainda
  * exige solicitação de torcedores e aparece como destinatário “sócio”.
+ * Desligado não conta — `desligarMembro` preserva `status: APROVADO` e só
+ * grava `desligadoEm` (Achado 11).
  */
 export async function isSocioAprovado(userId: string): Promise<boolean> {
   const membro: { id: string } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    where: { userId, status: 'APROVADO', desligadoEm: null, tipo: 'SOCIO' },
     select: { id: true },
   })
   if (membro) return true

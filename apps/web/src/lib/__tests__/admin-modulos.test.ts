@@ -162,7 +162,8 @@ describe('tabsPermitidasDoModulo', () => {
 
   it('trata permissao null como herdada do gate do módulo', () => {
     const tabs = tabsPermitidasDoModulo('bar', [PERMISSIONS.BAR_OPERATE])
-    expect(tabs.map((t) => t.id)).toEqual(['balcao', 'vendas'])
+    // balcao/vendas: permissao null; comandas: BAR_OPERATE (§5.10 lista)
+    expect(tabs.map((t) => t.id)).toEqual(['balcao', 'vendas', 'comandas'])
   })
 
   it('abre Desempenho do bar para quem lê o financeiro sem gerir o bar', () => {

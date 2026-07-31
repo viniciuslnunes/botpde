@@ -14,9 +14,9 @@ import {
   Clock,
   Copy,
   CreditCard,
-  HandCoins,
   Loader2,
   Minus,
+  NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -26,9 +26,12 @@ import {
   X,
 } from 'lucide-react'
 import {
-  METODO_PAGAMENTO_BAR,
+  LIMITE_COMANDA_PADRAO,
   METODO_PAGAMENTO_BAR_LABEL,
+  METODO_PAGAMENTO_QUITACAO_FIADO_BAR,
+  percentualLimite,
   resumirVenda,
+  saldoComanda,
 } from '@torcida/types'
 import { toast } from '@torcida/ui'
 import {
@@ -37,16 +40,30 @@ import {
   consultarStatusVendaBar,
   registrarVendaBar,
 } from '@/app/admin/bar/actions'
+import {
+  abrirComandaBar,
+  confirmarPixMockComandaBar,
+  consultarStatusComandaBar,
+  fecharComandaBar,
+  lancarItensComandaBar,
+  liberarLimiteComandaBar,
+  removerLancamentoComandaBar,
+} from '@/app/admin/bar/comanda-actions'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { cartItemExit, springSnappy } from '@/lib/motion-presets'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
-import type { BarProdutoSerializado, BarVendaSerializada } from '@/lib/bar-serialize'
+import type {
+  BarComandaSerializada,
+  BarProdutoSerializado,
+  BarVendaSerializada,
+} from '@/lib/bar-serialize'
 
-type Metodo = (typeof METODO_PAGAMENTO_BAR)[number]
+/** Métodos do Pedido (venda rápida) e do fechamento de comanda — sem FIADO. */
+type Metodo = (typeof METODO_PAGAMENTO_QUITACAO_FIADO_BAR)[number]
 
-type CartLine = {
+type PedidoLine = {
   produtoId: string
   nome: string
   preco: number
@@ -54,14 +71,26 @@ type CartLine = {
   estoque: number
 }
 
-type PixPendente = {
-  vendaId: string
-  copiaCola: string
-  provider: string
-  total: number
-}
+type PixPendente =
+  | {
+      kind: 'venda'
+      vendaId: string
+      copiaCola: string
+      provider: string
+      total: number
+    }
+  | {
+      kind: 'comanda'
+      comandaId: string
+      pagamentoId: string
+      copiaCola: string
+      provider: string
+      total: number
+    }
 
 type Fase = 'venda' | 'pix' | 'sucesso'
+
+type PagamentoLinha = { metodo: Metodo; valorStr: string }
 
 /** Resumo do turno exibido no topbar quando a trilha lateral não cabe. */
 export type BarPdvTurnoResumo = {
@@ -71,14 +100,15 @@ export type BarPdvTurnoResumo = {
   pendentes: number
 }
 
-/** Rótulo curto do método: no rodapé da comanda (21rem) "Cartão de crédito" quebra. */
+/** Rótulo curto do método: no rodapé do Pedido (21rem) "Cartão de crédito" quebra. */
 const METODO_LABEL_CURTO: Record<string, string> = {
   PIX: 'PIX',
   DINHEIRO: 'Dinheiro',
   CARTAO_DEBITO: 'Débito',
   CARTAO_CREDITO: 'Crédito',
-  FIADO: 'Fiado',
 }
+
+const METODOS_PEDIDO = METODO_PAGAMENTO_QUITACAO_FIADO_BAR as readonly Metodo[]
 
 function formatarPreco(valor: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -97,7 +127,6 @@ function formatarTempoRelativo(iso: string) {
 function MetodoIcon({ metodo }: { metodo: Metodo }) {
   if (metodo === 'PIX') return <QrCode className="h-4 w-4" />
   if (metodo === 'DINHEIRO') return <Banknote className="h-4 w-4" />
-  if (metodo === 'FIADO') return <HandCoins className="h-4 w-4" />
   return <CreditCard className="h-4 w-4" />
 }
 
@@ -181,11 +210,18 @@ function setTurnoSidebarStored(value: boolean) {
   turnoSidebarListeners.forEach((l) => l())
 }
 
-/** Data padrão de vencimento do fiado: hoje + 7 dias, em `yyyy-mm-dd` para `<input type="date">`. */
-function vencimentoFiadoPadrao(): string {
+/** Data padrão de vencimento do débito: hoje + 7 dias, em `yyyy-mm-dd` para `<input type="date">`. */
+function vencimentoDebitoPadrao(): string {
   const d = new Date()
   d.setDate(d.getDate() + 7)
   return d.toISOString().slice(0, 10)
+}
+
+function recomputarComandaLocal(c: BarComandaSerializada): BarComandaSerializada {
+  const total = c.lancamentos.reduce((acc, l) => acc + l.total, 0)
+  const saldo = saldoComanda({ total, desconto: c.desconto, totalPago: c.totalPago })
+  const pct = percentualLimite(total, c.limiteEfetivo)
+  return { ...c, total, saldo, percentualLimite: pct }
 }
 
 export function BarPdv({
@@ -196,7 +232,8 @@ export function BarPdv({
   unidadeNome,
   podeCancelar,
   podeGerir = podeCancelar,
-  membrosFiado = [],
+  membrosComanda = [],
+  comandasAbertas: comandasIniciais = [],
   turnoAberto = true,
   turnoResumo = null,
   turnoPainel,
@@ -207,10 +244,12 @@ export function BarPdv({
   pendentesTotal: number
   unidadeNome: string
   podeCancelar: boolean
-  /** Conceder fiado exige `bar:manage` (mesmo que operar o PDV só precise de `bar:operate`). */
+  /** Liberar limite, desconto, débito e remover lançamento exigem `bar:manage`. */
   podeGerir?: boolean
-  /** Membros aprovados da unidade — devedor do fiado (só carregado quando `podeGerir`). */
-  membrosFiado?: { id: string; nome: string }[]
+  /** Membros aprovados da unidade — titular MEMBRO ao abrir comanda. */
+  membrosComanda?: { id: string; nome: string }[]
+  /** Comandas ABERTA da unidade (contexto do PDV). */
+  comandasAbertas?: BarComandaSerializada[]
   /** Sem turno aberto o PDV não registra novas vendas. */
   turnoAberto?: boolean
   /** Números do turno no topbar — o caixa não fica invisível quando a trilha lateral recolhe. */
@@ -222,22 +261,32 @@ export function BarPdv({
   const [produtos, setProdutos] = useState(produtosIniciais)
   const [pendentes, setPendentes] = useState(pendentesIniciais)
   const [pendentesTotal, setPendentesTotal] = useState(pendentesTotalInicial)
+  const [comandas, setComandas] = useState(comandasIniciais)
+  const [comandasPropRef, setComandasPropRef] = useState(comandasIniciais)
+  const [comandaIdAtiva, setComandaIdAtiva] = useState<string | null>(null)
+
+  // Sync após router.refresh (nova referência de props) sem useEffect.
+  if (comandasIniciais !== comandasPropRef) {
+    setComandasPropRef(comandasIniciais)
+    setComandas(comandasIniciais)
+    if (comandaIdAtiva && !comandasIniciais.some((c) => c.id === comandaIdAtiva)) {
+      setComandaIdAtiva(null)
+    }
+  }
   const [categoriaId, setCategoriaId] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
-  const [cart, setCart] = useState<CartLine[]>([])
+  const [pedido, setPedido] = useState<PedidoLine[]>([])
   const [metodo, setMetodo] = useState<Metodo>('DINHEIRO')
-  const [membroIdFiado, setMembroIdFiado] = useState('')
-  const [vencimentoFiado, setVencimentoFiado] = useState(vencimentoFiadoPadrao)
   const [descontoStr, setDescontoStr] = useState('')
   const [observacao, setObservacao] = useState('')
   const [fase, setFase] = useState<Fase>('venda')
   const [pix, setPix] = useState<PixPendente | null>(null)
-  const [pixItens, setPixItens] = useState<CartLine[] | null>(null)
+  const [pixItens, setPixItens] = useState<PedidoLine[] | null>(null)
   const [ultimoTotal, setUltimoTotal] = useState(0)
   const [copied, setCopied] = useState(false)
   const [pending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
-  const [comandaMobileAberta, setComandaMobileAberta] = useState(false)
+  const [pedidoMobileAberto, setPedidoMobileAberto] = useState(false)
   const [opcoesAbertas, setOpcoesAbertas] = useState(false)
   const turnoSidebarAberto = useSyncExternalStore(
     turnoSidebarSubscribe,
@@ -246,18 +295,49 @@ export function BarPdv({
   )
   const [turnoDrawerAberto, setTurnoDrawerAberto] = useState(false)
 
+  // Modais de comanda
+  const [modalAbrir, setModalAbrir] = useState(false)
+  const [abrirCodigo, setAbrirCodigo] = useState('')
+  const [abrirTipo, setAbrirTipo] = useState<'MEMBRO' | 'AVULSO'>('AVULSO')
+  const [abrirMembroId, setAbrirMembroId] = useState('')
+  const [abrirNome, setAbrirNome] = useState('')
+  const [abrirLimite, setAbrirLimite] = useState('')
+  const [modalFechar, setModalFechar] = useState(false)
+  const [fecharDesconto, setFecharDesconto] = useState('')
+  const [fecharMotivoDesconto, setFecharMotivoDesconto] = useState('')
+  const [fecharPagamentos, setFecharPagamentos] = useState<PagamentoLinha[]>([
+    { metodo: 'DINHEIRO', valorStr: '' },
+  ])
+  const [fecharVencimento, setFecharVencimento] = useState(vencimentoDebitoPadrao)
+  const [modalLimite, setModalLimite] = useState(false)
+  const [novoLimiteStr, setNovoLimiteStr] = useState('')
+  const [removerVendaId, setRemoverVendaId] = useState<string | null>(null)
+  const [removerMotivo, setRemoverMotivo] = useState('')
+
+  const comandaAtiva = useMemo(
+    () => (comandaIdAtiva ? (comandas.find((c) => c.id === comandaIdAtiva) ?? null) : null),
+    [comandaIdAtiva, comandas],
+  )
+  const modoComanda = comandaAtiva != null
+
   const desconto = Math.max(0, Number(descontoStr.replace(',', '.')) || 0)
 
   const resumo = useMemo(
     () =>
       resumirVenda(
-        cart.map((l) => ({ precoUnit: l.preco, quantidade: l.quantidade })),
-        desconto,
+        pedido.map((l) => ({ precoUnit: l.preco, quantidade: l.quantidade })),
+        modoComanda ? 0 : desconto,
       ),
-    [cart, desconto],
+    [pedido, desconto, modoComanda],
   )
 
-  const qtdItens = useMemo(() => cart.reduce((n, l) => n + l.quantidade, 0), [cart])
+  const qtdItens = useMemo(() => pedido.reduce((n, l) => n + l.quantidade, 0), [pedido])
+
+  const avisoLimitePct = useMemo(() => {
+    if (!comandaAtiva?.limiteEfetivo) return null
+    const pct = percentualLimite(comandaAtiva.total, comandaAtiva.limiteEfetivo)
+    return pct != null && pct >= 80 ? pct : null
+  }, [comandaAtiva])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -270,16 +350,16 @@ export function BarPdv({
 
   const estoqueDisponivel = useCallback(
     (produtoId: string, estoqueBase: number) => {
-      const noCarrinho = cart.find((l) => l.produtoId === produtoId)?.quantidade ?? 0
-      return Math.max(0, estoqueBase - noCarrinho)
+      const noPedido = pedido.find((l) => l.produtoId === produtoId)?.quantidade ?? 0
+      return Math.max(0, estoqueBase - noPedido)
     },
-    [cart],
+    [pedido],
   )
 
   function adicionarProduto(p: BarProdutoSerializado) {
     if (fase !== 'venda' || p.estoque <= 0) return
     setErro(null)
-    setCart((prev) => {
+    setPedido((prev) => {
       const existente = prev.find((l) => l.produtoId === p.id)
       if (existente) {
         if (existente.quantidade >= existente.estoque || existente.quantidade >= 99) return prev
@@ -302,7 +382,7 @@ export function BarPdv({
 
   function alterarQtd(produtoId: string, delta: number) {
     if (fase !== 'venda') return
-    setCart((prev) =>
+    setPedido((prev) =>
       prev
         .map((l) => {
           if (l.produtoId !== produtoId) return l
@@ -315,28 +395,26 @@ export function BarPdv({
 
   function setQtdProduto(p: BarProdutoSerializado, delta: number) {
     if (fase !== 'venda') return
-    const noCarrinho = cart.find((l) => l.produtoId === p.id)
-    if (!noCarrinho && delta > 0) {
+    const noPedido = pedido.find((l) => l.produtoId === p.id)
+    if (!noPedido && delta > 0) {
       adicionarProduto(p)
       return
     }
-    if (noCarrinho) alterarQtd(p.id, delta)
+    if (noPedido) alterarQtd(p.id, delta)
   }
 
   function removerLinha(produtoId: string) {
-    setCart((prev) => prev.filter((l) => l.produtoId !== produtoId))
+    setPedido((prev) => prev.filter((l) => l.produtoId !== produtoId))
   }
 
-  function limparCarrinho() {
-    setCart([])
+  function limparPedido() {
+    setPedido([])
     setDescontoStr('')
     setObservacao('')
     setErro(null)
-    setMembroIdFiado('')
-    setVencimentoFiado(vencimentoFiadoPadrao())
   }
 
-  function aplicarBaixaLocal(linhas: CartLine[]) {
+  function aplicarBaixaLocal(linhas: PedidoLine[]) {
     setProdutos((prev) =>
       prev.map((p) => {
         const linha = linhas.find((l) => l.produtoId === p.id)
@@ -346,7 +424,7 @@ export function BarPdv({
     )
   }
 
-  function restaurarBaixaLocal(linhas: CartLine[]) {
+  function restaurarBaixaLocal(linhas: PedidoLine[]) {
     setProdutos((prev) =>
       prev.map((p) => {
         const linha = linhas.find((l) => l.produtoId === p.id)
@@ -366,32 +444,18 @@ export function BarPdv({
     setPix(null)
     setPixItens(null)
     setUltimoTotal(0)
-    limparCarrinho()
+    limparPedido()
     setMetodo('DINHEIRO')
-    setComandaMobileAberta(false)
+    setPedidoMobileAberto(false)
   }
 
   function cobrar() {
-    if (cart.length === 0) {
+    if (pedido.length === 0) {
       setErro('Adicione pelo menos um item')
       return
     }
-    if (metodo === 'FIADO') {
-      if (!podeGerir) {
-        setErro('Fiado requer permissão de gestor')
-        return
-      }
-      if (!membroIdFiado) {
-        setErro('Selecione o membro devedor do fiado')
-        return
-      }
-      if (!vencimentoFiado) {
-        setErro('Informe o vencimento do fiado')
-        return
-      }
-    }
     setErro(null)
-    const snapshot = cart.map((l) => ({ ...l }))
+    const snapshot = pedido.map((l) => ({ ...l }))
     const totalPrevisto = resumo.total
 
     startTransition(async () => {
@@ -400,9 +464,6 @@ export function BarPdv({
         metodoPagamento: metodo,
         desconto,
         observacao: observacao.trim() || undefined,
-        ...(metodo === 'FIADO'
-          ? { membroId: membroIdFiado, vencimento: vencimentoFiado }
-          : {}),
       })
 
       if (!result.success) {
@@ -412,12 +473,12 @@ export function BarPdv({
       }
 
       aplicarBaixaLocal(snapshot)
-      setComandaMobileAberta(false)
+      setPedidoMobileAberto(false)
 
       if (result.pago) {
         setUltimoTotal(totalPrevisto)
         setFase('sucesso')
-        setCart([])
+        setPedido([])
         setDescontoStr('')
         setObservacao('')
         toast.success('Venda registrada', { description: formatarPreco(totalPrevisto) })
@@ -451,6 +512,7 @@ export function BarPdv({
       setPendentesTotal((n) => n + 1)
 
       setPix({
+        kind: 'venda',
         vendaId: result.vendaId,
         copiaCola: result.pix.copiaCola,
         provider: result.pix.provider,
@@ -459,9 +521,297 @@ export function BarPdv({
       setPixItens(snapshot)
       setUltimoTotal(totalPrevisto)
       setFase('pix')
-      setCart([])
+      setPedido([])
       setDescontoStr('')
       setObservacao('')
+    })
+  }
+
+  function lancarNaComanda() {
+    if (!comandaAtiva) return
+    if (pedido.length === 0) {
+      setErro('Adicione pelo menos um item')
+      return
+    }
+    setErro(null)
+    const snapshot = pedido.map((l) => ({ ...l }))
+    const totalPedido = resumo.total
+
+    startTransition(async () => {
+      const result = await lancarItensComandaBar({
+        comandaId: comandaAtiva.id,
+        itens: snapshot.map((l) => ({ produtoId: l.produtoId, quantidade: l.quantidade })),
+      })
+      if (!result.success) {
+        setErro(result.error)
+        toast.error(result.error)
+        return
+      }
+
+      aplicarBaixaLocal(snapshot)
+      setPedido([])
+      setPedidoMobileAberto(false)
+
+      const novoLancamento = {
+        id: result.vendaId,
+        total: totalPedido,
+        criadoEm: new Date().toISOString(),
+        itens: snapshot.map((l, i) => ({
+          id: `local-${i}`,
+          produtoId: l.produtoId,
+          produtoNome: l.nome,
+          quantidade: l.quantidade,
+          precoUnit: l.preco,
+          total: l.preco * l.quantidade,
+        })),
+      }
+      setComandas((prev) =>
+        prev.map((c) => {
+          if (c.id !== comandaAtiva.id) return c
+          return recomputarComandaLocal({
+            ...c,
+            total: result.totalComanda,
+            lancamentos: [...c.lancamentos, novoLancamento],
+          })
+        }),
+      )
+      if (result.avisoLimitePct != null) {
+        toast.message(`Comanda em ${Math.round(result.avisoLimitePct)}% do limite`)
+      } else {
+        toast.success('Itens lançados na comanda')
+      }
+      router.refresh()
+    })
+  }
+
+  function confirmarAbrirComanda() {
+    const codigo = abrirCodigo.trim()
+    if (!codigo) {
+      toast.error('Informe o código da comanda')
+      return
+    }
+    const limiteNum =
+      abrirLimite.trim() === '' ? undefined : Number(abrirLimite.replace(',', '.'))
+    if (limiteNum != null && (!Number.isFinite(limiteNum) || limiteNum <= 0)) {
+      toast.error('Limite inválido')
+      return
+    }
+    startTransition(async () => {
+      const result = await abrirComandaBar({
+        codigo,
+        tipo: abrirTipo,
+        membroId: abrirTipo === 'MEMBRO' ? abrirMembroId || undefined : undefined,
+        titularNome: abrirTipo === 'AVULSO' ? abrirNome.trim() || undefined : undefined,
+        limite: limiteNum,
+      })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      const titularNome =
+        abrirTipo === 'MEMBRO'
+          ? (membrosComanda.find((m) => m.id === abrirMembroId)?.nome ?? 'Membro')
+          : abrirNome.trim()
+      const limiteEfetivo =
+        limiteNum ?? LIMITE_COMANDA_PADRAO
+      const nova: BarComandaSerializada = {
+        id: result.comandaId,
+        codigo,
+        tipo: abrirTipo,
+        status: 'ABERTA',
+        titularNome,
+        titularMembroId: abrirTipo === 'MEMBRO' ? abrirMembroId : null,
+        limite: limiteNum ?? null,
+        limiteEfetivo,
+        total: 0,
+        totalPago: 0,
+        desconto: 0,
+        saldo: 0,
+        percentualLimite: 0,
+        abertaEm: new Date().toISOString(),
+        lancamentos: [],
+      }
+      setComandas((prev) => [...prev, nova].sort((a, b) => a.codigo.localeCompare(b.codigo)))
+      setComandaIdAtiva(result.comandaId)
+      setModalAbrir(false)
+      setAbrirCodigo('')
+      setAbrirNome('')
+      setAbrirMembroId('')
+      setAbrirLimite('')
+      toast.success(`Comanda ${codigo} aberta`)
+      router.refresh()
+    })
+  }
+
+  function confirmarLiberarLimite() {
+    if (!comandaAtiva || !podeGerir) return
+    const novo =
+      novoLimiteStr.trim() === '' ? undefined : Number(novoLimiteStr.replace(',', '.'))
+    if (novo != null && (!Number.isFinite(novo) || novo <= 0)) {
+      toast.error('Limite inválido')
+      return
+    }
+    startTransition(async () => {
+      const result = await liberarLimiteComandaBar({
+        comandaId: comandaAtiva.id,
+        novoLimite: novo,
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      setComandas((prev) =>
+        prev.map((c) => {
+          if (c.id !== comandaAtiva.id) return c
+          const limiteEfetivo = novo ?? LIMITE_COMANDA_PADRAO
+          return recomputarComandaLocal({
+            ...c,
+            limite: novo ?? null,
+            limiteEfetivo,
+          })
+        }),
+      )
+      setModalLimite(false)
+      setNovoLimiteStr('')
+      toast.success('Limite atualizado')
+      router.refresh()
+    })
+  }
+
+  function confirmarRemoverLancamento() {
+    if (!removerVendaId || !podeGerir) return
+    if (removerMotivo.trim().length < 3) {
+      toast.error('Informe o motivo (mín. 3 caracteres)')
+      return
+    }
+    const vendaId = removerVendaId
+    const lancamento = comandaAtiva?.lancamentos.find((l) => l.id === vendaId)
+    startTransition(async () => {
+      const result = await removerLancamentoComandaBar({
+        vendaId,
+        motivo: removerMotivo.trim(),
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (lancamento) {
+        const linhas: PedidoLine[] = lancamento.itens
+          .filter((i) => i.produtoId)
+          .map((i) => ({
+            produtoId: i.produtoId!,
+            nome: i.produtoNome,
+            preco: i.precoUnit,
+            quantidade: i.quantidade,
+            estoque: i.quantidade,
+          }))
+        if (linhas.length) restaurarBaixaLocal(linhas)
+      }
+      setComandas((prev) =>
+        prev.map((c) => {
+          if (c.id !== comandaAtiva?.id) return c
+          return recomputarComandaLocal({
+            ...c,
+            lancamentos: c.lancamentos.filter((l) => l.id !== vendaId),
+          })
+        }),
+      )
+      setRemoverVendaId(null)
+      setRemoverMotivo('')
+      toast.message('Lançamento removido — estoque restaurado')
+      router.refresh()
+    })
+  }
+
+  function abrirModalFechar() {
+    if (!comandaAtiva) return
+    if (comandaAtiva.lancamentos.length === 0) {
+      toast.error('Comanda sem consumo — cancele em vez de fechar')
+      return
+    }
+    const saldo = comandaAtiva.saldo > 0 ? comandaAtiva.saldo : comandaAtiva.total - comandaAtiva.desconto
+    setFecharDesconto('')
+    setFecharMotivoDesconto('')
+    setFecharPagamentos([{ metodo: 'DINHEIRO', valorStr: saldo > 0 ? String(saldo.toFixed(2)) : '' }])
+    setFecharVencimento(vencimentoDebitoPadrao())
+    setModalFechar(true)
+  }
+
+  function confirmarFecharComanda() {
+    if (!comandaAtiva) return
+    const descontoFechar = Math.max(0, Number(fecharDesconto.replace(',', '.')) || 0)
+    const pagamentos = fecharPagamentos
+      .map((p) => ({
+        metodo: p.metodo,
+        valor: Number(p.valorStr.replace(',', '.')) || 0,
+      }))
+      .filter((p) => p.valor > 0)
+
+    const totalAposDesconto = Math.max(0, comandaAtiva.total - descontoFechar)
+    const somaPag = pagamentos.reduce((a, p) => a + p.valor, 0)
+    const saldoPrevisto = Math.max(
+      0,
+      Math.round((totalAposDesconto - comandaAtiva.totalPago - somaPag) * 100) / 100,
+    )
+
+    if (saldoPrevisto > 0) {
+      if (!podeGerir) {
+        toast.error('Fechar com débito exige permissão de gestor')
+        return
+      }
+      if (comandaAtiva.tipo === 'AVULSO') {
+        toast.error('Comanda avulsa não pode fechar com débito — cubra o total')
+        return
+      }
+      if (!fecharVencimento) {
+        toast.error('Informe o vencimento do débito')
+        return
+      }
+    }
+    if (descontoFechar > 0 && !podeGerir) {
+      toast.error('Desconto exige permissão de gestor')
+      return
+    }
+
+    startTransition(async () => {
+      const result = await fecharComandaBar({
+        comandaId: comandaAtiva.id,
+        desconto: descontoFechar,
+        motivoDesconto: descontoFechar > 0 ? fecharMotivoDesconto.trim() || undefined : undefined,
+        pagamentos,
+        vencimento: saldoPrevisto > 0 ? fecharVencimento : undefined,
+      })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+
+      setModalFechar(false)
+
+      if (result.pix && result.pix.length > 0) {
+        const first = result.pix[0]!
+        setPix({
+          kind: 'comanda',
+          comandaId: comandaAtiva.id,
+          pagamentoId: first.pagamentoId,
+          copiaCola: first.copiaCola,
+          provider: first.provider,
+          total: totalAposDesconto - comandaAtiva.totalPago,
+        })
+        setUltimoTotal(totalAposDesconto - comandaAtiva.totalPago)
+        setFase('pix')
+        toast.message('Aguardando PIX da comanda')
+        return
+      }
+
+      setComandas((prev) => prev.filter((c) => c.id !== comandaAtiva.id))
+      setComandaIdAtiva(null)
+      setUltimoTotal(totalAposDesconto)
+      setFase('sucesso')
+      toast.success(
+        result.status === 'FECHADA_COM_DEBITO' ? 'Comanda fechada com débito' : 'Comanda fechada',
+      )
+      router.refresh()
     })
   }
 
@@ -471,6 +821,7 @@ export function BarPdv({
       return
     }
     setPix({
+      kind: 'venda',
       vendaId: venda.id,
       copiaCola: venda.pixCopiaCola,
       provider: venda.gatewayProvider ?? 'mock',
@@ -489,7 +840,7 @@ export function BarPdv({
     )
     setUltimoTotal(venda.total)
     setFase('pix')
-    setComandaMobileAberta(false)
+    setPedidoMobileAberto(false)
   }
 
   function cancelarPendenteDaFaixa(venda: BarVendaSerializada) {
@@ -500,7 +851,7 @@ export function BarPdv({
         toast.error(result.error)
         return
       }
-      const linhas: CartLine[] = venda.itens
+      const linhas: PedidoLine[] = venda.itens
         .filter((i) => i.produtoId)
         .map((i) => ({
           produtoId: i.produtoId!,
@@ -511,7 +862,7 @@ export function BarPdv({
         }))
       if (linhas.length) restaurarBaixaLocal(linhas)
       removerPendente(venda.id)
-      if (pix?.vendaId === venda.id) {
+      if (pix?.kind === 'venda' && pix.vendaId === venda.id) {
         setFase('venda')
         setPix(null)
         setPixItens(null)
@@ -524,24 +875,38 @@ export function BarPdv({
   const pollPix = useCallback(() => {
     if (!pix) return
     void (async () => {
-      const status = await consultarStatusVendaBar(pix.vendaId)
+      if (pix.kind === 'venda') {
+        const status = await consultarStatusVendaBar(pix.vendaId)
+        if (!status.success) return
+        if (status.status === 'PAGA') {
+          removerPendente(pix.vendaId)
+          setFase('sucesso')
+          setPix(null)
+          setPixItens(null)
+          toast.success('PIX confirmado', { description: formatarPreco(pix.total) })
+        } else if (status.status === 'CANCELADA') {
+          if (pixItens) restaurarBaixaLocal(pixItens)
+          removerPendente(pix.vendaId)
+          setErro('Venda cancelada')
+          setFase('venda')
+          setPix(null)
+          setPixItens(null)
+        }
+        return
+      }
+
+      const status = await consultarStatusComandaBar(pix.comandaId)
       if (!status.success) return
-      if (status.status === 'PAGA') {
-        removerPendente(pix.vendaId)
+      if (status.status === 'FECHADA_PAGA' || status.status === 'FECHADA_COM_DEBITO') {
+        setComandas((prev) => prev.filter((c) => c.id !== pix.comandaId))
+        setComandaIdAtiva(null)
         setFase('sucesso')
         setPix(null)
-        setPixItens(null)
-        toast.success('PIX confirmado', { description: formatarPreco(pix.total) })
-      } else if (status.status === 'CANCELADA') {
-        if (pixItens) restaurarBaixaLocal(pixItens)
-        removerPendente(pix.vendaId)
-        setErro('Venda cancelada')
-        setFase('venda')
-        setPix(null)
-        setPixItens(null)
+        toast.success('PIX da comanda confirmado', { description: formatarPreco(pix.total) })
+        router.refresh()
       }
     })()
-  }, [pix, pixItens])
+  }, [pix, pixItens, router])
 
   useVisibleInterval(pollPix, 2500, fase === 'pix' && pix != null)
 
@@ -555,21 +920,35 @@ export function BarPdv({
   function confirmarMock() {
     if (!pix) return
     startTransition(async () => {
-      const result = await confirmarPixMockBar(pix.vendaId)
+      if (pix.kind === 'venda') {
+        const result = await confirmarPixMockBar(pix.vendaId)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        removerPendente(pix.vendaId)
+        setFase('sucesso')
+        setPix(null)
+        setPixItens(null)
+        toast.success('PIX confirmado (mock)')
+        return
+      }
+      const result = await confirmarPixMockComandaBar(pix.pagamentoId)
       if (result.error) {
         toast.error(result.error)
         return
       }
-      removerPendente(pix.vendaId)
+      setComandas((prev) => prev.filter((c) => c.id !== pix.comandaId))
+      setComandaIdAtiva(null)
       setFase('sucesso')
       setPix(null)
-      setPixItens(null)
-      toast.success('PIX confirmado (mock)')
+      toast.success('PIX da comanda confirmado (mock)')
+      router.refresh()
     })
   }
 
   function cancelarPix() {
-    if (!pix || !podeCancelar) return
+    if (!pix || pix.kind !== 'venda' || !podeCancelar) return
     const vendaId = pix.vendaId
     const itens = pixItens
     startTransition(async () => {
@@ -591,24 +970,24 @@ export function BarPdv({
 
   const opcoesVisiveis = opcoesAbertas || desconto > 0 || observacao.length > 0
 
-  // @container: a comanda é renderizada tanto na coluna fixa (21–25rem) quanto no
+  // @container: o Pedido é renderizado tanto na coluna fixa (21–25rem) quanto no
   // bottom sheet das telas estreitas. Breakpoint de viewport aqui mentia —
   // `sm:grid-cols-2` valia numa coluna de 21rem e espremia os campos.
   const sidebar = (
     <div className="@container flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-baseline justify-between gap-2 pb-2.5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">
-          Comanda
+          Pedido
           {qtdItens > 0 && (
             <span className="ml-2 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs font-bold tabular-nums tracking-normal text-[rgb(var(--foreground-muted))]">
               {qtdItens}
             </span>
           )}
         </h2>
-        {cart.length > 0 && (
+        {pedido.length > 0 && (
           <button
             type="button"
-            onClick={limparCarrinho}
+            onClick={limparPedido}
             className="rounded-full px-2 py-1 text-xs font-semibold text-[rgb(var(--color-danger-fg))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.1)]"
           >
             Limpar
@@ -616,19 +995,82 @@ export function BarPdv({
         )}
       </div>
 
+      {modoComanda && comandaAtiva && (
+        <div className="mb-2 shrink-0 space-y-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="truncate text-xs font-bold text-[rgb(var(--foreground))]">
+              {comandaAtiva.codigo}
+              <span className="ml-1.5 font-medium text-[rgb(var(--foreground-muted))]">
+                · {comandaAtiva.titularNome}
+              </span>
+            </p>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-[rgb(var(--foreground))]">
+              {formatarPreco(comandaAtiva.total)}
+            </span>
+          </div>
+          {comandaAtiva.limiteEfetivo != null && (
+            <div>
+              <div className="mb-1 flex justify-between text-[10px] font-semibold text-[rgb(var(--foreground-muted))]">
+                <span>
+                  Limite {formatarPreco(comandaAtiva.limiteEfetivo)}
+                  {avisoLimitePct != null && (
+                    <span className="ml-1 text-[rgb(var(--color-warning-fg))]">
+                      · {Math.round(avisoLimitePct)}%
+                    </span>
+                  )}
+                </span>
+                {podeGerir && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNovoLimiteStr(
+                        comandaAtiva.limite != null ? String(comandaAtiva.limite) : '',
+                      )
+                      setModalLimite(true)
+                    }}
+                    className="text-[rgb(var(--color-primary-fg))] hover:underline"
+                  >
+                    Liberar
+                  </button>
+                )}
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border))]">
+                <div
+                  className={[
+                    'h-full rounded-full transition-[width]',
+                    avisoLimitePct != null
+                      ? 'bg-[rgb(var(--color-warning-fg))]'
+                      : 'bg-[rgb(var(--primary))]',
+                  ].join(' ')}
+                  style={{
+                    width: `${Math.min(100, comandaAtiva.percentualLimite ?? 0)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {comandaAtiva.totalPago > 0 && (
+            <p className="text-[10px] text-[rgb(var(--foreground-muted))]">
+              Já pago {formatarPreco(comandaAtiva.totalPago)} · saldo{' '}
+              {formatarPreco(comandaAtiva.saldo)}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {cart.length === 0 ? (
-          <div className="flex h-full min-h-[7rem] flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-6 text-center">
+        {pedido.length === 0 ? (
+          <div className="flex min-h-[7rem] flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-6 text-center">
             <Beer className="mb-2 h-7 w-7 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Comanda vazia</p>
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Pedido vazio</p>
             <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-              Toque num item do cardápio para lançar
+              Toque num item do cardápio para adicionar
             </p>
           </div>
         ) : (
           <ul className="space-y-1.5">
             <AnimatePresence mode="popLayout" initial={false}>
-              {cart.map((l) => (
+              {pedido.map((l) => (
                 <m.li
                   key={l.produtoId}
                   layout
@@ -674,134 +1116,145 @@ export function BarPdv({
             </AnimatePresence>
           </ul>
         )}
-      </div>
 
-      <div className="mt-2.5 shrink-0 space-y-2.5 border-t border-[rgb(var(--border))] pt-2.5">
-        <button
-          type="button"
-          onClick={() => setOpcoesAbertas((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-xs font-semibold text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <span>
-            Desconto e observação
-            {desconto > 0 && (
-              <span className="ml-2 tabular-nums text-[rgb(var(--color-primary-fg))]">
-                −{formatarPreco(desconto)}
-              </span>
-            )}
-          </span>
-          <ChevronDown
-            className={[
-              'h-4 w-4 transition-transform duration-200',
-              opcoesVisiveis ? 'rotate-180' : '',
-            ].join(' ')}
-          />
-        </button>
-        {opcoesVisiveis && (
-          <div className="@[22rem]:grid-cols-2 grid grid-cols-1 gap-2">
-            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Desconto (R$)
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                value={descontoStr}
-                onChange={(e) => setDescontoStr(e.target.value)}
-                placeholder="0,00"
-                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums text-[rgb(var(--foreground))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
-              />
-            </label>
-            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Observação
-              <input
-                type="text"
-                maxLength={200}
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                placeholder="Opcional"
-                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
-              />
-            </label>
+        {modoComanda && comandaAtiva && comandaAtiva.lancamentos.length > 0 && (
+          <div className="mt-3 space-y-1.5 border-t border-[rgb(var(--border))] pt-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Na comanda
+            </p>
+            {comandaAtiva.lancamentos.map((lanc) => (
+              <div
+                key={lanc.id}
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    {lanc.itens.map((item) => (
+                      <p
+                        key={item.id}
+                        className="truncate text-[12px] text-[rgb(var(--foreground))]"
+                      >
+                        {item.quantidade}× {item.produtoNome}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-xs font-bold tabular-nums text-[rgb(var(--foreground))]">
+                      {formatarPreco(lanc.total)}
+                    </span>
+                    {podeGerir && (
+                      <button
+                        type="button"
+                        aria-label="Remover lançamento"
+                        onClick={() => {
+                          setRemoverVendaId(lanc.id)
+                          setRemoverMotivo('')
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--color-danger)_/_0.1)] hover:text-[rgb(var(--color-danger-fg))]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            Pagamento
+        {modoComanda && comandaAtiva && comandaAtiva.lancamentos.length === 0 && pedido.length === 0 && (
+          <p className="mt-3 text-center text-xs text-[rgb(var(--foreground-muted))]">
+            Nenhum lançamento nesta comanda ainda
           </p>
-          <div className="@[19rem]:grid-cols-3 grid grid-cols-2 gap-1.5">
-            {(METODO_PAGAMENTO_BAR as readonly Metodo[]).map((m) => {
-              const bloqueado = m === 'FIADO' && !podeGerir
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={bloqueado}
-                  aria-pressed={metodo === m}
-                  title={
-                    bloqueado
-                      ? 'Fiado requer permissão de gestor'
-                      : METODO_PAGAMENTO_BAR_LABEL[m]
-                  }
-                  onClick={() => !bloqueado && setMetodo(m)}
-                  className={[
-                    'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-semibold leading-none transition-colors',
-                    bloqueado
-                      ? 'cursor-not-allowed border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] opacity-50'
-                      : metodo === m
+        )}
+      </div>
+
+      <div className="mt-2.5 shrink-0 space-y-2.5 border-t border-[rgb(var(--border))] pt-2.5">
+        {!modoComanda && (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpcoesAbertas((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-xs font-semibold text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            >
+              <span>
+                Desconto e observação
+                {desconto > 0 && (
+                  <span className="ml-2 tabular-nums text-[rgb(var(--color-primary-fg))]">
+                    −{formatarPreco(desconto)}
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                className={[
+                  'h-4 w-4 transition-transform duration-200',
+                  opcoesVisiveis ? 'rotate-180' : '',
+                ].join(' ')}
+              />
+            </button>
+            {opcoesVisiveis && (
+              <div className="@[22rem]:grid-cols-2 grid grid-cols-1 gap-2">
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Desconto (R$)
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={descontoStr}
+                    onChange={(e) => setDescontoStr(e.target.value)}
+                    placeholder="0,00"
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums text-[rgb(var(--foreground))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Observação
+                  <input
+                    type="text"
+                    maxLength={200}
+                    value={observacao}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    placeholder="Opcional"
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
+                  />
+                </label>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Pagamento
+              </p>
+              <div className="@[19rem]:grid-cols-4 grid grid-cols-2 gap-1.5">
+                {METODOS_PEDIDO.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={metodo === m}
+                    title={METODO_PAGAMENTO_BAR_LABEL[m]}
+                    onClick={() => setMetodo(m)}
+                    className={[
+                      'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-semibold leading-none transition-colors',
+                      metodo === m
                         ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
                         : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.4)] hover:bg-[rgb(var(--background-subtle))]',
-                  ].join(' ')}
-                >
-                  <MetodoIcon metodo={m} />
-                  {METODO_LABEL_CURTO[m] ?? METODO_PAGAMENTO_BAR_LABEL[m]}
-                </button>
-              )
-            })}
-          </div>
-          {metodo === 'FIADO' && !podeGerir && (
-            <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Fiado requer permissão de gestor.
-            </p>
-          )}
-        </div>
-
-        {metodo === 'FIADO' && podeGerir && (
-          <div className="@[22rem]:grid-cols-2 grid grid-cols-1 gap-2 rounded-xl border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.06)] p-2.5">
-            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Devedor *
-              <select
-                value={membroIdFiado}
-                onChange={(e) => setMembroIdFiado(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-2 text-sm text-[rgb(var(--foreground))]"
-              >
-                <option value="">Selecione o membro</option>
-                {membrosFiado.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
-                  </option>
+                    ].join(' ')}
+                  >
+                    <MetodoIcon metodo={m} />
+                    {METODO_LABEL_CURTO[m] ?? METODO_PAGAMENTO_BAR_LABEL[m]}
+                  </button>
                 ))}
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Vencimento *
-              <input
-                type="date"
-                value={vencimentoFiado}
-                onChange={(e) => setVencimentoFiado(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-2 text-sm text-[rgb(var(--foreground))]"
-              />
-            </label>
-          </div>
+              </div>
+            </div>
+          </>
         )}
 
         <div className="rounded-xl bg-[rgb(var(--background-subtle))] px-3 py-2.5">
           <div className="flex justify-between text-xs text-[rgb(var(--foreground-muted))]">
-            <span>Subtotal</span>
+            <span>{modoComanda ? 'Pedido' : 'Subtotal'}</span>
             <span className="tabular-nums">{formatarPreco(resumo.subtotal)}</span>
           </div>
-          {resumo.desconto > 0 && (
+          {!modoComanda && resumo.desconto > 0 && (
             <div className="mt-1 flex justify-between text-xs text-[rgb(var(--foreground-muted))]">
               <span>Desconto</span>
               <span className="tabular-nums">−{formatarPreco(resumo.desconto)}</span>
@@ -809,7 +1262,7 @@ export function BarPdv({
           )}
           <div className="mt-1.5 flex items-baseline justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Total
+              {modoComanda ? 'A lançar' : 'Total'}
             </span>
             <span className="text-[1.75rem] font-bold leading-none tabular-nums text-[rgb(var(--foreground))]">
               {formatarPreco(resumo.total)}
@@ -826,18 +1279,48 @@ export function BarPdv({
           </p>
         )}
 
-        <button
-          type="button"
-          disabled={pending || cart.length === 0}
-          onClick={cobrar}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100"
-        >
-          {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-          {metodo === 'PIX' ? 'Gerar PIX' : 'Cobrar'}
-          {cart.length > 0 && (
-            <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
-          )}
-        </button>
+        {modoComanda ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled={pending || pedido.length === 0}
+              onClick={lancarNaComanda}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100"
+            >
+              {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+              Lançar na comanda
+              {pedido.length > 0 && (
+                <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              disabled={pending || !comandaAtiva || comandaAtiva.lancamentos.length === 0}
+              onClick={abrirModalFechar}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-3 text-sm font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Fechar comanda
+              {comandaAtiva && comandaAtiva.total > 0 && (
+                <span className="tabular-nums opacity-80">
+                  · {formatarPreco(comandaAtiva.total)}
+                </span>
+              )}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={pending || pedido.length === 0}
+            onClick={cobrar}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100"
+          >
+            {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+            {metodo === 'PIX' ? 'Gerar PIX' : 'Cobrar'}
+            {pedido.length > 0 && (
+              <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
+            )}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -854,7 +1337,7 @@ export function BarPdv({
   )
 
   // Trilha de turno: só entra quando o frame tem largura de sobra (≥82rem). Abaixo
-  // disso a comanda tem prioridade e o turno vira drawer pelo chip do topbar.
+  // disso o Pedido tem prioridade e o turno vira drawer pelo chip do topbar.
   const turnoSidebar = (
     <aside
       className={[
@@ -939,7 +1422,7 @@ export function BarPdv({
           icon={
             <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-600 dark:text-emerald-400" />
           }
-          title="Venda paga"
+          title="Pago"
           description={formatarPreco(ultimoTotal)}
           className="w-full max-w-md rounded-3xl border border-[rgb(var(--color-success)_/_0.35)] bg-[rgb(var(--color-success)_/_0.08)] p-8 text-center"
         >
@@ -1033,7 +1516,7 @@ export function BarPdv({
               </button>
             )}
 
-            {podeCancelar && (
+            {podeCancelar && pix.kind === 'venda' && (
               <button
                 type="button"
                 disabled={pending}
@@ -1042,6 +1525,18 @@ export function BarPdv({
               >
                 <X className="h-4 w-4" />
                 Cancelar venda
+              </button>
+            )}
+            {pix.kind === 'comanda' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFase('venda')
+                  setPix(null)
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))]"
+              >
+                Voltar sem confirmar
               </button>
             )}
           </div>
@@ -1065,9 +1560,55 @@ export function BarPdv({
           </h1>
         </div>
 
+        {/* Contexto de comanda: Sem comanda = venda rápida. */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <label className="sr-only" htmlFor="pdv-comanda-select">
+            Comanda ativa
+          </label>
+          <div className="relative min-w-0">
+            <NotebookPen className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+            <select
+              id="pdv-comanda-select"
+              value={comandaIdAtiva ?? ''}
+              onChange={(e) => {
+                const v = e.target.value
+                setComandaIdAtiva(v === '' ? null : v)
+                setErro(null)
+              }}
+              className="h-10 max-w-[11rem] truncate rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-0 pl-8 pr-7 text-xs font-semibold text-[rgb(var(--foreground))] @[42rem]/pdv:max-w-[16rem] @[56rem]/pdv:max-w-[20rem]"
+            >
+              <option value="">Sem comanda</option>
+              {comandas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.codigo} · {c.titularNome}
+                  {c.total > 0 ? ` · ${formatarPreco(c.total)}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            disabled={!turnoAberto || pending}
+            onClick={() => setModalAbrir(true)}
+            className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-[rgb(var(--border))] px-2.5 text-xs font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50 @[42rem]/pdv:px-3"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden @[34rem]/pdv:inline">Abrir</span>
+          </button>
+        </div>
+
+        {comandaAtiva && avisoLimitePct != null && (
+          <span
+            title={`${Math.round(avisoLimitePct)}% do limite`}
+            className="hidden h-10 items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-3 text-xs font-bold text-[rgb(var(--color-warning-fg))] @[56rem]/pdv:inline-flex"
+          >
+            Limite {Math.round(avisoLimitePct)}%
+          </span>
+        )}
+
         {/* Números do caixa no topbar: a trilha de turno some abaixo de 82rem. */}
         {turnoResumo && (
-          <div className="hidden items-center gap-4 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-1.5 @[56rem]/pdv:flex @[82rem]/pdv:hidden">
+          <div className="hidden items-center gap-4 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-1.5 @[72rem]/pdv:flex @[82rem]/pdv:hidden">
             <span className="flex items-center gap-2">
               {turnoStatusDot}
               <span className="text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
@@ -1091,13 +1632,13 @@ export function BarPdv({
         >
           <Clock className="h-4 w-4" />
           {turnoStatusDot}
-          <span className="hidden @[34rem]/pdv:inline">Turno</span>
+          <span className="hidden @[48rem]/pdv:inline">Turno</span>
         </button>
 
         {pendentesTotal > 0 ? (
           <span
             title={`${pendentesTotal} PIX aguardando confirmação`}
-            className="hidden h-10 items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-3 text-xs font-bold text-[rgb(var(--color-warning-fg))] @[42rem]/pdv:inline-flex"
+            className="hidden h-10 items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-3 text-xs font-bold text-[rgb(var(--color-warning-fg))] @[56rem]/pdv:inline-flex"
           >
             {pendentesTotal} PIX
           </span>
@@ -1105,7 +1646,7 @@ export function BarPdv({
 
         <Link
           href="/admin/bar/vendas"
-          className="hidden h-10 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] @[42rem]/pdv:inline-flex"
+          className="hidden h-10 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] @[56rem]/pdv:inline-flex"
         >
           <ReceiptText className="h-4 w-4" />
           Vendas
@@ -1254,7 +1795,7 @@ export function BarPdv({
                   // Zona de ação com largura fixa — a linha não reflui ao lançar.
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15.5rem,100%),1fr))] gap-2">
                     {filtrados.map((p) => {
-                      const noCarrinho = cart.find((l) => l.produtoId === p.id)?.quantidade ?? 0
+                      const noPedido = pedido.find((l) => l.produtoId === p.id)?.quantidade ?? 0
                       const disponivel = estoqueDisponivel(p.id, p.estoque)
                       const esgotado = p.estoque <= 0
                       const semMais = esgotado || disponivel <= 0
@@ -1273,7 +1814,7 @@ export function BarPdv({
                           tabIndex={esgotado ? -1 : 0}
                           aria-disabled={bloqueado}
                           aria-label={`${p.nome}, ${formatarPreco(p.preco)}${
-                            noCarrinho > 0 ? `, ${noCarrinho} na comanda` : ''
+                            noPedido > 0 ? `, ${noPedido} no pedido` : ''
                           }${esgotado ? ', esgotado' : ''}`}
                           whileTap={bloqueado ? undefined : { scale: 0.98 }}
                           transition={springSnappy}
@@ -1288,7 +1829,7 @@ export function BarPdv({
                             'flex min-w-0 select-none items-center gap-2.5 rounded-xl border p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.5)]',
                             esgotado
                               ? 'cursor-not-allowed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-55'
-                              : noCarrinho > 0
+                              : noPedido > 0
                                 ? 'cursor-pointer border-[rgb(var(--color-primary)_/_0.55)] bg-[rgb(var(--color-primary)_/_0.08)]'
                                 : 'cursor-pointer border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.35)] hover:bg-[rgb(var(--surface-raised))]',
                           ].join(' ')}
@@ -1339,7 +1880,7 @@ export function BarPdv({
                             onKeyDown={(e) => e.stopPropagation()}
                             role="presentation"
                           >
-                            {esgotado ? null : noCarrinho > 0 ? (
+                            {esgotado ? null : noPedido > 0 ? (
                               <>
                                 <button
                                   type="button"
@@ -1351,13 +1892,13 @@ export function BarPdv({
                                   <Minus className="h-3.5 w-3.5" />
                                 </button>
                                 <m.span
-                                  key={noCarrinho}
+                                  key={noPedido}
                                   initial={{ scale: 0.7 }}
                                   animate={{ scale: 1 }}
                                   transition={springSnappy}
                                   className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-xs font-bold tabular-nums text-[rgb(var(--color-primary-fg))]"
                                 >
-                                  {noCarrinho}
+                                  {noPedido}
                                 </m.span>
                               </>
                             ) : (
@@ -1380,7 +1921,7 @@ export function BarPdv({
               </div>
             </section>
 
-            {/* Comanda: coluna fixa a partir de 60rem de frame. */}
+            {/* Pedido: coluna fixa a partir de 60rem de frame. */}
             <aside className="hidden min-h-0 w-[21rem] shrink-0 flex-col border-l border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 @[60rem]/pdv:flex @[76rem]/pdv:w-[23rem] @[100rem]/pdv:w-[25rem]">
               {sidebar}
             </aside>
@@ -1388,17 +1929,17 @@ export function BarPdv({
         )}
       </div>
 
-      {/* Frame estreito: barra de resumo + bottom sheet da comanda. */}
-      {turnoAberto && !comandaMobileAberta && cart.length > 0 && (
+      {/* Frame estreito: barra de resumo + bottom sheet do Pedido. */}
+      {turnoAberto && !pedidoMobileAberto && pedido.length > 0 && (
         <div className="absolute inset-x-0 bottom-0 z-30 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.97)] p-3 backdrop-blur @[60rem]/pdv:hidden">
           <button
             type="button"
             disabled={pending}
-            onClick={() => setComandaMobileAberta(true)}
+            onClick={() => setPedidoMobileAberto(true)}
             className="flex w-full items-center justify-between gap-3 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
           >
             <span className="flex items-center gap-2">
-              Ver comanda
+              Ver pedido
               <span className="rounded-full bg-black/15 px-2 py-0.5 text-xs tabular-nums">
                 {qtdItens}
               </span>
@@ -1408,22 +1949,22 @@ export function BarPdv({
         </div>
       )}
 
-      {turnoAberto && comandaMobileAberta && (
+      {turnoAberto && pedidoMobileAberto && (
         <div className="absolute inset-0 z-40 flex flex-col justify-end @[60rem]/pdv:hidden">
           <button
             type="button"
-            aria-label="Fechar comanda"
+            aria-label="Fechar pedido"
             className="absolute inset-0 bg-black/50"
-            onClick={() => setComandaMobileAberta(false)}
+            onClick={() => setPedidoMobileAberto(false)}
           />
           <div className="relative flex h-[85%] flex-col rounded-t-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
             <div className="relative flex h-10 shrink-0 items-center justify-center border-b border-[rgb(var(--border))] px-3">
               <div className="h-1 w-10 rounded-full bg-[rgb(var(--border-strong))]" />
               <button
                 type="button"
-                onClick={() => setComandaMobileAberta(false)}
+                onClick={() => setPedidoMobileAberto(false)}
                 className="absolute right-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                aria-label="Fechar comanda"
+                aria-label="Fechar pedido"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1434,6 +1975,371 @@ export function BarPdv({
       )}
 
       {turnoDrawer}
+
+      {/* Modal: abrir comanda */}
+      {modalAbrir && (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 p-3 @[40rem]/pdv:items-center">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdv-abrir-comanda-titulo"
+            className="w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+          >
+            <h2
+              id="pdv-abrir-comanda-titulo"
+              className="text-base font-bold text-[rgb(var(--foreground))]"
+            >
+              Abrir comanda
+            </h2>
+            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              Conta aberta para acumular lançamentos. O Pedido continua à direita.
+            </p>
+            <div className="mt-3 space-y-3">
+              <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Código *
+                <input
+                  value={abrirCodigo}
+                  onChange={(e) => setAbrirCodigo(e.target.value)}
+                  placeholder="Mesa 12 / A-01"
+                  className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['AVULSO', 'MEMBRO'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={abrirTipo === t}
+                    onClick={() => setAbrirTipo(t)}
+                    className={[
+                      'rounded-xl px-3 py-2 text-sm font-semibold',
+                      abrirTipo === t
+                        ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
+                        : 'border border-[rgb(var(--border))]',
+                    ].join(' ')}
+                  >
+                    {t === 'AVULSO' ? 'Avulso' : 'Membro'}
+                  </button>
+                ))}
+              </div>
+              {abrirTipo === 'MEMBRO' ? (
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Titular *
+                  <select
+                    value={abrirMembroId}
+                    onChange={(e) => setAbrirMembroId(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                  >
+                    <option value="">Selecione</option>
+                    {membrosComanda.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Nome *
+                  <input
+                    value={abrirNome}
+                    onChange={(e) => setAbrirNome(e.target.value)}
+                    placeholder="Nome / mesa"
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+              <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Limite (opcional)
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={abrirLimite}
+                  onChange={(e) => setAbrirLimite(e.target.value)}
+                  placeholder={`Padrão R$ ${LIMITE_COMANDA_PADRAO}`}
+                  className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModalAbrir(false)}
+                className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirmarAbrirComanda}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Abrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: fechar comanda (N pagamentos) — não usa StickyPersistBar. */}
+      {modalFechar && comandaAtiva && (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 p-3 @[40rem]/pdv:items-center">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdv-fechar-comanda-titulo"
+            className="max-h-[90%] w-full max-w-lg overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+          >
+            <h2
+              id="pdv-fechar-comanda-titulo"
+              className="text-base font-bold text-[rgb(var(--foreground))]"
+            >
+              Fechar comanda {comandaAtiva.codigo}
+            </h2>
+            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+              Total {formatarPreco(comandaAtiva.total)}
+              {comandaAtiva.totalPago > 0 && (
+                <> · já pago {formatarPreco(comandaAtiva.totalPago)}</>
+              )}
+            </p>
+
+            {podeGerir && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Desconto (R$)
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={fecharDesconto}
+                    onChange={(e) => setFecharDesconto(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Motivo do desconto
+                  <input
+                    value={fecharMotivoDesconto}
+                    onChange={(e) => setFecharMotivoDesconto(e.target.value)}
+                    disabled={!fecharDesconto || Number(fecharDesconto) <= 0}
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm disabled:opacity-50"
+                  />
+                </label>
+              </div>
+            )}
+
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  Pagamentos
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFecharPagamentos((prev) => [...prev, { metodo: 'DINHEIRO', valorStr: '' }])
+                  }
+                  className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]"
+                >
+                  + linha
+                </button>
+              </div>
+              {fecharPagamentos.map((linha, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <select
+                    value={linha.metodo}
+                    onChange={(e) => {
+                      const metodoNext = e.target.value as Metodo
+                      setFecharPagamentos((prev) =>
+                        prev.map((p, i) => (i === idx ? { ...p, metodo: metodoNext } : p)),
+                      )
+                    }}
+                    className="w-[7.5rem] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-2 text-sm"
+                  >
+                    {METODOS_PEDIDO.map((m) => (
+                      <option key={m} value={m}>
+                        {METODO_LABEL_CURTO[m]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={linha.valorStr}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setFecharPagamentos((prev) =>
+                        prev.map((p, i) => (i === idx ? { ...p, valorStr: v } : p)),
+                      )
+                    }}
+                    placeholder="0,00"
+                    className="min-w-0 flex-1 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums"
+                  />
+                  {fecharPagamentos.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label="Remover linha"
+                      onClick={() =>
+                        setFecharPagamentos((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--color-danger)_/_0.1)]"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {(() => {
+              const desc = Math.max(0, Number(fecharDesconto.replace(',', '.')) || 0)
+              const soma = fecharPagamentos.reduce(
+                (a, p) => a + (Number(p.valorStr.replace(',', '.')) || 0),
+                0,
+              )
+              const saldoPrev = Math.max(
+                0,
+                Math.round((comandaAtiva.total - desc - comandaAtiva.totalPago - soma) * 100) / 100,
+              )
+              if (saldoPrev <= 0) return null
+              if (comandaAtiva.tipo === 'AVULSO') {
+                return (
+                  <p role="alert" className="mt-3 text-sm text-[rgb(var(--color-danger-fg))]">
+                    Comanda avulsa não fecha com débito — cubra o total.
+                  </p>
+                )
+              }
+              if (!podeGerir) {
+                return (
+                  <p role="alert" className="mt-3 text-sm text-[rgb(var(--color-warning-fg))]">
+                    Saldo {formatarPreco(saldoPrev)} — fechar com débito exige gestor.
+                  </p>
+                )
+              }
+              return (
+                <label className="mt-3 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Vencimento do débito *
+                  <input
+                    type="date"
+                    value={fecharVencimento}
+                    onChange={(e) => setFecharVencimento(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                  />
+                </label>
+              )
+            })()}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModalFechar(false)}
+                className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirmarFecharComanda}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Confirmar fechamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalLimite && comandaAtiva && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+          >
+            <h2 className="text-base font-bold">Liberar / elevar limite</h2>
+            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              Comanda {comandaAtiva.codigo} · atual{' '}
+              {formatarPreco(comandaAtiva.limiteEfetivo ?? LIMITE_COMANDA_PADRAO)}
+            </p>
+            <label className="mt-3 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Novo limite (R$)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={novoLimiteStr}
+                onChange={(e) => setNovoLimiteStr(e.target.value)}
+                placeholder={`Padrão ${LIMITE_COMANDA_PADRAO}`}
+                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm tabular-nums"
+              />
+            </label>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModalLimite(false)}
+                className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirmarLiberarLimite}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removerVendaId && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+          >
+            <h2 className="text-base font-bold">Remover lançamento</h2>
+            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              Devolve estoque e exige motivo (bar:manage).
+            </p>
+            <label className="mt-3 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Motivo *
+              <input
+                value={removerMotivo}
+                onChange={(e) => setRemoverMotivo(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRemoverVendaId(null)}
+                className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirmarRemoverLancamento}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--color-danger-fg))] px-3 py-2.5 text-sm font-bold text-white"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

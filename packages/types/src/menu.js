@@ -73,7 +73,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
     secao: 'operacao',
   },
-  // Etapas do módulo (vendas, fiado, produtos, estoque, desempenho) vivem nas
+  // Etapas do módulo (vendas, comandas, produtos, estoque, desempenho) vivem nas
   // tabs de `/admin/bar` — o menu guarda só a entrada do módulo e o atalho
   // operacional do PDV, que é tela cheia e fica fora do shell de tabs.
   {
@@ -233,7 +233,16 @@ export const ADMIN_MODULOS = ([
         // Estorno é venda revertida — mesma etapa.
         matchPaths: ['/admin/bar/estornos'],
       },
-      { id: 'fiado', label: 'Fiado', href: '/admin/bar/fiado', permissao: PERMISSIONS.BAR_MANAGE },
+      {
+        id: 'comandas',
+        label: 'Comandas',
+        href: '/admin/bar/comandas',
+        // Lista = bar:operate (§5.10); OR manage evita regressão de papéis
+        // que só tinham manage no fiado legado. Quit/cancel na UI = manage.
+        permissao: [PERMISSIONS.BAR_OPERATE, PERMISSIONS.BAR_MANAGE],
+        // Links legados de Notificacao / redirect permanente.
+        matchPaths: ['/admin/bar/fiado'],
+      },
       { id: 'produtos', label: 'Produtos', href: '/admin/bar/produtos', permissao: PERMISSIONS.BAR_MANAGE },
       {
         id: 'estoque',

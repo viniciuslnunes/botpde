@@ -114,6 +114,31 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
 }
 
 /**
+ * Nó de partida canônico para percorrer a árvore de Sede de um tenant:
+ * a raiz `SEDE` e, na falta dela, a unidade mais antiga do tenant.
+ *
+ * Partir de um nó arbitrário quebra a derivação: uma SUBSEDE no meio da
+ * árvore não alcança as unidades penduradas em outros ramos, e a Sede mãe
+ * perde a relação de ancestral sobre a própria filha. O `orderBy` é o que
+ * torna a escolha estável — sem ele o Postgres pode devolver linhas
+ * diferentes entre execuções, e o mesmo tenant funciona numa e falha na
+ * seguinte. Ver `docs/ops/auditoria-funcional-2026-07.md` §Achado 9.
+ */
+async function findSedeRaiz(tenantId: string): Promise<SedeNode | null> {
+  const ordem = [{ criadoEm: 'asc' as const }, { id: 'asc' as const }]
+  const select = { id: true, tenantId: true, sedeId: true }
+
+  const raiz: SedeNode | null = await db.sede.findFirst({
+    where: { tenantId, tipo: 'SEDE' },
+    select,
+    orderBy: ordem,
+  })
+  if (raiz) return raiz
+
+  return db.sede.findFirst({ where: { tenantId }, select, orderBy: ordem })
+}
+
+/**
  * Cadeia completa de tenants ancestrais de um tenant, do mais próximo ao
  * mais distante (ex: PDE → [Subsede, Sede]). Ao contrário de
  * `getTenantHierarquia` (que só expõe o ancestral mais próximo, para a tela
@@ -122,15 +147,7 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
  * níveis de hierarquia.
  */
 async function getAncestorTenantIdsImpl(tenantId: string): Promise<string[]> {
-  const sede: SedeNode | null =
-    (await db.sede.findFirst({
-      where: { tenantId, tipo: 'SEDE' },
-      select: { id: true, tenantId: true, sedeId: true },
-    })) ??
-    (await db.sede.findFirst({
-      where: { tenantId },
-      select: { id: true, tenantId: true, sedeId: true },
-    }))
+  const sede = await findSedeRaiz(tenantId)
   if (!sede) return []
 
   return ancestorTenantIds(sede)
@@ -150,15 +167,7 @@ export const getAncestorTenantIds = cache(async (tenantId: string): Promise<stri
  * agregar afiliados da torcida inteira. Retorna [] se o tenant não tem Sede.
  */
 async function getDescendantTenantIdsImpl(tenantId: string): Promise<string[]> {
-  const sede: SedeNode | null =
-    (await db.sede.findFirst({
-      where: { tenantId, tipo: 'SEDE' },
-      select: { id: true, tenantId: true, sedeId: true },
-    })) ??
-    (await db.sede.findFirst({
-      where: { tenantId },
-      select: { id: true, tenantId: true, sedeId: true },
-    }))
+  const sede = await findSedeRaiz(tenantId)
   if (!sede) return []
 
   return descendantTenantIds(sede.id)
@@ -303,10 +312,7 @@ async function getTenantRelationImpl(
 ): Promise<TenantRelation> {
   if (actorTenantId === targetTenantId) return 'self'
 
-  const actorSede: SedeNode | null = await db.sede.findFirst({
-    where: { tenantId: actorTenantId },
-    select: { id: true, tenantId: true, sedeId: true },
-  })
+  const actorSede = await findSedeRaiz(actorTenantId)
 
   if (actorSede) {
     const [ancestrais, descendentes] = await Promise.all([
@@ -430,15 +436,7 @@ export async function getTenantHierarquia(tenantId: string): Promise<{
   descendentes: TenantHierarquiaNode[]
 }> {
   // Preferir a Sede raiz (tipo SEDE) — evita pegar PDE co-tenant.
-  const sede: SedeNode | null =
-    (await db.sede.findFirst({
-      where: { tenantId, tipo: 'SEDE' },
-      select: { id: true, tenantId: true, sedeId: true },
-    })) ??
-    (await db.sede.findFirst({
-      where: { tenantId },
-      select: { id: true, tenantId: true, sedeId: true },
-    }))
+  const sede = await findSedeRaiz(tenantId)
   if (!sede) return { ancestral: null, descendentes: [] }
 
   const [ancestraisIds, descendentesIds] = await Promise.all([

@@ -40,6 +40,11 @@ export type MembroParaEspelho = {
   responsavelDocumento: string | null
   autorizacaoMenorAceitaEm: Date | null
   termoResponsabilidadeAceitoEm: Date | null
+  /**
+   * Área pretendida na SEDE, declarada no onboarding por quem entrou por uma
+   * unidade. Vira o `departamentoId` do espelho (preferência, não membership).
+   */
+  departamentoSedeId?: string | null
 }
 
 export type DadosLgeEspelho = {
@@ -151,7 +156,9 @@ export type PendenciaEspelhoResultado = {
 /**
  * Caso B: cria/atualiza gêmeo PENDENTE na Sede raiz quando o sócio solicita
  * ingresso numa afiliada. No-op se a origem já é a raiz.
- * Não copia planoAssociacaoId, departamentoId nem sedeId.
+ * Não copia planoAssociacaoId nem sedeId. O `departamentoId` do espelho vem de
+ * `membro.departamentoSedeId` (área pretendida NA SEDE), nunca do departamento
+ * da origem — que é id de outro tenant. Ver `departamentoSedeParaEspelho`.
  */
 export async function criarOuAtualizarPendenciaEspelhoNaSede(
   tx: Prisma.TransactionClient,
@@ -177,6 +184,7 @@ export async function criarOuAtualizarPendenciaEspelhoNaSede(
       membroOrigemId: true,
       desligadoEm: true,
       status: true,
+      departamentoId: true,
     },
   })
 
@@ -216,6 +224,7 @@ export async function criarOuAtualizarPendenciaEspelhoNaSede(
 
   const dadosEspelho = {
     ...dadosCadastraisEspelho(membro),
+    ...departamentoSedeParaEspelho(membro, existente),
     status: 'PENDENTE' as const,
     espelhado: true,
     aprovadoNaUnidadeTenantId: tenantOrigemId,
@@ -520,12 +529,33 @@ type EspelhoExistente = {
   membroOrigemId: string | null
   desligadoEm: Date | null
   status: string
+  departamentoId: string | null
+}
+
+/**
+ * Área pretendida na Sede para o espelho. Só semeia quando o espelho ainda não
+ * tem área — uma re-sincronização nunca sobrescreve decisão já tomada na Sede.
+ * Preferência, não membership: `UserDepartamento` só sai de `aprovarMembro`.
+ */
+export function departamentoSedeParaEspelho(
+  membro: Pick<MembroParaEspelho, 'departamentoSedeId'>,
+  existente: Pick<EspelhoExistente, 'departamentoId'> | null,
+): { departamentoId: string } | Record<string, never> {
+  const preferida = membro.departamentoSedeId ?? null
+  if (!preferida || existente?.departamentoId) return {}
+  return { departamentoId: preferida }
 }
 
 /**
  * Cria/atualiza o espelho do sócio na Sede raiz (Caso B) como APROVADO.
- * No-op se a origem já é a raiz. Não copia planoAssociacaoId, departamentoId
- * nem sedeId. Se já existir pendência-espelho, promove para APROVADO.
+ * No-op se a origem já é a raiz. Não copia planoAssociacaoId nem sedeId. Se já
+ * existir pendência-espelho, promove para APROVADO.
+ *
+ * `departamentoId` do espelho NÃO vem do departamento da origem (é id de outro
+ * tenant) — vem de `membro.departamentoSedeId`, a área na Sede declarada no
+ * onboarding. É preferência, não membership: nenhum `UserDepartamento` é
+ * criado aqui, a diretoria da Sede é que efetiva. Só semeia quando o espelho
+ * ainda não tem área, para nunca sobrescrever decisão já tomada na Sede.
  */
 export async function sincronizarSocioNaSedeRaiz(
   tx: Prisma.TransactionClient,
@@ -550,6 +580,7 @@ export async function sincronizarSocioNaSedeRaiz(
       membroOrigemId: true,
       desligadoEm: true,
       status: true,
+      departamentoId: true,
     },
   })
 
@@ -588,6 +619,7 @@ export async function sincronizarSocioNaSedeRaiz(
   const agora = new Date()
   const dadosEspelho = {
     ...dadosCadastraisEspelho(membro),
+    ...departamentoSedeParaEspelho(membro, existente),
     status: 'APROVADO' as const,
     espelhado: true,
     aprovadoNaUnidadeTenantId: tenantOrigemId,

@@ -1,8 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, X, RotateCcw } from 'lucide-react'
-import { aprovarMembro, reprovarMembro, reverterMembro } from '@/app/admin/membros/actions'
+import { Check, X, RotateCcw, UserPlus } from 'lucide-react'
+import {
+  aprovarMembro,
+  efetivarAreaPretendida,
+  reprovarMembro,
+  reverterMembro,
+} from '@/app/admin/membros/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { ReprovarMembroDialog } from './reprovar-membro-dialog'
 
@@ -22,6 +27,12 @@ interface MemberActionsProps {
   isSocio?: boolean
   /** Etapas obrigatórias já detectadas como incompletas; vêm pré-marcadas. */
   pontosIncompletos?: string[]
+  /**
+   * Sócio APROVADO cuja área pretendida **neste nível** ainda não entrou em
+   * vigor — o outro nível venceu o first-wins da fila e só efetivou a dele.
+   * `undefined` = a tela não calculou; não mostra a ação.
+   */
+  areaPendenteEfetivacao?: boolean
 }
 
 export function MemberActions({
@@ -35,6 +46,7 @@ export function MemberActions({
   nomeMembro,
   isSocio,
   pontosIncompletos,
+  areaPendenteEfetivacao,
 }: MemberActionsProps) {
   const confirmAction = useConfirmAction()
   const [reprovarAberto, setReprovarAberto] = useState(false)
@@ -42,17 +54,48 @@ export function MemberActions({
   const via = aprovadoNaUnidadeNome?.trim()
   const quem = aprovadoPorNome?.trim()
   const quando = aprovadoEmLabel?.trim()
+  // O vínculo é first-wins nos dois níveis, a área não: quem não decidiu
+  // efetiva a sua aqui. Ver `efetivarAreaPretendida`.
+  const podeEfetivarArea = status === 'APROVADO' && areaPendenteEfetivacao === true && !!depto
 
-  // Espelho já decidido: só leitura + rastro de quem analisou.
+  async function handleEfetivarArea() {
+    await confirmAction({
+      titulo: `Incluir em ${depto}?`,
+      descricao: `A pessoa entra na equipe de ${depto} deste nível. O vínculo de sócio já está aprovado — a área é decidida por cada nível da hierarquia separadamente.`,
+      labelConfirmar: 'Incluir na área',
+      variante: 'success',
+      cancelled: 'Inclusão cancelada.',
+      run: () => efetivarAreaPretendida(membroId),
+      success: `Incluído em ${depto}.`,
+    })
+  }
+
+  const botaoEfetivarArea = podeEfetivarArea ? (
+    <button
+      type="button"
+      onClick={() => void handleEfetivarArea()}
+      className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] sm:px-3"
+      title={`Colocar em vigor a área pretendida (${depto}) neste nível`}
+    >
+      <UserPlus className="h-3.5 w-3.5" />
+      Incluir em {depto}
+    </button>
+  ) : null
+
+  // Espelho já decidido: só leitura do cadastro + rastro de quem analisou. A
+  // área deste nível continua sendo decisão local — não é mutação do espelho.
   if (espelhado && status !== 'PENDENTE') {
     return (
-      <span className="text-xs text-[rgb(var(--foreground-muted))]">
-        {quem
-          ? `Analisada por ${quem}${quando ? ` em ${quando}` : ''}`
-          : via
-            ? `Aprovado via ${via}`
-            : 'Espelho da Sede'}
-      </span>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="text-xs text-[rgb(var(--foreground-muted))]">
+          {quem
+            ? `Analisada por ${quem}${quando ? ` em ${quando}` : ''}`
+            : via
+              ? `Aprovado via ${via}`
+              : 'Espelho da Sede'}
+        </span>
+        {botaoEfetivarArea}
+      </div>
     )
   }
 
@@ -147,6 +190,7 @@ export function MemberActions({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+      {botaoEfetivarArea}
       <button
         onClick={() => void handleReverter()}
         aria-label="Reverter para pendente"

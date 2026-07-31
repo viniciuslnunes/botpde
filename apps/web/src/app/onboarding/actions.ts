@@ -29,6 +29,7 @@ import {
   encontrarConflitoRg,
   encontrarConflitoTelefone,
   lockNumeroAssociadoDaTorcida,
+  resolverTenantRaizId,
   REPROVACAO_LIMPA,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
@@ -316,6 +317,14 @@ const solicitarVinculoSchema = z.object({
   // ex.: "sede-principal-pde"). A existência é validada contra o banco abaixo —
   // esse é o guard real; o formato UUID travava vínculos válidos.
   departamentoId: z
+    .string()
+    .max(64)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  // Área pretendida na SEDE quando o vínculo nasce numa unidade promovida a
+  // tenant próprio (Caso B). `Departamento` é por tenant: a área na unidade vai
+  // em `departamentoId`, a da Sede aqui. Rejeitada se o vínculo já nasce na raiz.
+  departamentoSedeId: z
     .string()
     .max(64)
     .optional()
@@ -907,6 +916,7 @@ export async function solicitarVinculo(
       termoResponsabilidadeAceitoEm: data.termoResponsabilidadeAceito ? new Date() : undefined,
       sedeId: undefined as string | undefined,
       departamentoId: null as string | null,
+      departamentoSedeId: null as string | null,
     }
 
     // Vínculo territorial: worktree (Caso A + Caso B). Se a sede for de um
@@ -969,6 +979,32 @@ export async function solicitarVinculo(
       departamentoId = dep.id
     }
     dadosMembro.departamentoId = departamentoId
+
+    // Área na SEDE: só existe quando o vínculo nasce num tenant-filho (Caso B).
+    // Validada contra a RAIZ da hierarquia, não contra `tenantDestino`.
+    let departamentoSedeId: string | null = null
+    if (data.tipo === 'SOCIO' && data.departamentoSedeId) {
+      const raizId = await resolverTenantRaizId(tenantDestino.id)
+      if (raizId === tenantDestino.id) {
+        return {
+          errors: {
+            departamentoSedeId: [
+              'Você entrou direto pela sede — informe só o departamento pretendido.',
+            ],
+          },
+        }
+      }
+      const depSede: { id: string; slug: string; nome: string } | null =
+        await db.departamento.findFirst({
+          where: { id: data.departamentoSedeId, tenantId: raizId },
+          select: { id: true, slug: true, nome: true },
+        })
+      if (!depSede || isDepartamentoLegado(depSede)) {
+        return { errors: { departamentoSedeId: ['Departamento da sede inválido'] } }
+      }
+      departamentoSedeId = depSede.id
+    }
+    dadosMembro.departamentoSedeId = departamentoSedeId
 
     // TORCEDOR entra sem fila de aprovação (copy do wizard: "entrada imediata,
     // sem aprovação nem comprovante") — só não abre tenant próprio no portal
@@ -1256,6 +1292,7 @@ export async function solicitarVinculo(
             responsavelDocumento: true,
             autorizacaoMenorAceitaEm: true,
             termoResponsabilidadeAceitoEm: true,
+            departamentoSedeId: true,
           },
         })
 

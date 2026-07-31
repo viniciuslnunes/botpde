@@ -52,6 +52,7 @@
     "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
     "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",
     "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js",
+    "db:migrate-fiado-comanda": "node scripts/migrate-fiado-para-comanda.js",
     "audit:regras": "node scripts/audit-regras-negocio.js",
     "seed:corinthians-teste": "node scripts/seed-corinthians-teste.js",
     "seed:corinthians-teste-modulos": "node scripts/seed-corinthians-teste-modulos.js",

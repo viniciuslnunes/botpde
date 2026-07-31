@@ -334,34 +334,94 @@ turnosAbertosDup.length ? erro('bar', `${turnosAbertosDup.length} unidade(s) com
 const fiadoPagoSemLanc = await db.barFiado.count({ where: { status: 'PAGA', financeiroLancamentoId: null } })
 fiadoPagoSemLanc ? erro('bar', `${fiadoPagoSemLanc} BarFiado quitado sem lançamento no livro-caixa`) : ok('bar', 'Todo fiado quitado tem lançamento')
 
+// Pós-migração fiado→comanda: venda vira EM_COMANDA (ainda válida). Legado
+// pré-migração continua PAGA. Qualquer outro status é erro.
 const fiadoStatusVenda = await db.$queryRaw`
   SELECT COUNT(*)::int AS n FROM saas_bar_fiados f JOIN saas_bar_vendas v ON v.id = f.venda_id
-  WHERE f.status = 'PAGA' AND v.status <> 'PAGA'`
-;(fiadoStatusVenda[0]?.n ?? 0) ? erro('bar', `${fiadoStatusVenda[0].n} BarFiado quitado cuja BarVenda continua não-PAGA (venda deveria virar PAGA na quitação)`) : ok('bar', 'Fiado quitado sempre tem venda PAGA')
+  WHERE f.status = 'PAGA' AND v.status NOT IN ('PAGA', 'EM_COMANDA')`
+;(fiadoStatusVenda[0]?.n ?? 0) ? erro('bar', `${fiadoStatusVenda[0].n} BarFiado quitado cuja BarVenda não está PAGA nem EM_COMANDA`) : ok('bar', 'Fiado quitado tem venda PAGA ou EM_COMANDA (migrado)')
+
+// ── Invariantes Comanda (modulo-bar-comanda.md §11) ──────────────────────
+const emComandaSemComanda = await db.barVenda.count({
+  where: { status: 'EM_COMANDA', OR: [{ comandaId: null }, { financeiroLancamentoId: { not: null } }] },
+})
+emComandaSemComanda
+  ? erro('bar', `${emComandaSemComanda} BarVenda EM_COMANDA sem comandaId ou com receita no lançamento`)
+  : ok('bar', 'EM_COMANDA ⇒ comandaId set + financeiroLancamentoId null')
+
+const pagConfirmSemLanc = await db.barComandaPagamento.count({
+  where: { status: 'CONFIRMADO', financeiroLancamentoId: null },
+})
+pagConfirmSemLanc
+  ? erro('bar', `${pagConfirmSemLanc} BarComandaPagamento CONFIRMADO sem financeiroLancamentoId`)
+  : ok('bar', 'Pagamento CONFIRMADO tem lançamento no livro-caixa')
+
+const fechadaPagaSaldo = await db.$queryRaw`
+  SELECT COUNT(*)::int AS n FROM saas_bar_comandas
+  WHERE status = 'FECHADA_PAGA'
+    AND ROUND(total - desconto - total_pago, 2) <> 0`
+;(fechadaPagaSaldo[0]?.n ?? 0)
+  ? erro('bar', `${fechadaPagaSaldo[0].n} comanda FECHADA_PAGA com saldo ≠ 0`)
+  : ok('bar', 'FECHADA_PAGA tem saldo 0')
+
+const debitoInvalido = await db.$queryRaw`
+  SELECT COUNT(*)::int AS n FROM saas_bar_comandas
+  WHERE status IN ('FECHADA_COM_DEBITO', 'VENCIDA')
+    AND (
+      ROUND(total - desconto - total_pago, 2) <= 0
+      OR vencimento IS NULL
+      OR tipo <> 'MEMBRO'
+    )`
+;(debitoInvalido[0]?.n ?? 0)
+  ? erro('bar', `${debitoInvalido[0].n} comanda com débito sem saldo>0/vencimento/MEMBRO`)
+  : ok('bar', 'FECHADA_COM_DEBITO/VENCIDA ⇒ saldo > 0 + vencimento + MEMBRO')
 
 const pedidoPagoSemLanc = await db.saasPedido.count({ where: { status: { in: ['CONFIRMADO', 'ENTREGUE'] }, financeiroLancamentoId: null } })
 pedidoPagoSemLanc ? alerta('loja', `${pedidoPagoSemLanc} SaasPedido confirmado/entregue sem receita no livro-caixa`) : ok('loja', 'Todo pedido confirmado/entregue tem receita lançada')
 
-// Conciliação de caixa do bar, por tenant: toda venda PAGA vira receita BAR,
-// menos o que ainda está pendurado em fiado aberto (cuja receita só entra na
-// quitação). Por tenant para não misturar torcidas nem depender de marcador.
+// Conciliação de caixa do bar, por tenant:
+//   esperado = vendas PAGA
+//            − fiado legado ainda PAGA (receita só na quitação)
+//            + pagamentos de comanda CONFIRMADO (receita no pagamento; venda EM_COMANDA)
 const tenantsComBar = await db.barVenda.groupBy({ by: ['tenantId'], where: { status: 'PAGA' }, _sum: { total: true } })
+const tenantsComPagComanda = await db.$queryRaw`
+  SELECT c.tenant_id AS "tenantId", COALESCE(SUM(p.valor), 0)::float AS total
+  FROM saas_bar_comanda_pagamentos p
+  JOIN saas_bar_comandas c ON c.id = p.comanda_id
+  WHERE p.status = 'CONFIRMADO'
+  GROUP BY c.tenant_id`
+const pagPorTenant = new Map(tenantsComPagComanda.map((r) => [r.tenantId, Number(r.total)]))
+const tenantIds = [...new Set([
+  ...tenantsComBar.map((l) => l.tenantId),
+  ...pagPorTenant.keys(),
+])]
 const desconciliados = []
-for (const linha of tenantsComBar) {
+for (const tenantId of tenantIds) {
+  const linha = tenantsComBar.find((l) => l.tenantId === tenantId)
   const [fiadoAberto, receitaBar] = await Promise.all([
-    db.barFiado.aggregate({ where: { tenantId: linha.tenantId, status: { in: ['PENDENTE', 'VENCIDA'] } }, _sum: { valor: true } }),
-    db.financeiroLancamento.aggregate({ where: { tenantId: linha.tenantId, categoria: 'BAR', tipo: 'RECEITA' }, _sum: { valor: true } }),
+    db.barFiado.aggregate({
+      where: {
+        tenantId,
+        status: { in: ['PENDENTE', 'VENCIDA'] },
+        venda: { status: 'PAGA' },
+      },
+      _sum: { valor: true },
+    }),
+    db.financeiroLancamento.aggregate({ where: { tenantId, categoria: 'BAR', tipo: 'RECEITA' }, _sum: { valor: true } }),
   ])
-  const esperado = Number(linha._sum.total ?? 0) - Number(fiadoAberto._sum.valor ?? 0)
+  const esperado =
+    Number(linha?._sum.total ?? 0)
+    - Number(fiadoAberto._sum.valor ?? 0)
+    + (pagPorTenant.get(tenantId) ?? 0)
   const real = Number(receitaBar._sum.valor ?? 0)
   if (Math.abs(esperado - real) > 0.02) {
-    const t = await db.tenant.findUnique({ where: { id: linha.tenantId }, select: { slug: true } })
+    const t = await db.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } })
     desconciliados.push(`${t?.slug}: esperado R$ ${esperado.toFixed(2)} · caixa R$ ${real.toFixed(2)} (Δ ${(real - esperado).toFixed(2)})`)
   }
 }
 desconciliados.length
   ? alerta('bar', `Caixa do bar não concilia em ${desconciliados.length} torcida(s): ${desconciliados.join(' | ')}`)
-  : ok('bar', `Caixa do bar concilia em ${tenantsComBar.length} torcida(s): vendas PAGA − fiado em aberto = receitas BAR`)
+  : ok('bar', `Caixa do bar concilia em ${tenantIds.length} torcida(s): PAGA − fiado legado + pag. comanda = receitas BAR`)
 
 const somaItens = await db.$queryRaw`
   SELECT COUNT(*)::int AS n FROM saas_bar_vendas v

@@ -176,12 +176,47 @@ describe('google-maps', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('latlng=-23.5195922%2C-46.6453042')
     expect(endereco).toEqual({
       endereco: 'Rua Cristina Tomás, 183',
+      logradouro: 'Rua Cristina Tomás',
+      numero: '183',
+      bairro: '',
       cidade: 'São Paulo',
       estado: 'SP',
       cep: '05045-000',
     })
 
     vi.unstubAllGlobals()
+  })
+
+  it('reverseGeocodeEndereco lê o bairro de sublocality_level_1 ou neighborhood', async () => {
+    // O Geocoding do Google alterna entre os dois tipos no Brasil — o
+    // formulário de endereço do onboarding depende do bairro estar preenchido.
+    const respostaCom = (tipoBairro: string) => ({
+      ok: true,
+      json: async () => ({
+        status: 'OK',
+        results: [
+          {
+            address_components: [
+              { long_name: '183', short_name: '183', types: ['street_number'] },
+              { long_name: 'Rua Cristina Tomás', short_name: 'R. Cristina Tomás', types: ['route'] },
+              { long_name: 'Pinheiros', short_name: 'Pinheiros', types: [tipoBairro, 'political'] },
+              { long_name: 'São Paulo', short_name: 'São Paulo', types: ['administrative_area_level_2'] },
+              { long_name: 'São Paulo', short_name: 'SP', types: ['administrative_area_level_1'] },
+              { long_name: '05045-000', short_name: '05045-000', types: ['postal_code'] },
+            ],
+          },
+        ],
+      }),
+    })
+
+    for (const tipo of ['sublocality_level_1', 'neighborhood', 'sublocality']) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respostaCom(tipo)))
+      const endereco = await reverseGeocodeEndereco({ lat: -23.51, lng: -46.64 })
+      expect(endereco?.bairro).toBe('Pinheiros')
+      expect(endereco?.logradouro).toBe('Rua Cristina Tomás')
+      expect(endereco?.numero).toBe('183')
+      vi.unstubAllGlobals()
+    }
   })
 
   it('reverseGeocodeEndereco retorna null sem API key configurada', async () => {

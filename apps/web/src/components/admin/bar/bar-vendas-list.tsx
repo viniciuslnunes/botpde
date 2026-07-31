@@ -22,7 +22,7 @@ export interface BarVendaListItem {
   totalLabel: string
   descontoLabel: string | null
   observacao: string | null
-  /** Fiado em aberto → cancelar em /admin/bar/fiado; só quitado pode estornar. */
+  /** Débito de comanda em aberto → cancelar em /admin/bar/comandas; só quitado pode estornar. */
   podeEstornar: boolean
   itens: { id: string; label: string; totalLabel: string }[]
 }
@@ -176,10 +176,10 @@ export function BarVendasList({
                 venda.metodoPagamento === 'FIADO' &&
                 !venda.podeEstornar && (
                   <Link
-                    href="/admin/bar/fiado"
+                    href="/admin/bar/comandas?tab=em_aberto"
                     className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
                   >
-                    Ver fiado
+                    Ver comandas
                   </Link>
                 )}
               {podeGerir && venda.status === 'PAGA' && venda.podeEstornar && (

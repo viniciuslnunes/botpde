@@ -34,10 +34,10 @@ para `tipo: SOCIO` via `.superRefine` em `solicitarVinculoSchema`,
 | `responsavelNome`, `responsavelDocumento`, `autorizacaoMenorAceitaEm` | Responsável legal — obrigatórios só quando o SOCIO tem menos de 18 anos (calculado a partir de `dataNascimento`) |
 | `termoResponsabilidadeAceitoEm` | Timestamp do aceite do termo de responsabilidade — obrigatório para SOCIO |
 
-### Fluxo guiado das 3 abas (2026-07-30)
+### Fluxo guiado das 4 abas (2026-07-30)
 
 O formulário de sócio (`PassoVinculo` em `apps/web/src/app/onboarding/wizard.tsx`)
-avança aba por aba — Identificação → Endereço → Documentos:
+avança aba por aba — Identificação → Endereço → **Associação** → Documentos:
 
 - `validarCamposSocio()` é **pura** (só lê estado) e roda no render *e* no submit,
   com as mesmas regras do `.superRefine` da action. `filtrarErrosDaAba()` recorta o
@@ -50,6 +50,30 @@ avança aba por aba — Identificação → Endereço → Documentos:
 - O termo de responsabilidade fica na aba Documentos e o bloco de responsável
   legal na aba Identificação — nada de campo obrigatório fora das abas, senão a
   liberação do "Próximo" mentiria.
+- **Associação** (aba própria desde 2026-07-30): `numeroAssociado`, `anosSocio` e
+  o(s) departamento(s) pretendido(s). Antes moravam no rodapé da aba Endereço —
+  dado de vínculo com a torcida não é endereço, e a aba Endereço ficava com dois
+  assuntos. Com 4 abas a tab bar rola horizontalmente no mobile (`overflow-x-auto`)
+  em vez de espremer os rótulos.
+
+### Endereço pela localização (2026-07-30)
+
+Se o usuário confirmou a localização por GPS no passo **Região**, a aba Endereço
+oferece **"Preencher pela minha localização"**, que reaproveita aquelas
+coordenadas (sem pedir permissão de novo) e completa CEP, logradouro, número,
+bairro, cidade e UF via `reverseGeocodeEndereco`.
+
+- Só o GPS conta: o geocode de cidade+UF devolve o **centróide do município** e
+  preencheria uma rua aleatória. `PassoRegiao.onLocalizacao` informa a origem
+  (`'gps' | 'cidade'`) e só a primeira alimenta `coordsDispositivo`.
+- Sem GPS prévio o botão continua aparecendo e pede geolocalização na hora;
+  negada a permissão, cai no CEP com aviso — nunca bloqueia o passo.
+- Gate por `isGoogleMapsConfigured()`: sem `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` o
+  bloco não é renderizado (degradação graciosa).
+- `reverseGeocodeEndereco` passou a devolver `logradouro`/`numero` separados e
+  `bairro` (`sublocality_level_1` → `neighborhood` → `sublocality`, que o Google
+  alterna no Brasil). O campo `endereco` concatenado segue existindo para
+  sedes/eventos.
 
 ## Fila compartilhada de admissão (Caso B, 2026-07-27)
 

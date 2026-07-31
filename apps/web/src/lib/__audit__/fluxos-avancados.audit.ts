@@ -894,6 +894,94 @@ describe('fluxo: quem administra cargos pode se dar poder que não tem?', () => 
     }
   })
 
+  it('roles:manage não atribui o cargo de sistema owner a outro usuário', async () => {
+    const AREA = 'rbac/escalada'
+    const tenant = await tenantPorSlug(SLUG_PRINCIPAL)
+    if (!tenant) return
+
+    const { PERMISSIONS, hasPermission } = await import('@torcida/types')
+
+    // Ator: tem roles:manage, NÃO é owner, e resolve este tenant como ativo.
+    // O caminho `criarRole` era o conhecido; este é mais curto — `perfilIds`
+    // aceitava qualquer cargo do tenant, e só `vice` tinha guarda.
+    const candidatos: { userId: string }[] = await db.userRole.findMany({
+      where: { tenantId: tenant.id },
+      select: { userId: true },
+      distinct: ['userId'],
+      take: 60,
+    })
+    const { getActiveTenant } = await import('@/lib/tenant')
+    const { isSuperAdminEmail } = await import('@/lib/tenant-context')
+    const { assertTenantOwner } = await import('@/lib/authz')
+
+    let ator: string | null = null
+    for (const c of candidatos) {
+      const u: { email: string } | null = await db.user.findUnique({
+        where: { id: c.userId },
+        select: { email: true },
+      })
+      if (isSuperAdminEmail(u?.email)) continue
+      const efetivas = await permissoesEfetivas(tenant.id, c.userId)
+      if (!hasPermission(efetivas, PERMISSIONS.ROLES_MANAGE)) continue
+      if (hasPermission(efetivas, PERMISSIONS.SETTINGS_MANAGE)) continue // já é owner na prática
+      const ehOwner = await assertTenantOwner(c.userId, tenant.id).then(
+        () => true,
+        () => false,
+      )
+      if (ehOwner) continue
+      const ativo = await getActiveTenant(c.userId, u?.email ?? null)
+      if (ativo?.id !== tenant.id) continue
+      ator = c.userId
+      break
+    }
+
+    const roleOwner: { id: string } | null = await db.role.findFirst({
+      where: { tenantId: tenant.id, isSystem: true, nome: 'owner' },
+      select: { id: true },
+    })
+    if (!ator || !roleOwner) {
+      alerta(
+        AREA,
+        `Sem ator não-owner com roles:manage e tenant ativo ${tenant.slug} — auto-promoção não exercitada`,
+      )
+      return
+    }
+
+    // Alvo sintético: contém o dano se a guarda falhar — nenhuma linha de
+    // usuário real é tocada por `salvarAcessoUsuario`.
+    const alvo: { id: string } = await db.user.create({
+      data: { email: `audit-escalada-${Date.now()}@exemplo.invalid`, nome: `${MARCA} alvo` },
+      select: { id: true },
+    })
+    aoDesfazer(`remover alvo sintético da escalada ${alvo.id}`, async () => {
+      await db.userPermission.deleteMany({ where: { userId: alvo.id } })
+      await db.userRole.deleteMany({ where: { userId: alvo.id } })
+      await db.user.deleteMany({ where: { id: alvo.id } })
+    })
+
+    const form = new FormData()
+    form.append('perfilIds', roleOwner.id)
+
+    const { salvarAcessoUsuario } = await import('@/app/admin/(plataforma)/acessos/actions')
+    const r = await comoUsuario(ator, () => tentativa(() => salvarAcessoUsuario(alvo.id, form)))
+
+    const virouOwner = await assertTenantOwner(alvo.id, tenant.id).then(
+      () => true,
+      () => false,
+    )
+
+    if (virouOwner) {
+      erro(
+        AREA,
+        'ESCALADA DE PRIVILÉGIO: quem tem roles:manage sem ser owner atribuiu o cargo de sistema `owner` — o alvo passa em `assertTenantOwner` e alcança as ações reservadas ao Presidente (hierarquia visível, exigência de documentos, troca de afiliação)',
+      )
+    } else if (!r.ok) {
+      ok(AREA, `salvarAcessoUsuario recusou atribuir o cargo owner a quem não pode: "${r.erro}"`)
+    } else {
+      ok(AREA, 'Cargo owner não foi atribuído (a action reportou sucesso sem conceder)')
+    }
+  })
+
   it('cargos de sistema são imutáveis pela edição e pela exclusão', async () => {
     const AREA = 'rbac/cargo-sistema'
     const tenant = await tenantPorSlug(SLUG_PRINCIPAL)

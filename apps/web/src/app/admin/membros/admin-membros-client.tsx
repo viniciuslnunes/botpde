@@ -209,6 +209,7 @@ export function AdminMembrosTable({
                       aprovadoEmLabel={membro.aprovadoEmLabel}
                       nomeMembro={membro.nome}
                       isSocio={membro.isSocio}
+                      areaPendenteEfetivacao={membro.areaPendenteEfetivacao}
                     />
                   </td>
                 </m.tr>

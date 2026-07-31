@@ -59,6 +59,7 @@ export type AdminSedeListItem = {
   horarios: string | null
   capacidade: number | null
   responsavel: string | null
+  responsavelUserId?: string | null
   fotoUrl: string | null
   ativa: boolean
   lat: number | null
@@ -71,15 +72,23 @@ export type AdminSedeListItem = {
   paiHerdado?: PaiHerdadoListItem | null
   /**
    * Unidade já promovida a portal próprio (Caso B) — aparece na árvore da
-   * torcida-mãe, mas a edição administrativa é no tenant filho.
+   * torcida-mãe. Edição pela mãe exige `affiliation:manage` (ver
+   * `podeGerirPortalProprio`).
    */
   portalProprio?: boolean
   /** Tenant do portal próprio (só quando `portalProprio`). */
   portalTenantId?: string | null
   /**
+   * Ator na sede principal com `affiliation:manage` (ou super-admin) —
+   * pode editar/desativar esta unidade Caso B a partir da mãe.
+   */
+  podeGerirPortalProprio?: boolean
+  /** Há `responsavelUserId` — liderança local vinculada. */
+  temLiderancaVinculada?: boolean
+  /**
    * Calculado no servidor: super-admin sempre; Presidente/Vice só quando
-   * esta é uma Sede (`tipo: 'SEDE'`) duplicada — ver `assertPresidenteGlobal`
-   * e `excluirSede`.
+   * esta é uma Sede (`tipo: 'SEDE'`) duplicada; portal próprio com
+   * `affiliation:manage` e sem liderança vinculada — ver `excluirSede`.
    */
   podeExcluir: boolean
 }
@@ -176,7 +185,7 @@ function SedeThumb({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden bg-[rgb(var(--background-subtle))] ${sizeClass}`}
+      className={`relative shrink-0 overflow-hidden rounded-l-2xl bg-[rgb(var(--background-subtle))] ${sizeClass}`}
     >
       {coverUrl ? (
         <Image
@@ -377,7 +386,9 @@ function SedeCard({
     <div className={nivel > 0 ? 'ml-3 border-l border-[rgb(var(--border))] pl-3 sm:ml-5 sm:pl-5' : ''}>
       <article
         className={[
-          'group overflow-hidden rounded-2xl border transition-colors',
+          // Sem `overflow-hidden`: o menu `SedeAcoesMenu` (absolute) precisa
+          // ultrapassar a borda do card. O thumb já faz o clip da imagem.
+          'group relative z-0 rounded-2xl border transition-colors focus-within:z-20 has-[[aria-expanded=true]]:z-20',
           sede.ativa
             ? 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.4)]'
             : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-75',
@@ -466,7 +477,39 @@ function SedeCard({
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:flex-col sm:items-stretch sm:self-center lg:flex-row">
-              {sede.portalProprio && sede.portalTenantId ? (
+              {sede.portalProprio && sede.podeGerirPortalProprio ? (
+                <>
+                  <Link
+                    href={`/admin/sedes/${sede.id}`}
+                    className="inline-flex items-center justify-center gap-1 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.28)] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.18)]"
+                  >
+                    Editar
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                  {sede.portalTenantId ? (
+                    <Link
+                      href={`/admin/torcida/unidade/${sede.portalTenantId}`}
+                      className="inline-flex items-center justify-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-900 ring-1 ring-inset ring-amber-500/30 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
+                    >
+                      Ver administração
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  ) : null}
+                  <SedeAcoesMenu
+                    sedeId={sede.id}
+                    sedeNome={sede.nome}
+                    ativa={sede.ativa}
+                    podeExcluir={sede.podeExcluir}
+                    portalProprio={Boolean(sede.portalProprio)}
+                    bloqueioExcluir={
+                      sede.portalProprio && sede.temLiderancaVinculada
+                        ? 'Com liderança vinculada só é possível desativar.'
+                        : null
+                    }
+                    destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
+                  />
+                </>
+              ) : sede.portalProprio && sede.portalTenantId ? (
                 <Link
                   href={`/admin/torcida/unidade/${sede.portalTenantId}`}
                   className="inline-flex items-center justify-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-900 ring-1 ring-inset ring-amber-500/30 transition-colors hover:bg-amber-500/25 dark:text-amber-200"

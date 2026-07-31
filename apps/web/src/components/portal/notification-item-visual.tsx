@@ -76,6 +76,7 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   BAR_VENDA_ESTORNADA: PackageX,
   BAR_ESTOQUE_BAIXO: PackageX,
   BAR_FIADO_VENCIDO: Wallet,
+  BAR_COMANDA_VENCIDA: Wallet,
   BAR_TURNO_DIVERGENCIA: ShieldAlert,
   BAR_ESTORNO_ANOMALO: ShieldAlert,
   PATRIMONIO_RESPONSAVEL_DEFINIDO: UserCog,

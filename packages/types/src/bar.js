@@ -34,7 +34,37 @@ export const STATUS_VENDA_BAR_LABEL = {
   PAGA: 'Paga',
   CANCELADA: 'Cancelada',
   ESTORNADA: 'Estornada',
+  EM_COMANDA: 'Em comanda',
 }
+
+/** @type {Record<string, string>} */
+export const STATUS_COMANDA_BAR_LABEL = {
+  ABERTA: 'Aberta',
+  FECHADA_PAGA: 'Fechada (paga)',
+  FECHADA_COM_DEBITO: 'Fechada com débito',
+  QUITADA: 'Quitada',
+  VENCIDA: 'Vencida',
+  CANCELADA: 'Cancelada',
+}
+
+/** @type {Record<string, string>} */
+export const STATUS_PAGAMENTO_COMANDA_BAR_LABEL = {
+  PENDENTE: 'Pendente',
+  CONFIRMADO: 'Confirmado',
+  CANCELADO: 'Cancelado',
+}
+
+/** @type {Record<string, string>} */
+export const TIPO_TITULAR_COMANDA_BAR_LABEL = {
+  MEMBRO: 'Membro',
+  AVULSO: 'Avulso',
+}
+
+/**
+ * Teto padrão de consumo por comanda (R$). `null` no nível da unidade
+ * desliga o controle (ver `limiteEfetivoComanda`).
+ */
+export const LIMITE_COMANDA_PADRAO = 150
 
 /** Limite de vendas por página nas listagens do Bar. */
 export const BAR_PAGE_SIZE = 40
@@ -163,6 +193,11 @@ export const FecharTurnoBarSchema = z.object({
     .max(300, 'Observação muito longa')
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  /**
+   * Ciência explícita de comandas ABERTA na unidade ao fechar o turno.
+   * Obrigatória no server quando count(ABERTA) > 0 — não bloqueia o fechamento.
+   */
+  cienciaComandasAbertas: z.boolean().optional(),
 })
 
 /** Motivo opcional do estorno de venda paga. */
@@ -189,6 +224,132 @@ export const CancelarFiadoBarSchema = z.object({
     .trim()
     .min(3, 'Informe o motivo (mín. 3 caracteres)')
     .max(200, 'Motivo muito longo'),
+})
+
+export const TipoTitularComandaBarSchema = z.enum(['MEMBRO', 'AVULSO'])
+
+/** Métodos válidos em pagamento de comanda (exclui FIADO). */
+export const MetodoPagamentoComandaBarSchema = MetodoPagamentoQuitacaoFiadoBarSchema
+
+const PagamentoComandaBarItemSchema = z.object({
+  metodo: MetodoPagamentoComandaBarSchema,
+  valor: z.coerce.number().positive('Valor deve ser maior que zero').max(9999999.99, 'Valor muito alto'),
+})
+
+/**
+ * Abertura de comanda. MEMBRO exige membroId; AVULSO exige titularNome ≥ 2.
+ */
+export const AbrirComandaBarSchema = z
+  .object({
+    codigo: z.string().trim().min(1, 'Informe o código da comanda').max(40, 'Código muito longo'),
+    tipo: TipoTitularComandaBarSchema,
+    membroId: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined))
+      .refine((v) => v === undefined || z.string().uuid().safeParse(v).success, 'Membro inválido'),
+    titularNome: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
+    limite: z.preprocess(
+      (val) => (val === '' || val === null || val === undefined ? undefined : val),
+      z.coerce
+        .number()
+        .positive('Limite deve ser maior que zero')
+        .max(9999999.99, 'Limite muito alto')
+        .optional(),
+    ),
+  })
+  .superRefine((data, ctx) => {
+    if (data.tipo === 'MEMBRO') {
+      if (!data.membroId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Selecione o membro titular', path: ['membroId'] })
+      }
+    } else {
+      if (!data.titularNome || data.titularNome.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Informe o nome do titular (mín. 2 caracteres)',
+          path: ['titularNome'],
+        })
+      }
+    }
+  })
+
+export const LancarItensComandaBarSchema = z.object({
+  comandaId: z.string().uuid('Comanda inválida'),
+  itens: z.array(ItemVendaBarSchema).min(1, 'Adicione pelo menos um item'),
+})
+
+export const RemoverLancamentoComandaBarSchema = z.object({
+  vendaId: z.string().uuid('Lançamento inválido'),
+  motivo: z
+    .string()
+    .trim()
+    .min(3, 'Informe o motivo (mín. 3 caracteres)')
+    .max(200, 'Motivo muito longo'),
+})
+
+/**
+ * Fechamento: N pagamentos. `vencimento` obrigatório quando o saldo após
+ * pagamentos confirmados + desconto permanece > 0 (débito — só MEMBRO no server).
+ */
+export const FecharComandaBarSchema = z
+  .object({
+    comandaId: z.string().uuid('Comanda inválida'),
+    desconto: z.coerce.number().min(0, 'Desconto não pode ser negativo').max(9999999.99).default(0),
+    motivoDesconto: z
+      .string()
+      .trim()
+      .max(200, 'Motivo muito longo')
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined)),
+    pagamentos: z.array(PagamentoComandaBarItemSchema).default([]),
+    vencimento: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
+  })
+  .superRefine((data, ctx) => {
+    if (data.desconto > 0 && !data.motivoDesconto) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Informe o motivo do desconto',
+        path: ['motivoDesconto'],
+      })
+    }
+  })
+
+/** Pagamento avulso / parcial em comanda (abertura antecipada ou quitação). */
+export const RegistrarPagamentoComandaBarSchema = z.object({
+  comandaId: z.string().uuid('Comanda inválida'),
+  metodo: MetodoPagamentoComandaBarSchema,
+  valor: z.coerce.number().positive('Valor deve ser maior que zero').max(9999999.99, 'Valor muito alto'),
+})
+
+/** Quitação (parcial ou total) de débito FECHADA_COM_DEBITO / VENCIDA. */
+export const QuitarComandaBarSchema = RegistrarPagamentoComandaBarSchema
+
+export const CancelarComandaBarSchema = z.object({
+  comandaId: z.string().uuid('Comanda inválida'),
+  motivo: z
+    .string()
+    .trim()
+    .min(3, 'Informe o motivo (mín. 3 caracteres)')
+    .max(200, 'Motivo muito longo'),
+})
+
+export const LiberarLimiteComandaBarSchema = z.object({
+  comandaId: z.string().uuid('Comanda inválida'),
+  novoLimite: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.coerce
+      .number()
+      .positive('Limite deve ser maior que zero')
+      .max(9999999.99, 'Limite muito alto')
+      .optional(),
+  ),
 })
 
 /** Cadastro de fornecedor de insumos do Bar. */
@@ -276,6 +437,90 @@ export function recalcularCustoMedio({ estoqueAtual, custoMedioAtual, quantidade
   if (denominador <= 0) return 0
   if (estoque <= 0) return round2(Number(custoTotalEntrada) / entrada)
   return round2((estoque * Number(custoMedioAtual || 0) + Number(custoTotalEntrada)) / denominador)
+}
+
+/**
+ * Saldo em aberto da comanda: total − desconto − totalPago.
+ * @param {{ total: number, desconto?: number, totalPago?: number }} p
+ * @returns {number}
+ */
+export function saldoComanda({ total, desconto = 0, totalPago = 0 }) {
+  return round2(Number(total || 0) - Number(desconto || 0) - Number(totalPago || 0))
+}
+
+/**
+ * Limite efetivo: override da comanda, senão padrão da unidade.
+ * `null` no padrão (e sem override) desliga o controle.
+ * @param {number | null | undefined} comandaLimite
+ * @param {number | null | undefined} padraoUnidade
+ * @returns {number | null}
+ */
+export function limiteEfetivoComanda(comandaLimite, padraoUnidade) {
+  if (comandaLimite != null && !Number.isNaN(Number(comandaLimite))) {
+    return Number(comandaLimite)
+  }
+  if (padraoUnidade == null || Number.isNaN(Number(padraoUnidade))) return null
+  return Number(padraoUnidade)
+}
+
+/**
+ * Percentual do limite consumido (0–100+). `null` se limite desligado.
+ * @param {number} total
+ * @param {number | null | undefined} limite
+ * @returns {number | null}
+ */
+export function percentualLimite(total, limite) {
+  if (limite == null || Number(limite) <= 0) return null
+  return round2((Number(total || 0) / Number(limite)) * 100)
+}
+
+/**
+ * Recebido do bar = vendas rápidas PAGA (sem comanda) + pagamentos de comanda
+ * CONFIRMADO. Não inclui lançamentos EM_COMANDA.
+ * @param {number} vendasRapidasTotal
+ * @param {number} pagamentosComandaTotal
+ * @returns {number}
+ */
+export function somarRecebidoBar(vendasRapidasTotal, pagamentosComandaTotal) {
+  return round2(Number(vendasRapidasTotal || 0) + Number(pagamentosComandaTotal || 0))
+}
+
+/**
+ * Monta o resumo Recebido no formato legado `BarVendasResumo`
+ * (`totalPago` = dinheiro entrado; `quantidade` = nº de eventos).
+ * @param {{
+ *   vendasRapidasTotal?: number
+ *   vendasRapidasCount?: number
+ *   pagamentosComandaTotal?: number
+ *   pagamentosComandaCount?: number
+ * }} p
+ * @returns {{ totalVendas: number, totalPago: number, quantidade: number }}
+ */
+export function montarResumoRecebidoBar({
+  vendasRapidasTotal = 0,
+  vendasRapidasCount = 0,
+  pagamentosComandaTotal = 0,
+  pagamentosComandaCount = 0,
+} = {}) {
+  const totalPago = somarRecebidoBar(vendasRapidasTotal, pagamentosComandaTotal)
+  return {
+    totalVendas: totalPago,
+    totalPago,
+    quantidade: Number(vendasRapidasCount || 0) + Number(pagamentosComandaCount || 0),
+  }
+}
+
+/**
+ * Consumo em aberto: soma dos totais líquidos (total − desconto) das comandas ABERTA.
+ * @param {Array<{ total: number, desconto?: number }>} comandas
+ * @returns {number}
+ */
+export function somarConsumoEmAbertoBar(comandas) {
+  let soma = 0
+  for (const c of comandas || []) {
+    soma += Number(c.total || 0) - Number(c.desconto || 0)
+  }
+  return round2(Math.max(0, soma))
 }
 
 // `slugify` (para slug de categoria) já é exportado por `./loja.js` no índice do pacote.

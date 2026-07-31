@@ -7,6 +7,18 @@ import {
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '@torcida/types'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
 
+/**
+ * A promoção faz ~40 round-trips sequenciais numa transação interativa: cria
+ * tenant, move sedes, 3 upserts de cargo, 10 departamentos canônicos, 22
+ * perfis, owner, membros migrados (loop por membro), canal e `AuditLog`. Só o
+ * seed canônico mediu 5,86 s contra o Postgres remoto — o default de 5 s do
+ * Prisma expira e faz rollback da promoção inteira ("Transaction already
+ * closed"). Mesma classe do timeout já corrigido na decisão de admissão
+ * (`TRANSACAO_DECISAO_MEMBRO_OPTS`). Ver
+ * `docs/ops/auditoria-funcional-2026-07.md` §Achado 8.
+ */
+const TRANSACAO_PROMOCAO_OPTS = { timeout: 45_000, maxWait: 15_000 }
+
 const SYSTEM_ROLE_DEFAULTS: Record<string, { cor: string; ordem: number }> = {
   [SYSTEM_ROLES.OWNER]: { cor: '#2563eb', ordem: 0 },
   [SYSTEM_ROLES.ADMIN]: { cor: '#0891b2', ordem: 1 },
@@ -296,7 +308,7 @@ export async function promoverSedeParaTenant(params: {
       filhosMovidos: filhos.length,
       ownerUserId,
     }
-  })
+  }, TRANSACAO_PROMOCAO_OPTS)
 
   invalidateHierarchyCache(tenantMaeId)
   invalidateHierarchyCache(result.novoTenantId)

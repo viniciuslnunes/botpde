@@ -128,8 +128,9 @@ Reprovado ou pendente **nunca** aparece na equipe do departamento.
    administra membros daquele depto sem precisar de `ROLES_MANAGE` global —
    delegação pontual por design.
 3. **Exclusão de associado** é figura estatutária formal (e obrigação prática
-   pós-LGE) — fluxo de desligamento com auditoria importa. Hoje reusa
-   `MEMBERS_BLOCK`/`MEMBERS_WARN`; não há permissão dedicada de desligamento
-   estatutário com registro formal — lacuna a considerar (ver `ARCHITECTURE.md §6`).
+   pós-LGE). No produto já existe `members:dismiss` (desligamento estatutário,
+   distinto de `members:block`/`members:warn`), no pacote gestor da Diretoria
+   canônica e no catálogo `PERMISSIONS` (`packages/types/src/permissions.js`).
+   Fonte: código + auditoria funcional 2026-07; confiança alta.
 4. Eleições internas com chapas são realidade nas grandes — enquetes/votação
    (módulo Salas) têm caso de uso forte.

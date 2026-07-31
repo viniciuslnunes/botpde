@@ -43,6 +43,60 @@ export async function criarNotificacao(input: CriarNotificacaoInput): Promise<No
   return created
 }
 
+/**
+ * Critério do EVENTO que já foi resolvido — nunca inclui `userId`.
+ * A `Notificacao` não guarda a FK da entidade (o `link` é genérico), então a
+ * amarração é `tipo` + `atorId` + `corpo` (o mesmo trio usado no fan-out).
+ */
+export type CriterioReconciliacao = {
+  tipo: TipoNotificacao
+  /** Quem gerou o evento (denunciante, solicitante…). */
+  atorId?: string
+  /** Corpo exato gravado no fan-out — desambigua eventos do mesmo ator. */
+  corpo?: string
+}
+
+/**
+ * Marca lida a notificação de um evento **para todos os destinatários** do
+ * fan-out, não só para quem decidiu.
+ *
+ * O fan-out cria N notificações (uma por moderador/administrador); reconciliar
+ * escopado em `userId: session.user.id` deixava N-1 badges presos apontando
+ * para um pedido ou denúncia que já não existe — numa torcida com 6
+ * moderadores, 5 badges por denúncia resolvida. Ver
+ * `docs/ops/auditoria-funcional-2026-07.md` §Achado 10.
+ *
+ * Emite o ping de SSE para cada destinatário afetado, para o sino atualizar
+ * sem esperar o polling.
+ */
+export async function reconciliarNotificacoesDoEvento(
+  tenantId: string,
+  criterio: CriterioReconciliacao,
+): Promise<number> {
+  const where = {
+    tenantId,
+    tipo: criterio.tipo,
+    lida: false,
+    ...(criterio.atorId ? { atorId: criterio.atorId } : {}),
+    ...(criterio.corpo !== undefined ? { corpo: criterio.corpo } : {}),
+  }
+
+  // Os destinatários precisam ser lidos ANTES do update — depois dele as
+  // linhas já não casam com `lida: false`.
+  const afetados: Array<{ userId: string }> = await db.notificacao.findMany({
+    where,
+    select: { userId: true },
+    distinct: ['userId'],
+  })
+  if (afetados.length === 0) return 0
+
+  const { count } = await db.notificacao.updateMany({ where, data: { lida: true } })
+  if (count > 0) {
+    for (const { userId } of afetados) emitNotificacaoPing(tenantId, userId)
+  }
+  return count
+}
+
 export async function criarNotificacoesEmLote(inputs: CriarNotificacaoInput[]): Promise<number> {
   if (inputs.length === 0) return 0
   const result = await db.notificacao.createMany({
@@ -277,9 +331,17 @@ export async function listarDestinatariosAdmin(
   return listarDestinatariosAdminPorPermissoes(tenantId, [permission], excetoUserId)
 }
 
+/**
+ * Destinatários do comunicado da torcida: membros aprovados e **ativos**.
+ *
+ * `desligarMembro` grava `desligadoEm` e mantém `status: APROVADO` — filtrar
+ * só por status deixava o ex-membro no fan-out, recebendo comunicado urgente
+ * da torcida da qual já saiu. Ver `docs/ops/auditoria-funcional-2026-07.md`
+ * §Achado 11.
+ */
 export async function listarUserIdsMembrosAprovados(tenantId: string): Promise<string[]> {
   const membros: Array<{ userId: string }> = await db.saasMembro.findMany({
-    where: { tenantId, status: 'APROVADO' },
+    where: { tenantId, status: 'APROVADO', desligadoEm: null },
     select: { userId: true },
   })
   return membros.map((m) => m.userId)

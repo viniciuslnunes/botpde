@@ -1,0 +1,1044 @@
+[
+  {
+    "clube": "Fogão (RJ)",
+    "manter": {
+      "id": "888d0a6b-2567-4e5e-ab94-4515147db6b4",
+      "slug": "furia-jovem-do-botafogo-rj",
+      "nome": "Fúria Jovem do Botafogo",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903804/torcida/catalogo/logos/furia-jovem-do-botafogo-rj.gif",
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "9a3579ed-40d5-446b-ac2b-b365fb53038c",
+      "design": {
+        "dark": {
+          "surface": "#161618",
+          "background": "#08080a",
+          "surfaceRaised": "#212123",
+          "backgroundSubtle": "#151517"
+        },
+        "grid": {
+          "sizePx": 48,
+          "enabled": true,
+          "baseColor": null,
+          "lineColor": null,
+          "lineOpacity": 0.03
+        },
+        "brand": {
+          "primary": "#000000",
+          "secondary": "#ffffff"
+        },
+        "light": {
+          "surface": "#f5f5f5",
+          "background": "#f7f7f7",
+          "surfaceRaised": "#dcdcdd",
+          "backgroundSubtle": "#e5e6e7"
+        },
+        "actions": {
+          "info": "#1a45a5",
+          "danger": "#c8102e",
+          "success": "#242424",
+          "warning": "#d5790c"
+        },
+        "brandFg": {
+          "primary": null,
+          "secondary": null
+        },
+        "version": 1,
+        "actionsFg": {
+          "info": null,
+          "danger": null,
+          "success": null,
+          "warning": null
+        },
+        "customPalettes": []
+      },
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 31,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 21,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 1,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 3,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 1
+      },
+      "rivalidades": [
+        {
+          "id": "b9304768-c22d-40e4-8812-894855059ba6",
+          "outro": "torcida-jovem-flamengo",
+          "lado": "B"
+        },
+        {
+          "id": "271e8155-174b-48dc-892a-24748aeb7153",
+          "outro": "young-flu",
+          "lado": "B"
+        }
+      ],
+      "aliancas": [
+        {
+          "id": "ac9cb659-8614-4d87-9d57-5175c27f5b0a",
+          "status": "SUGERIDA",
+          "outro": "torcida-jovem-santos",
+          "lado": "origem"
+        }
+      ],
+      "sedes": [
+        {
+          "id": "sede-principal-furia-jovem-do-botafogo-rj",
+          "nome": "Sede — Fúria Jovem do Botafogo",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 31,
+            "eventos": 3
+          }
+        }
+      ],
+      "membrosSample": [
+        {
+          "id": "17708cf6-eef9-461a-95aa-f954ed6a221e",
+          "userId": "72951c32-c7ff-45d6-b528-2c020c99dc25",
+          "status": "APROVADO"
+        },
+        {
+          "id": "179171f2-5576-4726-9174-23d53a58c886",
+          "userId": "68dec91c-65a6-4b23-9027-fb00be3c2b8e",
+          "status": "APROVADO"
+        },
+        {
+          "id": "231c0992-f615-46c5-8006-33edffe7a985",
+          "userId": "83f70644-73ea-4d9b-8ad0-74e899655d95",
+          "status": "APROVADO"
+        },
+        {
+          "id": "29ddc5f3-5224-4942-8b50-ca91c5f41972",
+          "userId": "2e202149-0aee-4ede-8534-bf23910cc61b",
+          "status": "REPROVADO"
+        },
+        {
+          "id": "45c68eca-7c4a-4b5f-be53-a7b2bbe28ce8",
+          "userId": "6848599c-d6d5-4558-9718-1b15109f88c7",
+          "status": "APROVADO"
+        }
+      ],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "48876efa-5b2a-4dee-8603-c49f22b98bc6",
+      "slug": "furia-jovem-botafogo",
+      "nome": "Fúria Jovem do Botafogo",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903804/torcida/catalogo/logos/furia-jovem-do-botafogo-rj.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "7263f451-4e2c-41d8-98b4-d7eb31839c0c",
+      "afiliacaoId": "9a3579ed-40d5-446b-ac2b-b365fb53038c",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "7263f451-4e2c-41d8-98b4-d7eb31839c0c",
+        "slug": "furia-jovem-do-botafogo-rj",
+        "nome": "FÚRIA JOVEM DO BOTAFOGO",
+        "titulo": "Fúria Jovem do Botafogo",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903804/torcida/catalogo/logos/furia-jovem-do-botafogo-rj.gif"
+      },
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 1,
+        "recomendacoes": 2,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 1
+      },
+      "rivalidades": [],
+      "aliancas": [
+        {
+          "id": "4b4cbf5c-6c80-4757-a316-a8cc2590df3c",
+          "status": "ATIVA",
+          "outro": "pde-gavioes-fiel",
+          "lado": "aliado"
+        }
+      ],
+      "sedes": [
+        {
+          "id": "sede-principal-furia-jovem-botafogo",
+          "nome": "Sede — Fúria Jovem do Botafogo",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 1,
+        "recomendacoes": 4,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Fúria Jovem do Botafogo",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": false,
+      "copiarCatalogo": true,
+      "renomear": false,
+      "transferirSedes": true,
+      "transferirAliancas": true,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  },
+  {
+    "clube": "Mengão (RJ)",
+    "manter": {
+      "id": "5964ab3b-7f43-486c-b196-020497827d89",
+      "slug": "torcida-jovem-flamengo",
+      "nome": "Torcida Jovem do Flamengo",
+      "logoUrl": null,
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "b8569582-ac86-4bfd-8593-b692c2582ee8",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 61,
+        "socios": 0,
+        "sedes": 5,
+        "posts": 31,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 1,
+        "aliancasAliado": 1,
+        "recomendacoes": 5,
+        "eventos": 3,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [
+        {
+          "id": "b9304768-c22d-40e4-8812-894855059ba6",
+          "outro": "furia-jovem-do-botafogo-rj",
+          "lado": "A"
+        },
+        {
+          "id": "a7b12bad-2857-4d74-90e4-464bdd59c936",
+          "outro": "dragoes-da-real",
+          "lado": "A"
+        },
+        {
+          "id": "e873e2e0-a00d-44ac-b5b4-614f84f34ede",
+          "outro": "young-flu",
+          "lado": "B"
+        }
+      ],
+      "aliancas": [
+        {
+          "id": "d595aabf-ae99-48cc-9e00-8a8dfa32cf79",
+          "status": "ENCERRADA",
+          "outro": "pavilhao-independente-cruzeiro",
+          "lado": "origem"
+        },
+        {
+          "id": "69fcf7a4-0896-4536-8740-79add6c6e2c0",
+          "status": "ATIVA",
+          "outro": "geral-do-gremio",
+          "lado": "aliado"
+        }
+      ],
+      "sedes": [
+        {
+          "id": "subsede-jovemfla-pelotao-central",
+          "nome": "Pelotão Central",
+          "tipo": "SUBSEDE",
+          "sedeId": "sede-principal-torcida-jovem-flamengo",
+          "_count": {
+            "filhos": 0,
+            "membros": 30,
+            "eventos": 0
+          }
+        },
+        {
+          "id": "subsede-jovemfla-brasilia",
+          "nome": "Pelotão Brasília",
+          "tipo": "SUBSEDE",
+          "sedeId": "sede-principal-torcida-jovem-flamengo",
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        },
+        {
+          "id": "subsede-jovemfla-bh",
+          "nome": "Pelotão Belo Horizonte",
+          "tipo": "SUBSEDE",
+          "sedeId": "sede-principal-torcida-jovem-flamengo",
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        },
+        {
+          "id": "subsede-jovemfla-primeiro-pelotao",
+          "nome": "1º Pelotão — Zona Sul",
+          "tipo": "SUBSEDE",
+          "sedeId": "sede-principal-torcida-jovem-flamengo",
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        },
+        {
+          "id": "sede-principal-torcida-jovem-flamengo",
+          "nome": "Sede — Torcida Jovem do Flamengo",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 4,
+            "membros": 31,
+            "eventos": 3
+          }
+        }
+      ],
+      "membrosSample": [
+        {
+          "id": "0323d9b6-c859-4976-a3a4-1f4ac26d2327",
+          "userId": "bc23394a-01eb-42ea-9693-06e8746f1110",
+          "status": "APROVADO"
+        },
+        {
+          "id": "049defbe-4989-429f-887b-e83f65ad0f22",
+          "userId": "33a1922c-526b-4814-b00e-79204bc65a92",
+          "status": "APROVADO"
+        },
+        {
+          "id": "0752edd2-211c-4001-b418-c6a7ec8bbdf8",
+          "userId": "7f8f8dc6-aaf2-4140-af9b-8982878fc5b8",
+          "status": "APROVADO"
+        },
+        {
+          "id": "0c0fa0e8-6b93-4007-af0a-cbb3139209f0",
+          "userId": "58a9d25e-8038-4f46-821d-8d7dd52c0692",
+          "status": "APROVADO"
+        },
+        {
+          "id": "0f684f77-4946-4cbe-a606-27a92cdc3fb1",
+          "userId": "bcb0ceea-202f-407d-9892-acd71caf0cdd",
+          "status": "APROVADO"
+        }
+      ],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 10,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "b12fb1b2-4c58-4b4e-aa1a-b9e7ffb94c1c",
+      "slug": "torcida-jovem-do-flamengo-rj",
+      "nome": "Jovem do Flamengo",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903785/torcida/catalogo/logos/torcida-jovem-do-flamengo-rj.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "9230d36f-d4b1-49a3-96c9-b6da38e9e5c0",
+      "afiliacaoId": "b8569582-ac86-4bfd-8593-b692c2582ee8",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "9230d36f-d4b1-49a3-96c9-b6da38e9e5c0",
+        "slug": "torcida-jovem-do-flamengo-rj",
+        "nome": "TORCIDA JOVEM DO FLAMENGO",
+        "titulo": "Jovem do Flamengo",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903785/torcida/catalogo/logos/torcida-jovem-do-flamengo-rj.gif"
+      },
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-jovem-do-flamengo-rj",
+          "nome": "Sede — Jovem do Flamengo",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Torcida Jovem do Flamengo",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": true,
+      "copiarCatalogo": true,
+      "renomear": false,
+      "transferirSedes": true,
+      "transferirAliancas": false,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  },
+  {
+    "clube": "Peixe (SP)",
+    "manter": {
+      "id": "4051c313-4b62-4906-b16d-091fb0fa70b6",
+      "slug": "torcida-jovem-santos",
+      "nome": "Torcida Jovem do Santos",
+      "logoUrl": null,
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "d283d998-669c-4baa-b9b1-cd2ddcd3e4de",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 31,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 23,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 1,
+        "recomendacoes": 0,
+        "eventos": 3,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [
+        {
+          "id": "628ab8e4-cc3f-4fe8-ac17-00cdfb22a916",
+          "outro": "pde-gavioes-fiel",
+          "lado": "A"
+        },
+        {
+          "id": "921f1697-d6e8-4987-b207-86f22753dbde",
+          "outro": "mancha-alviverde",
+          "lado": "A"
+        },
+        {
+          "id": "1b0ba770-2d26-4be3-91ba-c2656c849fb7",
+          "outro": "dragoes-da-real",
+          "lado": "A"
+        }
+      ],
+      "aliancas": [
+        {
+          "id": "ac9cb659-8614-4d87-9d57-5175c27f5b0a",
+          "status": "SUGERIDA",
+          "outro": "furia-jovem-do-botafogo-rj",
+          "lado": "aliado"
+        }
+      ],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-jovem-santos",
+          "nome": "Sede — Torcida Jovem do Santos",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 31,
+            "eventos": 3
+          }
+        }
+      ],
+      "membrosSample": [
+        {
+          "id": "0207b1e8-88b6-47e6-931b-88503d83e664",
+          "userId": "de465143-f8ee-46ab-934f-963011d8e3cf",
+          "status": "APROVADO"
+        },
+        {
+          "id": "0636e3c3-e460-44fd-a848-bcf35a63e206",
+          "userId": "21aa885d-3e3b-4d58-af72-341a10c2a70f",
+          "status": "PENDENTE"
+        },
+        {
+          "id": "09c2ee7f-f4b7-4554-bf88-99ca3c9f2e10",
+          "userId": "d2ca7cd0-e704-4af9-b69b-f4e6094a9214",
+          "status": "PENDENTE"
+        },
+        {
+          "id": "0ecdc565-f603-4630-8d15-3aebde3f795e",
+          "userId": "2057e3dd-ed0e-47a8-9efe-f13d5f9b2f75",
+          "status": "APROVADO"
+        },
+        {
+          "id": "108fcbcb-6641-4a54-903a-df617a087e60",
+          "userId": "c58c06fb-3e3d-4142-905d-20e09eb3d24d",
+          "status": "APROVADO"
+        }
+      ],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "a7085dcc-cb9d-47da-af1f-a1695d31f43d",
+      "slug": "torcida-jovem-santos-sp",
+      "nome": "Jovem Santos",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903977/torcida/catalogo/logos/torcida-jovem-santos-sp.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "1fc96c61-35d8-4414-867b-6ff77efd1310",
+      "afiliacaoId": "d283d998-669c-4baa-b9b1-cd2ddcd3e4de",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "1fc96c61-35d8-4414-867b-6ff77efd1310",
+        "slug": "torcida-jovem-santos-sp",
+        "nome": "TORCIDA JOVEM SANTOS",
+        "titulo": "Jovem Santos",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903977/torcida/catalogo/logos/torcida-jovem-santos-sp.gif"
+      },
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-jovem-santos-sp",
+          "nome": "Sede — Jovem Santos",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Torcida Jovem do Santos",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": true,
+      "copiarCatalogo": true,
+      "renomear": false,
+      "transferirSedes": true,
+      "transferirAliancas": false,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  },
+  {
+    "clube": "Colorado (RS)",
+    "manter": {
+      "id": "30c111a9-294f-436d-8e00-3f6f73d40edb",
+      "slug": "camisa-12-inter",
+      "nome": "Camisa 12",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903885/torcida/catalogo/logos/torcida-organizada-camisa-12-rs.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "6ab74b6a-2dee-4a63-8978-64303f9064dc",
+      "afiliacaoId": "3abc3946-d1c1-4882-9990-c11a3255dfc6",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "6ab74b6a-2dee-4a63-8978-64303f9064dc",
+        "slug": "torcida-organizada-camisa-12-rs",
+        "nome": "TORCIDA ORGANIZADA CAMISA 12",
+        "titulo": "Camisa 12",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903885/torcida/catalogo/logos/torcida-organizada-camisa-12-rs.gif"
+      },
+      "_count": {
+        "membros": 31,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 20,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 1,
+        "recomendacoes": 5,
+        "eventos": 3,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [
+        {
+          "id": "15fc1f80-1e60-43a5-9581-5251a1a439f7",
+          "outro": "geral-do-gremio",
+          "lado": "A"
+        }
+      ],
+      "aliancas": [
+        {
+          "id": "51ef682f-1cc5-40a8-b5f8-4455585e78a4",
+          "status": "PENDENTE",
+          "outro": "young-flu",
+          "lado": "aliado"
+        }
+      ],
+      "sedes": [
+        {
+          "id": "sede-principal-camisa-12-inter",
+          "nome": "Sede — Camisa 12",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 31,
+            "eventos": 3
+          }
+        }
+      ],
+      "membrosSample": [
+        {
+          "id": "08b38da4-d419-4764-9e45-16eed473f489",
+          "userId": "80ff03ee-24ce-47d1-96cf-0d29d9f6a08e",
+          "status": "APROVADO"
+        },
+        {
+          "id": "17389175-0e3b-49f2-9693-4e2566648893",
+          "userId": "d30f6d50-557d-4a21-8557-ed25f4d83d6b",
+          "status": "APROVADO"
+        },
+        {
+          "id": "24d5d9ab-1ae1-4700-9b77-7c6fc64c61cf",
+          "userId": "3f7f06c0-2e3b-49cf-890f-994e0163cdb9",
+          "status": "PENDENTE"
+        },
+        {
+          "id": "273a09c1-ec30-4a15-8866-e93c2d7e87fd",
+          "userId": "d7c95962-733b-4711-b0fb-af7c1918f1c1",
+          "status": "APROVADO"
+        },
+        {
+          "id": "2ac00853-6f38-4d64-bbfb-f46c3a081bbf",
+          "userId": "24224a6a-b71a-4412-9e9b-2ce2eb72e179",
+          "status": "APROVADO"
+        }
+      ],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 10,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "0d7bc9ba-b251-4923-a629-c1ed12b15643",
+      "slug": "torcida-organizada-camisa-12-rs",
+      "nome": "Camisa 12",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903885/torcida/catalogo/logos/torcida-organizada-camisa-12-rs.gif",
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "3abc3946-d1c1-4882-9990-c11a3255dfc6",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-organizada-camisa-12-rs",
+          "nome": "Sede — Camisa 12",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Camisa 12",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": false,
+      "copiarCatalogo": false,
+      "renomear": false,
+      "transferirSedes": true,
+      "transferirAliancas": false,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  },
+  {
+    "clube": "Tricolor (SP)",
+    "manter": {
+      "id": "b3545b7c-1896-4cd2-8c88-96674e230c06",
+      "slug": "torcida-tricolor-independente-sp",
+      "nome": "Tricolor Independente",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903952/torcida/catalogo/logos/torcida-tricolor-independente-sp.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "61356dd7-72f0-4c3b-af27-8503f13f430c",
+      "afiliacaoId": "c55488ca-fb00-4150-b8f7-42e1dfe415e0",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "61356dd7-72f0-4c3b-af27-8503f13f430c",
+        "slug": "torcida-tricolor-independente-sp",
+        "nome": "TORCIDA TRICOLOR INDEPENDENTE",
+        "titulo": "Tricolor Independente",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903952/torcida/catalogo/logos/torcida-tricolor-independente-sp.gif"
+      },
+      "_count": {
+        "membros": 1,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 1
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-tricolor-independente-sp",
+          "nome": "Sede — Tricolor Independente",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 1,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [
+        {
+          "id": "6e34c1d0-062c-4416-ab6b-5e75dca0a3cf",
+          "userId": "1c586ae4-8987-4da1-b363-a08344f2e0d0",
+          "status": "PENDENTE"
+        }
+      ],
+      "soft": {
+        "notificacoes": 2,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "0e82fa2b-fd72-4917-8d3d-b6751fda152b",
+      "slug": "tti-sao-paulo",
+      "nome": "Torcida Tricolor Independente",
+      "logoUrl": null,
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "c55488ca-fb00-4150-b8f7-42e1dfe415e0",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 5,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-tti-sao-paulo",
+          "nome": "Sede — Torcida Tricolor Independente",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 10,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Torcida Tricolor Independente",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": false,
+      "copiarCatalogo": false,
+      "renomear": true,
+      "transferirSedes": true,
+      "transferirAliancas": false,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  },
+  {
+    "clube": "Tricolor (RS)",
+    "manter": {
+      "id": "c9f2c01b-dc7c-4e63-a669-9e5da72aff55",
+      "slug": "torcida-jovem-do-gremio-rs",
+      "nome": "Jovem do Grêmio",
+      "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903876/torcida/catalogo/logos/torcida-jovem-do-gremio-rs.gif",
+      "ativo": true,
+      "torcidaConhecidaId": "9d066d04-04e5-4143-81db-fa48c95e4628",
+      "afiliacaoId": "99d8a414-f71c-45a3-a404-9b0275afaa61",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": {
+        "id": "9d066d04-04e5-4143-81db-fa48c95e4628",
+        "slug": "torcida-jovem-do-gremio-rs",
+        "nome": "TORCIDA JOVEM DO GRÊMIO",
+        "titulo": "Jovem do Grêmio",
+        "logoUrl": "https://res.cloudinary.com/dyhzxaak/image/upload/v1783903876/torcida/catalogo/logos/torcida-jovem-do-gremio-rs.gif"
+      },
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 0,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-jovem-do-gremio-rs",
+          "nome": "Sede — Jovem do Grêmio",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 0,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "dupe": {
+      "id": "553684f7-8e6e-4748-a137-3e671604caf9",
+      "slug": "torcida-jovem-gremio",
+      "nome": "Torcida Jovem do Grêmio",
+      "logoUrl": null,
+      "ativo": true,
+      "torcidaConhecidaId": null,
+      "afiliacaoId": "99d8a414-f71c-45a3-a404-9b0275afaa61",
+      "design": null,
+      "discordGuildId": null,
+      "plano": "FREE",
+      "torcidaConhecida": null,
+      "_count": {
+        "membros": 0,
+        "socios": 0,
+        "sedes": 1,
+        "posts": 0,
+        "roles": 24,
+        "departamentos": 10,
+        "aliancasOrigem": 0,
+        "aliancasAliado": 0,
+        "recomendacoes": 1,
+        "eventos": 0,
+        "produtos": 0,
+        "pedidos": 0,
+        "announcements": 0,
+        "auditLogs": 0
+      },
+      "rivalidades": [],
+      "aliancas": [],
+      "sedes": [
+        {
+          "id": "sede-principal-torcida-jovem-gremio",
+          "nome": "Sede — Torcida Jovem do Grêmio",
+          "tipo": "SEDE",
+          "sedeId": null,
+          "_count": {
+            "filhos": 0,
+            "membros": 0,
+            "eventos": 0
+          }
+        }
+      ],
+      "membrosSample": [],
+      "soft": {
+        "notificacoes": 0,
+        "recomendacoes": 2,
+        "aprovadoNaUnidade": 0
+      }
+    },
+    "nomeFormal": "Torcida Jovem do Grêmio",
+    "conflitos": {
+      "aliancasMesmoParceiro": [],
+      "rivalidadesMesmoParceiro": [],
+      "aliancaEntreSi": [],
+      "rivalidadeEntreSi": [],
+      "membrosOverlap": "checar se dupe.membros>0"
+    },
+    "acoes": {
+      "copiarLogo": false,
+      "copiarCatalogo": false,
+      "renomear": true,
+      "transferirSedes": true,
+      "transferirAliancas": false,
+      "transferirRivalidades": false,
+      "transferirMembros": false
+    }
+  }
+]

@@ -455,10 +455,20 @@ describe('invariante: unidade em tenant próprio continua descendente da mãe', 
       const v = await medirVisibilidade(forma.tenantId, forma.raizId)
 
       // Qual nó a derivação de relação realmente usou como ponto de partida.
-      const partidaRelation: { id: string; tipo: string } | null = await db.sede.findFirst({
-        where: { tenantId: forma.tenantId },
-        select: { id: true, tipo: true },
-      })
+      // Espelha `findSedeRaiz` (lib/hierarquia.ts): raiz SEDE, com `orderBy`
+      // determinístico, e só então qualquer unidade do tenant.
+      const ordem = [{ criadoEm: 'asc' as const }, { id: 'asc' as const }]
+      const partidaRelation: { id: string; tipo: string } | null =
+        (await db.sede.findFirst({
+          where: { tenantId: forma.tenantId, tipo: 'SEDE' },
+          select: { id: true, tipo: true },
+          orderBy: ordem,
+        })) ??
+        (await db.sede.findFirst({
+          where: { tenantId: forma.tenantId },
+          select: { id: true, tipo: true },
+          orderBy: ordem,
+        }))
       const partiuDaRaiz = partidaRelation?.id === forma.raizId
 
       if (v.maeVeRestrito) {
@@ -467,8 +477,10 @@ describe('invariante: unidade em tenant próprio continua descendente da mãe', 
         erro(
           AREA,
           `${rotulo}: Sede mãe NÃO enxerga o financeiro da própria unidade filha, com o elo \`sedeId\` intacto. ` +
-            `\`getTenantRelationImpl\` escolhe a sede do ator com \`findFirst({ where: { tenantId } })\` — sem preferir \`tipo: 'SEDE'\` e sem \`orderBy\`, ao contrário de \`getAncestorTenantIdsImpl\`/\`getDescendantTenantIdsImpl\`, que fazem \`?? \` para a raiz. ` +
-            `Aqui partiu de ${partidaRelation?.id} (${partidaRelation?.tipo}), raiz=${forma.raizId}, partiuDaRaiz=${partiuDaRaiz} — a varredura de descendentes começa no meio da árvore e não alcança a filha.`,
+            `A derivação partiu de ${partidaRelation?.id} (${partidaRelation?.tipo}), raiz=${forma.raizId}, partiuDaRaiz=${partiuDaRaiz}. ` +
+            (partiuDaRaiz
+              ? 'Partiu da raiz — a causa NÃO é o nó de partida (Achado 9, corrigido por `findSedeRaiz`); investigue o elo `sedeId` e a sensibilidade do recurso.'
+              : '`findSedeRaiz` não devolveu a raiz esperada — a varredura de descendentes começa no meio da árvore e não alcança a filha (regressão do Achado 9).'),
         )
       }
       if (!v.filhaVeRestrito) {

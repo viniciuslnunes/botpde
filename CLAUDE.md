@@ -65,12 +65,13 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Autorização**: toda Server Action de mutação chama `assertPermission(PERMISSION)`
   (`apps/web/src/lib/authz.ts`). É o **único** critério do admin — nunca por nome de
   cargo, nunca só no cliente. Permissões em `packages/types/src/permissions.js`.
-  **Permissão nova exige `db:repair-system-roles`**: cargo de sistema resolve pelo
-  array gravado no `Role`, não pela constante do código — sem o repair, torcidas
-  existentes ficam sem a capacidade nova, em silêncio (aconteceu com o módulo Bar;
-  ver `docs/ops/auditoria-funcional-2026-07.md` §Achado 1). Se só os arrays
-  estão defasados: `db:repair-system-roles -- --permissions-only` (sem
-  syncMembership por usuário).
+  **Cargos de sistema** (`owner`/`admin`/`vice`/`member`) resolvem o pacote por
+  `SYSTEM_ROLE_PERMISSIONS` em runtime (`permissionsOfRole`) — permissão nova
+  vale sem repair. `db:repair-system-roles` continua útil como **higiene** do
+  array gravado (bootstrap/UI); se só os arrays estão defasados:
+  `db:repair-system-roles -- --permissions-only` (sem syncMembership por usuário).
+  Permissão nova em **pacote de departamento** exige `seed:departamentos` nos
+  tenants existentes.
 - **Auditoria**: toda mutação administrativa grava `AuditLog` (ator, ação, entidade, id, detalhes).
 - **Validação**: `Zod safeParse` antes de qualquer operação de banco.
 - **Multi-tenant**: `tenantId` nunca omitido nas queries de dados SaaS. Referências
@@ -160,6 +161,15 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   **Preferência ≠ membership (2026-07-17):** onboarding grava
   `SaasMembro.departamentoId`; equipe só após `aprovarMembro` (ou Sem área).
   Repair: `db:repair-departamento-orfaos`.
+  **Área sede × unidade (2026-07-30):** `Departamento` é por tenant — quem entra
+  por unidade promovida (Caso B) declara `departamentoId` (área na unidade) e
+  `departamentoSedeId` (área na Sede, semeada no espelho por
+  `departamentoSedeParaEspelho`, sem sobrescrever). Badge/permissão já resolvem
+  por `(autor, tenant do post)` — não criar regra de canal para isso.
+  **Área é aprovada pelo próprio nível:** vínculo de sócio é first-wins nos dois
+  lados, área não — quem não decidiu efetiva depois via
+  `efetivarAreaPretendida`. Nunca aplicar `aplicarDepartamentoPreferido` num
+  tenant a partir da decisão de outro.
 - **Membros / admissão** — fila `/admin/membros`, reprovação com laudo obrigatório
  (categoria + justificativa + etapas erradas, `CATEGORIAS_REPROVACAO`/
  `PONTOS_REPROVACAO` em `packages/types/src/schemas/membro.js`) e aba de

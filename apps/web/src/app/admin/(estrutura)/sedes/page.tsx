@@ -3,6 +3,7 @@ import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
+import { atorPodeGerirPortalProprio } from '@/lib/sede-acesso-mae'
 import { redirect } from 'next/navigation'
 import {
   AdminSedesManager,
@@ -27,6 +28,7 @@ type SedeRow = {
   horarios: string | null
   capacidade: number | null
   responsavel: string | null
+  responsavelUserId: string | null
   fotoUrl: string | null
   ativa: boolean
   lat: number | null
@@ -49,6 +51,7 @@ const SEDE_LIST_SELECT = {
   horarios: true,
   capacidade: true,
   responsavel: true,
+  responsavelUserId: true,
   fotoUrl: true,
   ativa: true,
   lat: true,
@@ -212,19 +215,19 @@ export default async function AdminSedesPage() {
     }
   }
 
-  // Excluir Sede é destrutivo (remaneja membros/eventos e reorganiza a
-  // hierarquia). Super-admin pode excluir qualquer unidade; Presidente/Vice
-  // da sede principal só pode excluir uma Sede (`tipo: 'SEDE'`) duplicada —
-  // fora desse caso de limpeza, remover unidades é exclusivo do super-admin
-  // (ver `excluirSede` em actions.ts, mesma regra espelhada aqui pra UI).
+  // Excluir: super-admin qualquer; Presidente/Vice só Sede duplicada local;
+  // portal próprio (Caso B) — affiliation:manage E sem liderança vinculada
+  // (`responsavelUserId`). Com liderança + portal, só desativar.
   const presidenteSession = await assertPresidenteGlobal()
     .then((r) => r.session)
     .catch(() => null)
   const isSuperAdmin = Boolean(presidenteSession && isSuperAdminEmail(presidenteSession.user.email))
   const sedesTipoSedeCount = rowsLocal.filter((s) => s.tipo === 'SEDE').length
+  const podeGerirPortalProprio = await atorPodeGerirPortalProprio(authz.session, tenant.id)
 
   const sedes: AdminSedeListItem[] = rows.map((s) => {
     const portalProprio = Boolean(s.tenantId && s.tenantId !== tenant.id)
+    const temLiderancaVinculada = Boolean(s.responsavelUserId)
     return {
       id: s.id,
       nome: s.nome,
@@ -237,6 +240,7 @@ export default async function AdminSedesPage() {
       horarios: s.horarios,
       capacidade: s.capacidade,
       responsavel: s.responsavel,
+      responsavelUserId: s.responsavelUserId,
       fotoUrl: s.fotoUrl,
       ativa: s.ativa,
       lat: s.lat,
@@ -248,10 +252,12 @@ export default async function AdminSedesPage() {
       paiHerdado: s.sedeId ? (paisExternos.get(s.sedeId) ?? null) : null,
       portalProprio,
       portalTenantId: portalProprio ? s.tenantId : null,
-      podeExcluir:
-        !portalProprio &&
-        (isSuperAdmin ||
-          (presidenteSession != null && s.tipo === 'SEDE' && sedesTipoSedeCount > 1)),
+      podeGerirPortalProprio: portalProprio && podeGerirPortalProprio,
+      temLiderancaVinculada,
+      podeExcluir: portalProprio
+        ? podeGerirPortalProprio && !temLiderancaVinculada
+        : isSuperAdmin ||
+          (presidenteSession != null && s.tipo === 'SEDE' && sedesTipoSedeCount > 1),
     }
   })
   // Opções de pai só entre unidades do próprio tenant (não mover sob portal filho).
@@ -271,7 +277,8 @@ export default async function AdminSedesPage() {
     <div className="min-w-0 space-y-6">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
         Hierarquia Sede → Subsede → PDE — mapa, eventos e cadastro. Unidades com portal próprio
-        continuam na árvore.
+        continuam na árvore; a sede principal pode editá-las, desativá-las ou excluí-las com a
+        permissão de afiliação.
       </p>
       <MotionReveal>
         <AdminSedesManager

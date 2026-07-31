@@ -63,6 +63,7 @@ function revalidateBar() {
   revalidatePath('/admin/bar/estoque')
   revalidatePath('/admin/bar/vendas')
   revalidatePath('/admin/bar/fornecedores')
+  revalidatePath('/admin/bar/comandas')
   revalidatePath('/admin/bar/fiado')
   revalidatePath('/admin/bar/estornos')
   revalidatePath('/portal/bar')
@@ -1313,6 +1314,19 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
       }
     }
 
+    type ComandaAbertaResumo = { id: string; codigo: string; total: Prisma.Decimal }
+    const comandasAbertas: ComandaAbertaResumo[] = await db.barComanda.findMany({
+      where: { tenantId: tenant.id, sedeId: unidade.id, status: 'ABERTA' },
+      select: { id: true, codigo: true, total: true },
+      orderBy: { codigo: 'asc' },
+    })
+
+    if (comandasAbertas.length > 0 && parsed.data.cienciaComandasAbertas !== true) {
+      return {
+        error: `Há ${comandasAbertas.length} comanda(s) aberta(s). Confirme ciência antes de fechar o turno.`,
+      }
+    }
+
     const diferenca = round2(
       parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria,
     )
@@ -1333,6 +1347,12 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
       },
     })
 
+    const comandasAbertasAudit = comandasAbertas.map((c) => ({
+      id: c.id,
+      codigo: c.codigo,
+      total: Number(c.total),
+    }))
+
     await db.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -1349,6 +1369,8 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
           divergenciaAlta,
           totalPago: resumo.totalPago,
           quantidadePaga: resumo.quantidadePaga,
+          comandasAbertas: comandasAbertasAudit,
+          cienciaComandasAbertas: parsed.data.cienciaComandasAbertas ?? false,
         },
       },
     })
@@ -1552,3 +1574,7 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
     return { error: e instanceof Error ? e.message : 'Erro ao estornar venda' }
   }
 }
+
+// Comanda: actions em ./comanda-actions — NÃO re-exportar daqui.
+// Arquivos "use server" só aceitam export de async function direto;
+// re-export quebra o Turbopack ("module has no exports").

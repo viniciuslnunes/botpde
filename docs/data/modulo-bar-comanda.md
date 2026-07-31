@@ -5,8 +5,11 @@
 > mais pagamentos. Sair devendo deixa de ser um método de pagamento e passa a ser
 > **um desfecho do fechamento**.
 >
-> Status: **spec aprovada, não implementada**. Módulo em produção descrito em
-> [`modulo-bar.md`](./modulo-bar.md) — este documento é o alvo, aquele é o presente.
+> Status: **fases 1–5 implementadas** (schema, núcleo server, PDV, listagem
+> `/admin/bar/comandas`, redirect fiado, cron/notificações, ciência no turno,
+> portal `/portal/bar` leitura, métricas Recebido × Consumo em aberto).
+> Pendência residual: dropar `BarFiado` do schema após migração em produção (§9).
+> Módulo em produção descrito em [`modulo-bar.md`](./modulo-bar.md).
 
 ## 1. Por que trocar
 
@@ -222,7 +225,8 @@ Rótulos em `lib/audit-labels.ts`.
 - `/admin/bar/comandas` — **substitui `/admin/bar/fiado`**. Tabs internas por
   query param (`AdminTabs`): Abertas · Em aberto (débito) · Histórico.
 - Tab do módulo em `ADMIN_MODULOS` (`packages/types/src/menu.js`): `fiado` →
-  `comandas`, label "Comandas", gate `BAR_MANAGE` na etapa de débito.
+  `comandas`, label "Comandas", gate `BAR_OPERATE | BAR_MANAGE` (lista §5.10 =
+  operate; OR manage evita regressão do fiado). Quit/cancel débito = `BAR_MANAGE`.
 - **`/admin/bar/fiado` exige `permanentRedirect` para `/admin/bar/comandas`** —
   há `Notificacao.link` já gravado apontando para a rota antiga (CLAUDE.md,
   §Tabs).
@@ -258,8 +262,9 @@ caixa, confirmação explícita em modal, não formulário longo.
    invariantes de saldo.
 3. **PDV** — renomear carrinho para "Pedido", contexto de comanda ativa, limite,
    fechamento com N pagamentos.
-4. **`/admin/bar/comandas`** + redirect da rota antiga + notificações + cron.
-5. **Portal** (§6) e ajuste dos relatórios (§5.8 item 33: "Recebido" × "Em aberto").
+4. **`/admin/bar/comandas`** + redirect da rota antiga + notificações + cron +
+   ciência no fechamento de turno (§5.9) — **feito**.
+5. **Portal** (§6) e ajuste dos relatórios (§5.8 item 33: "Recebido" × "Em aberto") — **feito**.
 
 ## 11. Invariantes para `audit:regras`
 - Comanda `ABERTA` com `totalPago > 0` é válida (pagamento parcial antecipado).

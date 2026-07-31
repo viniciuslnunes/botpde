@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
-import { assertPermission, assertTenantOwner } from '@/lib/authz'
+import { assertPermission, assertPodeDelegar, assertTenantOwner } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -316,7 +316,8 @@ export async function salvarAfiliacao(formData: FormData): Promise<void> {
 // ── Cargos ────────────────────────────────────────────────────────────────────
 
 export async function criarRole(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
@@ -342,6 +343,9 @@ export async function criarRole(formData: FormData) {
   if (!departamentoId && permissions.length === 0 && permissionsExtras.length === 0) {
     throw new Error('Selecione ao menos uma permissão ou vincule um departamento')
   }
+
+  // Cargo novo não pode carregar permissão que o criador não tem (Achado 6).
+  assertPodeDelegar(ctx, [...permissions, ...permissionsExtras], 'a um cargo')
 
   const existing = await db.role.findFirst({
     where: { tenantId: tenant.id, nome },
@@ -375,7 +379,8 @@ export async function criarRole(formData: FormData) {
 }
 
 export async function atualizarRole(roleId: string, formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const role = await db.role.findFirst({
     where: { id: roleId, tenantId: tenant.id },
@@ -412,6 +417,13 @@ export async function atualizarRole(roleId: string, formData: FormData) {
   if (!departamentoId && permissions.length === 0 && permissionsExtras.length === 0) {
     throw new Error('Selecione ao menos uma permissão ou vincule um departamento')
   }
+
+  // Só o que está sendo ACRESCENTADO precisa estar ao alcance (Achado 6) —
+  // senão quem não tem `settings:manage` não conseguiria nem renomear um cargo
+  // que já a carrega, criado por quem podia.
+  const jaTinha = new Set([...(role.permissions ?? []), ...(role.permissionsExtras ?? [])])
+  const acrescentadas = [...permissions, ...permissionsExtras].filter((p) => !jaTinha.has(p))
+  assertPodeDelegar(ctx, acrescentadas, 'a um cargo')
 
   await db.role.update({
     where: { id: roleId },
@@ -553,7 +565,8 @@ interface MembroDepartamentoLite {
 }
 
 export async function criarDepartamento(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
@@ -571,6 +584,10 @@ export async function criarDepartamento(formData: FormData) {
     ...permissions,
     ...permissionsGestorRaw,
   ]).filter((p) => !permissions.includes(p))
+
+  // O pacote do departamento vira o cargo `Membro · X` / `Gestor · X`, que é
+  // atribuível — mesmo vetor de escalada de `criarRole` (Achado 6).
+  assertPodeDelegar(ctx, [...permissions, ...permissionsGestor], 'a um departamento')
 
   const existing = await db.departamento.findFirst({
     where: { tenantId: tenant.id, nome },
@@ -606,7 +623,8 @@ export async function criarDepartamento(formData: FormData) {
 }
 
 export async function atualizarDepartamento(departamentoId: string, formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const departamento = await db.departamento.findFirst({
     where: { id: departamentoId, tenantId: tenant.id },
@@ -629,6 +647,17 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
     ...permissions,
     ...permissionsGestorRaw,
   ]).filter((p) => !permissions.includes(p))
+
+  // Idem `atualizarRole`: só o acréscimo precisa estar ao alcance (Achado 6).
+  const jaTinha = new Set([
+    ...(departamento.permissions ?? []),
+    ...(departamento.permissionsGestor ?? []),
+  ])
+  assertPodeDelegar(
+    ctx,
+    [...permissions, ...permissionsGestor].filter((p) => !jaTinha.has(p)),
+    'a um departamento',
+  )
 
   // Regenera o slug só quando o nome mudou — mantém URLs/referências estáveis
   const slug =

@@ -29,8 +29,24 @@ export interface AdminMembroItem {
   inicial: string
   telefone?: string | null
   idade?: number | null
-  /** Departamento pretendido no onboarding (sócio); null se não informou. */
+  /**
+   * Departamento pretendido no onboarding (sócio); null se não informou.
+   * Sempre a área NESTE tenant — na linha de origem em Subsede/PDE é a área na
+   * unidade; no espelho da Sede, a área na Sede.
+   */
   departamentoNome?: string | null
+  /**
+   * Só na origem de um vínculo nascido em unidade com portal próprio: a área
+   * pretendida na Sede. Deixa a diretoria da unidade ver o quadro completo.
+   */
+  departamentoSedeNome?: string | null
+  /**
+   * Sócio já APROVADO cuja área pretendida **neste tenant** ainda não entrou em
+   * vigor — acontece quando o outro nível da hierarquia venceu o first-wins da
+   * fila. Habilita a ação de efetivar a área aqui. `undefined` = a tela não
+   * calculou (não mostra a ação).
+   */
+  areaPendenteEfetivacao?: boolean
   /** Unidade territorial (Sede/Subsede/PDE). */
   sedeNome?: string | null
   /** Comprovante de vínculo (só sócio; dado RESTRITO — nunca cachear). */

@@ -6,13 +6,25 @@ import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
-import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
+import {
+  calculateEffectivePermissions,
+  hasPermission,
+  labelPermission,
+  permissoesForaDoAlcance,
+  PERMISSIONS,
+} from '@torcida/types'
 
 type AuthzResult = {
   session: Session
   tenant: Tenant
-  /** Evita 2ª leitura de RBAC no caminho crítico de publicação. */
+  /**
+   * Conjunto efetivo do ator. Evita 2ª leitura de RBAC no caminho crítico de
+   * publicação, e é o que limita a delegação (`permissoesForaDoAlcance`).
+   * `undefined` quando o ator é super-admin — aí `isSuperAdmin` é a resposta.
+   */
   permissoesEfetivas?: ReturnType<typeof calculateEffectivePermissions>
+  /** Super-admin opera fora do RBAC por tenant: nenhum limite de delegação. */
+  isSuperAdmin?: boolean
 }
 
 export type AuthzComunidadeNacional = {
@@ -27,7 +39,18 @@ async function resolvePortalTenant(session: Session): Promise<Tenant | null> {
   return getActiveTenant(session.user.id, session.user.email)
 }
 
-/** Torcedor global ou PENDENTE no clube — posts PUBLICO no feed cross-torcida (spec §3.1). */
+/**
+ * Torcedor global ou PENDENTE no clube — posts PUBLICO no feed cross-torcida
+ * (spec §3.1).
+ *
+ * Membro **APROVADO** nunca passa por aqui (`return false` no fim): para ele o
+ * conjunto efetivo de permissões é a palavra final, inclusive em PUBLICO — um
+ * override negado de `community:post` bloqueia toda visibilidade. Já quem é
+ * PENDENTE ou não tem vínculo publica PUBLICO mesmo com o override negado, e
+ * isso é deliberado: o override é **por torcida**, e este caminho é o feed
+ * nacional do torcedor, que não pertence a nenhuma. Ver
+ * `docs/ops/auditoria-funcional-2026-07.md` §Achado 7.
+ */
 async function podePublicarComoTorcedorFeed(
   userId: string,
   tenantId: string,
@@ -68,7 +91,7 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
   if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
-    return { session, tenant }
+    return { session, tenant, isSuperAdmin: true }
   }
 
   const { rolePermissions, overrides }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
@@ -77,7 +100,35 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 
   if (!hasPermission(effective, permission)) throw new Error('Sem permissão')
 
-  return { session, tenant }
+  return { session, tenant, permissoesEfetivas: effective, isSuperAdmin: false }
+}
+
+/**
+ * Ninguém delega o que não tem: barra conceder permissão (ou atribuir cargo
+ * que a carregue) fora do conjunto efetivo do ator.
+ *
+ * `roles:manage` sem este limite equivale a owner — o portador fabrica um
+ * cargo com qualquer permissão do catálogo, veste, e escala. E como o cargo de
+ * sistema `owner` também é atribuível, a escalada alcançava até
+ * `assertTenantOwner`. Ver `docs/ops/auditoria-funcional-2026-07.md` §Achado 6.
+ *
+ * Super-admin passa direto (opera fora do RBAC por tenant). Owner tem `'*'`,
+ * então `permissoesForaDoAlcance` já devolve vazio para ele.
+ */
+export function assertPodeDelegar(
+  ctx: Pick<AuthzResult, 'permissoesEfetivas' | 'isSuperAdmin'>,
+  desejadas: string[],
+  oQue: string,
+): void {
+  if (ctx.isSuperAdmin) return
+
+  const fora = permissoesForaDoAlcance(ctx.permissoesEfetivas ?? [], desejadas)
+  if (fora.length === 0) return
+
+  const lista = fora.map((p) => labelPermission(p)).join(', ')
+  throw new Error(
+    `Você não pode conceder ${oQue} permissões que não tem: ${lista}. Peça a quem já as tem.`,
+  )
 }
 
 /**
@@ -92,7 +143,7 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
   if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
-    return { session, tenant }
+    return { session, tenant, isSuperAdmin: true }
   }
 
   const { rolePermissions, overrides }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
@@ -101,7 +152,7 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
 
   if (!permissions.some((p) => hasPermission(effective, p))) throw new Error('Sem permissão')
 
-  return { session, tenant }
+  return { session, tenant, permissoesEfetivas: effective, isSuperAdmin: false }
 }
 
 /**
@@ -337,6 +388,15 @@ export async function assertAutorPublicacaoPost(
   }
   if (membro && membro.status !== 'APROVADO') {
     throw new Error('Seu cadastro de associado não está ativo.')
+  }
+  // Membro APROVADO sem `community:post`: `podePublicarComoTorcedorFeed`
+  // devolve false para quem é aprovado, então a recusa acima é a permissão —
+  // não o onboarding. Sem este ramo a mensagem caía no fall-through e mandava
+  // concluir um onboarding já concluído, divergindo de
+  // `checarPodePublicarNoFeed` (que alimenta o compositor). Ver
+  // `docs/ops/auditoria-funcional-2026-07.md` §Achado 7.
+  if (membro && !temPermissao) {
+    throw new Error('Você não tem permissão para publicar.')
   }
   throw new Error('Conclua o onboarding do torcedor para publicar.')
 }

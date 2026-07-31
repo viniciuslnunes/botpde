@@ -20,6 +20,22 @@ export type LocalizacaoOnboarding = {
   lng: number
 }
 
+/**
+ * A unidade escolhida no onboarding tem portal próprio (Caso B: Subsede/PDE
+ * promovida a tenant)? Só nesse caso o sócio ganha DUAS linhas de vínculo — a
+ * origem na unidade e o espelho na Sede — e faz sentido declarar uma área em
+ * cada nível: `Departamento` é por tenant, então unidade do mesmo tenant (ou a
+ * própria Sede) compartilha um único conjunto de departamentos.
+ */
+export function exigeDepartamentoDaSede(
+  unidadeTenantId: string | null | undefined,
+  torcidaTenantId: string,
+): boolean {
+  const unidade = unidadeTenantId?.trim()
+  if (!unidade) return false
+  return unidade !== torcidaTenantId.trim()
+}
+
 export function normalizarTexto(valor: string): string {
   return valor
     .normalize('NFD')

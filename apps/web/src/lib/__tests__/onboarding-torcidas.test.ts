@@ -243,7 +243,11 @@ describe('getSedesDaTorcidaOnboarding', () => {
     expect(getDescendantTenantIds).toHaveBeenCalledWith('t-mae')
     expect(sedeFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tenantId: { in: ['t-mae', 't-pde'] }, ativa: true },
+        where: {
+          tenantId: { in: ['t-mae', 't-pde'] },
+          ativa: true,
+          tenant: { ativo: true },
+        },
       }),
     )
     expect(sedes).toHaveLength(1)

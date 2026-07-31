@@ -1,5 +1,12 @@
 /** Props serializáveis para Client Components do Bar (Prisma Decimal → number). */
 
+import {
+  LIMITE_COMANDA_PADRAO,
+  limiteEfetivoComanda,
+  percentualLimite,
+  saldoComanda,
+} from '@torcida/types'
+
 export type BarProdutoSerializado = {
   id: string
   nome: string
@@ -115,6 +122,96 @@ export function serializeVendaBar(v: {
       quantidade: item.quantidade,
       precoUnit: Number(item.precoUnit),
       total: Number(item.total),
+    })),
+  }
+}
+
+export type BarComandaLancamentoSerializado = {
+  id: string
+  total: number
+  criadoEm: string
+  itens: BarVendaItemSerializado[]
+}
+
+export type BarComandaSerializada = {
+  id: string
+  codigo: string
+  tipo: 'MEMBRO' | 'AVULSO'
+  status: string
+  titularNome: string
+  titularMembroId: string | null
+  /** Override gravado; `null` = padrão da unidade. */
+  limite: number | null
+  /** Limite efetivo (override ou `LIMITE_COMANDA_PADRAO`). */
+  limiteEfetivo: number | null
+  total: number
+  totalPago: number
+  desconto: number
+  saldo: number
+  /** % do limite consumido; `null` se sem teto. */
+  percentualLimite: number | null
+  abertaEm: string
+  lancamentos: BarComandaLancamentoSerializado[]
+}
+
+export function serializeComandaBar(c: {
+  id: string
+  codigo: string
+  tipo: string
+  status: string
+  titularNome: string
+  titularMembroId: string | null
+  limite: unknown
+  total: unknown
+  totalPago: unknown
+  desconto: unknown
+  abertaEm: Date
+  vendas: Array<{
+    id: string
+    total: unknown
+    criadoEm: Date
+    itens: Array<{
+      id: string
+      produtoId: string | null
+      produtoNome: string
+      quantidade: number
+      precoUnit: unknown
+      total: unknown
+    }>
+  }>
+}): BarComandaSerializada {
+  const total = Number(c.total)
+  const totalPago = Number(c.totalPago)
+  const desconto = Number(c.desconto)
+  const limiteOverride = c.limite == null ? null : Number(c.limite)
+  const limiteEfetivo = limiteEfetivoComanda(limiteOverride, LIMITE_COMANDA_PADRAO)
+  return {
+    id: c.id,
+    codigo: c.codigo,
+    tipo: c.tipo as 'MEMBRO' | 'AVULSO',
+    status: c.status,
+    titularNome: c.titularNome,
+    titularMembroId: c.titularMembroId,
+    limite: limiteOverride,
+    limiteEfetivo,
+    total,
+    totalPago,
+    desconto,
+    saldo: saldoComanda({ total, desconto, totalPago }),
+    percentualLimite: percentualLimite(total, limiteEfetivo),
+    abertaEm: c.abertaEm.toISOString(),
+    lancamentos: c.vendas.map((v) => ({
+      id: v.id,
+      total: Number(v.total),
+      criadoEm: v.criadoEm.toISOString(),
+      itens: v.itens.map((item) => ({
+        id: item.id,
+        produtoId: item.produtoId,
+        produtoNome: item.produtoNome,
+        quantidade: item.quantidade,
+        precoUnit: Number(item.precoUnit),
+        total: Number(item.total),
+      })),
     })),
   }
 }

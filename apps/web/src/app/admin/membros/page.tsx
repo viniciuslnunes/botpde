@@ -59,6 +59,7 @@ import {
 } from '@/lib/listagem/query'
 import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { mapToAdminMembroItem } from '@/lib/admin-membro-map'
+import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { AdminMembrosTable } from './admin-membros-client'
 import { ExportarLgeButton } from './exportar-lge-button'
 import type { Metadata } from 'next'
@@ -562,6 +563,7 @@ export default async function MembrosPage({
       include: {
         user: { select: { nome: true, email: true, avatarUrl: true } },
         departamento: { select: { id: true, nome: true } },
+        departamentoSede: { select: { nome: true } },
         sede: { select: { id: true, nome: true, tipo: true } },
       },
       orderBy: montarOrderByListagem(SPEC, listagem),
@@ -702,6 +704,13 @@ export default async function MembrosPage({
       sociosOutrosTenants.filter((s) => tenantsRivais.has(s.tenantId)).map((s) => s.userId),
     )
   }
+
+  // Área pretendida × área em vigor: com a fila first-wins da torcida, o nível
+  // que não decidiu fica com a área pendente até efetivar aqui.
+  const areasEfetivadasPorUser = await getAreasEfetivadasPorUser(
+    tenant.id,
+    membros.map((m: (typeof membros)[number]) => m.userId),
+  )
 
   const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
   for (const r of reprovacoesOutrosTenants) {
@@ -958,7 +967,10 @@ export default async function MembrosPage({
                   avatarUrl: membro.user.avatarUrl,
                 },
                 departamento: membro.departamento
-                  ? { nome: membro.departamento.nome }
+                  ? { id: membro.departamento.id, nome: membro.departamento.nome }
+                  : null,
+                departamentoSede: membro.departamentoSede
+                  ? { nome: membro.departamentoSede.nome }
                   : null,
                 sede: membro.sede ? { nome: membro.sede.nome } : null,
               },
@@ -974,6 +986,7 @@ export default async function MembrosPage({
                     : undefined,
                 tentativas: tentativasPorMembro.get(membro.id) ?? 1,
                 ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
+                areasEfetivadas: areasEfetivadasPorUser.get(membro.userId) ?? new Set<string>(),
               },
             ),
           )}

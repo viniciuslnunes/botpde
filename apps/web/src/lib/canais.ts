@@ -67,7 +67,9 @@ const MAX_CANAIS_OFICIAIS_PROVISION = 50
  * unidade da mesma torcida (sede/subsedes/PDEs) — não só no `viewerTenantId`
  * atual, já que o vínculo pode ter sido feito numa subsede e o usuário
  * navegar pela sede (ou vice-versa). Torcedor (vínculo `TORCEDOR` ou nenhum
- * vínculo aprovado) não conta.
+ * vínculo aprovado) não conta. Quem foi desligado também não: `desligarMembro`
+ * mantém `status: APROVADO` e só grava `desligadoEm` (Achado 11), então o
+ * filtro precisa dos dois — como já faz `elegibilidadeCanalMembro` abaixo.
  */
 const isSocioDaTorcida = cache(async function isSocioDaTorcida(
   userId: string,
@@ -75,7 +77,13 @@ const isSocioDaTorcida = cache(async function isSocioDaTorcida(
 ): Promise<boolean> {
   const lineage = await getTorcidaLineageTenantIds(tenantId)
   const membro: { id: string } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'APROVADO', tipo: 'SOCIO', tenantId: { in: lineage } },
+    where: {
+      userId,
+      status: 'APROVADO',
+      desligadoEm: null,
+      tipo: 'SOCIO',
+      tenantId: { in: lineage },
+    },
     select: { id: true },
   })
   return !!membro

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { dispatchAlertasEstoqueBaixoBar, dispatchAlertasFiadoVencidoBar } from '@/lib/bar-alertas'
+import {
+  dispatchAlertasComandaVencidaBar,
+  dispatchAlertasEstoqueBaixoBar,
+  dispatchAlertasFiadoVencidoBar,
+} from '@/lib/bar-alertas'
 
 /**
- * Cron de alertas do Bar orientados a tempo (estoque baixo / fiado vencido).
+ * Cron de alertas do Bar orientados a tempo (estoque baixo / comanda e fiado legado).
  * Protegido por `CRON_SECRET` (Bearer) — configurar no Railway/scheduler.
  */
 export async function GET(request: Request) {
@@ -14,10 +18,12 @@ export async function GET(request: Request) {
     }
   }
 
-  const [estoqueBaixo, fiadoVencido] = await Promise.all([
+  const [estoqueBaixo, comandaVencida, fiadoVencido] = await Promise.all([
     dispatchAlertasEstoqueBaixoBar(),
+    dispatchAlertasComandaVencidaBar(),
+    // Legado: no-op seguro se não houver BarFiado PENDENTE.
     dispatchAlertasFiadoVencidoBar(),
   ])
 
-  return NextResponse.json({ ok: true, estoqueBaixo, fiadoVencido })
+  return NextResponse.json({ ok: true, estoqueBaixo, comandaVencida, fiadoVencido })
 }

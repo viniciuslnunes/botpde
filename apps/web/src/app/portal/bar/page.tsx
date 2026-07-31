@@ -4,8 +4,15 @@ import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { listarCategoriasBar, listarProdutosBar, resolveUnidadeBar } from '@/lib/bar'
 import type { BarCategoriaLite, BarProdutoLite } from '@/lib/bar'
+import {
+  getComandaAbertaDoMembro,
+  listarDebitosComandaDoMembro,
+  type BarComandaAbertaPortal,
+  type BarDebitoComandaPortal,
+} from '@/lib/bar-comanda'
 import { serializeProdutoBar } from '@/lib/bar-serialize'
 import { BarCardapio } from '@/components/portal/bar/bar-cardapio'
+import { BarMinhaComanda } from '@/components/portal/bar/bar-minha-comanda'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -16,11 +23,19 @@ export default async function PortalBarPage() {
   if (!tenant) redirect('/')
   if (!session?.user?.id) redirect('/entrar')
 
-  const unidade = await resolveUnidadeBar(tenant.id, session.user.id)
+  const userId = session.user.id
+  const unidade = await resolveUnidadeBar(tenant.id, userId)
 
-  const [produtos, categorias]: [BarProdutoLite[], BarCategoriaLite[]] = await Promise.all([
+  const [produtos, categorias, comanda, debitos]: [
+    BarProdutoLite[],
+    BarCategoriaLite[],
+    BarComandaAbertaPortal | null,
+    BarDebitoComandaPortal[],
+  ] = await Promise.all([
     listarProdutosBar(tenant.id, unidade.id, { apenasAtivos: true }),
     listarCategoriasBar(tenant.id, unidade.id),
+    getComandaAbertaDoMembro(tenant.id, unidade.id, userId),
+    listarDebitosComandaDoMembro(tenant.id, unidade.id, userId),
   ])
 
   const categoriasAtivas = categorias
@@ -60,6 +75,11 @@ export default async function PortalBarPage() {
       </MotionReveal>
 
       <MotionReveal index={1}>
+        {/* Com comanda/débito: cards; senão: linha discreta (não card vazio barulhento). */}
+        <BarMinhaComanda comanda={comanda} debitos={debitos} />
+      </MotionReveal>
+
+      <MotionReveal index={2}>
         <BarCardapio produtos={itens} categorias={categoriasAtivas} />
       </MotionReveal>
     </div>

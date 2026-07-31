@@ -4,6 +4,7 @@ import type {
   MembroReprovacaoDetalhe,
 } from '@/app/admin/membros/admin-membro-item'
 import { formatRg, labelCategoriaReprovacao } from '@torcida/types'
+import { areaPendenteDeEfetivacao } from '@/lib/area-efetivada'
 
 const TIPO_BADGE: Record<string, string> = {
   SOCIO: 'Sócio',
@@ -78,7 +79,8 @@ export const membroDetalheSelect = {
   espelhado: true,
   aprovadoNaUnidadeTenantId: true,
   user: { select: { email: true, avatarUrl: true } },
-  departamento: { select: { nome: true } },
+  departamento: { select: { id: true, nome: true } },
+  departamentoSede: { select: { nome: true } },
   sede: { select: { nome: true } },
 } as const
 
@@ -134,7 +136,8 @@ export type MembroDetalheRow = {
   espelhado: boolean
   aprovadoNaUnidadeTenantId: string | null
   user: { email: string | null; avatarUrl: string | null }
-  departamento: { nome: string } | null
+  departamento: { id: string; nome: string } | null
+  departamentoSede: { nome: string } | null
   sede: { nome: string } | null
 }
 
@@ -146,6 +149,8 @@ export function mapToAdminMembroItem(
     reprovacoesOutraTorcida?: number
     tentativas?: number
     ultimoMotivoReprovacao?: string
+    /** Áreas já em vigor deste usuário neste tenant (`getAreasEfetivadasPorUser`). */
+    areasEfetivadas?: Set<string>
   },
 ): AdminMembroItem {
   const isSocio = membro.tipo === 'SOCIO'
@@ -181,6 +186,13 @@ export function mapToAdminMembroItem(
     telefone: membro.telefone,
     idade: membro.idade,
     departamentoNome: membro.departamento?.nome ?? null,
+    departamentoSedeNome: membro.departamentoSede?.nome ?? null,
+    // Sem `areasEfetivadas` a tela não calculou — fica undefined e a UI não
+    // oferece a ação, em vez de assumir "pendente" e mostrar botão fantasma.
+    areaPendenteEfetivacao:
+      opts?.areasEfetivadas === undefined || !isSocio || membro.status !== 'APROVADO'
+        ? undefined
+        : areaPendenteDeEfetivacao(membro.departamento?.id, opts.areasEfetivadas),
     sedeNome: membro.sede?.nome ?? null,
     imagemProva: isSocio ? membro.imagemProva : null,
     numeroAssociado: isSocio ? membro.numeroAssociado : null,

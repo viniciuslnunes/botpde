@@ -4,9 +4,19 @@ Rodada de validação ponta a ponta sobre os dois lotes de teste em volume
 (ver `plano-teste-volume-dados.md`), cobrindo **feed, canais/grupos,
 permissões, departamentos, área admin e eventos**.
 
-> **Estado (2026-07-30):** achados 2 e 4 corrigidos no código. O repair do
-> roster foi validado apenas com `--dry-run`; a aplicação mutável segue
-> pendente de execução operacional.
+> **Estado (2026-07-30, após as rodadas de correção):** achados 1, 2, 4, 6, 7, 8,
+> 9, 10 e 11 corrigidos no código. O Achado 1 fechou a **classe**: cargos de
+> sistema resolvem por `SYSTEM_ROLE_PERMISSIONS` em runtime
+> (`permissionsOfRole`); o array gravado e o repair passam a ser higiene.
+> Matriz canônica alinhada: Bar sob Financeiro; `members:import` na Diretoria;
+> `community:post_nacional` na Presidência (cargo) e Comunicação gestor;
+> gestores operacionais sem mega-pacote transversal.
+>
+> Placar após as correções: `audit:hierarquia` **31 conformes / 0 erros**
+> (era 20/2), `audit:notificacoes` **15 / 0** (era 11/3),
+> `audit:fluxos-avancados` **30 / aceitos**, `audit:fluxos` **35 / 0**,
+> `audit:mensageria` **16 / 0**. `tsc` limpo, `eslint` 0 erros, Vitest
+> 751/751 (+ testes Achado 1).
 
 ## Como a auditoria roda
 
@@ -39,12 +49,18 @@ o tenant pelo vínculo do usuário e rodar o RBAC de verdade.
 
 ## Achado 1 — Cargos de sistema desatualizados em quase toda a plataforma
 
-**Severidade: alta. Afeta produção, não é dado de teste.**
+**Severidade: alta. Afeta produção. Corrigido em 2026-07-30 (prevenção).**
 
-Cargo de sistema resolve permissão pelo **array gravado no `Role`**
-(`permissionsOfRole` lê `role.permissions` / `role.permissionsExtras`), não
+> **Estado:** o sintoma no banco foi sanado com `db:repair-system-roles`; a
+> **classe** fechou quando `permissionsOfRole` passou a resolver cargos de
+> sistema por `SYSTEM_ROLE_PERMISSIONS[nome]` em runtime. O array gravado e o
+> repair passam a ser higiene. Matriz canônica: Bar sob Financeiro;
+> `members:import` na Diretoria; `post_nacional` na Presidência + Comunicação.
+
+Cargo de sistema **antes** resolvia permissão pelo **array gravado no `Role`**
+(`permissionsOfRole` lia `role.permissions` / `role.permissionsExtras`), não
 pela constante `SYSTEM_ROLE_PERMISSIONS` do código. Toda permissão nova
-precisa de `db:repair-system-roles` para chegar às torcidas **já
+precisava de `db:repair-system-roles` para chegar às torcidas **já
 existentes**. Isso não aconteceu:
 
 | Cargo | Torcidas com `Role` desatualizado | Permissões que faltam |
@@ -54,7 +70,7 @@ existentes**. Isso não aconteceu:
 | `admin` | **461 / 565** | `members:dismiss`, `members:export_lge`, `bar:operate`, `bar:manage` |
 | `member` | 0 / 565 | — (em dia) |
 
-Consequência concreta, verificada nos gates:
+Consequência concreta, verificada nos gates (antes da correção):
 
 - **O módulo Bar está inacessível.** `/admin/bar/page.tsx` faz
   `assertAnyPermission([BAR_OPERATE, BAR_MANAGE])`. Presidente e vice de 562
@@ -78,8 +94,7 @@ Presidente de `torcida-fiel-macabra-sp` chama `abrirTurnoBar()` e recebe
 `Role` de owner sem `bar:operate` nem `bar:manage` gravados) — testar no
 Gaviões daria falso "tudo certo", porque ele é um dos poucos atualizados.
 
-Correção: quando **só** os arrays persistidos estão defasados (caso deste
-achado — Roles `isSystem` já existem, memberships ok), rodar o modo rápido:
+Mitigação pontual (ainda válida como higiene do array gravado):
 
 ```bash
 pnpm --filter @torcida/db db:repair-system-roles -- --permissions-only --dry-run
@@ -91,10 +106,9 @@ Isso atualiza em lote `permissionsExtras` (owner/admin/vice) ou
 `syncMembership` por usuário nem bootstrap de departamentos. O default
 sem `--permissions-only` continua sendo o repair completo (mais lento).
 
-Prevenção a decidir — o candidato natural é o repair virar parte do
-deploy, ou o cargo de sistema deixar de depender do array gravado e
-resolver pela constante em runtime (o segundo elimina a classe de bug
-inteira).
+**Prevenção (fechada):** cargos de sistema resolvem pela constante em
+runtime. Pacotes de departamento canônico alinhados na mesma rodada — ver
+§Rodada 8 / Achado 1 fechado.
 
 ## Achado 2 — Gate de comentário não respeita rivalidade
 
@@ -692,6 +706,212 @@ sobrou, ainda por risco × esforço:
     rivalidade barrando escolha. 4 `SolicitacaoUnidade` semeadas.
 12. **Importação de membros** — `importarMock` → `desfazerImportacao`. Zero
     `ImportacaoMembros` no banco; precisa de dado.
+
+## Rodada 8 — correções (2026-07-30)
+
+Primeira rodada que **corrige** em vez de achar. Ordem executada: 1, 9, 11,
+10, 8 — do mais barato/destravante para o mais caro, deixando 6 e 7 de fora
+por serem decisão de produto.
+
+### Achado 1 — fechado: runtime pela constante
+
+`permissionsOfRole` passou a devolver `SYSTEM_ROLE_PERMISSIONS[nome]` quando
+o `Role.nome` é cargo de sistema (`owner` / `admin` / `vice` / `member`). O
+array gravado (`permissions` / `permissionsExtras`) deixa de ser a fonte de
+verdade efetiva — a próxima permissão nova vale sem
+`db:repair-system-roles`. O repair e o check em `audit:dados` continuam como
+**higiene** (bootstrap/UI), não como gate de deploy.
+
+Matriz canônica (`departamentos-canonicos.js`) alinhada na mesma rodada:
+`bar:operate`/`bar:manage` no Financeiro; `members:import` no gestor
+Diretoria; `community:post_nacional` no gestor Comunicação (Presidência já
+tem via cargo de sistema); gestores de área operacional sem
+`finance:manage` / `store:manage` / `sedes:manage` transversais.
+
+### Achado 9 — `findSedeRaiz`, um só ponto de escolha
+
+`lib/hierarquia.ts` ganhou `findSedeRaiz(tenantId)`: raiz `SEDE` primeiro,
+qualquer unidade do tenant como fallback, **com `orderBy` determinístico**
+(`criadoEm`, depois `id`) nos dois ramos. `getTenantRelationImpl`,
+`getAncestorTenantIdsImpl`, `getDescendantTenantIdsImpl` e
+`getTenantHierarquia` passaram a usá-lo — antes só o primeiro divergia, e os
+outros três já não eram estáveis entre execuções por falta de `orderBy`.
+
+Verificado: a torcida de 4 unidades, que falhava, agora conforma —
+`torcida com 4 unidades: Sede mãe enxerga o RESTRITO da unidade filha`.
+
+### Achado 8 — orçamento de tempo compatível com o trabalho
+
+`TRANSACAO_PROMOCAO_OPTS = { timeout: 45_000, maxWait: 15_000 }` em
+`promoverSedeParaTenant`. 45 s e não 30 s porque a migração de membros é um
+loop com 2 round-trips por membro, que o achado mediu com poucos membros.
+
+O efeito colateral é o que importa: **o caminho feliz da promoção saiu do
+limbo**. As asserções que já estavam escritas e nunca rodaram passaram a
+rodar — tenant próprio criado, elo `sedeId` preservado, 3 cargos de sistema,
+owner atribuído com `SaasMembro` APROVADO, 10 departamentos canônicos,
+`AuditLog`, e o invariante de visibilidade sobre a forma que a **action**
+produz (não mais sobre uma forma montada à mão).
+
+### Achado 10 — reconciliar por evento, não por destinatário
+
+`reconciliarNotificacoesDoEvento(tenantId, { tipo, atorId?, corpo? })` em
+`lib/notificacoes.ts`. Lê os destinatários **antes** do update (depois dele
+nada casa com `lida: false`), marca todos, e emite um ping de SSE por
+destinatário afetado.
+
+Aplicado nos 4 pontos de fan-out: as 4 funções de moderação
+(`DENUNCIA_NOVA`), `decidirPedidoGrupo` (`GRUPO_PEDIDO`),
+`decidirPedidoCanal` (`CANAL_PEDIDO`) e `marcarSolicitacoesLidas`
+(`MEMBRO_SOLICITADO`).
+
+Deliberadamente **não** aplicado a `marcarNotificacoesSeguimentoPendentesLidas`
+(SEGUIMENTO_PENDENTE tem um único destinatário — não é fan-out) nem a
+`marcarTodasNotificacoesLidas` (inbox do próprio usuário, onde escopar por
+`userId` é o correto).
+
+Cobertura: `lib/__tests__/notificacoes-reconciliacao.test.ts` fixa o
+invariante do `where` (nunca `userId`), a ordem findMany→updateMany, e o
+no-op quando ninguém tem pendência. A auditoria ganhou uma **guarda de
+regressão** estática — reconciliação de fila que volte a usar
+`userId: session.user.id` vira erro.
+
+### Achado 11 — desligado é ex-membro para todo efeito
+
+`desligadoEm: null` em `listarUserIdsMembrosAprovados`. E, na varredura dos
+outros consumidores que o achado pedia, mais dois gates com a mesma omissão
+— ambos concedendo privilégio de sócio a quem já saiu:
+
+- `isSocioDaTorcida` (`lib/canais.ts`) — desligado continuava vendo canal
+  restrito a sócio. Inconsistente com `elegibilidadeCanalMembro`, no mesmo
+  arquivo, que já checava `desligadoEm`.
+- `isSocioAprovado` (`lib/mensageria.ts`) — gate de solicitação de DM.
+
+**Não** alterados, por serem decisão de produto e não de acesso: contagens de
+dashboard e relatórios (`admin-dashboard.ts`, `membros-section.tsx`,
+`comunidade-insights.ts`), badges de autor (`autor-badges.ts`), resultados de
+busca (`comunidade-busca.ts`) e listas de contato. Se a intenção for que
+ex-membro suma dessas superfícies também, é trabalho novo — vale decidir de
+uma vez em vez de caso a caso.
+
+### Lição
+
+**Reverificar antes de corrigir.** O Achado 1 abria a fila de correções e não
+existia mais. O custo de conferir foi um dry-run; o custo de não conferir
+seria uma escrita em 565 tenants de produção para resolver um problema já
+resolvido. Achado registrado é hipótese datada, não estado atual — vale para
+o próximo que abrir esta lista.
+
+## Rodada 9 — achados 6 e 7 (2026-07-30)
+
+Os dois estavam parados como "decisão de produto antes de código". Ao serem
+analisados, **nenhum dos dois era**: o 7 tinha a hipótese errada, e o 6 era
+mais grave do que o registro, não mais ambíguo.
+
+### Achado 7 — a hipótese estava errada; o defeito é a mensagem
+
+A hipótese: com `PerfilTorcedor` completo, o override negado de
+`community:post` deixaria de impedir a publicação PÚBLICA, porque o gate cai
+em `podePublicarComoTorcedorFeed`.
+
+Testado, não deduzido. Os 4 overrides negados do banco são todos membro
+**APROVADO**. No único cujo tenant ativo casa com o do override
+(`@pavilhao-nove`), o perfil de torcedor foi completado e alinhado ao clube do
+tenant, a publicação PÚBLICA foi tentada, e reverteu-se tudo. **Bloqueou.**
+
+A razão está em `podePublicarComoTorcedorFeed` (`lib/authz.ts`): libera quem é
+`PENDENTE` ou quem não tem vínculo, e devolve `false` para quem é `APROVADO`
+— independente do onboarding. Para membro aprovado, o conjunto efetivo é a
+palavra final em todas as visibilidades. **Hipótese derrubada.**
+
+O defeito real é outro, e enganou a própria auditoria: a mensagem devolvida
+era *"Conclua o onboarding do torcedor para publicar."* — com o onboarding
+concluído. É o fall-through de `assertAutorPublicacaoPost`, a única saída
+depois que todos os `if` falham. E divergia do gêmeo que alimenta o
+compositor, `checarPodePublicarNoFeed`, que já tinha o ramo certo. O
+compositor dizia uma coisa e o submit dizia outra — foi por isso que a rodada
+3 classificou o caso como "barrado pelo onboarding, inconclusivo".
+
+Corrigido com o ramo `membro && !temPermissao` antes do fall-through. O alerta
+da rodada 3 virou conforme: *"Override negado também bloqueou a publicação
+pública: 'Você não tem permissão para publicar.'"*
+
+A pergunta de produto que sobrou é bem mais estreita e foi **documentada como
+intencional** no JSDoc de `podePublicarComoTorcedorFeed`: quem é `PENDENTE` ou
+não tem vínculo publica PUBLICO mesmo com o override negado, porque o override
+é **por torcida** e esse caminho é o feed nacional do torcedor.
+
+### Achado 6 — não era decisão de produto
+
+O registro dizia "pode ser intencional (quem administra cargos administra o
+RBAC inteiro)". Não é: `SYSTEM_ROLE_PERMISSIONS` monta `admin` e `vice` como
+`ALL_PERMISSIONS` **menos `settings:manage`**, de propósito, e
+`assertTenantOwner` existe como peso final do Presidente. A escalada derrubava
+uma fronteira que o próprio código desenha.
+
+Superfície medida antes da correção:
+
+| | |
+|---|---|
+| Pares usuário×torcida com `roles:manage` efetivo | 99 |
+| Destes, **sem** o cargo de sistema owner | **85** |
+| Cargos customizados carregando `settings:manage` | 0 de 11.305 |
+| Overrides concedendo `settings:manage` | 0 |
+
+Os 85 são todos `admin` ou `vice`. Porta aberta, ninguém tinha passado.
+
+**Um segundo caminho, mais curto que o registrado.** A auditoria achou o truque
+do cargo customizado (`criarRole`). Mas `salvarAcessoUsuario` validava só que o
+`roleId` pertence ao tenant, e a única guarda era a de `vice` (limite de 2 +
+Sede principal). O cargo `owner` não tinha nenhuma, e `/admin/acessos` lista
+todos os cargos. Um admin se atribuía `owner` direto — e aí não ganhava só
+`settings:manage`: passava em `assertTenantOwner`, alcançando as três ações
+reservadas ao Presidente (`salvarHierarquiaVisivel`,
+`salvarExigirDocumentosCadastro`, `salvarAfiliacao`).
+
+**Correção — a regra geral, não uma lista fixa.** `permissoesForaDoAlcance`
+(`packages/types/src/permissions.js`) responde "o que dessas o ator não tem?",
+e `assertPodeDelegar` (`lib/authz.ts`) transforma isso em recusa com rótulo
+legível. `assertPermission` passou a devolver `permissoesEfetivas` e
+`isSuperAdmin` para alimentá-la sem 2ª leitura de RBAC.
+
+Aplicada em **cinco** pontos — os dois do achado mais três do mesmo vetor:
+
+- `criarRole` / `atualizarRole`
+- `criarDepartamento` / `atualizarDepartamento` — o pacote do departamento vira
+  o cargo `Membro · X` / `Gestor · X`, que é atribuível; sem isso a escalada
+  saía pela porta ao lado
+- `salvarAcessoUsuario` — cargos atribuídos (pacote inteiro) **e** overrides
+  concedidos
+
+Duas assimetrias deliberadas: só o que está sendo **acrescentado** é checado
+(senão quem não tem `settings:manage` não conseguiria nem renomear um cargo que
+já a carrega, criado por quem podia), e **retirar** acesso nunca é escalada —
+override negado passa livre.
+
+Efeito colateral aceito: quando o Presidente sai, só o super-admin repõe o
+cargo `owner`. Era o comportamento pretendido pelo `assertTenantOwner` desde
+sempre; agora vale de fato.
+
+`labelPermission` ganhou uma tabela para permissões fora de
+`PERMISSION_GROUPS`. Só `settings:manage` estava nesse caso — justamente por
+ser exclusiva do owner e nunca aparecer no formulário de cargos, ela era a
+única que a mensagem de recusa cuspiria como chave crua.
+
+Cobertura: `lib/__tests__/delegacao-permissoes.test.ts` (14 casos, incluindo
+"admin não atribui owner" e "admin continua atribuindo admin e member" — o
+limite não pode travar a operação normal) e um teste novo em
+`audit:fluxos-avancados` para o caminho de auto-promoção, com **alvo
+sintético** para conter o dano caso a guarda falhe.
+
+### Lição
+
+**"Pode ser intencional" merece ser resolvido, não arquivado.** Os dois
+achados ficaram sete rodadas na fila como decisão de produto. Nenhum era: bastou
+ler o que o código já declara (`SYSTEM_ROLE_PERMISSIONS` tirando
+`settings:manage` de admin) e executar o caso em vez de deduzir (o override
+que "provavelmente" não bloquearia). Ambiguidade registrada tende a virar
+ambiguidade permanente.
 
 ## Lacunas de cobertura (não são bugs)
 

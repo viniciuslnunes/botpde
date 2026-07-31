@@ -8,6 +8,7 @@ import {
   PERMISSIONS,
   formatNomeTorcida,
 } from '@torcida/types'
+import { assertPodeMutarSedeNaArvore } from '@/lib/sede-acesso-mae'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EditarSedeForm } from '@/components/admin/sede-forms'
@@ -57,62 +58,72 @@ export default async function EditarSedePage({
     tenantId: string | null
   }
 
+  const sede: SedeEdit | null = await db.sede.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      nome: true,
+      tipo: true,
+      sedeId: true,
+      endereco: true,
+      cidade: true,
+      estado: true,
+      cep: true,
+      capacidade: true,
+      responsavel: true,
+      responsavelUserId: true,
+      telefone: true,
+      horarios: true,
+      descricao: true,
+      fotoUrl: true,
+      lat: true,
+      lng: true,
+      streetViewHeading: true,
+      streetViewPitch: true,
+      streetViewFov: true,
+      ativa: true,
+      tenantId: true,
+    },
+  })
+  if (!sede) notFound()
+
+  let portalProprio = false
+  try {
+    const acesso = await assertPodeMutarSedeNaArvore(session, tenant, id)
+    portalProprio = acesso.portalProprio
+  } catch {
+    notFound()
+  }
+
+  const tenantDaUnidade = sede.tenantId ?? tenant.id
   const agora = new Date()
 
-  const [sede, todasSedes, membrosCount, filhosAtivos, eventos, candidatosRaw]: [
-    SedeEdit | null,
+  const [todasSedes, membrosCount, filhosAtivos, eventos, candidatosRaw]: [
     Array<{ id: string; nome: string; tipo: string }>,
     number,
     number,
     Array<{ id: string; titulo: string; data: Date }>,
     Array<{ userId: string; nome: string; user: { nome: string | null; email: string | null } }>,
   ] = await Promise.all([
-    db.sede.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        nome: true,
-        tipo: true,
-        sedeId: true,
-        endereco: true,
-        cidade: true,
-        estado: true,
-        cep: true,
-        capacidade: true,
-        responsavel: true,
-        responsavelUserId: true,
-        telefone: true,
-        horarios: true,
-        descricao: true,
-        fotoUrl: true,
-        lat: true,
-        lng: true,
-        streetViewHeading: true,
-        streetViewPitch: true,
-        streetViewFov: true,
-        ativa: true,
-        tenantId: true,
-      },
-    }),
     db.sede.findMany({
       where: { tenantId: tenant.id },
       select: { id: true, nome: true, tipo: true },
       orderBy: { nome: 'asc' },
     }),
     db.saasMembro.count({
-      where: { tenantId: tenant.id, sedeId: id, status: 'APROVADO' },
+      where: { tenantId: tenantDaUnidade, sedeId: id, status: 'APROVADO' },
     }),
     db.sede.count({
-      where: { tenantId: tenant.id, sedeId: id, ativa: true },
+      where: { tenantId: tenantDaUnidade, sedeId: id, ativa: true },
     }),
     db.evento.findMany({
-      where: { tenantId: tenant.id, sedeId: id, data: { gte: agora } },
+      where: { tenantId: tenantDaUnidade, sedeId: id, data: { gte: agora } },
       orderBy: { data: 'asc' },
       take: 5,
       select: { id: true, titulo: true, data: true },
     }),
     db.saasMembro.findMany({
-      where: { tenantId: tenant.id, status: 'APROVADO' },
+      where: { tenantId: tenantDaUnidade, status: 'APROVADO' },
       orderBy: { nome: 'asc' },
       take: 200,
       select: {
@@ -122,8 +133,6 @@ export default async function EditarSedePage({
       },
     }),
   ])
-
-  if (!sede || sede.tenantId !== tenant.id) notFound()
 
   // Caso B: pai pode estar no tenant da torcida principal (fora deste host).
   type PaiHerdadoLite = {
@@ -150,7 +159,7 @@ export default async function EditarSedePage({
         tenant: { select: { nome: true } },
       },
     })
-    if (pai?.tenantId && pai.tenantId !== tenant.id && pai.tenant) {
+    if (pai?.tenantId && pai.tenantId !== tenantDaUnidade && pai.tenant) {
       paiHerdado = {
         id: pai.id,
         nome: pai.nome,
@@ -170,6 +179,7 @@ export default async function EditarSedePage({
 
   let podePromoverUi = false
   if (
+    !portalProprio &&
     sede.ativa &&
     (sede.tipo === 'SUBSEDE' || sede.tipo === 'PONTO_ENCONTRO') &&
     sede.tenantId === tenant.id
@@ -205,6 +215,7 @@ export default async function EditarSedePage({
             <Badge variant={sede.ativa ? 'success' : 'neutral'}>
               {sede.ativa ? 'Ativa' : 'Inativa'}
             </Badge>
+            {portalProprio ? <Badge variant="warning">Portal próprio</Badge> : null}
             {paiHerdado ? (
               <Badge variant="neutral">PDE de {paiHerdado.tenantNome}</Badge>
             ) : null}
@@ -213,7 +224,25 @@ export default async function EditarSedePage({
       />
 
       <div className="space-y-6">
-        {paiHerdado && (
+        {portalProprio && (
+          <MotionReveal index={0}>
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                Portal próprio — você está editando pela sede principal. Tipo e vínculo na
+                hierarquia ficam travados; para operar o admin do portal use{' '}
+                <Link
+                  href={`/admin/torcida/unidade/${sede.tenantId}`}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Ver administração
+                </Link>
+                .
+              </p>
+            </div>
+          </MotionReveal>
+        )}
+
+        {paiHerdado && !portalProprio && (
           <MotionReveal index={0}>
             <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
               <p className="text-sm text-[rgb(var(--foreground-muted))]">

@@ -5,37 +5,29 @@ import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
-import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarSafe, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 
 const denunciaIdSchema = z.object({ denunciaId: z.string().min(1) })
 
 /**
- * Marca como lida a notificação `DENUNCIA_NOVA` correspondente a esta denúncia
- * para o admin que está decidindo. A notificação não guarda `denunciaId`
+ * Marca como lida a notificação `DENUNCIA_NOVA` desta denúncia para **todos os
+ * moderadores** que a receberam, não só para quem decidiu — a denúncia está
+ * resolvida para a equipe inteira. A notificação não guarda `denunciaId`
  * (link genérico para a fila de moderação), então usamos `atorId` (denunciante)
  * + `corpo` (motivo truncado, igual ao criado no fan-out) para amarrar à
  * denúncia específica sem afetar notificações de outras denúncias do mesmo
  * denunciante.
  */
 async function marcarNotificacaoDenunciaLida(
-  userId: string,
   tenantId: string,
   denuncianteId: string,
   motivo: string,
 ): Promise<void> {
-  const { count } = await db.notificacao.updateMany({
-    where: {
-      userId,
-      tenantId,
-      atorId: denuncianteId,
-      tipo: 'DENUNCIA_NOVA',
-      corpo: motivo.slice(0, 140),
-      lida: false,
-    },
-    data: { lida: true },
+  await reconciliarNotificacoesDoEvento(tenantId, {
+    tipo: 'DENUNCIA_NOVA',
+    atorId: denuncianteId,
+    corpo: motivo.slice(0, 140),
   })
-  if (count > 0) emitNotificacaoPing(tenantId, userId)
 }
 
 export async function resolverDenuncia(denunciaId: string): Promise<void> {
@@ -49,7 +41,7 @@ export async function resolverDenuncia(denunciaId: string): Promise<void> {
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
 
-  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
+  await marcarNotificacaoDenunciaLida(tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({
@@ -99,7 +91,7 @@ export async function resolverDenunciaMensagem(denunciaId: string): Promise<void
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
 
-  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
+  await marcarNotificacaoDenunciaLida(tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({
@@ -148,7 +140,7 @@ export async function descartarDenunciaMensagem(denunciaId: string): Promise<voi
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
 
-  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
+  await marcarNotificacaoDenunciaLida(tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({
@@ -192,7 +184,7 @@ export async function descartarDenuncia(denunciaId: string): Promise<void> {
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
 
-  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
+  await marcarNotificacaoDenunciaLida(tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({

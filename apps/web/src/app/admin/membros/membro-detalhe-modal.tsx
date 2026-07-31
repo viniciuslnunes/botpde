@@ -528,7 +528,13 @@ function TabResumo({
           }
         />
         <Campo label="Unidade" value={membro.sedeNome} />
-        <Campo label="Departamento pretendido" value={membro.departamentoNome} />
+        <Campo
+          label={membro.departamentoSedeNome ? 'Departamento aqui' : 'Departamento pretendido'}
+          value={membro.departamentoNome}
+        />
+        {membro.departamentoSedeNome && (
+          <Campo label="Departamento na sede" value={membro.departamentoSedeNome} />
+        )}
         <Campo label="Telefone" value={membro.telefone} />
         <Campo label="E-mail" value={membro.email} />
         <Campo label="Cidade" value={membro.cidade} />
@@ -779,10 +785,27 @@ function TabOperacao({ membro, rep }: { membro: AdminMembroItem; rep: Set<string
       <Secao titulo="Vínculo na torcida">
         <Campo label="Unidade" value={membro.sedeNome} reprovado={rep.has('unidade')} />
         <Campo
-          label="Departamento pretendido"
-          value={membro.departamentoNome}
+          label={membro.departamentoSedeNome ? 'Departamento aqui' : 'Departamento pretendido'}
+          value={
+            membro.departamentoNome
+              ? membro.areaPendenteEfetivacao === true
+                ? `${membro.departamentoNome} — pretendida, ainda não em vigor`
+                : membro.areaPendenteEfetivacao === false
+                  ? `${membro.departamentoNome} — em vigor`
+                  : membro.departamentoNome
+              : null
+          }
           reprovado={rep.has('departamento')}
         />
+        {/* Cada nível tem seus departamentos: quem entrou por uma unidade com
+            portal próprio declara a área nos dois, com papéis independentes. */}
+        {membro.departamentoSedeNome && (
+          <Campo
+            label="Departamento na sede"
+            value={`${membro.departamentoSedeNome} — vale quando a sede aprovar`}
+            reprovado={rep.has('departamento')}
+          />
+        )}
         <Campo
           label="Espelho"
           value={
@@ -1102,6 +1125,7 @@ export function MembroDetalheModal({
                 aprovadoEmLabel={membro.aprovadoEmLabel}
                 nomeMembro={membro.nome}
                 isSocio={membro.isSocio}
+                areaPendenteEfetivacao={membro.areaPendenteEfetivacao}
                 pontosIncompletos={[
                   ...new Set(
                     [...checks, ...docs].filter((c) => c.obrigatorio && !c.ok).map((c) => c.id),

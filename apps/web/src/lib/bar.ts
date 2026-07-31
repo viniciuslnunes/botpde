@@ -10,7 +10,13 @@ import type {
   TipoSede,
 } from '@torcida/db'
 import { Prisma } from '@torcida/db'
-import { BAR_PAGE_SIZE, LIMIAR_DIVERGENCIA_ABS, LIMIAR_DIVERGENCIA_PCT } from '@torcida/types'
+import {
+  BAR_PAGE_SIZE,
+  LIMIAR_DIVERGENCIA_ABS,
+  LIMIAR_DIVERGENCIA_PCT,
+  montarResumoRecebidoBar,
+  somarConsumoEmAbertoBar,
+} from '@torcida/types'
 import {
   bucketSomaPorDia,
   resolverIntervaloPeriodo,
@@ -234,34 +240,137 @@ export const listarVendasBar = cache(async function listarVendasBar(
   return { itens: rows, page, pageSize, total }
 })
 
-/** Resumo das vendas pagas da unidade (bruto, líquido após desconto e quantidade). */
+/**
+ * Where de venda rápida PAGA (sem comanda). Recebido ≠ lançamento EM_COMANDA.
+ * @see docs/data/modulo-bar-comanda.md §5.8 item 33
+ */
+function whereVendaRapidaPaga(
+  tenantId: string,
+  sedeId: string | undefined,
+  criadoRange?: { gte?: Date; lte?: Date },
+): Prisma.BarVendaWhereInput {
+  const where: Prisma.BarVendaWhereInput = {
+    tenantId,
+    status: 'PAGA',
+    comandaId: null,
+  }
+  if (sedeId) where.sedeId = sedeId
+  if (criadoRange) where.criadoEm = criadoRange
+  return where
+}
+
+/**
+ * Where de pagamento de comanda CONFIRMADO. Data = `recebidoEm` (não `pagoEm`).
+ */
+function wherePagamentoComandaConfirmado(
+  tenantId: string,
+  sedeId: string | undefined,
+  recebidoRange?: { gte?: Date; lte?: Date },
+): Prisma.BarComandaPagamentoWhereInput {
+  const comanda: Prisma.BarComandaWhereInput = { tenantId }
+  if (sedeId) comanda.sedeId = sedeId
+  const where: Prisma.BarComandaPagamentoWhereInput = {
+    status: 'CONFIRMADO',
+    comanda: { is: comanda },
+  }
+  if (recebidoRange) where.recebidoEm = recebidoRange
+  return where
+}
+
+async function agregarRecebidoBar(
+  tenantId: string,
+  sedeId: string | undefined,
+  range?: { gte?: Date; lte?: Date },
+): Promise<BarVendasResumo> {
+  const [vendasAgg, pagAgg]: [
+    { _sum: { total: Prisma.Decimal | null }; _count: { _all: number } },
+    { _sum: { valor: Prisma.Decimal | null }; _count: { _all: number } },
+  ] = await Promise.all([
+    db.barVenda.aggregate({
+      where: whereVendaRapidaPaga(tenantId, sedeId, range),
+      _sum: { total: true },
+      _count: { _all: true },
+    }),
+    db.barComandaPagamento.aggregate({
+      where: wherePagamentoComandaConfirmado(tenantId, sedeId, range),
+      _sum: { valor: true },
+      _count: { _all: true },
+    }),
+  ])
+
+  return montarResumoRecebidoBar({
+    vendasRapidasTotal: Number(vendasAgg._sum.total ?? 0),
+    vendasRapidasCount: vendasAgg._count._all,
+    pagamentosComandaTotal: Number(pagAgg._sum.valor ?? 0),
+    pagamentosComandaCount: pagAgg._count._all,
+  })
+}
+
+/**
+ * Recebido = vendas rápidas PAGA (sem comandaId) + BarComandaPagamento CONFIRMADO
+ * no período (`recebidoEm`). Não conta EM_COMANDA.
+ *
+ * Alias histórico: `resumirVendasBar` — `totalPago` = Recebido; `quantidade` =
+ * nº de eventos (vendas rápidas + pagamentos).
+ */
+export const resumirRecebidoBar = cache(async function resumirRecebidoBar(
+  tenantId: string,
+  sedeId?: string,
+  opts?: { desde?: Date; ate?: Date },
+): Promise<BarVendasResumo> {
+  const range =
+    opts?.desde || opts?.ate
+      ? { ...(opts.desde ? { gte: opts.desde } : {}), ...(opts.ate ? { lte: opts.ate } : {}) }
+      : undefined
+  return agregarRecebidoBar(tenantId, sedeId, range)
+})
+
+/**
+ * @deprecated Preferir `resumirRecebidoBar` — mantido como alias com sede obrigatória
+ * (hub da unidade). Semântica = Recebido (§5.8.33).
+ */
 export const resumirVendasBar = cache(async function resumirVendasBar(
   tenantId: string,
   sedeId: string,
   opts?: { desde?: Date },
 ): Promise<BarVendasResumo> {
-  const where: Prisma.BarVendaWhereInput = { tenantId, sedeId, status: 'PAGA' }
-  if (opts?.desde) where.criadoEm = { gte: opts.desde }
+  return resumirRecebidoBar(tenantId, sedeId, opts)
+})
 
-  const agg: {
-    _sum: { subtotal: Prisma.Decimal | null; total: Prisma.Decimal | null }
-    _count: { _all: number }
-  } = await db.barVenda.aggregate({
-    where,
-    _sum: { subtotal: true, total: true },
-    _count: { _all: true },
-  })
+export type BarConsumoEmAbertoResumo = {
+  /** Soma de (total − desconto) das comandas ABERTA — snapshot atual. */
+  total: number
+  quantidade: number
+}
+
+/**
+ * Consumo em aberto: snapshot das comandas ABERTA (não é série temporal).
+ * Spec §5.8.33 — separado de Recebido.
+ */
+export const resumirConsumoEmAbertoBar = cache(async function resumirConsumoEmAbertoBar(
+  tenantId: string,
+  sedeId?: string,
+): Promise<BarConsumoEmAbertoResumo> {
+  const where: Prisma.BarComandaWhereInput = { tenantId, status: 'ABERTA' }
+  if (sedeId) where.sedeId = sedeId
+
+  const rows: Array<{ total: Prisma.Decimal; desconto: Prisma.Decimal }> =
+    await db.barComanda.findMany({
+      where,
+      select: { total: true, desconto: true },
+    })
 
   return {
-    totalVendas: Number(agg._sum.subtotal ?? 0),
-    totalPago: Number(agg._sum.total ?? 0),
-    quantidade: agg._count._all,
+    total: somarConsumoEmAbertoBar(
+      rows.map((r) => ({ total: Number(r.total), desconto: Number(r.desconto) })),
+    ),
+    quantidade: rows.length,
   }
 })
 
 /**
- * Vendas PAGAS por dia (valor = total líquido), últimos `dias` dias.
- * Sem `sedeId` = torcida inteira (relatórios); com `sedeId` = unidade (hub).
+ * Recebido por dia (vendas rápidas + pagamentos CONFIRMADO via `recebidoEm`).
+ * Sem `sedeId` = torcida inteira (relatórios); com `sedeId` = unidade.
  */
 export const resumirVendasBarPorDia = cache(async function resumirVendasBarPorDia(
   tenantId: string,
@@ -270,16 +379,27 @@ export const resumirVendasBarPorDia = cache(async function resumirVendasBarPorDi
 ): Promise<SerieTemporal> {
   const fim = new Date()
   const inicio = new Date(fim.getTime() - dias * 24 * 60 * 60 * 1000)
-  const where: Prisma.BarVendaWhereInput = { tenantId, status: 'PAGA', criadoEm: { gte: inicio } }
-  if (sedeId) where.sedeId = sedeId
+  const range = { gte: inicio }
 
-  const rows: Array<{ criadoEm: Date; total: Prisma.Decimal }> = await db.barVenda.findMany({
-    where,
-    select: { criadoEm: true, total: true },
-  })
+  const [vendas, pagamentos]: [
+    Array<{ criadoEm: Date; total: Prisma.Decimal }>,
+    Array<{ recebidoEm: Date; valor: Prisma.Decimal }>,
+  ] = await Promise.all([
+    db.barVenda.findMany({
+      where: whereVendaRapidaPaga(tenantId, sedeId, range),
+      select: { criadoEm: true, total: true },
+    }),
+    db.barComandaPagamento.findMany({
+      where: wherePagamentoComandaConfirmado(tenantId, sedeId, range),
+      select: { recebidoEm: true, valor: true },
+    }),
+  ])
 
   return bucketSomaPorDia(
-    rows.map((r) => ({ data: r.criadoEm, valor: Number(r.total) })),
+    [
+      ...vendas.map((r) => ({ data: r.criadoEm, valor: Number(r.total) })),
+      ...pagamentos.map((r) => ({ data: r.recebidoEm, valor: Number(r.valor) })),
+    ],
     inicio,
     fim,
   )
@@ -291,7 +411,10 @@ export type BarMaisVendido = {
   receita: number
 }
 
-/** Top 5 produtos por quantidade nas vendas PAGAS do período. */
+/**
+ * Top 5 produtos por quantidade consumida (PAGA rápida ou EM_COMANDA) no período.
+ * Label UI: "Mais consumidos" — produto saiu, independente de Recebido.
+ */
 export const listarMaisVendidosBar = cache(async function listarMaisVendidosBar(
   tenantId: string,
   periodo: Periodo,
@@ -300,7 +423,7 @@ export const listarMaisVendidosBar = cache(async function listarMaisVendidosBar(
   const { inicio, fim } = resolverIntervaloPeriodo(periodo)
   const whereVenda: Prisma.BarVendaWhereInput = {
     tenantId,
-    status: 'PAGA',
+    status: { in: ['PAGA', 'EM_COMANDA'] },
     criadoEm: { gte: inicio, lte: fim },
   }
   if (sedeId) whereVenda.sedeId = sedeId
@@ -339,43 +462,20 @@ export type BarVendasComparativo = {
   anterior: BarVendasResumo
 }
 
-type BarVendaAggRow = {
-  _sum: { subtotal: Prisma.Decimal | null; total: Prisma.Decimal | null }
-  _count: { _all: number }
-}
-
-function aggParaResumo(agg: BarVendaAggRow): BarVendasResumo {
-  return {
-    totalVendas: Number(agg._sum.subtotal ?? 0),
-    totalPago: Number(agg._sum.total ?? 0),
-    quantidade: agg._count._all,
-  }
-}
-
-/** Vendas PAGAS do período vs período imediatamente anterior (TrendDelta). */
+/** Recebido do período vs período imediatamente anterior (TrendDelta). */
 export const compararVendasBarPeriodo = cache(async function compararVendasBarPeriodo(
   tenantId: string,
   periodo: Periodo,
   sedeId?: string,
 ): Promise<BarVendasComparativo> {
   const { inicio, fim, inicioAnterior, fimAnterior } = resolverIntervaloPeriodo(periodo)
-  const base: Prisma.BarVendaWhereInput = { tenantId, status: 'PAGA' }
-  if (sedeId) base.sedeId = sedeId
 
-  const [atual, anterior]: [BarVendaAggRow, BarVendaAggRow] = await Promise.all([
-    db.barVenda.aggregate({
-      where: { ...base, criadoEm: { gte: inicio, lte: fim } },
-      _sum: { subtotal: true, total: true },
-      _count: { _all: true },
-    }),
-    db.barVenda.aggregate({
-      where: { ...base, criadoEm: { gte: inicioAnterior, lte: fimAnterior } },
-      _sum: { subtotal: true, total: true },
-      _count: { _all: true },
-    }),
+  const [atual, anterior]: [BarVendasResumo, BarVendasResumo] = await Promise.all([
+    agregarRecebidoBar(tenantId, sedeId, { gte: inicio, lte: fim }),
+    agregarRecebidoBar(tenantId, sedeId, { gte: inicioAnterior, lte: fimAnterior }),
   ])
 
-  return { atual: aggParaResumo(atual), anterior: aggParaResumo(anterior) }
+  return { atual, anterior }
 })
 
 /**
@@ -440,10 +540,11 @@ export const resumirTurnoBar = cache(async function resumirTurnoBar(
 ): Promise<BarTurnoResumo> {
   const whereBase: Prisma.BarVendaWhereInput = { tenantId, turnoId }
 
-  const [pagas, pendentes, dinheiroAgg]: [
+  const [pagas, pendentes, dinheiroVendasAgg, dinheiroComandaAgg]: [
     { _sum: { total: Prisma.Decimal | null }; _count: { _all: number } },
     number,
     { _sum: { total: Prisma.Decimal | null } },
+    { _sum: { valor: Prisma.Decimal | null } },
   ] = await Promise.all([
     db.barVenda.aggregate({
       where: { ...whereBase, status: 'PAGA' },
@@ -455,12 +556,25 @@ export const resumirTurnoBar = cache(async function resumirTurnoBar(
       where: { ...whereBase, status: 'PAGA', metodoPagamento: 'DINHEIRO' },
       _sum: { total: true },
     }),
+    // Pagamentos de comanda em dinheiro confirmados neste turno (§5.9).
+    db.barComandaPagamento.aggregate({
+      where: {
+        turnoId,
+        status: 'CONFIRMADO',
+        metodoPagamento: 'DINHEIRO',
+        comanda: { tenantId },
+      },
+      _sum: { valor: true },
+    }),
   ])
+
+  const dinheiroEsperado =
+    Number(dinheiroVendasAgg._sum.total ?? 0) + Number(dinheiroComandaAgg._sum.valor ?? 0)
 
   return {
     totalPago: Number(pagas._sum.total ?? 0),
     quantidadePaga: pagas._count._all,
-    dinheiroEsperado: Number(dinheiroAgg._sum.total ?? 0),
+    dinheiroEsperado,
     pendentes,
   }
 })
@@ -474,8 +588,8 @@ export type BarMargemResumo = {
 }
 
 /**
- * Margem estimada das vendas PAGA (Σ total − Σ custoUnit×qtd).
- * Sem schema extra — usa snapshots em BarVendaItem.
+ * Margem estimada do consumo (Σ total − Σ custoUnit×qtd) em vendas PAGA **e**
+ * EM_COMANDA — o produto saiu. `receita` aqui = consumo, não "Recebido".
  * `sedeId` opcional: `undefined` agrega a torcida inteira (relatórios).
  */
 export const resumirMargemBar = cache(async function resumirMargemBar(
@@ -485,7 +599,7 @@ export const resumirMargemBar = cache(async function resumirMargemBar(
 ): Promise<BarMargemResumo> {
   const whereVenda: Prisma.BarVendaWhereInput = {
     tenantId,
-    status: 'PAGA',
+    status: { in: ['PAGA', 'EM_COMANDA'] },
   }
   if (sedeId) whereVenda.sedeId = sedeId
   if (opts?.turnoId) whereVenda.turnoId = opts.turnoId
@@ -647,7 +761,10 @@ export type BarMembroParaFiadoLite = {
   email: string | null
 }
 
-/** Membros aprovados da unidade — usado no `<select>` de devedor do fiado. */
+/**
+ * Membros aprovados da unidade — fiado legado e titular de comanda MEMBRO no PDV.
+ * Alias: `listarMembrosParaComanda`.
+ */
 export const listarMembrosParaFiado = cache(async function listarMembrosParaFiado(
   tenantId: string,
   sedeId: string,
@@ -670,6 +787,9 @@ export const listarMembrosParaFiado = cache(async function listarMembrosParaFiad
 
   return rows.map((r) => ({ id: r.userId, membroId: r.id, nome: r.nome, email: r.user.email }))
 })
+
+/** Alias PDV — mesmo conjunto APROVADO da unidade (titular de comanda MEMBRO). */
+export const listarMembrosParaComanda = listarMembrosParaFiado
 
 export type BarMovimentacaoEstoqueLite = {
   id: string

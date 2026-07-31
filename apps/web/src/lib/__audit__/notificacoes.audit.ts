@@ -508,8 +508,11 @@ describe('reverificação: o que a auditoria de 2026-07-22 dizia ainda vale?', (
     }
 
     // Alegação 1: "a Notificacao original nunca é marcada lida ao decidir pela
-    // fila", nos 3 arquivos citados. Estado atual: implementado nos três — o
-    // que sobrou é o alcance (ver bloco A).
+    // fila", nos 3 arquivos citados. Estado atual: implementado nos três, e
+    // desde a correção do Achado 10 pelo helper central
+    // `reconciliarNotificacoesDoEvento` — que é justamente o que não escopa
+    // por destinatário. Aceitar as duas formas: `updateMany` local com
+    // `lida: true`, ou a delegação ao helper.
     const arquivos = [
       'apps/web/src/app/portal/comunidade/actions.ts',
       'apps/web/src/app/admin/comunidade/moderacao/actions.ts',
@@ -521,7 +524,9 @@ describe('reverificação: o que a auditoria de 2026-07-22 dizia ainda vale?', (
     const semReconciliacao = arquivos.filter((rel) => {
       try {
         const src = readFileSync(join(raiz, rel), 'utf8')
-        return !/notificacao\.updateMany[\s\S]{0,400}lida:\s*true/.test(src)
+        const updateManyLocal = /notificacao\.updateMany[\s\S]{0,400}lida:\s*true/.test(src)
+        const viaHelper = /reconciliarNotificacoesDoEvento\s*\(/.test(src)
+        return !updateManyLocal && !viaHelper
       } catch {
         return false
       }
@@ -529,10 +534,34 @@ describe('reverificação: o que a auditoria de 2026-07-22 dizia ainda vale?', (
     if (semReconciliacao.length === 0) {
       ok(
         AREA,
-        'PARCIALMENTE DERRUBADA a alegação "badge preso": os 3 arquivos citados passaram a reconciliar a leitura ao decidir pela fila. O que sobrou é o alcance — a reconciliação cobre só quem decidiu (ver notificacoes/reconciliacao).',
+        'DERRUBADA a alegação "badge preso": os 3 arquivos citados reconciliam a leitura ao decidir pela fila, e o alcance deixou de ser só quem decidiu (Achado 10 corrigido — ver notificacoes/reconciliacao).',
       )
     } else {
       erro(AREA, `Ainda sem reconciliação de leitura: ${semReconciliacao.join(', ')}`)
+    }
+
+    // Guarda contra regressão do Achado 10: reconciliação de fan-out escopada
+    // em `userId: session.user.id` deixa N-1 badges presos.
+    const escopadaPorDestinatario = arquivos.filter((rel) => {
+      try {
+        const src = readFileSync(join(raiz, rel), 'utf8')
+        return /notificacao\.updateMany\(\{\s*where:\s*\{[^}]*userId:\s*session\.user\.id[\s\S]{0,300}?tipo:\s*'(?:GRUPO_PEDIDO|CANAL_PEDIDO|DENUNCIA_NOVA|MEMBRO_SOLICITADO)'/.test(
+          src,
+        )
+      } catch {
+        return false
+      }
+    })
+    if (escopadaPorDestinatario.length === 0) {
+      ok(
+        AREA,
+        'Nenhuma reconciliação de fila reintroduziu o escopo por destinatário (`userId: session.user.id`) — o alcance do Achado 10 segue coberto.',
+      )
+    } else {
+      erro(
+        AREA,
+        `Regressão do Achado 10 — reconciliação de fan-out voltou a ser escopada por destinatário em: ${escopadaPorDestinatario.join(', ')}`,
+      )
     }
 
     alerta(
