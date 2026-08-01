@@ -6,6 +6,8 @@ import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding 
 import { getTenantFromHost } from '@/lib/tenant'
 import { usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { resolverConvite } from '@/lib/convite'
+import { isConviteSlugShape } from '@/lib/convite-cookie'
+import { lerSlugConviteDoCookie } from '@/lib/convite-cookie-server'
 import { OnboardingSkeleton } from './onboarding-skeleton'
 import { OnboardingWizard } from './wizard'
 
@@ -14,10 +16,24 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<{ convite?: string }>
 }) {
-  const { convite: conviteSlug } = await searchParams
+  const { convite: conviteNaUrl } = await searchParams
+  const slugUrl = isConviteSlugShape(conviteNaUrl) ? conviteNaUrl : null
+  const slugCookie = slugUrl ? null : await lerSlugConviteDoCookie()
+  const conviteSlug = slugUrl ?? slugCookie
+
+  // Cookie sozinho → canônica na URL (refresh/histórico mantêm o contexto).
+  if (!slugUrl && conviteSlug) {
+    redirect(`/onboarding?convite=${encodeURIComponent(conviteSlug)}`)
+  }
 
   const session = await auth()
-  if (!session?.user?.id) redirect('/entrar')
+  if (!session?.user?.id) {
+    redirect(
+      conviteSlug
+        ? `/entrar?callbackUrl=${encodeURIComponent(`/convite/${conviteSlug}`)}`
+        : '/entrar',
+    )
+  }
 
   const userId = session.user.id
 
@@ -55,7 +71,7 @@ export default async function OnboardingPage({
         nomeInicial={session.user.name ?? ''}
         emailInicial={session.user.email ?? ''}
         userId={userId}
-        conviteSlug={conviteSlug ?? null}
+        conviteSlug={conviteSlug}
       />
     </Suspense>
   )

@@ -7,6 +7,7 @@ import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { tagNomeUsuario } from '@/lib/avatar-cache'
 import { destinoInternoSeguro } from '@/lib/callback-url'
+import { lerSlugConviteDoCookie } from '@/lib/convite-cookie-server'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 
@@ -92,11 +93,15 @@ export async function definirApelido(
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   // Mesmo padrão do login: o cliente navega para preservar o cookie de sessão.
+  // Convite: form `callbackUrl` → cookie do proxy → fallback pós-login.
+  const destinoForm = destinoInternoSeguro(formData.get('callbackUrl'))
+  const slugConvite = destinoForm ? null : await lerSlugConviteDoCookie()
+  const destinoConvite = slugConvite ? `/convite/${slugConvite}` : null
+
   return {
     redirectTo:
-      // Convite direto retoma o destino original (`/convite/<slug>`) — sem isso
-      // o link se perderia justamente no passo que existe para não perder dado.
-      destinoInternoSeguro(formData.get('callbackUrl')) ??
+      destinoForm ??
+      destinoConvite ??
       (isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto'),
   }
 }

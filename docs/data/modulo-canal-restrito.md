@@ -204,9 +204,12 @@ criarContaComSenha            → entra com `callbackUrl` (fallback /onboarding)
 proxy.ts, já logado em /entrar → honra `callbackUrl` em vez de /auth/contexto
 ```
 
-Cada um valida com `destinoInternoSeguro` (no proxy, a mesma checagem inline —
-Edge runtime). Ao mexer em login/cadastro, refaça o teste em aba anônima com
-**conta nova por e-mail**, que é o caminho que quebrou.
+**Cinto de segurança (2026-08-01):** ao visitar `/convite/<slug>`, o `proxy.ts`
+grava o cookie httpOnly curto `torcida_convite`. Login, cadastro, apelido,
+`/auth/contexto` e `/onboarding` leem esse cookie se o `callbackUrl`/`?convite=`
+sumir. O wizard mantém `?convite=` em todo `replaceState`/`pushState` (antes
+apagava e um refresh caía no passo Clube). Ao mexer em login/cadastro, refaça o
+teste em aba anônima com **conta nova por e-mail**.
 
 `lib/convite.ts` `resolverConvite(slug)` monta clube + torcida + unidade **sem**
 passar pelos filtros de isolamento: quem tem o link foi convidado.

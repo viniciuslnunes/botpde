@@ -11,6 +11,7 @@ import {
   usuarioPrecisaOnboarding,
   TENANT_CTX_COOKIE,
 } from '@/lib/tenant-context'
+import { lerSlugConviteDoCookie } from '@/lib/convite-cookie-server'
 
 /**
  * Pós-login: define cookie de torcida (single-tenant) ou redireciona
@@ -27,13 +28,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(publicUrl('/super-admin/torcidas', request))
   }
 
+  // Convite direto sobrevive se o login perdeu o `callbackUrl` mas o proxy
+  // gravou o cookie ao visitar `/convite/<slug>`.
+  const conviteSlug = await lerSlugConviteDoCookie()
+  const destinoOnboarding = conviteSlug
+    ? `/onboarding?convite=${encodeURIComponent(conviteSlug)}`
+    : '/onboarding'
+  const destinoApelido = conviteSlug
+    ? `/definir-apelido?callbackUrl=${encodeURIComponent(`/convite/${conviteSlug}`)}`
+    : '/definir-apelido'
+
   // Nome + @ obrigatórios antes de onboarding/portal (OAuth e contas antigas).
   if (await usuarioPrecisaNickname(session.user.id)) {
-    return NextResponse.redirect(publicUrl('/definir-apelido', request))
+    return NextResponse.redirect(publicUrl(destinoApelido, request))
   }
 
   if (await usuarioPrecisaOnboarding(session.user.id)) {
-    return NextResponse.redirect(publicUrl('/onboarding', request))
+    return NextResponse.redirect(publicUrl(destinoOnboarding, request))
   }
 
   const slug = await resolveUserTenantSlugForUser(session.user.id)
@@ -45,7 +56,7 @@ export async function GET(request: Request) {
     if (perfil?.onboardingConcluidoEm) {
       return NextResponse.redirect(publicUrl('/portal/comunidade', request))
     }
-    return NextResponse.redirect(publicUrl('/onboarding', request))
+    return NextResponse.redirect(publicUrl(destinoOnboarding, request))
   }
 
   if (env.ROOT_DOMAIN) {

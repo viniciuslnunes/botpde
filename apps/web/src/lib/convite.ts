@@ -28,6 +28,8 @@ import { isTenantRestrito } from '@/lib/isolamento'
  */
 
 export interface ConviteOnboarding {
+  /** Slug opaco do link (`Tenant.conviteSlug`) — precisa sobreviver na URL do wizard. */
+  conviteSlug: string
   tenantId: string
   tenantSlug: string
   /** A unidade convidada está com o canal restrito? Muda o texto da tela. */
@@ -208,6 +210,7 @@ export const resolverConvite = cache(
     }
 
     return {
+      conviteSlug: termo,
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       canalRestrito,

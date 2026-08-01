@@ -31,6 +31,7 @@ import {
   buscarCidadesDaUf,
   registrarInteresseUnidade,
   buscarSedesDaTorcida,
+  consumirConviteCookie,
 } from './actions'
 import { ComboboxRegiao } from './combobox-regiao'
 import {
@@ -82,12 +83,18 @@ function isPassoHistorico(value: unknown): value is Passo {
   return typeof value === 'string' && PASSOS_HISTORICO.has(value as Passo)
 }
 
-function urlDoPasso(passo: Passo, vinculoModo?: 'escolha' | 'socio'): string {
+function urlDoPasso(
+  passo: Passo,
+  vinculoModo?: 'escolha' | 'socio',
+  conviteSlug?: string | null,
+): string {
   const params = new URLSearchParams()
   params.set('passo', passo)
   if (passo === 'vinculo' && vinculoModo === 'socio') {
     params.set('modo', 'socio')
   }
+  // Sem isto o replaceState no mount apaga `?convite=` e um refresh cai no Clube.
+  if (conviteSlug) params.set('convite', conviteSlug)
   return `/onboarding?${params.toString()}`
 }
 
@@ -187,11 +194,17 @@ export function OnboardingWizard({
     setErro(null)
   }
 
+  const conviteSlug = convite?.conviteSlug ?? null
+
   /** Avança um passo e empilha no histórico do navegador (voltar do browser = Voltar). */
   function avancarPara(novo: Passo, modo: 'escolha' | 'socio' = 'escolha') {
     aplicarPasso(novo, 1, modo)
     if (!PASSOS_HISTORICO.has(novo)) return
-    window.history.pushState(mergeHistoryState(novo, modo), '', urlDoPasso(novo, modo))
+    window.history.pushState(
+      mergeHistoryState(novo, modo),
+      '',
+      urlDoPasso(novo, modo, conviteSlug),
+    )
   }
 
   /** Voltar UI = mesma ação da seta do navegador. */
@@ -203,12 +216,19 @@ export function OnboardingWizard({
   function corrigirPasso(novo: Passo, dir = -1) {
     aplicarPasso(novo, dir)
     if (!PASSOS_HISTORICO.has(novo)) return
-    window.history.replaceState(mergeHistoryState(novo), '', urlDoPasso(novo))
+    window.history.replaceState(
+      mergeHistoryState(novo),
+      '',
+      urlDoPasso(novo, undefined, conviteSlug),
+    )
   }
 
   useEffect(() => {
     let initialPasso: Passo = convite ? convite.passoInicial : 'clube'
     let initialVinculoModo: 'escolha' | 'socio' = 'escolha'
+
+    // Cookie de curto prazo já cumpriu o papel (chegamos com o convite resolvido).
+    if (convite) void consumirConviteCookie()
 
     try {
       // Convite é intenção explícita e recente: descarta o rascunho de uma
@@ -257,7 +277,7 @@ export function OnboardingWizard({
       window.history.replaceState(
         mergeHistoryState(initialPasso, initialVinculoModo),
         '',
-        urlDoPasso(initialPasso, initialVinculoModo),
+        urlDoPasso(initialPasso, initialVinculoModo, convite?.conviteSlug),
       )
       setWizardDraftRestored(true)
     }

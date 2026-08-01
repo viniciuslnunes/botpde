@@ -9,8 +9,21 @@ import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { excedeuLimitePublico, registrarUsoPublico } from '@/lib/public-rate-limit'
 import { getClientIp } from '@/lib/request-ip'
 import { destinoInternoSeguro } from '@/lib/callback-url'
+import { lerSlugConviteDoCookie } from '@/lib/convite-cookie-server'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+
+/** `callbackUrl` do form, senão cookie gravado em `/convite/<slug>`, senão fallback. */
+async function destinoPosAuth(
+  callbackUrl: unknown,
+  fallback: string,
+): Promise<string> {
+  const daUrl = destinoInternoSeguro(callbackUrl)
+  if (daUrl) return daUrl
+  const slug = await lerSlugConviteDoCookie()
+  if (slug) return `/convite/${slug}`
+  return fallback
+}
 
 export type LoginSenhaState = { message?: string; redirectTo?: string }
 
@@ -66,7 +79,7 @@ export async function entrarComSenha(
   }
 
   // Convite de unidade retoma o destino original; sem isso o link se perde.
-  const destino = destinoInternoSeguro(formData.get('callbackUrl')) ?? '/auth/contexto'
+  const destino = await destinoPosAuth(formData.get('callbackUrl'), '/auth/contexto')
   return entrarComCredenciais(login, senha, destino)
 }
 
@@ -145,7 +158,7 @@ export async function criarContaComSenha(
   // Com convite de unidade o destino é o próprio `/convite/<slug>`, que já
   // adianta clube, torcida e unidade; sem isso o cadastro cai no passo Clube.
   // Em paralelo, aquece o catálogo (unstable_cache) pra /onboarding chegar quente.
-  const destino = destinoInternoSeguro(formData.get('callbackUrl')) ?? '/onboarding'
+  const destino = await destinoPosAuth(formData.get('callbackUrl'), '/onboarding')
   const [, login] = await Promise.all([
     import('@/lib/onboarding').then((m) =>
       Promise.all([m.getAfiliacoesParaOnboarding(), m.getRegioesOnboarding()]),

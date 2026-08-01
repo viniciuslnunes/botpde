@@ -33,7 +33,14 @@ export default async function DefinirApelidoPage({
   const destino = destinoInternoSeguro(callbackUrl)
 
   const session = await auth()
-  if (!session?.user?.id) redirect('/entrar')
+  if (!session?.user?.id) {
+    // Sem sessão: retoma o destino (ex.: `/convite/<slug>`) em vez de perder o link.
+    redirect(
+      destino
+        ? `/entrar?callbackUrl=${encodeURIComponent(destino)}`
+        : '/entrar',
+    )
+  }
 
   const user: {
     nickname: string | null

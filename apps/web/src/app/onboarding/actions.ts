@@ -22,6 +22,7 @@ import {
   type MunicipioBrasil,
 } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
+import { limparSlugConviteCookie } from '@/lib/convite-cookie-server'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
   encontrarConflitoCpf,
@@ -229,8 +230,17 @@ export async function concluirComoTorcedor(): Promise<OnboardingActionState> {
   // Limpa cookie de contexto de tentativa anterior (ex.: usuário já tinha
   // fixado uma torcida específica) — torcedor global cai na Comunidade Nacional.
   await clearTenantContextSlug()
+  await limparSlugConviteCookie()
 
   return { ok: true, redirectTo: '/portal/comunidade' }
+}
+
+/**
+ * O wizard já montou com o convite resolvido (URL/estado): descarta o cookie
+ * de curto prazo para não reaplicar o atalho num onboarding futuro na mesma aba.
+ */
+export async function consumirConviteCookie(): Promise<void> {
+  await limparSlugConviteCookie()
 }
 
 // ─── 3. Solicitar vínculo com uma torcida (sócio ou torcedor da torcida) ─────────
@@ -1362,6 +1372,7 @@ export async function solicitarVinculo(
     // só resolve tenant pra SOCIO APROVADO). Limpa explicitamente pra não
     // herdar um cookie de uma tentativa anterior.
     await clearTenantContextSlug()
+    await limparSlugConviteCookie()
     return {
       ok: true,
       redirectTo: `/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`,

@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { NextResponse, after } from 'next/server'
 import { resetPrismaQueryCount, getAndResetPrismaMetrics, metricsEnabled } from '@torcida/db'
+import { gravarConviteCookie, isConviteSlugShape } from '@/lib/convite-cookie'
 
 const PUBLIC_PATHS = [
   '/entrar',
@@ -15,6 +16,26 @@ const PUBLIC_PATHS = [
 
 /** Auth real fica no Route Handler / página — evita falso negativo do proxy. */
 const AUTH_DEFER_PATHS = ['/auth/contexto', '/onboarding', '/definir-apelido']
+
+function isSecureRequest(req: { nextUrl: { protocol: string } }): boolean {
+  return process.env.NODE_ENV === 'production' || req.nextUrl.protocol === 'https:'
+}
+
+/**
+ * `/convite/<slug>`: grava o slug em cookie curto antes do redirect de login.
+ * Assim, se o `callbackUrl` se perder no cadastro/OAuth, o onboarding ainda
+ * recupera o convite e não cai no passo Clube.
+ */
+function matchConviteSlug(pathname: string): string | null {
+  const m = pathname.match(/^\/convite\/([^/]+)$/)
+  if (!m?.[1]) return null
+  try {
+    const slug = decodeURIComponent(m[1]).trim()
+    return isConviteSlugShape(slug) ? slug : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * SSE: o proxy `auth()` às vezes dá falso negativo. Redirect HTML para
@@ -51,14 +72,26 @@ export const proxy = auth((req) => {
     return NextResponse.next()
   }
 
+  const conviteSlug = matchConviteSlug(pathname)
+
   if (!session) {
     if (pathname.startsWith('/api/')) {
       return new NextResponse('Não autenticado', { status: 401 })
     }
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/entrar'
+    loginUrl.search = ''
     loginUrl.searchParams.set('callbackUrl', pathname)
-    return NextResponse.redirect(loginUrl)
+    const res = NextResponse.redirect(loginUrl)
+    if (conviteSlug) gravarConviteCookie(res, conviteSlug, isSecureRequest(req))
+    return res
+  }
+
+  // Logado em `/convite/<slug>`: renova o cookie e deixa a página redirecionar.
+  if (conviteSlug) {
+    const res = NextResponse.next()
+    gravarConviteCookie(res, conviteSlug, isSecureRequest(req))
+    return res
   }
 
   if (pathname === '/entrar') {
