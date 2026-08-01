@@ -45,6 +45,33 @@ export async function resolverAfiliacaoIdEfetiva(
   return null
 }
 
+type AncestralTorcidaRow = {
+  id: string
+  nome: string
+  logoUrl: string | null
+  afiliacaoId: string | null
+  torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
+}
+
+/** Ancestrais ordenados do mais próximo ao mais distante, com logo/nome. */
+async function carregarAncestraisTorcida(tenantId: string): Promise<AncestralTorcidaRow[]> {
+  const ancestrais = await getAncestorTenantIds(tenantId)
+  if (ancestrais.length === 0) return []
+
+  const rows: AncestralTorcidaRow[] = await db.tenant.findMany({
+    where: { id: { in: ancestrais }, ativo: true, sintetico: false },
+    select: {
+      id: true,
+      nome: true,
+      logoUrl: true,
+      afiliacaoId: true,
+      torcidaConhecida: { select: { logoUrl: true, titulo: true } },
+    },
+  })
+  const porId = new Map(rows.map((r) => [r.id, r]))
+  return ancestrais.map((id) => porId.get(id)).filter((r): r is AncestralTorcidaRow => Boolean(r))
+}
+
 /**
  * Convite direto: link da própria torcida/unidade que adianta as etapas de
  * clube, torcida e unidade no onboarding e leva o usuário direto à pergunta
@@ -59,6 +86,13 @@ export async function resolverAfiliacaoIdEfetiva(
  * mesmo `usuarioPrecisaNickname` do onboarding normal.
  */
 
+/** Sede/mãe da unidade convidada (Caso B) — logo e copy da malha aberta. */
+export interface TorcidaMaeConvite {
+  id: string
+  nome: string
+  logoUrl: string | null
+}
+
 export interface ConviteOnboarding {
   /** Slug opaco do link (`Tenant.conviteSlug`) — precisa sobreviver na URL do wizard. */
   conviteSlug: string
@@ -66,6 +100,11 @@ export interface ConviteOnboarding {
   tenantSlug: string
   /** A unidade convidada está com o canal restrito? Muda o texto da tela. */
   canalRestrito: boolean
+  /**
+   * Ancestral imediato com identidade de torcida (ex.: Gaviões). Null quando
+   * o próprio link é da Sede — aí `torcida` já é a organizada.
+   */
+  torcidaMae: TorcidaMaeConvite | null
   clube: AfiliacaoOnboarding
   torcida: TorcidaOnboarding
   /** Unidade sugerida (única do tenant convidado), quando houver só uma. */
@@ -172,9 +211,27 @@ export const resolverConvite = cache(
     })
     if (!tenant) return null
 
-    // Unidade Caso B pode ter nascido sem espelhar o clube da Sede.
-    const afiliacaoId = await resolverAfiliacaoIdEfetiva(tenant.id, tenant.afiliacaoId)
+    const ancestrais = await carregarAncestraisTorcida(tenant.id)
+    const afiliacaoId =
+      tenant.afiliacaoId ??
+      ancestrais.find((a) => a.afiliacaoId)?.afiliacaoId ??
+      null
     if (!afiliacaoId) return null
+
+    const ancestralComLogo = ancestrais.find(
+      (a) => a.torcidaConhecida?.logoUrl || a.logoUrl,
+    )
+    const torcidaMaeRow = ancestrais[0] ?? null
+    const torcidaMae: TorcidaMaeConvite | null = torcidaMaeRow
+      ? {
+          id: torcidaMaeRow.id,
+          nome: formatNomeTorcida(
+            torcidaMaeRow.torcidaConhecida?.titulo ?? torcidaMaeRow.nome,
+          ),
+          logoUrl:
+            torcidaMaeRow.torcidaConhecida?.logoUrl ?? torcidaMaeRow.logoUrl ?? null,
+        }
+      : null
 
     const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito] = await Promise.all([
       db.afiliacao.findUnique({
@@ -208,6 +265,11 @@ export const resolverConvite = cache(
     const sedesOnboarding = sedes.map(mapSede)
     const raiz = sedesOnboarding.find((s) => s.tipo === 'SEDE') ?? sedesOnboarding[0] ?? null
 
+    // Unidade Caso B quase nunca tem logo própria — usa a da Sede no card.
+    const logoPropria = tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl
+    const logoHerdada =
+      ancestralComLogo?.torcidaConhecida?.logoUrl ?? ancestralComLogo?.logoUrl ?? null
+
     const clube: AfiliacaoOnboarding = {
       id: afiliacao.id,
       nome: formatNomeAfiliacao(afiliacao.nome),
@@ -231,7 +293,7 @@ export const resolverConvite = cache(
       id: tenant.id,
       nome: formatNomeTorcida(tenant.torcidaConhecida?.titulo ?? tenant.nome),
       slug: tenant.slug,
-      logoUrl: tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl,
+      logoUrl: logoPropria ?? logoHerdada,
       corPrimaria: tenant.corPrimaria,
       membrosAprovados: tenant._count.membros,
       sedes: sedesOnboarding,
@@ -250,6 +312,7 @@ export const resolverConvite = cache(
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       canalRestrito,
+      torcidaMae,
       clube,
       torcida,
       // Uma única unidade = escolha óbvia; várias, o usuário decide no passo.

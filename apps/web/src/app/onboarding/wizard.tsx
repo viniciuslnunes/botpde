@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
@@ -56,7 +58,7 @@ import type {
   SedeOnboarding,
   RegiaoOnboarding,
 } from '@/lib/onboarding'
-import type { ConviteOnboarding } from '@/lib/convite'
+import type { ConviteOnboarding, TorcidaMaeConvite } from '@/lib/convite'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
@@ -585,6 +587,8 @@ export function OnboardingWizard({
                 userId={userId}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
+                canalRestrito={convite?.canalRestrito ?? false}
+                torcidaMae={convite?.torcidaMae ?? null}
                 modo={vinculoModo}
                 onAbrirSocio={abrirModoSocio}
                 onVoltar={voltarHistorico}
@@ -1729,6 +1733,8 @@ function PassoVinculo({
   coordsDispositivo,
   unidadeId,
   unidadeNaoListada,
+  canalRestrito,
+  torcidaMae,
   userId,
   modo,
   onAbrirSocio,
@@ -1746,6 +1752,10 @@ function PassoVinculo({
   coordsDispositivo: { lat: number; lng: number } | null
   unidadeId: string | null
   unidadeNaoListada: boolean
+  /** Convite de unidade com canal fechado — copy e benefícios mudam. */
+  canalRestrito: boolean
+  /** Sede/mãe quando o convite é de unidade Caso B. */
+  torcidaMae: TorcidaMaeConvite | null
   userId: string
   modo: 'escolha' | 'socio'
   onAbrirSocio: () => void
@@ -1952,6 +1962,10 @@ function PassoVinculo({
   )
   const nomeUnidade = unidadeSelecionada?.nome ?? 'sua unidade'
   const nomeTorcidaSede = torcida.nome
+  /** Organizada "mãe" na copy (Gaviões); cai na própria torcida se o link for da Sede. */
+  const nomeOrganizada = torcidaMae?.nome ?? torcida.nome
+  const logoOrganizada = torcidaMae?.logoUrl ?? torcida.logoUrl
+  const fotoUnidade = unidadeSelecionada?.fotoUrl ?? null
 
   const nomeClube = clube?.apelido?.trim() || clube?.nome || 'seu clube'
 
@@ -2389,8 +2403,11 @@ function PassoVinculo({
           Como você participa da {torcida.nome}?
         </h1>
         <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
-          Escolha um dos dois caminhos. Cada um define o que você vê na comunidade
-          do {nomeClube} e na da {torcida.nome}.
+          {canalRestrito
+            ? `Escolha um dos dois caminhos. Com o canal restrito, sua comunidade fica na ${torcida.nome}.`
+            : torcidaMae
+              ? `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube}, na da ${nomeOrganizada} e na da ${torcida.nome}.`
+              : `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube} e na da ${torcida.nome}.`}
         </p>
 
         {!torcida.acessivelNoHost && (
@@ -2433,27 +2450,62 @@ function PassoVinculo({
                 Torcedor da torcida
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                Entra agora nas duas comunidades — sem aprovação nem comprovante.
+                {canalRestrito
+                  ? 'Entra agora na comunidade da unidade — sem aprovação nem comprovante.'
+                  : 'Entra agora nas comunidades — sem aprovação nem comprovante.'}
               </p>
 
               <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-                <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                  <span>
-                    Comunidade do <strong>{nomeClube}</strong> (feed nacional)
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                  <span>
-                    Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
-                    novidades)
-                  </span>
-                </li>
-                <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                  <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                  <span>Sem mural exclusivo de sócios</span>
-                </li>
+                {canalRestrito ? (
+                  <>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Espaço aberto da <strong>{nomeUnidade}</strong> (eventos e
+                        novidades)
+                      </span>
+                    </li>
+                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                      <span>
+                        Sem feed da <strong>{nomeOrganizada}</strong> nem da
+                        comunidade nacional
+                      </span>
+                    </li>
+                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                      <span>Sem mural exclusivo de sócios</span>
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Comunidade do <strong>{nomeClube}</strong> (feed nacional)
+                      </span>
+                    </li>
+                    {torcidaMae ? (
+                      <li className="flex gap-2">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                        <span>
+                          Comunidade da <strong>{nomeOrganizada}</strong>
+                        </span>
+                      </li>
+                    ) : null}
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
+                        novidades)
+                      </span>
+                    </li>
+                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                      <span>Sem mural exclusivo de sócios</span>
+                    </li>
+                  </>
+                )}
               </ul>
 
               <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
@@ -2472,8 +2524,8 @@ function PassoVinculo({
           >
             <div className="relative flex w-[6.5rem] shrink-0 items-center justify-center self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
               <EscudoClube
-                nome={torcida.nome}
-                escudoUrl={torcida.logoUrl}
+                nome={nomeOrganizada}
+                escudoUrl={logoOrganizada}
                 size="xl"
                 priority
               />
@@ -2497,23 +2549,75 @@ function PassoVinculo({
               </p>
 
               <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-                <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                  <span>
-                    Comunidade do <strong>{nomeClube}</strong>
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                  <span>
-                    Mural interno de sócios da <strong>{torcida.nome}</strong>
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                  <span>Carteirinha, benefícios e posts exclusivos</span>
-                </li>
+                {canalRestrito ? (
+                  <>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Mural interno de sócios da <strong>{nomeUnidade}</strong>
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>Carteirinha, benefícios e posts exclusivos</span>
+                    </li>
+                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                      <span>
+                        Sem interação com a comunidade da{' '}
+                        <strong>{nomeOrganizada}</strong> nem o feed nacional
+                        (canal restrito)
+                      </span>
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Comunidade do <strong>{nomeClube}</strong>
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>
+                        Mural interno de sócios da <strong>{nomeUnidade}</strong>
+                      </span>
+                    </li>
+                    {torcidaMae ? (
+                      <li className="flex gap-2">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                        <span>
+                          Também interage com a comunidade da{' '}
+                          <strong>{nomeOrganizada}</strong>
+                        </span>
+                      </li>
+                    ) : null}
+                    <li className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
+                      <span>Carteirinha, benefícios e posts exclusivos</span>
+                    </li>
+                  </>
+                )}
               </ul>
+
+              {fotoUnidade ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+                  <div className="relative aspect-[16/9] w-full">
+                    <Image
+                      src={fotoUnidade}
+                      alt={`Foto da unidade ${nomeUnidade}`}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 320px"
+                      className="object-cover"
+                      unoptimized={!canOptimizeImageUrl(fotoUnidade)}
+                    />
+                  </div>
+                  <p className="px-3 py-2 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                    {nomeUnidade}
+                  </p>
+                </div>
+              ) : null}
 
               <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
                 Solicitar vínculo
@@ -2534,7 +2638,7 @@ function PassoVinculo({
             Preencha seus dados. A liderança da {torcida.nome} vai analisar.
           </p>
         </div>
-        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="xl" />
+        <EscudoClube nome={nomeOrganizada} escudoUrl={logoOrganizada} size="xl" />
       </div>
 
       <div className="mt-6 space-y-4">
