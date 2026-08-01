@@ -52,6 +52,7 @@ import {
   parseListagemParams,
   serializarListagemParams,
   type ListagemFacetas,
+  type ListagemParams,
 } from '@/lib/listagem'
 import { LISTAGEM_MEMBROS } from '@/lib/listagem/specs'
 import {
@@ -609,16 +610,21 @@ export default async function MembrosPage({
     ate: periodoGrafico === 'custom' ? customEnd : undefined,
   }
 
-  const where: Prisma.SaasMembroWhereInput = montarWhereListagem(SPEC, listagem, {
-    escopo: { tenantId: tenant.id },
-  })
   // A tab Desligados usa a mesma chave `status` na URL (um eixo só para quem
-  // opera), mas no banco o critério é `desligadoEm` — troca a condição que a
-  // spec montou, senão viraria `status: 'DESLIGADO'`, que não existe.
-  if (statusFiltro === 'DESLIGADO') {
-    delete where.status
-    where.desligadoEm = { not: null }
-  }
+  // opera), mas no banco o critério é `desligadoEm`. O filtro sai dos params
+  // ANTES de montar o `where` (e o das facetas): a spec o encaixa dentro do
+  // `AND`, então mexer no `where` pronto deixava `status: 'DESLIGADO'` lá,
+  // valor que não existe no enum e derrubava a página.
+  const listagemQuery: ListagemParams =
+    statusFiltro === 'DESLIGADO'
+      ? { ...listagem, filtros: { ...listagem.filtros, status: [] } }
+      : listagem
+  const extraWhere: Prisma.SaasMembroWhereInput[] =
+    statusFiltro === 'DESLIGADO' ? [{ desligadoEm: { not: null } }] : []
+  const where: Prisma.SaasMembroWhereInput = montarWhereListagem(SPEC, listagemQuery, {
+    escopo: { tenantId: tenant.id },
+    extra: extraWhere,
+  })
 
   const [membros, total, contagens, totalDesligados, sedes, departamentosOpts] =
     await Promise.all([
@@ -677,8 +683,8 @@ export default async function MembrosPage({
   // lado de "Sócio" mostra quantos apareceriam se a opção fosse marcada.
   const facetas: ListagemFacetas = await carregarFacetas(
     SPEC,
-    listagem,
-    { escopo: { tenantId: tenant.id } },
+    listagemQuery,
+    { escopo: { tenantId: tenant.id }, extra: extraWhere },
     async (campo, whereFaceta) => {
       const linhas = await db.saasMembro.groupBy({
         by: [campo as 'tipo'],
