@@ -68,14 +68,18 @@ interface SolicitacaoRow {
   status: StatusReativacaoCanal
   motivo: string | null
   decididoEm: Date | null
-  solicitadoPor: { nome: string | null } | null
+  solicitadoPorId: string | null
 }
 
-function toSolicitacaoLite(row: SolicitacaoRow, agora: number): SolicitacaoReativacaoLite {
+function toSolicitacaoLite(
+  row: SolicitacaoRow,
+  agora: number,
+  nomes: Map<string, string | null>,
+): SolicitacaoReativacaoLite {
   return {
     id: row.id,
     solicitanteTenantId: row.solicitanteTenantId,
-    solicitadoPorNome: row.solicitadoPor?.nome ?? null,
+    solicitadoPorNome: row.solicitadoPorId ? (nomes.get(row.solicitadoPorId) ?? null) : null,
     mensagem: row.mensagem,
     prazoEm: row.prazoEm,
     criadoEm: row.criadoEm,
@@ -118,13 +122,34 @@ export const getEstadoCanalRestritoEmLote = cache(
           status: true,
           motivo: true,
           decididoEm: true,
-          solicitadoPor: { select: { nome: true } },
+          // `SolicitacaoReativacaoCanal` guarda só o id do autor (sem relação
+          // com `User`) — o nome é resolvido depois, e apenas para as pendentes.
+          solicitadoPorId: true,
         },
       }),
       getTenantsRestritos(),
     ])
 
     const agora = Date.now()
+
+    // Só a pendente em prazo mostra autor na UI — buscar nome de todo o
+    // histórico seria desperdício.
+    const autoresPendentes = [
+      ...new Set(
+        solicitacoes
+          .filter((s) => s.status === 'PENDENTE' && s.prazoEm.getTime() > agora)
+          .map((s) => s.solicitadoPorId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ]
+    const nomes = new Map<string, string | null>()
+    if (autoresPendentes.length > 0) {
+      const autores: { id: string; nome: string | null }[] = await db.user.findMany({
+        where: { id: { in: autoresPendentes } },
+        select: { id: true, nome: true },
+      })
+      for (const a of autores) nomes.set(a.id, a.nome)
+    }
 
     for (const t of tenants) {
       estado.set(t.id, {
@@ -144,7 +169,8 @@ export const getEstadoCanalRestritoEmLote = cache(
       if (s.status === 'PENDENTE') {
         // Pedido vencido não é mais "pendente" para o usuário — o canal já voltou.
         if (s.prazoEm.getTime() <= agora) continue
-        if (!atual.solicitacaoPendente) atual.solicitacaoPendente = toSolicitacaoLite(s, agora)
+        if (!atual.solicitacaoPendente)
+          atual.solicitacaoPendente = toSolicitacaoLite(s, agora, nomes)
         continue
       }
       if (!atual.ultimaDecisao) {
