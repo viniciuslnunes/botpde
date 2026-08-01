@@ -8,8 +8,12 @@ export type UsuarioVinculo = {
   tenantNome: string
   tenantSlug: string
   cargo: string | null
+  /** null = há cargo no tenant mas nenhuma linha de `SaasMembro`. */
+  membroId: string | null
   membroStatus: 'PENDENTE' | 'APROVADO' | 'REPROVADO' | null
   membroDesligado: boolean
+  /** Espelho da Sede: só a unidade de origem apaga. Ver `motivoImpedeApagar`. */
+  membroEspelhado: boolean
 }
 
 export type UsuarioDetalhe = {
@@ -49,8 +53,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       },
       membros: {
         select: {
+          id: true,
           status: true,
           desligadoEm: true,
+          espelhado: true,
           tenant: { select: { id: true, nome: true, slug: true } },
         },
       },
@@ -74,8 +80,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         tenantNome: ur.tenant.nome,
         tenantSlug: ur.tenant.slug,
         cargo: ur.role.nome,
+        membroId: null,
         membroStatus: null,
         membroDesligado: false,
+        membroEspelhado: false,
       })
     }
   }
@@ -84,16 +92,20 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const key = m.tenant.id
     const atual = porTenant.get(key)
     if (atual) {
+      atual.membroId = m.id
       atual.membroStatus = m.status
       atual.membroDesligado = m.desligadoEm != null
+      atual.membroEspelhado = m.espelhado
     } else {
       porTenant.set(key, {
         tenantId: m.tenant.id,
         tenantNome: m.tenant.nome,
         tenantSlug: m.tenant.slug,
         cargo: null,
+        membroId: m.id,
         membroStatus: m.status,
         membroDesligado: m.desligadoEm != null,
+        membroEspelhado: m.espelhado,
       })
     }
   }

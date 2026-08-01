@@ -37,7 +37,13 @@ import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
 import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma, nomeExibicaoAfiliacao } from '@torcida/types'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
-import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
+import {
+  getPostPorId,
+  podeVerFeedSocios,
+  resolveTenantIdsSomenteComunicado,
+  resolveVisibleTenantIdsForFeed,
+} from '@/lib/feed'
+import { getTenantsRestritos } from '@/lib/isolamento'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
@@ -315,6 +321,9 @@ type PostEngajavelLite = {
   oculto: boolean
   visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
   tenant: { afiliacaoId: string | null; sintetico: boolean }
+  /** R5 — distingue o comunicado oficial das demais publicações. */
+  tipo?: string
+  comunicadoOrigemId?: string | null
 }
 
 /**
@@ -326,6 +335,22 @@ async function podeEngajarPostVisivel(
   post: PostEngajavelLite,
 ): Promise<boolean> {
   if (post.oculto) return false
+
+  // R5 — canal restrito ANTES dos atalhos. O fast-path "mesmo clube + PÚBLICO"
+  // não consulta hierarquia; sem esta trava, qualquer torcedor do clube com o
+  // id do post reagiria/comentaria em publicação de uma unidade isolada — e a
+  // própria unidade isolada engajaria na praça de fora. Vale nos dois sentidos.
+  if (post.tenantId !== ctx.tenantId) {
+    const restritos = await getTenantsRestritos()
+    if (restritos.has(post.tenantId)) return false
+    if (ctx.tenantId && restritos.has(ctx.tenantId)) {
+      // Única exceção: o comunicado oficial do ancestral, a só publicação
+      // externa que a unidade isolada enxerga.
+      if (!ehComunicadoOficialEngajavel(post)) return false
+      const ancestrais = await resolveTenantIdsSomenteComunicado(ctx.tenantId)
+      return ancestrais.includes(post.tenantId)
+    }
+  }
 
   if (!ctx.tenantId) {
     return (
@@ -347,6 +372,10 @@ async function podeEngajarPostVisivel(
 
   const ids = await resolveVisibleTenantIdsForFeed(ctx.tenantId, ctx.viewerId)
   return ids.includes(post.tenantId)
+}
+
+function ehComunicadoOficialEngajavel(post: PostEngajavelLite): boolean {
+  return post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId != null
 }
 
 /**
@@ -1118,6 +1147,8 @@ export async function comentarPost(
         tenantId: true,
         oculto: true,
         visibilidade: true,
+        tipo: true,
+        comunicadoOrigemId: true,
         tenant: { select: { afiliacaoId: true, sintetico: true } },
       },
     }) as Promise<PostEngajavelLite | null>,
@@ -3652,6 +3683,8 @@ export async function reagirPost(
         tenantId: true,
         oculto: true,
         visibilidade: true,
+        tipo: true,
+        comunicadoOrigemId: true,
         tenant: { select: { afiliacaoId: true, sintetico: true } },
       },
     }) as Promise<PostEngajavelLite | null>,
@@ -3736,6 +3769,8 @@ export async function denunciarPost(
       tenantId: true,
       oculto: true,
       visibilidade: true,
+      tipo: true,
+      comunicadoOrigemId: true,
       tenant: { select: { afiliacaoId: true, sintetico: true } },
     },
   })

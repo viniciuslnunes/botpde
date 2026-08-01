@@ -425,3 +425,21 @@ describe('filterMenuByPermissions com OR', () => {
     }
   })
 })
+
+describe('members:purge — hard delete fica só com o Presidente', () => {
+  it('owner tem, admin e vice NÃO herdam', () => {
+    // `ALL_PERMISSIONS` é a base dos pacotes de admin e vice: sem a exclusão
+    // explícita em SYSTEM_ROLE_PERMISSIONS, os dois ganhariam a permissão de
+    // graça na próxima vez que alguém mexer nessa lista.
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER]).toContain(PERMISSIONS.MEMBERS_PURGE)
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN]).not.toContain(
+      PERMISSIONS.MEMBERS_PURGE,
+    )
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE]).not.toContain(PERMISSIONS.MEMBERS_PURGE)
+  })
+
+  it('bloquear (members:block) segue com admin e vice — é operação de rotina', () => {
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN]).toContain(PERMISSIONS.MEMBERS_BLOCK)
+    expect(SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE]).toContain(PERMISSIONS.MEMBERS_BLOCK)
+  })
+})

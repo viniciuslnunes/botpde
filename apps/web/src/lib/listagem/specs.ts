@@ -114,6 +114,9 @@ export const LISTAGEM_MEMBROS: ListagemSpec = {
         { valor: 'PENDENTE', label: 'Pendentes' },
         { valor: 'APROVADO', label: 'Aprovados' },
         { valor: 'REPROVADO', label: 'Reprovados' },
+        // Não é `status` no banco (é `desligadoEm`) — a página traduz. Fica no
+        // mesmo eixo porque para quem opera a base é a mesma pergunta.
+        { valor: 'DESLIGADO', label: 'Desligados' },
       ],
     },
   ],

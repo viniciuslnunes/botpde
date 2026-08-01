@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { db, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
@@ -140,14 +141,26 @@ export default async function SociosPage({
   const now = new Date()
   const em30dias = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-  let podeEmitir = isSuperAdminEmail(session.user.email)
-  if (!podeEmitir && session.user.id) {
+  const superAdmin = isSuperAdminEmail(session.user.email)
+  let podeEmitir = superAdmin
+  // Aba Acessos do card: `roles:manage`, a mesma permissão do Controle de
+  // acesso. Esconder a aba é só affordance — quem chamar a action sem ela
+  // continua barrado no servidor.
+  let podeGerirAcessos = superAdmin
+  // Bloquear/apagar no card do sócio: as mesmas permissões de /admin/membros.
+  // O gate real está nas Server Actions; aqui é só affordance.
+  let podeBloquear = superAdmin
+  let podeApagar = superAdmin
+  if (!superAdmin && session.user.id) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
       session.user.id,
       tenant.id,
     )
     const effective = calculateEffectivePermissions(rolePermissions, overrides)
     podeEmitir = hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
+    podeGerirAcessos = hasPermission(effective, PERMISSIONS.ROLES_MANAGE)
+    podeBloquear = hasPermission(effective, PERMISSIONS.MEMBERS_BLOCK)
+    podeApagar = hasPermission(effective, PERMISSIONS.MEMBERS_PURGE)
   }
 
   // Anti-join via User.socios — evita NOT IN gigante em tenants grandes
@@ -338,6 +351,18 @@ export default async function SociosPage({
     }
   }
 
+  // Bloqueios em lote, só dos usuários que aparecem nesta página. Inclui os
+  // ancestrais: bloqueio na Sede vale aqui e o card precisa refletir isso.
+  const escopoBloqueio = [tenant.id, ...(await getAncestorTenantIds(tenant.id))]
+  const bloqueios: { userId: string }[] = await db.membroBloqueio.findMany({
+    where: {
+      tenantId: { in: escopoBloqueio },
+      userId: { in: [...detalhePorUserId.keys()] },
+    },
+    select: { userId: true },
+  })
+  const bloqueadosUserIds = [...new Set(bloqueios.map((b) => b.userId))]
+
   type OptRow = {
     id: string
     userId: string
@@ -520,6 +545,10 @@ export default async function SociosPage({
         statusFiltro={statusFiltro}
         tabHrefs={tabHrefs}
         podeEmitir={podeEmitir}
+        podeGerirAcessos={podeGerirAcessos}
+        podeBloquear={podeBloquear}
+        podeApagar={podeApagar}
+        bloqueadosUserIds={bloqueadosUserIds}
         toolbar={toolbar}
         cabecalho={cabecalho}
         paginacao={paginacaoEl}

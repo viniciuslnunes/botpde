@@ -1,16 +1,10 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { auth } from '@/lib/auth'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { MessagesSquare, Megaphone } from 'lucide-react'
-import {
-  PERMISSIONS,
-  calculateEffectivePermissions,
-  hasPermission,
-  primeiraTabPermitida,
-} from '@torcida/types'
+import { PERMISSIONS, hasPermission, primeiraTabPermitida } from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import {
   resumirEngajamento,
@@ -112,11 +106,8 @@ async function ComunidadeInsights({
 }
 
 export default async function AdminComunidadePage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/admin')
-
-  const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
-  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  // Mesmo tenant e mesmas permissões do shell — ver `contextoAdmin`.
+  const { tenant, permissoes: effective } = await contextoAdmin()
 
   const podePublicarComunicado = hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
   const podeGerenciarPosts = hasPermission(effective, PERMISSIONS.COMMUNITY_MANAGE)

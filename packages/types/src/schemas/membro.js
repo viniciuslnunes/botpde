@@ -223,6 +223,11 @@ export const ReprovarMembroSchema = z
       .default([]),
     /** false = reprovação definitiva; bloqueia o reenvio pelo solicitante. */
     permiteReenvio: z.boolean().default(true),
+    /**
+     * true = além de reprovar, bloqueia novas solicitações na unidade onde a
+     * solicitação nasceu. Exige `members:block` (revalidado no servidor).
+     */
+    bloquear: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
     if (categoriaExigePontos(data.categoria) && data.pontos.length === 0) {
@@ -239,4 +244,25 @@ export const DEFAULT_REPROVAR_MEMBRO = {
   motivo: '',
   pontos: /** @type {string[]} */ ([]),
   permiteReenvio: true,
+  bloquear: false,
 }
+
+// ─── Bloqueio de novas solicitações ─────────────────────────────────────────
+// Bloqueio é sobre o USUÁRIO na torcida (não sobre a linha de `SaasMembro`):
+// vale mesmo sem cadastro e herda para as unidades descendentes.
+
+export const MOTIVO_BLOQUEIO_MIN = 3
+export const MOTIVO_BLOQUEIO_MAX = 500
+
+export const BloquearMembroSchema = z.object({
+  userId: z.string().uuid('Usuário inválido'),
+  motivo: z
+    .string()
+    .trim()
+    .min(MOTIVO_BLOQUEIO_MIN, 'Explique o motivo do bloqueio')
+    .max(MOTIVO_BLOQUEIO_MAX, 'Motivo muito longo'),
+})
+
+export const DesbloquearMembroSchema = z.object({
+  userId: z.string().uuid('Usuário inválido'),
+})

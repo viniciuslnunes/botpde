@@ -6,6 +6,7 @@ import { nicknameSchema } from '@torcida/types'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { tagNomeUsuario } from '@/lib/avatar-cache'
+import { destinoInternoSeguro } from '@/lib/callback-url'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 
@@ -92,8 +93,10 @@ export async function definirApelido(
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   // Mesmo padrão do login: o cliente navega para preservar o cookie de sessão.
   return {
-    redirectTo: isSuperAdminEmail(session.user.email)
-      ? '/super-admin/torcidas'
-      : '/auth/contexto',
+    redirectTo:
+      // Convite direto retoma o destino original (`/convite/<slug>`) — sem isso
+      // o link se perderia justamente no passo que existe para não perder dado.
+      destinoInternoSeguro(formData.get('callbackUrl')) ??
+      (isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto'),
   }
 }

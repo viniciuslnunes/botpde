@@ -134,6 +134,33 @@ No portal, `/portal/cadastro` mostra o motivo, as etapas a corrigir e bloqueia
 o reenvio quando `reprovadoPermiteReenvio` é `false` — a barreira é servidor
 (`solicitarCadastro` e o wizard de onboarding), não só a tela.
 
+## Acesso da pessoa na aba do cadastro (2026-07-31)
+
+Cargo, área e permissões adicionais são decididos **no card do membro**, aba
+**Acessos** — o mesmo card que já traz Resumo, Cadastro, Documentos, Associação,
+Operação e Histórico. Quem acabou de aprovar alguém não precisa mais sair para
+`/admin/acessos`, procurar a pessoa numa lista da torcida inteira e torcer para
+clicar no homônimo certo.
+
+- **A pessoa vem do cadastro aberto**, nunca de escolha manual:
+  `carregarAcessoMembro(membroId)`
+  (`apps/web/src/app/admin/membros/acesso-actions.ts`) resolve `membroId →
+  userId` e devolve cargos, áreas e vínculos atuais **daquele** usuário. Carrega
+  sob demanda: abrir um card não paga essas consultas enquanto a aba não é
+  aberta.
+- **Painel reaproveitado, não reescrito**: `AccessUserPanel` ganhou
+  `variant="embutido"` — sem cabeçalho/back-link (o card já identifica a
+  pessoa) e com rodapé de ações **no fluxo**. A `StickyPersistBar` é um portal
+  `fixed z-20`: dentro do modal (`z-50`) ela ficaria atrás do backdrop e o
+  usuário ficaria sem botão de salvar.
+- **Gate próprio**: a aba exige `roles:manage` (ver o cadastro é
+  `members:view`). Esconder a aba é só affordance — `carregarAcessoMembro` e
+  `salvarAcessoUsuario` barram no servidor.
+- **Sócios herdam de graça**: `/admin/socios` já abre o mesmo
+  `MembroDetalheModal`; só passa a flag de permissão.
+- Salvar **não fecha** o card: recarrega o painel e a mudança já aparece na aba
+  Histórico ao lado.
+
 ## Histórico do cadastro (aba Logs)
 
 `listarHistoricoMembro` (`apps/web/src/app/admin/membros/historico-actions.ts`)
@@ -145,6 +172,23 @@ edição LGE e a reatribuição de unidade pelo admin, e para o reenvio feito pe
 próprio solicitante. Registrar só a ação, sem o antes/depois, deixa a aba
 inútil para conferência.
 
+**Mudança de acesso também é histórico do cadastro (2026-07-31).** Cargo, área
+e permissão são gravados contra o `User` (é o usuário que tem acesso, não a
+ficha), então a aba lê uma segunda fatia: `entidade: 'User'` +
+`entidadeId: membro.userId`, restrita a uma lista fechada de ações
+(`ACOES_ACESSO`) — `entidade: 'User'` também guarda coisas de outra natureza,
+que não são histórico do vínculo. As duas fatias são ordenadas juntas por data.
+
+O log de acesso passou a gravar `detalhes.alteracoes` no mesmo formato do diff
+de cadastro, via `diffAcessoUsuario` (`apps/web/src/lib/acesso-audit-diff.ts`):
+`Cargos`, `Áreas`, `Permissões adicionais` e `Permissões revogadas do cargo`,
+cada uma com **de → para**. Antes o log guardava só `perfilIds` e
+`permissoesEfetivas` — ids crus, sem estado anterior: dava para saber que
+alguém mexeu, nunca o que entrou ou saiu. Cargo de sistema sai com o rótulo da
+unidade (Presidente/Liderança), não com o nome interno do papel; permissão sai
+com o rótulo de `PERMISSION_GROUPS`. Invariantes em
+`lib/__tests__/acesso-audit-diff.test.ts`.
+
 Membros reprovados **antes** desta mudança não têm laudo: a aba continua
 visível e explica a ausência em vez de sumir. Dados de teste ganham laudo e
 histórico com
@@ -154,9 +198,87 @@ Cobertura ponta a ponta: `pnpm --filter @torcida/web audit:fluxos`
 (§ "cadastro pendente → reprovação justificada") exercita justificativa curta
 barrada, laudo persistido, histórico e reenvio bloqueado.
 
+## Ciclo de vida do número de associado (2026-08-01)
+
+O `numeroAssociado` é recurso escasso da torcida (carteirinha física), não
+identidade. Quem ocupa o número na lineage (Sede + afiliadas):
+
+| Situação do vínculo | Ocupa o número? |
+|---|---|
+| `PENDENTE` | sim — solicitação viva, número reservado |
+| `APROVADO` | sim |
+| `REPROVADO` | **não** — volta ao pool |
+| desligado (`desligadoEm`) | não |
+
+`encontrarConflitoNumeroAssociado` (`lib/membros-sede.ts`) filtra
+`status: { not: 'REPROVADO' }`. O valor **continua gravado** na linha reprovada:
+o laudo e o diff do histórico precisam mostrar o nº que a pessoa declarou. Ele
+só deixa de bloquear outro torcedor — quem foi reprovado mantém "seu" número
+enquanto ninguém o tomar, e é first-come-first-served daí em diante.
+
+Reverter para `PENDENTE` **não** libera: a solicitação volta a ser viva.
+
+CPF, RG e telefone seguem bloqueando mesmo em reprovados — identidade não é
+vaga, e o mesmo CPF em duas pessoas é sinal de fraude, não de número livre.
+
+`desligarMembro` revoga a carteirinha (origem **e** espelho) e grava
+`SOCIO_CARTEIRINHA_REVOGADA`. Sem isso o `numeroSocio` — que é
+`@@unique([tenantId, numeroSocio])` em `SaasSocio` — ficaria preso para sempre.
+
+## Bloqueio de novas solicitações (2026-08-01)
+
+`MembroBloqueio` (`saas_membro_bloqueios`, `@@unique([tenantId, userId])`) barra
+o **usuário**, não a linha de `SaasMembro`: vale mesmo para quem nunca se
+cadastrou e sobrevive ao registro ser apagado.
+
+- **Escopo herdado para baixo, sem cópia por unidade.**
+  `estaBloqueadoNoTenant(userId, tenantId)` consulta o próprio tenant + seus
+  **ancestrais**. Bloqueio na Sede vale nas subsedes/PDEs; bloqueio numa unidade
+  vale só naquele ramo e **não sobe**.
+- **Barra o cadastro** em `solicitarVinculo` (onboarding) e `solicitarCadastro`
+  (`/portal/cadastro`), antes de qualquer escrita, com mensagem distinta da de
+  reprovação definitiva.
+- **Gate**: `members:block` — que já existia no pacote de owner/admin/vice e
+  estava sem uso até aqui. Motivo é obrigatório e vai para o `AuditLog`
+  (`MEMBRO_BLOQUEADO` / `MEMBRO_DESBLOQUEADO`).
+- **Desbloquear apaga a linha**; o histórico fica no `AuditLog`.
+- **Reprovar com bloqueio**: `reprovarMembro` aceita `bloquear: true`, revalida
+  `members:block` no servidor e grava o bloqueio no tenant da **unidade de
+  origem** da solicitação — é lá que novas tentativas batem.
+- **Associado ativo é recusado**: bloquear um `APROVADO` sem `desligadoEm`
+  devolve "Desligue o associado antes de bloquear". Desligamento é
+  `members:dismiss`, outra permissão; encadear as duas escondido apagaria o
+  rastro de quem decidiu o quê.
+
+`reprovadoPermiteReenvio` continua existindo e é outra coisa: "esta análise
+acabou" (sobre a solicitação). O bloqueio é "esta pessoa não entra" (sobre o
+usuário).
+
+## Apagar cadastro definitivamente (2026-08-01)
+
+Reprovado e desligado **continuam listados** em `/admin/membros` (tab
+"Desligados" + badge) e no card de `/admin/socios` — some da operação, não do
+registro. Para sumir de vez:
+
+- **Permissão `members:purge`**, deliberadamente **fora** dos pacotes de admin e
+  vice em `SYSTEM_ROLE_PERMISSIONS` — na prática Presidente (owner) e
+  super-admin. `ALL_PERMISSIONS` é a base desses pacotes, então a exclusão
+  precisa ser explícita; invariante travado em `lib/__tests__/rbac.test.ts`.
+- **Só reprovado ou desligado**, nunca cadastro ativo, e nunca o espelho da Sede
+  (apaga-se na unidade de origem). Regra em `motivoImpedeApagar`.
+- Apaga `SaasMembro` + espelho + `SaasSocio` (o `numeroSocio` volta ao pool).
+- **Preserva `AuditLog` e `MembroBloqueio`**: o rastro tem de sobreviver ao
+  registro, e apagar não pode virar a porta dos fundos para quem está bloqueado
+  voltar a se inscrever. O log `MEMBRO_APAGADO` guarda snapshot dos campos.
+- Duas portas, uma semântica: a Server Action `apagarMembroDefinitivo` (gate por
+  `members:purge`) e `DELETE /api/super-admin/membros/[id]` (gate por allowlist
+  de e-mail) chamam ambas `executarPurgeMembro` de `lib/membros-purge.ts`.
+  Super-admin não é atalho para pular a regra de negócio.
+
 ## Libs (`apps/web/src/lib/`)
 
 - `cobrancas.ts` — listar, sincronizar vencidas, baixar como paga (+ lançamento financeiro)
+- `membros-purge.ts` — regra e execução do hard delete (Server Action + super-admin)
 - `pix-gateway.ts` — `mock` default; Mercado Pago com `PIX_GATEWAY_MODE=mercadopago` + `MERCADOPAGO_ACCESS_TOKEN`
 - `carteirinha-qr.ts` — payload HMAC, validação pública
 - `associacao-home.ts` — snapshot único para `/portal`
@@ -213,5 +335,7 @@ mostra link de validação + cópia. Câmeras do celular abrem o link público.
 - `FINANCE_MANAGE` — planos, cobranças, export financeiro
 - `MEMBERS_EXPORT_LGE` — CSV cadastro LGE
 - `MEMBERS_DISMISS` — desligamento estatutário
+- `MEMBERS_BLOCK` — bloquear novas solicitações (owner/admin/vice)
+- `MEMBERS_PURGE` — apagar cadastro de vez (**só owner** + super-admin)
 
 Ver `packages/types/src/associacao.js` para schemas Zod.

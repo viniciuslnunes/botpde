@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import { listarVinculosAprovadosDoUsuario, type TorcidaOpcao } from '@/lib/tenant-context'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { getTenantsRestritos } from '@/lib/isolamento'
 
 /**
  * IDs de tenant onde o usuário pode comprar: torcidas onde é `SaasMembro`
@@ -14,13 +15,23 @@ import { getAncestorTenantIds } from '@/lib/hierarquia'
 export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
   userId: string,
 ): Promise<Set<string>> {
-  const vinculos: TorcidaOpcao[] = await listarVinculosAprovadosDoUsuario(userId)
+  const [vinculos, restritos]: [TorcidaOpcao[], Set<string>] = await Promise.all([
+    listarVinculosAprovadosDoUsuario(userId),
+    getTenantsRestritos(),
+  ])
+
   const ids = new Set<string>()
   for (const v of vinculos) {
+    // R5 — a loja da unidade isolada continua para os membros dela; o que o
+    // isolamento corta é a ponte com a loja da Sede (e a dela com o resto).
+    if (restritos.has(v.id)) {
+      ids.add(v.id)
+      continue
+    }
     ids.add(v.id)
     const ancestrais = await getAncestorTenantIds(v.id)
     const raiz = ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : v.id
-    ids.add(raiz)
+    if (!restritos.has(raiz)) ids.add(raiz)
   }
   return ids
 })

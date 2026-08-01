@@ -56,6 +56,7 @@ pnpm --filter @torcida/web audit:hierarquia  # Sede→Subsede→PDE (promover, e
 pnpm --filter @torcida/web audit:notificacoes # fan-out, reconciliação de leitura, escopo
 pnpm --filter @torcida/web audit:mensageria  # DM: segregação por rivalidade, bloqueio, solicitação
 pnpm --filter @torcida/web audit:loja        # cupom, estoque (inclui concorrência), pedido, seguir
+pnpm --filter @torcida/web audit:canal-restrito  # R5: semeia unidade Caso B (o seed não tem) e mede o isolamento
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
@@ -176,6 +177,12 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
  histórico com diff campo a campo (`historico-actions.ts`,
  `lib/membro-audit-diff.ts`); ver `docs/data/modulo-associacao.md`
  §reprovação com laudo e §histórico do cadastro.
+ **Acesso no card (2026-07-31):** cargo/área/permissão adicional são editados
+ na aba **Acessos** do card do membro (`membro-acesso-tab.tsx` +
+ `acesso-actions.ts`), que reusa `AccessUserPanel` com `variant="embutido"` —
+ a pessoa vem do `membroId` aberto, e o gate é `roles:manage`. Sócios abrem o
+ mesmo modal. O log grava diff legível (`lib/acesso-audit-diff.ts`) e a aba
+ Histórico lê também `entidade: 'User'`.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Bar** — PDV do bar da sede (`/admin/bar`): catálogo, estoque, venda rápida com
@@ -216,4 +223,17 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   afiliações, usuários, moderação e auditoria cross-tenant; ver
   `docs/data/modulo-super-admin.md` (inclui pendência: LGPD só tem exportação,
   exclusão de conta ainda não implementada).
+- **Canal restrito (R5)** — a liderança de uma unidade Caso B pode isolar o
+  canal: sai da malha de **interação** (CN, coirmãs, aliados, salas, lojas, DMs,
+  onboarding público, busca) e mantém administração e comunidade **internas**.
+  Estado em `apps/web/src/lib/isolamento.ts` (**nunca ler `Tenant.canalRestrito`
+  direto** — a expiração dos 5 dias é derivada na leitura); primitiva pura
+  `aplicarIsolamento` em `packages/types/src/visibility.js`; UI/estado em
+  `lib/canal-restrito.ts`, transições em `lib/canal-restrito-mutacoes.ts`.
+  **Estrutural nunca é gateado** (`getAncestorTenantIds`,
+  `getDescendantTenantIds`, `getTorcidaLineageTenantIds`, `getTorcidaWorktree`,
+  `getTenantHierarquia`) — só relação/visibilidade e os conjuntos por
+  `afiliacaoId`. Entrada da unidade restrita é por `/convite/<slug>`
+  (`lib/convite.ts`), que **não** pula e-mail nem apelido. Ver
+  `docs/data/modulo-canal-restrito.md` e `ARCHITECTURE.md` §5.13.
 - `ARCHITECTURE.md` — decisões fechadas (§5) e itens em aberto (§6).

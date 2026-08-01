@@ -4,6 +4,10 @@ import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from './hierarquia'
 import { tagFeedDescobrir } from './comunidade-cache'
 import { compactOr } from '@/lib/prisma-filters'
+import {
+  orSomenteComunicadoOficial,
+  resolveTenantIdsSomenteComunicado,
+} from './feed'
 
 export const COMUNICADOS_CACHE_TAG = 'comunicados-feed'
 
@@ -82,7 +86,11 @@ function reviveComunicadoDates(items: ComunicadoFeedItem[]): ComunicadoFeedItem[
 async function fetchComunicadosBase(tenantId: string): Promise<ComunicadoFeedItem[]> {
   const cached = await unstable_cache(
     async () => {
-      const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+      // Recurso `comunicados`, não `comunidade`: com canal restrito (R5) a
+      // unidade deixa de ver o FEED da Sede e continua recebendo os
+      // COMUNICADOS dela — isolamento corta interação, não comunicação
+      // institucional. Ver RECURSOS_CASCATA_INSTITUCIONAL.
+      const tenantIds = await getVisibleTenantIds(tenantId, 'comunicados')
       const announcements = (await db.announcement.findMany({
         where: { tenantId: { in: tenantIds } },
         orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
@@ -117,8 +125,13 @@ export async function getFeedComunidade(
   opts: { takePosts?: number; userId?: string; visibleTenantIds?: string[] } = {},
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
   const wantPosts = opts.takePosts != null && opts.takePosts > 0
-  const tenantIds =
-    opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
+  const [tenantIds, somenteComunicado] = await Promise.all([
+    opts.visibleTenantIds
+      ? Promise.resolve(opts.visibleTenantIds)
+      : getVisibleTenantIds(tenantId, 'comunidade'),
+    // R5 — com canal restrito o ancestral entra só pelo comunicado oficial.
+    resolveTenantIdsSomenteComunicado(tenantId),
+  ])
   const tenantsExternos = tenantIds.filter((id) => id !== tenantId)
 
   const [announcements, posts] = await Promise.all([
@@ -132,6 +145,7 @@ export async function getFeedComunidade(
               tenantsExternos.length > 0
                 ? { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' }
                 : null,
+              ...orSomenteComunicadoOficial(somenteComunicado),
             ]),
           },
           orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],

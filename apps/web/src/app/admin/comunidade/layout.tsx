@@ -3,17 +3,15 @@ import { redirect } from 'next/navigation'
 import { LayoutDashboard, Megaphone, MessagesSquare, Newspaper, ShieldAlert } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
-import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
-import { getTenantFromHost } from '@/lib/tenant'
+import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
 import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
 export default async function ComunidadeModuloLayout({ children }: { children: ReactNode }) {
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/admin')
-
-  const permissoes = await permissoesEfetivasNoAdmin()
+  // Tenant e permissões da mesma fonte que as páginas — contagem de badge e
+  // conteúdo da tab sempre falam do mesmo tenant (ver `contextoAdmin`).
+  const { tenant, permissoes } = await contextoAdmin()
   const tabsBase = montarTabsModulo('comunidade', permissoes)
   // Sem nenhuma etapa acessível não há módulo a mostrar; cada rota mantém o
   // próprio gate, isto aqui é só para não renderizar uma barra vazia.

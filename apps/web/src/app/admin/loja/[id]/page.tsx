@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { notFound, redirect } from 'next/navigation'
@@ -23,14 +22,13 @@ function formatarData(data: Date) {
 export default async function EditarProdutoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
+  // Tenant do próprio gate (tenant ativo), não do host.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.STORE_MANAGE)
+    ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
     redirect('/admin')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const [produto, categorias, pedidoItens] = await Promise.all([
     db.saasProduto.findFirst({ where: { id, tenantId: tenant.id } }),

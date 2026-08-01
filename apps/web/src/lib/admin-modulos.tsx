@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
+import type { Tenant } from '@torcida/db'
+import type { Session } from 'next-auth'
 import {
   WILDCARD_PERMISSION,
   calculateEffectivePermissions,
@@ -38,6 +40,47 @@ export async function permissoesEfetivasNoAdmin(): Promise<string[]> {
 
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
   return calculateEffectivePermissions(rolePermissions, overrides)
+}
+
+/** Sessão + tenant ativo + permissões efetivas nele, para páginas de um módulo. */
+export interface ContextoAdmin {
+  session: Session
+  tenant: Tenant
+  permissoes: string[]
+}
+
+/**
+ * Contexto de uma página de módulo admin: o **mesmo** tenant e o **mesmo**
+ * conjunto de permissões que o shell usou para montar as tabs.
+ *
+ * Existe porque divergir disso expulsa o usuário em silêncio. Rotas que
+ * resolviam o tenant por `getTenantFromHost()` pegavam o `TENANT_SLUG` do
+ * deploy (ou o cookie sem validar vínculo) em vez do tenant ativo, e rotas que
+ * iam direto a `getUserPermissionsInTenant` ignoravam o super admin — que não
+ * tem `SaasMembro` e portanto saía com conjunto vazio. Em `/admin/comunidade` o
+ * menu mostrava o módulo (shell, wildcard) e a página redirecionava para
+ * `/admin`.
+ *
+ * Nunca é controle de acesso: cada rota segue responsável pelo próprio gate.
+ */
+export async function contextoAdmin(): Promise<ContextoAdmin> {
+  const session = await auth()
+  if (!session?.user?.id) redirect('/admin')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
+  if (!tenant) redirect('/admin')
+
+  // Super admin opera fora do RBAC por tenant — mesma regra do shell.
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant, permissoes: [WILDCARD_PERMISSION] }
+  }
+
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
+  return {
+    session,
+    tenant,
+    permissoes: calculateEffectivePermissions(rolePermissions, overrides),
+  }
 }
 
 /**

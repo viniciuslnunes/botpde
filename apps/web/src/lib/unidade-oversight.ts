@@ -108,3 +108,72 @@ export const listarMembrosDaUnidade = cache(async function listarMembrosDaUnidad
   ])
   return { itens, total }
 })
+
+export interface PostUnidadeItem {
+  id: string
+  conteudo: string
+  autorNome: string | null
+  criadoEm: Date
+  oculto: boolean
+  visibilidade: string
+  totalComentarios: number
+  totalReacoes: number
+}
+
+/**
+ * R5 — leitura da comunidade da unidade pelo Presidente/Vice da Sede. É o
+ * caminho de monitoramento quando a unidade fecha o canal: em vez de injetar a
+ * unidade restrita no feed pessoal do Presidente (que vazaria para o cache
+ * compartilhado da Sede), o conteúdo é lido aqui, sob o gate explícito
+ * `assertPresidentePodeLerUnidade`.
+ *
+ * Somente leitura por construção: nenhuma ação de engajamento é exposta, e o
+ * select não traz nada além do necessário para acompanhar o mural.
+ */
+export const listarPostsDaUnidade = cache(async function listarPostsDaUnidade(
+  tenantId: string,
+  limite = 30,
+): Promise<{ itens: PostUnidadeItem[]; total: number }> {
+  const [total, posts]: [
+    number,
+    Array<{
+      id: string
+      conteudo: string
+      criadoEm: Date
+      oculto: boolean
+      visibilidade: string
+      autor: { nome: string | null } | null
+      _count: { comentarios: number; reacoes: number }
+    }>,
+  ] = await Promise.all([
+    db.post.count({ where: { tenantId } }),
+    db.post.findMany({
+      where: { tenantId },
+      orderBy: { criadoEm: 'desc' },
+      take: limite,
+      select: {
+        id: true,
+        conteudo: true,
+        criadoEm: true,
+        oculto: true,
+        visibilidade: true,
+        autor: { select: { nome: true } },
+        _count: { select: { comentarios: true, reacoes: true } },
+      },
+    }),
+  ])
+
+  return {
+    total,
+    itens: posts.map((p) => ({
+      id: p.id,
+      conteudo: p.conteudo,
+      autorNome: p.autor?.nome ?? null,
+      criadoEm: p.criadoEm,
+      oculto: p.oculto,
+      visibilidade: p.visibilidade,
+      totalComentarios: p._count.comentarios,
+      totalReacoes: p._count.reacoes,
+    })),
+  }
+})

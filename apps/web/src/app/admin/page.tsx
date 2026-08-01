@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
-import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
@@ -221,8 +220,9 @@ async function DashboardListasSection({
 }
 
 export default async function AdminPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/')
+  // Mesmo tenant do menu lateral e dos módulos — ver `contextoAdmin`.
+  const { session, tenant } = await contextoAdmin()
+  if (!session.user?.id) redirect('/')
 
   return (
     <div className="flex min-h-full flex-col">

@@ -14,6 +14,7 @@ import {
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
 import { formatNomeAfiliacao, formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
+import { getTenantsRestritos } from '@/lib/isolamento'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
@@ -228,7 +229,24 @@ export const getSedesDaTorcidaOnboarding = cache(
       select: SEDE_ONBOARDING_SELECT,
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
     })
-    return sedes.map(mapSedeOnboarding)
+
+    // R5 — unidade DESCENDENTE com canal restrito sai da vitrine: quem entra
+    // nela vem pelo convite direto (`/convite/[slug]`).
+    //
+    // O próprio `tenantId` consultado nunca é filtrado — mesma semântica do
+    // `manter` de `filtrarTenantsRestritos`. Sem essa exceção, o convite para
+    // uma unidade restrita devolveria zero unidades e `solicitarVinculo`
+    // gravaria o membro SEM `sedeId`, perdendo o vínculo territorial em
+    // silêncio (a função também valida a escolha do usuário, não só monta a
+    // vitrine).
+    //
+    // O corte usa o estado EFETIVO (`getTenantsRestritos`), nunca a coluna
+    // crua — senão uma unidade já reativada pelo prazo continuaria escondida
+    // até o cron rodar.
+    const restritos = await getTenantsRestritos()
+    return sedes
+      .filter((s) => !s.tenantId || s.tenantId === tenantId || !restritos.has(s.tenantId))
+      .map(mapSedeOnboarding)
   },
 )
 
@@ -531,7 +549,9 @@ export const getTorcidasPorAfiliacao = cache(
     const idsFilho = new Set(
       ancestralFlags.filter((f) => f.temAncestral).map((f) => f.id),
     )
-    const raizes = unicos.filter((t) => !idsFilho.has(t.id))
+    // R5 — torcida/unidade com canal restrito não aparece no passo Torcida.
+    const restritos = await getTenantsRestritos()
+    const raizes = unicos.filter((t) => !idsFilho.has(t.id) && !restritos.has(t.id))
 
     const [statsMap, sedesPorRaiz] = await Promise.all([
       calcularStatsTorcidasOnboarding(raizes.map((t) => t.id)),

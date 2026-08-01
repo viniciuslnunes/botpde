@@ -1,8 +1,7 @@
-import { auth } from '@/lib/auth'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { Newspaper } from 'lucide-react'
 import { aprovarNoticia, rejeitarNoticia } from './actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
@@ -26,11 +25,7 @@ function formatarData(data: Date) {
 }
 
 export default async function AdminNoticiasPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/admin')
-
-  const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
-  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  const { tenant, permissoes: effective } = await contextoAdmin()
   if (!hasPermission(effective, PERMISSIONS.NEWS_CURATE)) redirect('/admin')
 
   if (!tenant.afiliacaoId) {

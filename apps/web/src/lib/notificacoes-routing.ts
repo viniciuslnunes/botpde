@@ -154,6 +154,28 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissaoAdmin: PERMISSIONS.AFFILIATION_MANAGE,
     rota: '/admin/afiliacoes',
   },
+  // R5 — canal restrito. A unidade recebe o pedido da Sede em Configurações
+  // (é lá que a liderança decide); a Sede recebe o desfecho em /admin/sedes.
+  CANAL_RESTRITO_ATIVADO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+    rota: '/admin/sedes',
+  },
+  CANAL_REATIVACAO_SOLICITADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.SETTINGS_MANAGE,
+    rota: '/admin/configuracoes',
+  },
+  CANAL_REATIVACAO_RECUSADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+    rota: '/admin/sedes',
+  },
+  CANAL_REATIVADO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+    rota: '/admin/sedes',
+  },
 }
 
 export { agregarBadgesPorMenu, menuIdParaTipo } from '@/lib/notificacoes-menu-badges'

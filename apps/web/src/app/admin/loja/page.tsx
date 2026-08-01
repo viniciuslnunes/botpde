@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -48,15 +47,15 @@ function serializarProduto(p: {
 }
 
 export default async function AdminLojaPage() {
+  // O tenant vem do próprio gate (tenant ativo) — reabrir por host mostraria o
+  // catálogo de outra torcida.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.STORE_MANAGE)
+    ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
     // Sem gestão de catálogo, a etapa de entrada do módulo é Pedidos.
     redirect('/admin/loja/pedidos')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const [produtos, categorias] = await Promise.all([
     db.saasProduto.findMany({

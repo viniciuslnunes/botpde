@@ -55,6 +55,7 @@ import type {
   SedeOnboarding,
   RegiaoOnboarding,
 } from '@/lib/onboarding'
+import type { ConviteOnboarding } from '@/lib/convite'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
@@ -111,6 +112,13 @@ type Props = {
   nomeInicial: string
   emailInicial: string
   userId: string
+  /**
+   * Convite direto (`/convite/<slug>`): clube, torcida e unidade já vêm
+   * resolvidos pelo link e o wizard abre no passo Vínculo. Para uma unidade
+   * com canal restrito, este é o único caminho de entrada — ela não aparece
+   * na vitrine pública do onboarding.
+   */
+  convite?: ConviteOnboarding | null
 }
 
 export function OnboardingWizard({
@@ -119,18 +127,19 @@ export function OnboardingWizard({
   nomeInicial,
   emailInicial,
   userId,
+  convite = null,
 }: Props) {
   const { allowUnload } = useUnsavedChangesContext()
-  const [passo, setPasso] = useState<Passo>('clube')
+  const [passo, setPasso] = useState<Passo>(convite ? convite.passoInicial : 'clube')
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>('escolha')
 
   // Seleções acumuladas
-  const [clube, setClube] = useState<AfiliacaoOnboarding | null>(null)
-  const [uf, setUf] = useState('')
-  const [cidade, setCidade] = useState('')
+  const [clube, setClube] = useState<AfiliacaoOnboarding | null>(convite?.clube ?? null)
+  const [uf, setUf] = useState(convite?.uf ?? '')
+  const [cidade, setCidade] = useState(convite?.cidade ?? '')
   const [localizacaoPrecisa, setLocalizacaoPrecisa] = useState<GoogleMapsRegion | null>(null)
   /**
    * Coordenadas vindas do GPS do dispositivo (não do centróide da cidade) —
@@ -139,8 +148,8 @@ export function OnboardingWizard({
   const [coordsDispositivo, setCoordsDispositivo] = useState<{ lat: number; lng: number } | null>(
     null,
   )
-  const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(null)
-  const [unidadeId, setUnidadeId] = useState<string | null>(null)
+  const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(convite?.torcida ?? null)
+  const [unidadeId, setUnidadeId] = useState<string | null>(convite?.unidadeId ?? null)
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
 
   const passoRef = useRef(passo)
@@ -156,6 +165,15 @@ export function OnboardingWizard({
   /** Garante que o passo do histórico não pule dados ainda não escolhidos. */
   function passoAlcancavel(alvo: Passo): Passo {
     if (alvo === 'concluindo') return 'concluindo'
+    // Com convite, clube e torcida vieram do link: voltar atrás só permitiria
+    // trocar de torcida e invalidar o convite. O passo Unidade continua
+    // acessível quando a torcida tem mais de uma — é escolha do usuário.
+    if (convite) {
+      if (convite.passoInicial === 'unidade' && (alvo === 'unidade' || alvo === 'vinculo')) {
+        return alvo
+      }
+      return 'vinculo'
+    }
     if (!clubeRef.current && alvo !== 'clube') return 'clube'
     if (!torcidaRef.current && (alvo === 'unidade' || alvo === 'vinculo')) return 'torcida'
     return alvo
@@ -189,11 +207,14 @@ export function OnboardingWizard({
   }
 
   useEffect(() => {
-    let initialPasso: Passo = 'clube'
+    let initialPasso: Passo = convite ? convite.passoInicial : 'clube'
     let initialVinculoModo: 'escolha' | 'socio' = 'escolha'
 
     try {
-      const raw = window.sessionStorage.getItem(wizardDraftKey)
+      // Convite é intenção explícita e recente: descarta o rascunho de uma
+      // sessão anterior, que apontaria para outra torcida.
+      if (convite) window.sessionStorage.removeItem(wizardDraftKey)
+      const raw = convite ? null : window.sessionStorage.getItem(wizardDraftKey)
       if (raw) {
         const saved = JSON.parse(raw) as Partial<{
           passo: Passo

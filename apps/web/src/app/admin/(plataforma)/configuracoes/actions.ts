@@ -5,9 +5,16 @@ import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission, assertPodeDelegar, assertTenantOwner } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
-import { invalidateHierarchyCache } from '@/lib/hierarquia'
+import { getAncestorTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { getOrCreateCanalOficial } from '@/lib/canais'
+import { generateInviteSlug } from '@/lib/invite-slug'
+import { getEstadoCanalRestrito, getSolicitacaoRespondivel } from '@/lib/canal-restrito'
+import {
+  notificarSedeSobreCanal,
+  propagarMudancaDeIsolamento,
+  reabrirCanal,
+} from '@/lib/canal-restrito-mutacoes'
 import {
   ALL_PERMISSIONS,
   applyPermissionCascade,
@@ -209,6 +216,214 @@ export async function salvarExigirDocumentosCadastro(formData: FormData) {
   revalidatePath('/admin/configuracoes')
   revalidatePath('/onboarding')
   invalidateTenantCache(tenant.slug)
+}
+
+// ── R5 — Canal restrito ───────────────────────────────────────────────────────
+
+/**
+ * Só UNIDADE fecha o canal. A Sede raiz não tem de quem se isolar, e fechá-la
+ * esconderia a torcida inteira do onboarding e da comunidade nacional.
+ *
+ * A página já esconde a seção para a raiz, mas isso é gate de cliente: a
+ * Server Action é chamável direto, então a regra precisa valer aqui.
+ */
+async function assertEhUnidadeDaTorcida(tenantId: string): Promise<void> {
+  const ancestrais = await getAncestorTenantIds(tenantId)
+  if (ancestrais.length === 0) {
+    throw new ExpectedError(
+      'Só uma subsede ou ponto de encontro pode restringir o canal — a torcida principal, não.',
+    )
+  }
+}
+
+const motivoSchema = z
+  .string()
+  .trim()
+  .min(10, 'Explique em pelo menos 10 caracteres.')
+  .max(600, 'Use no máximo 600 caracteres.')
+
+/**
+ * Liderança fecha o canal da unidade. Some da malha de interação (comunidade
+ * nacional, aliados, salas, lojas, DMs, onboarding e busca); administração e
+ * comunidade internas seguem intactas, e a cascata institucional da Sede
+ * continua descendo. Reversível a qualquer momento pela própria liderança.
+ */
+export async function ativarCanalRestrito(): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+  await assertEhUnidadeDaTorcida(tenant.id)
+
+  const estado = await getEstadoCanalRestrito(tenant.id)
+  if (estado.restrito) return
+
+  await db.$transaction([
+    db.tenant.update({
+      where: { id: tenant.id },
+      data: {
+        canalRestrito: true,
+        canalRestritoDesde: new Date(),
+        canalRestritoPorId: session.user.id,
+      },
+    }),
+    db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'CANAL_RESTRITO_ATIVADO',
+        entidade: 'Tenant',
+        entidadeId: tenant.id,
+        detalhes: { restrito: true },
+      },
+    }),
+  ])
+
+  await propagarMudancaDeIsolamento(tenant.id)
+  await notificarSedeSobreCanal(tenant.id, session.user.id, {
+    tipo: 'CANAL_RESTRITO_ATIVADO',
+    titulo: `${formatNomeTorcida(tenant.nome)} restringiu o canal`,
+    corpo:
+      'A unidade segue visível na estrutura da torcida, mas saiu da comunidade nacional e das interações externas por decisão da liderança local.',
+  })
+}
+
+/** Liderança reabre o canal por conta própria — não depende de ninguém. */
+export async function desativarCanalRestrito(): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  await reabrirCanal({
+    tenantId: tenant.id,
+    tenantNome: tenant.nome,
+    atorId: session.user.id,
+    acao: 'CANAL_RESTRITO_DESATIVADO',
+    // Pedido em aberto vira APROVADA: a liderança concedeu o que a Sede pediu.
+    statusSolicitacao: 'APROVADA',
+    corpoNotificacao:
+      'A liderança reabriu o canal. Alianças, comunidade nacional, salas, lojas e conversas voltaram a valer.',
+  })
+}
+
+/** Liderança responde à solicitação da Sede: aprovar reabre; recusar mantém. */
+export async function responderReativacaoCanal(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const aprovar = formData.get('decisao') === 'aprovar'
+
+  const solicitacao = await getSolicitacaoRespondivel(tenant.id)
+  if (!solicitacao) {
+    throw new ExpectedError('Não há solicitação de reativação em aberto para responder.')
+  }
+
+  if (aprovar) {
+    await reabrirCanal({
+      tenantId: tenant.id,
+      tenantNome: tenant.nome,
+      atorId: session.user.id,
+      acao: 'CANAL_REATIVACAO_APROVADA',
+      statusSolicitacao: 'APROVADA',
+      corpoNotificacao:
+        'A liderança aprovou a reativação. O canal voltou à malha da torcida e do clube.',
+    })
+    return
+  }
+
+  const motivo = motivoSchema.safeParse(formData.get('motivo') ?? '')
+  if (!motivo.success) {
+    throw new ExpectedError(motivo.error.issues[0]?.message ?? 'Justificativa inválida.')
+  }
+
+  await db.$transaction([
+    db.solicitacaoReativacaoCanal.update({
+      where: { id: solicitacao.id },
+      data: {
+        status: 'RECUSADA',
+        decididoPorId: session.user.id,
+        decididoEm: new Date(),
+        motivo: motivo.data,
+      },
+    }),
+    db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'CANAL_REATIVACAO_RECUSADA',
+        entidade: 'SolicitacaoReativacaoCanal',
+        entidadeId: solicitacao.id,
+        detalhes: { motivo: motivo.data },
+      },
+    }),
+  ])
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/sedes')
+  await notificarSedeSobreCanal(tenant.id, session.user.id, {
+    tipo: 'CANAL_REATIVACAO_RECUSADA',
+    titulo: `${formatNomeTorcida(tenant.nome)} recusou reabrir o canal`,
+    corpo: motivo.data,
+    tenantDestinoId: solicitacao.solicitanteTenantId,
+  })
+}
+
+// ── R5 — Convite direto ───────────────────────────────────────────────────────
+
+/**
+ * Gera (ou rotaciona) o link de convite da torcida/unidade. Rotacionar
+ * invalida o link antigo na hora — é a forma de revogar um convite vazado.
+ * Para unidade com canal restrito, este link é a única porta de entrada.
+ */
+export async function gerarConviteTenant(): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+
+  const slug = generateInviteSlug()
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { conviteSlug: slug, conviteAtivo: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_CONVITE_GERADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { rotacionado: true },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+}
+
+/** Liga/desliga o convite sem trocar o slug (o link anterior volta a valer). */
+export async function alternarConviteTenant(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+
+  const ativo = formData.get('conviteAtivo') === 'true'
+  if (ativo) {
+    const atual: { conviteSlug: string | null } | null = await db.tenant.findUnique({
+      where: { id: tenant.id },
+      select: { conviteSlug: true },
+    })
+    if (!atual?.conviteSlug) {
+      throw new ExpectedError('Gere um link de convite antes de ativá-lo.')
+    }
+  }
+
+  await db.tenant.update({ where: { id: tenant.id }, data: { conviteAtivo: ativo } })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_CONVITE_ATUALIZADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { ativo },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
 }
 
 // ── Canal oficial (mural da unidade na Comunidade) ────────────────────────────

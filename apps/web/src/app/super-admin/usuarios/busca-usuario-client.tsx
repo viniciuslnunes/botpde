@@ -1,17 +1,32 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Search, UserCheck } from 'lucide-react'
+import { Loader2, Search, Trash2, UserCheck } from 'lucide-react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
 import { toast } from '@torcida/ui'
+import { useConfirmAction } from '@/lib/confirm-action'
 import type { UsuarioBuscaItem } from '@/app/api/super-admin/usuarios/busca/route'
-import type { UsuarioDetalhe } from '@/app/api/super-admin/usuarios/[id]/route'
+import type {
+  UsuarioDetalhe,
+  UsuarioVinculo,
+} from '@/app/api/super-admin/usuarios/[id]/route'
 import { ExportarDadosButton } from './exportar-dados-button'
 
 const STATUS_VARIANT: Record<'PENDENTE' | 'APROVADO' | 'REPROVADO', BadgeVariant> = {
   PENDENTE: 'warning',
   APROVADO: 'success',
   REPROVADO: 'danger',
+}
+
+/**
+ * Espelha `motivoImpedeApagar` (`lib/membros-purge.ts`), que é quem decide de
+ * verdade no servidor: só cadastro reprovado ou desligado, nunca espelho da
+ * Sede. Aqui é só affordance — esconder o botão evita oferecer uma ação que a
+ * rota vai recusar com 409.
+ */
+function podeApagarVinculo(v: UsuarioVinculo): boolean {
+  if (!v.membroId || v.membroEspelhado) return false
+  return v.membroStatus === 'REPROVADO' || v.membroDesligado
 }
 
 function formatarData(iso: string) {
@@ -27,6 +42,8 @@ export function BuscaUsuarioClient() {
   const [carregando, setCarregando] = useState(false)
   const [selecionado, setSelecionado] = useState<UsuarioDetalhe | null>(null)
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false)
+  const [apagandoId, setApagandoId] = useState<string | null>(null)
+  const confirmAction = useConfirmAction()
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -78,6 +95,35 @@ export function BuscaUsuarioClient() {
     } finally {
       setCarregandoDetalhe(false)
     }
+  }
+
+  async function apagarCadastro(userId: string, v: UsuarioVinculo) {
+    if (!v.membroId) return
+    const membroId = v.membroId
+    await confirmAction({
+      titulo: `Apagar o cadastro em ${v.tenantNome}?`,
+      descricao:
+        'Remove o cadastro, o espelho na Sede e a carteirinha. A auditoria e um bloqueio, se houver, permanecem. Não dá para desfazer.',
+      labelConfirmar: 'Apagar',
+      variante: 'destructive',
+      cancelled: 'Cadastro mantido.',
+      run: async () => {
+        setApagandoId(membroId)
+        try {
+          const res = await fetch(`/api/super-admin/membros/${membroId}`, {
+            method: 'DELETE',
+          })
+          const data = (await res.json()) as { ok?: boolean; error?: string }
+          if (!res.ok) throw new Error(data.error ?? 'Não foi possível apagar o cadastro.')
+          // Recarrega o detalhe: o vínculo apagado precisa sumir da lista, e o
+          // usuário pode continuar com cargo no tenant (linha permanece).
+          await selecionar(userId)
+        } finally {
+          setApagandoId(null)
+        }
+      },
+      success: 'Cadastro apagado.',
+    })
   }
 
   return (
@@ -189,6 +235,17 @@ export function BuscaUsuarioClient() {
                         {v.membroDesligado ? 'Desligado' : v.membroStatus}
                       </Badge>
                     ) : null}
+                    {podeApagarVinculo(v) && (
+                      <button
+                        type="button"
+                        onClick={() => void apagarCadastro(selecionado.id, v)}
+                        disabled={apagandoId === v.membroId}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--color-danger))] transition-colors hover:underline disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {apagandoId === v.membroId ? 'Apagando…' : 'Apagar cadastro'}
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

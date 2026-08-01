@@ -5,10 +5,17 @@ import { db } from '@torcida/db'
 import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
 import { usuarioPrecisaNickname } from '@/lib/tenant-context'
+import { resolverConvite } from '@/lib/convite'
 import { OnboardingSkeleton } from './onboarding-skeleton'
 import { OnboardingWizard } from './wizard'
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ convite?: string }>
+}) {
+  const { convite: conviteSlug } = await searchParams
+
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
@@ -22,7 +29,12 @@ export default async function OnboardingPage() {
   ])
 
   if (precisaNickname) {
-    redirect('/definir-apelido')
+    // Convite não pula a identidade: volta para cá depois do @ e do e-mail.
+    redirect(
+      conviteSlug
+        ? `/definir-apelido?callbackUrl=${encodeURIComponent(`/convite/${conviteSlug}`)}`
+        : '/definir-apelido',
+    )
   }
 
   if (hostTenant) {
@@ -43,6 +55,7 @@ export default async function OnboardingPage() {
         nomeInicial={session.user.name ?? ''}
         emailInicial={session.user.email ?? ''}
         userId={userId}
+        conviteSlug={conviteSlug ?? null}
       />
     </Suspense>
   )
@@ -53,14 +66,17 @@ async function OnboardingWizardLoader({
   nomeInicial,
   emailInicial,
   userId,
+  conviteSlug,
 }: {
   nomeInicial: string
   emailInicial: string
   userId: string
+  conviteSlug: string | null
 }) {
-  const [afiliacoesIniciais, regioes] = await Promise.all([
+  const [afiliacoesIniciais, regioes, convite] = await Promise.all([
     getAfiliacoesParaOnboarding(),
     getRegioesOnboarding(),
+    conviteSlug ? resolverConvite(conviteSlug) : Promise.resolve(null),
   ])
 
   return (
@@ -70,6 +86,7 @@ async function OnboardingWizardLoader({
       nomeInicial={nomeInicial}
       emailInicial={emailInicial}
       userId={userId}
+      convite={convite}
     />
   )
 }

@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
-import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { assertPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
+import { getEstadoCanalRestritoEmLote } from '@/lib/canal-restrito'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
@@ -225,10 +226,34 @@ export default async function AdminSedesPage() {
   const sedesTipoSedeCount = rowsLocal.filter((s) => s.tipo === 'SEDE').length
   const podeGerirPortalProprio = await atorPodeGerirPortalProprio(authz.session, tenant.id)
 
+  // R5 — canal restrito das unidades Caso B. A unidade continua listada aqui
+  // (a Sede nunca perde a visão da estrutura); o badge explica que o
+  // fechamento foi decisão da liderança local.
+  const tenantIdsCasoB = [
+    ...new Set(rowsCasoB.map((s) => s.tenantId).filter((id): id is string => Boolean(id))),
+  ]
+  const estadoCanalPorTenant = await getEstadoCanalRestritoEmLote(tenantIdsCasoB)
+  const podeSolicitarReativacao = presidenteSession != null
+  const podeImporReativacao =
+    presidenteSession != null &&
+    (await assertTenantOwner(presidenteSession.user.id, tenant.id).then(
+      () => true,
+      () => false,
+    ))
+
   const sedes: AdminSedeListItem[] = rows.map((s) => {
     const portalProprio = Boolean(s.tenantId && s.tenantId !== tenant.id)
     const temLiderancaVinculada = Boolean(s.responsavelUserId)
+    const estadoCanal = portalProprio && s.tenantId ? estadoCanalPorTenant.get(s.tenantId) : null
+    const pendenteCanal = estadoCanal?.solicitacaoPendente ?? null
     return {
+      canalRestrito: estadoCanal?.restrito ?? false,
+      canalSolicitacaoPendente: pendenteCanal !== null,
+      canalDiasRestantes: pendenteCanal
+        ? Math.floor(pendenteCanal.restanteMs / (24 * 60 * 60 * 1000))
+        : null,
+      podeSolicitarReativacao: podeSolicitarReativacao && !pendenteCanal,
+      podeImporReativacao,
       id: s.id,
       nome: s.nome,
       tipo: s.tipo,

@@ -6,6 +6,7 @@ import type { TipoSalaReuniao } from '@torcida/db'
 import { tagSalasAtivas, tagSalasNacionais } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
 import { compactOr, orTenantIdsIn } from '@/lib/prisma-filters'
+import { ISOLAMENTO_CACHE_TAG, filtrarTenantsRestritos } from '@/lib/isolamento'
 
 /** Contagem de participantes online (presença ativa), alinhada a `salas-presenca`. */
 export const participantesOnlineCountSelect = {
@@ -111,7 +112,10 @@ export const listSalasNacionais = cache(async function listSalasNacionais(
     select: { id: true, sintetico: true },
   })
   const tenantIdsSinteticos = tenants.filter((t) => t.sintetico).map((t) => t.id)
-  const tenantIdsOficiais = tenants.filter((t) => !t.sintetico).map((t) => t.id)
+  // R5 — unidade com canal restrito não expõe sala aberta na CN do clube.
+  const tenantIdsOficiais = await filtrarTenantsRestritos(
+    tenants.filter((t) => !t.sintetico).map((t) => t.id),
+  )
 
   const orSalas = compactOr([
     orTenantIdsIn(tenantIdsSinteticos),
@@ -139,7 +143,7 @@ export const listSalasNacionais = cache(async function listSalasNacionais(
           }) as Promise<SalaAtivaListItem[]>,
       ),
     ['salas-nacionais', afiliacaoId],
-    { revalidate: 15, tags: [tagSalasNacionais(afiliacaoId)] },
+    { revalidate: 15, tags: [tagSalasNacionais(afiliacaoId), ISOLAMENTO_CACHE_TAG] },
   )()
 
   return salas.map(normalizarDatasSala)

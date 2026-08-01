@@ -134,6 +134,12 @@ vi.mock('next/cache', () => ({
   revalidatePath,
 }))
 
+// Canal restrito (R5) tem cobertura própria em `canal-restrito.test.ts`; aqui
+// o tenant nunca está isolado, então `assertCanalNaoRestrito` é no-op.
+vi.mock('@/lib/isolamento', () => ({
+  isTenantRestrito: vi.fn(async () => false),
+}))
+
 import {
   aceitarAlianca,
   cancelarProposta,

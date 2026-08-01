@@ -8,6 +8,7 @@ import { excedeuLimite } from '@/lib/rate-limit'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { excedeuLimitePublico, registrarUsoPublico } from '@/lib/public-rate-limit'
 import { getClientIp } from '@/lib/request-ip'
+import { destinoInternoSeguro } from '@/lib/callback-url'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -64,7 +65,9 @@ export async function entrarComSenha(
     return { message: 'Muitas tentativas. Tente novamente em alguns minutos.' }
   }
 
-  return entrarComCredenciais(login, senha, '/auth/contexto')
+  // Convite de unidade retoma o destino original; sem isso o link se perde.
+  const destino = destinoInternoSeguro(formData.get('callbackUrl')) ?? '/auth/contexto'
+  return entrarComCredenciais(login, senha, destino)
 }
 
 const contaSchema = z.object({

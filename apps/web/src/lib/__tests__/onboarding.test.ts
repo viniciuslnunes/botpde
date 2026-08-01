@@ -92,8 +92,14 @@ vi.mock('@/lib/hierarquia', () => ({
   getDescendantTenantIds: getDescendantTenantIdsFn,
   getAncestorTenantIds: getAncestorTenantIdsFn,
 }))
+// Canal restrito (R5) tem cobertura própria em `canal-restrito.test.ts`.
+vi.mock('@/lib/isolamento', () => ({
+  getTenantsRestritos: vi.fn(async () => new Set<string>()),
+}))
+const estaBloqueadoNoTenantFn = vi.hoisted(() => vi.fn(async () => false))
 vi.mock('@/lib/membros-sede', () => ({
   criarOuAtualizarPendenciaEspelhoNaSede: criarPendenciaEspelhoFn,
+  estaBloqueadoNoTenant: estaBloqueadoNoTenantFn,
   lockNumeroAssociadoDaTorcida: vi.fn(async () => undefined),
   encontrarConflitoNumeroAssociado: vi.fn(async () => null),
   encontrarConflitoCpf: vi.fn(async () => null),
@@ -497,6 +503,24 @@ describe('solicitarVinculo — validação', () => {
       sedeId: UUID2,
       fallbackCriadoPorId: 'u1',
     })
+  })
+
+  it('recusa quem a diretoria bloqueou, mesmo sem cadastro anterior', async () => {
+    tenantFindFirst.mockResolvedValue({
+      id: UUID,
+      slug: 'torcida-teste',
+      nome: 'Torcida Teste',
+      exigirDocumentosCadastro: true,
+    })
+    sedeFindMany.mockResolvedValue([])
+    membroFindUnique.mockResolvedValue(null)
+    estaBloqueadoNoTenantFn.mockResolvedValueOnce(true)
+
+    const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
+
+    expect(r.message).toContain('bloqueou seu acesso')
+    // Barrado ANTES de qualquer escrita: nada de cadastro nem de espelho.
+    expect(criarPendenciaEspelhoFn).not.toHaveBeenCalled()
   })
 })
 

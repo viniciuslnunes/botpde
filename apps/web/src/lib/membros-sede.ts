@@ -1,4 +1,4 @@
-import { Prisma } from '@torcida/db'
+import { db, Prisma } from '@torcida/db'
 import { ExpectedError } from '@/lib/expected-error'
 import {
   getAncestorTenantIds,
@@ -376,9 +376,10 @@ export async function lockNumeroAssociadoDaTorcida(
 
 /**
  * Unicidade de `numeroAssociado` na torcida (lineage: Sede + afiliadas).
- * Qualquer vínculo ativo de outro user (PENDENTE / APROVADO / REPROVADO, não
- * desligado) conta — onboarding e aprovação usam a mesma regra para o número
- * nunca ser registrado em duplicata.
+ * Vínculo PENDENTE ou APROVADO (não desligado) de outro user ocupa o número —
+ * onboarding e aprovação usam a mesma regra para o número nunca ser registrado
+ * em duplicata. REPROVADO devolve o número ao pool: o valor continua gravado na
+ * linha para laudo/histórico, mas não bloqueia mais outro torcedor.
  *
  * Espelhos (`espelhado`) são ignorados: o canônico é a origem (mesmo userId).
  * Não identifica o dono do conflito (LGPD / UX).
@@ -408,6 +409,7 @@ export async function encontrarConflitoNumeroAssociado(
       numeroAssociado: numero,
       espelhado: false,
       desligadoEm: null,
+      status: { not: 'REPROVADO' },
       userId: { not: opts.userId },
       ...(opts.excludeMembroId ? { id: { not: opts.excludeMembroId } } : {}),
     },
@@ -739,4 +741,29 @@ export async function propagarLgeParaEspelho(
         : {}),
     },
   })
+}
+
+/**
+ * Bloqueio de novas solicitações: o usuário está barrado NESTE tenant?
+ *
+ * O escopo é HERDADO para baixo, sem cópia por unidade: um bloqueio gravado na
+ * Sede vale para todas as subsedes/PDEs descendentes; um bloqueio gravado numa
+ * unidade vale só naquele ramo e NÃO sobe para a Sede. Por isso a consulta olha
+ * o próprio tenant + seus ANCESTRAIS (nunca os descendentes).
+ *
+ * Bloqueio é sobre o USUÁRIO, não sobre a linha de `SaasMembro`: vale mesmo que
+ * a pessoa nunca tenha se cadastrado, e sobrevive ao registro ser apagado.
+ */
+export async function estaBloqueadoNoTenant(
+  userId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const ancestrais: string[] = await getAncestorTenantIds(tenantId)
+  const escopo = [tenantId, ...ancestrais]
+
+  const bloqueio: { id: string } | null = await db.membroBloqueio.findFirst({
+    where: { userId, tenantId: { in: escopo } },
+    select: { id: true },
+  })
+  return bloqueio !== null
 }

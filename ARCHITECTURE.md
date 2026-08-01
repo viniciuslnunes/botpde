@@ -1047,6 +1047,88 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
   2=rivalidade+departamento; 3=enriquecimento por API. Validação prévia pelos
   agentes `data-model` e `rbac` antes de codar via `implementation`.
 
+### 5.13 Canal restrito da unidade — isolamento derivado em leitura (2026-08-01)
+
+R5 da governança hierárquica: a liderança de uma unidade Caso B pode fechar o
+canal, retirando a unidade da malha de **interação** sem tocar em nenhum dado.
+Spec: `docs/data/modulo-canal-restrito.md`.
+
+Decisões estruturais que valem para além do módulo:
+
+- **O corte é derivado em LEITURA, não materializado.** Nada é apagado —
+  aliança, `MembroConversa` e post continuam gravados. O isolamento é um filtro
+  aplicado sobre conjuntos já carregados (`lib/isolamento.ts`), e reabrir o
+  canal é literalmente invalidar cache. Foi o que tornou possível o requisito
+  "ao reativar, todos os relacionamentos voltam automaticamente" sem escrever
+  uma única rotina de restauração.
+- **Expiração derivada > cron.** A reativação automática por silêncio (5 dias) é
+  calculada em `getTenantsRestritos()`, então a regra se cumpre mesmo com o
+  scheduler fora do ar; `/api/cron/canal-restrito-expiracao` só materializa a
+  linha, audita e notifica. Corolário obrigatório: **`Tenant.canalRestrito`
+  nunca é lido direto** — a coluna pode estar `true` com o estado efetivo já
+  `false`.
+- **Estrutural × interação vira uma linha explícita em `hierarquia.ts`.**
+  `getAncestorTenantIds` / `getDescendantTenantIds` /
+  `getTorcidaLineageTenantIds` / `getTorcidaWorktree` / `getTenantHierarquia`
+  são **estruturais** e nunca são gateadas — sustentam governança, espelho de
+  admissão na Sede e o console R1. O gate entra só em `getTenantRelation`,
+  `getVisibleTenantIds`, `getAlliedTenantIds` e nos conjuntos por `afiliacaoId`.
+- **Isolamento de praça social é bidirecional; comunicação institucional não.**
+  A unidade isolada não é vista **e** não vê — feed, canais, stories e busca da
+  Sede somem para ela. O que continua descendo é comunicado e evento, e isso é
+  decidido **por recurso** (`RECURSOS_CASCATA_INSTITUCIONAL` em
+  `packages/types/src/visibility.js`), não por relação. Foi preciso separar o
+  recurso `comunicados` de `comunidade` na matriz de sensibilidade: os dois
+  liam o mesmo conjunto de tenants, e sem a separação cortar o feed da Sede
+  derrubaria junto o comunicado oficial dela.
+- **Fast-path de autorização é o ponto cego típico.** `podeEngajarPostVisivel`
+  tinha um atalho "mesmo clube + PÚBLICO" que retornava `true` **antes** de
+  consultar hierarquia — com ele, qualquer torcedor do clube reagiria em post
+  de unidade isolada (bastava o id do post), e a unidade isolada engajaria na
+  praça de fora. Regra geral que fica: **checagem de isolamento vem antes de
+  qualquer atalho de performance em gate de leitura**.
+- **A relação crua e o rebaixamento ficam separados.**
+  `getTenantRelationCrua` calcula hierarquia/aliança/rivalidade como sempre;
+  `aplicarIsolamento` (pura, em `@torcida/types`, testada) rebaixa depois. A
+  assimetria mora numa função de 6 linhas, não espalhada por dezenas de queries.
+- **Monitoramento cross-tenant nunca passa pelo feed pessoal.** Presidente/Vice
+  leem a comunidade da unidade restrita pelo drill-down R1 com loader dedicado
+  (`listarPostsDaUnidade`), porque injetar a unidade no feed do Presidente
+  vazaria pelo cache compartilhado da Sede.
+
+### 5.14 Bloqueio de membro e hard delete do cadastro (2026-08-01)
+
+Três decisões fechadas sobre o fim do ciclo de vida de um cadastro. Spec e
+tabelas: `docs/data/modulo-associacao.md`.
+
+- **Número de associado é vaga, identidade não é.** `REPROVADO` devolve o
+  `numeroAssociado` ao pool (o valor segue gravado para laudo/histórico), mas
+  CPF/RG/telefone continuam bloqueando mesmo em reprovados. Confundir os dois
+  ou prendia o número para sempre, ou deixaria a mesma pessoa entrar duas vezes.
+  `PENDENTE` ainda ocupa: a solicitação está viva.
+- **Bloqueio é sobre o USUÁRIO e herda só para baixo.** `MembroBloqueio` é uma
+  linha por `(tenant, user)`, sem cópia por unidade;
+  `estaBloqueadoNoTenant` consulta o tenant + **ancestrais**. Bloqueio na Sede
+  cobre as unidades, bloqueio numa unidade não sobe. Materializar por unidade
+  exigiria fan-out a cada nova unidade criada — e um bloqueio esquecido é pior
+  que um bloqueio ausente. Sendo sobre o usuário, vale sem cadastro e sobrevive
+  ao cadastro ser apagado.
+- **Bloquear não desliga, e apagar não desbloqueia.** Bloquear alguém
+  `APROVADO` ativo é recusado, não encadeado com desligamento: são permissões
+  distintas (`members:block` × `members:dismiss`) e encadear escondido apagaria
+  o rastro de quem decidiu o quê. Na outra ponta, `executarPurgeMembro`
+  preserva `AuditLog` e `MembroBloqueio` — senão apagar o cadastro viraria a
+  porta dos fundos para reentrar.
+- **`members:purge` precisa de exclusão explícita.** `SYSTEM_ROLE_PERMISSIONS`
+  monta os pacotes de admin e vice como `ALL_PERMISSIONS.filter(...)`, então
+  toda permissão nova cai neles por padrão. Manter o hard delete só com o owner
+  exigiu listá-la nos dois filtros, ao lado de `SETTINGS_MANAGE`; o invariante
+  está travado em `lib/__tests__/rbac.test.ts` porque é silencioso ao quebrar.
+- **Uma semântica, duas portas.** A Server Action do tenant e a rota do
+  super-admin compartilham `lib/membros-purge.ts` (regra + execução). O
+  super-admin tem gate diferente (allowlist de e-mail, cross-tenant), não regra
+  de negócio diferente.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o

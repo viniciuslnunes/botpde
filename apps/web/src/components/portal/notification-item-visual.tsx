@@ -4,6 +4,8 @@ import {
   Handshake,
   Heart,
   IdCard,
+  Lock,
+  LockOpen,
   Mail,
   Megaphone,
   MessageCircle,
@@ -82,6 +84,10 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   PATRIMONIO_RESPONSAVEL_DEFINIDO: UserCog,
   PEDIDO_RECEBIDO: PackageCheck,
   SOLICITACAO_UNIDADE_CRIADA: MapPin,
+  CANAL_RESTRITO_ATIVADO: Lock,
+  CANAL_REATIVACAO_SOLICITADA: LockOpen,
+  CANAL_REATIVACAO_RECUSADA: ShieldOff,
+  CANAL_REATIVADO: LockOpen,
 }
 
 export interface NotificacaoAtorInfo {

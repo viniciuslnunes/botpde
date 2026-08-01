@@ -2,7 +2,15 @@
 
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
-import { wouldCreateSedeCycle, invalidateHierarchyCache } from '@/lib/hierarquia'
+import {
+  getDescendantTenantIds,
+  wouldCreateSedeCycle,
+  invalidateHierarchyCache,
+} from '@/lib/hierarquia'
+import { ExpectedError } from '@/lib/expected-error'
+import { PRAZO_REATIVACAO_DIAS, prazoReativacaoAPartirDe } from '@/lib/isolamento'
+import { getEstadoCanalRestrito, temSolicitacaoEmAberto } from '@/lib/canal-restrito'
+import { notificarUnidadeSobreCanal, reabrirCanal } from '@/lib/canal-restrito-mutacoes'
 import {
   validarHierarquiaSede,
   validarRebaixamentoComFilhos,
@@ -14,7 +22,7 @@ import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured } from '@/lib/
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { assertPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { ensureCanalOficialParaSede, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
 import { notificarSafe } from '@/lib/notificacoes'
@@ -991,4 +999,144 @@ export async function promoverSedeAction(sedeId: string): Promise<PromoverSedeAc
     filhosMovidos: result.filhosMovidos,
     message: `Unidade promovida ao tenant “${result.novoSlug}” (${result.membrosMigrados} membros, ${result.filhosMovidos} filhos).`,
   }
+}
+
+// ── R5 — Canal restrito: ações da Sede sobre unidades isoladas ────────────────
+
+const solicitacaoReativacaoSchema = z.object({
+  tenantId: z.string().uuid('Unidade inválida'),
+  mensagem: z
+    .string()
+    .trim()
+    .max(600, 'Use no máximo 600 caracteres.')
+    .optional()
+    .transform((v) => (v ? v : null)),
+})
+
+/**
+ * Presidente/Vice pedem à liderança que reabra o canal de uma unidade.
+ * A liderança tem `PRAZO_REATIVACAO_DIAS` para responder; passado o prazo sem
+ * resposta, o canal é reativado sozinho (a expiração é derivada na leitura —
+ * ver `lib/isolamento.ts`).
+ */
+export async function solicitarReativacaoCanal(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPresidenteGlobal()
+
+  const parsed = solicitacaoReativacaoSchema.safeParse({
+    tenantId: String(formData.get('tenantId') ?? ''),
+    mensagem: String(formData.get('mensagem') ?? ''),
+  })
+  if (!parsed.success) {
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos.')
+  }
+
+  const alvo = await assertUnidadeRestritaDaTorcida(tenant.id, parsed.data.tenantId)
+
+  if (await temSolicitacaoEmAberto(alvo.id)) {
+    throw new ExpectedError('Já existe uma solicitação de reativação aguardando resposta.')
+  }
+
+  const agora = new Date()
+  const solicitacao = await db.solicitacaoReativacaoCanal.create({
+    data: {
+      tenantId: alvo.id,
+      solicitanteTenantId: tenant.id,
+      solicitadoPorId: session.user.id,
+      mensagem: parsed.data.mensagem,
+      prazoEm: prazoReativacaoAPartirDe(agora),
+    },
+    select: { id: true, prazoEm: true },
+  })
+
+  await db.auditLog.createMany({
+    data: [tenant.id, alvo.id].map((tenantId) => ({
+      tenantId,
+      atorId: session.user.id,
+      acao: 'CANAL_REATIVACAO_SOLICITADA',
+      entidade: 'SolicitacaoReativacaoCanal',
+      entidadeId: solicitacao.id,
+      detalhes: { unidadeId: alvo.id, prazoEm: solicitacao.prazoEm.toISOString() },
+    })),
+  })
+
+  revalidatePath('/admin/sedes')
+  await notificarUnidadeSobreCanal(alvo.id, session.user.id, {
+    tipo: 'CANAL_REATIVACAO_SOLICITADA',
+    titulo: 'A Sede pediu a reabertura do canal',
+    corpo: `Você tem ${PRAZO_REATIVACAO_DIAS} dias para responder. Sem resposta até lá, o canal é reaberto automaticamente.`,
+  })
+}
+
+const imposicaoSchema = z.object({
+  tenantId: z.string().uuid('Unidade inválida'),
+  motivo: z
+    .string()
+    .trim()
+    .min(10, 'Explique em pelo menos 10 caracteres.')
+    .max(600, 'Use no máximo 600 caracteres.'),
+})
+
+/**
+ * Último recurso da Sede: o owner (Presidente) impõe a reabertura mesmo após
+ * recusa da liderança. Sem esta saída, a regra teria um furo — como o silêncio
+ * reabre em 5 dias, recusar seria a jogada dominante para isolar para sempre.
+ * Exige justificativa, fica registrada nos dois tenants e notifica a unidade.
+ */
+export async function imporReativacaoCanal(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPresidenteGlobal()
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const parsed = imposicaoSchema.safeParse({
+    tenantId: String(formData.get('tenantId') ?? ''),
+    motivo: String(formData.get('motivo') ?? ''),
+  })
+  if (!parsed.success) {
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos.')
+  }
+
+  const alvo = await assertUnidadeRestritaDaTorcida(tenant.id, parsed.data.tenantId)
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'CANAL_REATIVACAO_IMPOSTA',
+      entidade: 'Tenant',
+      entidadeId: alvo.id,
+      detalhes: { unidadeId: alvo.id, motivo: parsed.data.motivo },
+    },
+  })
+
+  await reabrirCanal({
+    tenantId: alvo.id,
+    tenantNome: alvo.nome,
+    atorId: session.user.id,
+    acao: 'CANAL_REATIVACAO_IMPOSTA',
+    statusSolicitacao: 'IMPOSTA',
+    motivo: parsed.data.motivo,
+    corpoNotificacao: `A Sede determinou a reabertura do canal. Motivo: ${parsed.data.motivo}`,
+  })
+}
+
+/** Alvo precisa ser unidade descendente desta torcida E estar com canal restrito. */
+async function assertUnidadeRestritaDaTorcida(
+  sedeTenantId: string,
+  alvoTenantId: string,
+): Promise<{ id: string; nome: string }> {
+  const descendentes = await getDescendantTenantIds(sedeTenantId)
+  if (!descendentes.includes(alvoTenantId)) {
+    throw new ExpectedError('Esta unidade não pertence à sua torcida.')
+  }
+
+  const estado = await getEstadoCanalRestrito(alvoTenantId)
+  if (!estado.restrito) {
+    throw new ExpectedError('O canal desta unidade já está aberto.')
+  }
+
+  const alvo: { id: string; nome: string } | null = await db.tenant.findUnique({
+    where: { id: alvoTenantId },
+    select: { id: true, nome: true },
+  })
+  if (!alvo) throw new ExpectedError('Unidade não encontrada.')
+  return alvo
 }

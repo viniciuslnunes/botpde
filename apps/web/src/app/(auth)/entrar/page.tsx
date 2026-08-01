@@ -1,12 +1,23 @@
 import { signIn } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
+import { destinoInternoSeguro } from '@/lib/callback-url'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { EntrarSenhaForm } from './entrar-senha-form'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Entrar' }
 
-export default async function EntrarPage() {
+export default async function EntrarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>
+}) {
+  const { callbackUrl } = await searchParams
+  // Convite de unidade (`/convite/<slug>`) e o `callbackUrl` do proxy entram
+  // por aqui; sem isso o destino se perde no login e o link não leva a lugar
+  // nenhum. Validado como caminho interno relativo (anti open redirect).
+  const destino = destinoInternoSeguro(callbackUrl) ?? '/auth/contexto'
+
   const tenant = await getTenantFromHost()
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
@@ -60,7 +71,7 @@ export default async function EntrarPage() {
               <form
                 action={async () => {
                   'use server'
-                  await signIn('discord', { redirectTo: '/auth/contexto' })
+                  await signIn('discord', { redirectTo: destino })
                 }}
               >
                 <button
@@ -83,7 +94,7 @@ export default async function EntrarPage() {
               <form
                 action={async () => {
                   'use server'
-                  await signIn('google', { redirectTo: '/auth/contexto' })
+                  await signIn('google', { redirectTo: destino })
                 }}
               >
                 <button
@@ -103,7 +114,7 @@ export default async function EntrarPage() {
               </div>
 
               {/* E-mail e senha */}
-              <EntrarSenhaForm corPrimaria={cor} />
+              <EntrarSenhaForm corPrimaria={cor} callbackUrl={destino} />
             </div>
           </div>
 

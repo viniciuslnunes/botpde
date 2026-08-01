@@ -17,7 +17,8 @@
     "audit:hierarquia": "vitest run --config vitest.audit.config.ts src/lib/__audit__/hierarquia.audit.ts",
     "audit:notificacoes": "vitest run --config vitest.audit.config.ts src/lib/__audit__/notificacoes.audit.ts",
     "audit:mensageria": "vitest run --config vitest.audit.config.ts src/lib/__audit__/mensageria.audit.ts",
-    "audit:loja": "vitest run --config vitest.audit.config.ts src/lib/__audit__/loja.audit.ts"
+    "audit:loja": "vitest run --config vitest.audit.config.ts src/lib/__audit__/loja.audit.ts",
+    "audit:canal-restrito": "vitest run --config vitest.audit.config.ts src/lib/__audit__/canal-restrito.audit.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

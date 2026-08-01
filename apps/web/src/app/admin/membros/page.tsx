@@ -1,14 +1,18 @@
 import { Suspense, type ReactNode } from 'react'
 import { db, type Prisma } from '@torcida/db'
 import { redirect } from 'next/navigation'
-import { Users, UserCheck, UserX, Clock } from 'lucide-react'
+import { Users, UserCheck, UserMinus, UserX, Clock } from 'lucide-react'
 import {
   PERMISSIONS,
+  calculateEffectivePermissions,
   formatNomeTorcida,
+  hasPermission,
   labelCategoriaReprovacao,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
-import { tenantsAreRivais } from '@/lib/hierarquia'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { getAncestorTenantIds, tenantsAreRivais } from '@/lib/hierarquia'
 import {
   distribuirMembros,
   resumirFilaPendentes,
@@ -66,7 +70,12 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membros — Admin' }
 
-type StatusFilter = StatusMembrosInsight
+/**
+ * Desligado NÃO é um `status` de `SaasMembro` (é `desligadoEm`), mas é uma tab
+ * do mesmo eixo para quem opera a base. Fica só aqui: `StatusMembrosInsight`
+ * segue com os três status reais, e a tab cai no painel "Todos".
+ */
+type StatusFilter = StatusMembrosInsight | 'DESLIGADO'
 
 const SPEC = LISTAGEM_MEMBROS
 
@@ -108,6 +117,7 @@ function parseStatusFiltro(valor: string | undefined): StatusFilter {
     case 'PENDENTE':
     case 'APROVADO':
     case 'REPROVADO':
+    case 'DESLIGADO':
       return valor
     default:
       return 'TODOS'
@@ -145,6 +155,8 @@ function descricaoInsights(status: StatusFilter, periodoLabel: string): string {
       return `Base aprovada · aprovações e desligamentos em ${periodoLabel} vs período anterior.`
     case 'REPROVADO':
       return `Reprovações em ${periodoLabel} vs período anterior · reenvio × definitivo · motivos.`
+    case 'DESLIGADO':
+      return `Cadastros desligados · o painel mantém a visão geral da base em ${periodoLabel}.`
     default:
       return `${periodoLabel} vs período anterior · evolução mensal da base.`
   }
@@ -510,11 +522,55 @@ export default async function MembrosPage({
 }) {
   // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
   // esconder o link no menu não basta, a URL direta precisa ser bloqueada.
+  let session: Awaited<ReturnType<typeof assertPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.MEMBERS_VIEW))
+    ;({ session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_VIEW))
   } catch {
     redirect('/admin')
+  }
+
+  // Aba Acessos do card de detalhes: `roles:manage`, a mesma permissão do
+  // Controle de acesso. Esconder a aba é só affordance — `carregarAcessoMembro`
+  // e `salvarAcessoUsuario` barram quem não tem, venha de onde vier.
+  let podeGerirAcessos = isSuperAdminEmail(session.user.email)
+  if (!podeGerirAcessos && session.user.id) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      tenant.id,
+    )
+    podeGerirAcessos = hasPermission(
+      calculateEffectivePermissions(rolePermissions, overrides),
+      PERMISSIONS.ROLES_MANAGE,
+    )
+  }
+
+  // Ações de bloqueio: `members:block`. Esconder o botão é só affordance —
+  // `bloquearMembro`/`desbloquearMembro` barram quem não tem, venha de onde vier.
+  let podeBloquear = isSuperAdminEmail(session.user.email)
+  if (!podeBloquear && session.user.id) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      tenant.id,
+    )
+    podeBloquear = hasPermission(
+      calculateEffectivePermissions(rolePermissions, overrides),
+      PERMISSIONS.MEMBERS_BLOCK,
+    )
+  }
+
+  // Hard delete: `members:purge`, fora dos pacotes de admin e vice — na
+  // prática Presidente e super-admin. `apagarMembroDefinitivo` revalida.
+  let podeApagar = isSuperAdminEmail(session.user.email)
+  if (!podeApagar && session.user.id) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      tenant.id,
+    )
+    podeApagar = hasPermission(
+      calculateEffectivePermissions(rolePermissions, overrides),
+      PERMISSIONS.MEMBERS_PURGE,
+    )
   }
 
   const params = await searchParams
@@ -556,8 +612,16 @@ export default async function MembrosPage({
   const where: Prisma.SaasMembroWhereInput = montarWhereListagem(SPEC, listagem, {
     escopo: { tenantId: tenant.id },
   })
+  // A tab Desligados usa a mesma chave `status` na URL (um eixo só para quem
+  // opera), mas no banco o critério é `desligadoEm` — troca a condição que a
+  // spec montou, senão viraria `status: 'DESLIGADO'`, que não existe.
+  if (statusFiltro === 'DESLIGADO') {
+    delete where.status
+    where.desligadoEm = { not: null }
+  }
 
-  const [membros, total, contagens, sedes, departamentosOpts] = await Promise.all([
+  const [membros, total, contagens, totalDesligados, sedes, departamentosOpts] =
+    await Promise.all([
     db.saasMembro.findMany({
       where,
       include: {
@@ -575,6 +639,9 @@ export default async function MembrosPage({
       where: { tenantId: tenant.id },
       _count: true,
     }),
+    // Desligado corta os três status (é ortogonal), então a contagem da tab
+    // sai de uma query própria em vez de somar buckets do groupBy.
+    db.saasMembro.count({ where: { tenantId: tenant.id, desligadoEm: { not: null } } }),
     db.sede.findMany({
       where: { tenantId: tenant.id, ativa: true },
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
@@ -712,6 +779,19 @@ export default async function MembrosPage({
     membros.map((m: (typeof membros)[number]) => m.userId),
   )
 
+  // Bloqueios em lote (nunca por linha). Inclui os ancestrais: um bloqueio na
+  // Sede vale aqui, e a lista precisa mostrar isso em vez de oferecer "Bloquear"
+  // para quem já está barrado de cima.
+  const escopoBloqueio = [tenant.id, ...(await getAncestorTenantIds(tenant.id))]
+  const bloqueios: { userId: string }[] = await db.membroBloqueio.findMany({
+    where: {
+      tenantId: { in: escopoBloqueio },
+      userId: { in: membros.map((m: (typeof membros)[number]) => m.userId) },
+    },
+    select: { userId: true },
+  })
+  const bloqueadosUserIds = [...new Set(bloqueios.map((b) => b.userId))]
+
   const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
   for (const r of reprovacoesOutrosTenants) {
     reprovacoesOutraTorcidaPorUser.set(
@@ -791,6 +871,12 @@ export default async function MembrosPage({
       label: 'Reprovados',
       icon: <UserX className={tabIconClass} aria-hidden />,
       count: count.REPROVADO,
+    },
+    {
+      status: 'DESLIGADO',
+      label: 'Desligados',
+      icon: <UserMinus className={tabIconClass} aria-hidden />,
+      count: totalDesligados,
     },
   ]
 
@@ -909,6 +995,10 @@ export default async function MembrosPage({
           ))}
           spec={SPEC}
           params={listagem}
+          podeGerirAcessos={podeGerirAcessos}
+          podeBloquear={podeBloquear}
+          podeApagar={podeApagar}
+          bloqueadosUserIds={bloqueadosUserIds}
           membros={membros.map((membro: (typeof membros)[number]) =>
             mapToAdminMembroItem(
               {

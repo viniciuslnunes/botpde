@@ -4,7 +4,12 @@ import { db, Prisma } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes, tagFeedNacional } from './comunidade-cache'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
-import { getVisibleTenantIds } from './hierarquia'
+import { getAncestorTenantIds, getVisibleTenantIds } from './hierarquia'
+import {
+  ISOLAMENTO_CACHE_TAG,
+  filtrarTenantsRestritos,
+  isTenantRestrito,
+} from './isolamento'
 import {
   getAutoresSemAcesso,
   getContagensSeguimentoEmLote,
@@ -642,18 +647,30 @@ async function getDescobrirPostsBaseCached(
 ): Promise<PostSocialItem[]> {
   const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
   const cursorKey = cursor ? `${cursor.criadoEmIso}:${cursor.id}` : 'start'
+  // R5 — ancestrais entram só pelo comunicado oficial quando o canal está
+  // restrito; na operação normal a lista é vazia e o `where` não muda.
+  const somenteComunicado = await resolveTenantIdsSomenteComunicado(tenantId)
+  const somenteComunicadoKey = [...somenteComunicado].sort().join(',')
 
   const cached = await unstable_cache(
     async () => {
       const cursorWhere = buildCursorWhere(cursor)
       const postsRaw = (await db.post.findMany({
         where: {
-          tenantId: { in: visibleTenantIds },
-          visibilidade: 'PUBLICO',
           oculto: false,
           ...escopoFeedSemConversa,
           ...cursorWhere,
-          OR: [{ tipo: 'MEMBRO' }, { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } }],
+          OR: compactOr([
+            {
+              tenantId: { in: visibleTenantIds },
+              visibilidade: 'PUBLICO',
+              OR: [
+                { tipo: 'MEMBRO' },
+                { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } },
+              ],
+            },
+            ...orSomenteComunicadoOficial(somenteComunicado),
+          ]),
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: fetchLimit,
@@ -661,8 +678,15 @@ async function getDescobrirPostsBaseCached(
       })) as PostRaw[]
       return postsRaw.map(projetarPost)
     },
-    ['feed-descobrir-base', tenantId, visibleTenantIdsKey, cursorKey, String(fetchLimit)],
-    { revalidate: 60, tags: [tagFeedDescobrir(tenantId)] },
+    [
+      'feed-descobrir-base',
+      tenantId,
+      visibleTenantIdsKey,
+      somenteComunicadoKey,
+      cursorKey,
+      String(fetchLimit),
+    ],
+    { revalidate: 60, tags: [tagFeedDescobrir(tenantId), ISOLAMENTO_CACHE_TAG] },
   )()
 
   return cached.map(revivePostSocialItem)
@@ -723,11 +747,46 @@ export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocia
  * da Comunidade Nacional do clube. Usado também em reagir/comentar para o
  * engajamento cobrir o mesmo conjunto que a UI lista.
  */
+/**
+ * R5 — tenants de onde a unidade isolada aceita SÓ o comunicado oficial.
+ *
+ * O comunicado é um único `Post` INSTITUCIONAL no tenant de quem publicou (não
+ * há fan-out por unidade — ver `criarComunicado`). Como o canal restrito tira
+ * o ancestral do conjunto do feed, sem esta exceção o comunicado da Sede
+ * sumiria da praça — e ele é a ÚNICA publicação externa que a unidade isolada
+ * deve enxergar.
+ */
+export async function resolveTenantIdsSomenteComunicado(
+  tenantId: string,
+): Promise<string[]> {
+  if (!(await isTenantRestrito(tenantId))) return []
+  return getAncestorTenantIds(tenantId)
+}
+
+/** `where` de post que libera exclusivamente o comunicado oficial. */
+export function orSomenteComunicadoOficial(tenantIds: string[]): Prisma.PostWhereInput[] {
+  if (tenantIds.length === 0) return []
+  return [
+    {
+      tenantId: { in: tenantIds },
+      tipo: 'INSTITUCIONAL',
+      comunicadoOrigemId: { not: null },
+      visibilidade: 'PUBLICO',
+      oculto: false,
+    },
+  ]
+}
+
 export async function resolveVisibleTenantIdsForFeed(
   tenantId: string,
   userId: string | undefined,
 ): Promise<string[]> {
   const base = await getVisibleTenantIds(tenantId, 'comunidade')
+
+  // R5 — canal restrito: a unidade isolada não recebe nem a Comunidade
+  // Nacional, nem as coirmãs, nem o feed da Sede. O comunicado oficial do
+  // ancestral entra por fora, via `resolveTenantIdsSomenteComunicado`.
+  if (await isTenantRestrito(tenantId)) return base
 
   const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
     where: { id: tenantId },
@@ -759,7 +818,9 @@ export async function resolveVisibleTenantIdsForFeed(
     where: { afiliacaoId: tenant.afiliacaoId, ativo: true, sintetico: false },
     select: { id: true },
   })
-  return [...new Set([...comSintetico, ...siblings.map((s) => s.id)])]
+  // R5 — coirmã com canal restrito não entra no feed de ninguém.
+  const siblingsAbertas = await filtrarTenantsRestritos(siblings.map((s) => s.id))
+  return [...new Set([...comSintetico, ...siblingsAbertas])]
 }
 
 export const getPostsParaFeed = cache(async function getPostsParaFeed(
@@ -1232,12 +1293,21 @@ export async function getPostPorId(
   tenantId: string,
   viewerId: string,
 ): Promise<PostSocialItem | null> {
-  const visibleTenantIds = await resolveVisibleTenantIdsForFeed(tenantId, viewerId)
+  const [visibleTenantIds, somenteComunicado] = await Promise.all([
+    resolveVisibleTenantIdsForFeed(tenantId, viewerId),
+    // R5 — o permalink precisa abrir o mesmo comunicado que o card do feed
+    // mostra; sem isto o link do comunicado da Sede daria 404 na unidade
+    // isolada, que é justamente a publicação externa que ela pode ver.
+    resolveTenantIdsSomenteComunicado(tenantId),
+  ])
   const raw: PostRaw | null = (await db.post.findFirst({
     where: {
       id: postId,
-      tenantId: { in: visibleTenantIds },
       oculto: false,
+      OR: compactOr([
+        { tenantId: { in: visibleTenantIds } },
+        ...orSomenteComunicadoOficial(somenteComunicado),
+      ]),
     },
     include: postInclude(viewerId),
   })) as PostRaw | null

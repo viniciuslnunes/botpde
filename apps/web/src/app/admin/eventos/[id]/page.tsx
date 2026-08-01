@@ -1,6 +1,4 @@
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, TIPO_EVENTO_LABEL } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
@@ -37,14 +35,15 @@ export default async function AdminEventoDetailPage({
   const { id } = await params
   const aba = parseAba((await searchParams).tab)
 
+  // Sessão e tenant vêm do próprio gate (tenant ativo), não do host.
+  let session: Awaited<ReturnType<typeof assertPermission>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+    ;({ session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE))
   } catch {
     redirect('/admin')
   }
-
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/portal')
+  if (!session.user?.id) redirect('/portal')
 
   type SedeLite = { id: string; nome: string; capacidade: number | null }
   type RsvpRow = {

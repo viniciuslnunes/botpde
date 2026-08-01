@@ -25,6 +25,7 @@ import {
   springSnappy,
 } from '@/lib/motion-presets'
 import { TabHistorico } from './membro-historico-tab'
+import { TabAcesso } from './membro-acesso-tab'
 import type { AdminMembroItem } from './admin-membro-item'
 
 type TabId =
@@ -34,6 +35,7 @@ type TabId =
   | 'documentos'
   | 'associacao'
   | 'operacao'
+  | 'acessos'
   | 'historico'
 
 /** Aba onde cada ponto do catálogo é exibido — usada para o badge vermelho. */
@@ -849,9 +851,25 @@ function TabOperacao({ membro, rep }: { membro: AdminMembroItem; rep: Set<string
 export function MembroDetalheModal({
   membro,
   onClose,
+  podeGerirAcessos = false,
+  podeBloquear = false,
+  bloqueado = false,
+  podeApagar = false,
 }: {
   membro: AdminMembroItem | null
   onClose: () => void
+  /** `members:block` do admin logado — libera bloquear/desbloquear no card. */
+  podeBloquear?: boolean
+  /** Já bloqueado neste tenant (ou herdado da Sede). */
+  bloqueado?: boolean
+  /** `members:purge` do admin logado — libera apagar de vez. */
+  podeApagar?: boolean
+  /**
+   * `roles:manage` do admin logado — resolvido no servidor pela página que
+   * monta a lista. Só esconde a aba; o gate de verdade está em
+   * `carregarAcessoMembro` e em `salvarAcessoUsuario`.
+   */
+  podeGerirAcessos?: boolean
 }) {
   const [tab, setTab] = useState<TabId>('resumo')
 
@@ -928,6 +946,11 @@ export function MembroDetalheModal({
       id: 'operacao',
       label: 'Operação',
       badgeReprovado: reprovadosNaTab('operacao') || undefined,
+    },
+    {
+      id: 'acessos',
+      label: 'Acessos',
+      hide: !podeGerirAcessos,
     },
     { id: 'historico', label: 'Histórico' },
   ]
@@ -1103,6 +1126,9 @@ export function MembroDetalheModal({
               {tab === 'documentos' && <TabDocumentos membro={membro} docs={docs} />}
               {tab === 'associacao' && <TabAssociacao membro={membro} rep={pontosReprovados} />}
               {tab === 'operacao' && <TabOperacao membro={membro} rep={pontosReprovados} />}
+              {tab === 'acessos' && podeGerirAcessos && (
+                <TabAcesso key={membro.id} membroId={membro.id} />
+              )}
               {tab === 'historico' && <TabHistorico key={membro.id} membroId={membro.id} />}
             </div>
 
@@ -1126,6 +1152,11 @@ export function MembroDetalheModal({
                 nomeMembro={membro.nome}
                 isSocio={membro.isSocio}
                 areaPendenteEfetivacao={membro.areaPendenteEfetivacao}
+                podeBloquear={podeBloquear}
+                userId={membro.userId}
+                bloqueado={bloqueado}
+                podeApagar={podeApagar}
+                desligado={!!membro.desligadoEmLabel}
                 pontosIncompletos={[
                   ...new Set(
                     [...checks, ...docs].filter((c) => c.obrigatorio && !c.ok).map((c) => c.id),

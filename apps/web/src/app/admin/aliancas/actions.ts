@@ -7,6 +7,8 @@ import { z } from 'zod'
 import { assertAliancasManage } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
 import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
+import { isTenantRestrito } from '@/lib/isolamento'
+import { ExpectedError } from '@/lib/expected-error'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import { formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
@@ -26,6 +28,19 @@ async function invalidateAliancaHierarchy(origemId: string, aliadoId: string): P
   ])
   for (const id of new Set([...lineA, ...lineB])) {
     invalidateHierarchyCache(id)
+  }
+}
+
+/**
+ * R5 — canal restrito: enquanto a unidade está isolada, nenhuma aliança NOVA
+ * pode ser firmada (nem proposta, nem aceita). As alianças já ATIVAS continuam
+ * gravadas e apenas inertes — voltam sozinhas quando o canal reabre.
+ */
+async function assertCanalNaoRestrito(tenantId: string): Promise<void> {
+  if (await isTenantRestrito(tenantId)) {
+    throw new ExpectedError(
+      'O canal desta unidade está restrito. Reative o canal em Configurações para firmar alianças.',
+    )
   }
 }
 
@@ -51,6 +66,7 @@ function assertStatus(alianca: Alianca, expected: StatusAlianca): void {
  */
 export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   const { session, tenant } = await assertAliancasManage()
+  await assertCanalNaoRestrito(tenant.id)
 
   const parsed = uuidSchema.safeParse(tenantAliadoId)
   if (!parsed.success) throw new Error('Torcida aliada inválida')
@@ -180,6 +196,7 @@ export async function proporAliancaFromRecomendacao(recomendacaoId: string): Pro
 
 export async function aceitarAlianca(aliancaId: string): Promise<void> {
   const { session, tenant } = await assertAliancasManage()
+  await assertCanalNaoRestrito(tenant.id)
 
   const parsed = uuidSchema.safeParse(aliancaId)
   if (!parsed.success) throw new Error('Aliança inválida')

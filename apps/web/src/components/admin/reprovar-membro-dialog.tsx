@@ -33,6 +33,8 @@ interface ReprovarMembroDialogProps {
   pontosSugeridos?: string[]
   /** Aviso extra quando a decisão vale para Sede e unidade de origem. */
   avisoEspelho?: string | null
+  /** `members:block`. Sem ela o bloqueio nem aparece — o servidor revalida. */
+  podeBloquear?: boolean
   onFechar: () => void
   reprovar: (input: ReprovarMembroInput) => Promise<unknown>
 }
@@ -47,6 +49,7 @@ export function ReprovarMembroDialog({
   isSocio = true,
   pontosSugeridos,
   avisoEspelho,
+  podeBloquear = false,
   onFechar,
   reprovar,
 }: ReprovarMembroDialogProps) {
@@ -54,6 +57,7 @@ export function ReprovarMembroDialog({
   const [motivo, setMotivo] = useState('')
   const [pontos, setPontos] = useState<string[]>(() => pontosSugeridos ?? [])
   const [permiteReenvio, setPermiteReenvio] = useState(true)
+  const [bloquear, setBloquear] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [tentouEnviar, setTentouEnviar] = useState(false)
 
@@ -106,12 +110,16 @@ export function ReprovarMembroDialog({
             motivo: motivo.trim(),
             pontos,
             permiteReenvio,
+            bloquear: podeBloquear && bloquear,
           }),
         {
           success: 'Reprovação registrada.',
-          successDescription: permiteReenvio
-            ? 'A pessoa foi avisada e pode corrigir o cadastro.'
-            : 'A pessoa foi avisada. O reenvio ficou bloqueado.',
+          successDescription:
+            podeBloquear && bloquear
+              ? 'A pessoa foi avisada e ficou bloqueada nesta unidade.'
+              : permiteReenvio
+                ? 'A pessoa foi avisada e pode corrigir o cadastro.'
+                : 'A pessoa foi avisada. O reenvio ficou bloqueado.',
           errorFallback: 'Não foi possível registrar a reprovação.',
         },
       )
@@ -310,6 +318,25 @@ export function ReprovarMembroDialog({
                   </span>
                 </span>
               </label>
+
+              {podeBloquear && (
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={bloquear}
+                    onChange={(e) => setBloquear(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span className="text-sm text-[rgb(var(--foreground))]">
+                    Bloquear novas solicitações nesta unidade
+                    <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                      {bloquear
+                        ? 'A pessoa não consegue mais se cadastrar aqui nem nas unidades abaixo desta, até alguém remover o bloqueio.'
+                        : 'Só reprova esta solicitação. A pessoa segue livre para tentar de novo.'}
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">

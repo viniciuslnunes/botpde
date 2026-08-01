@@ -29,6 +29,10 @@ export const ROTA_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
   BAR_COMANDA_VENCIDA: '/admin/bar/comandas',
   BAR_TURNO_DIVERGENCIA: '/admin/bar/pdv',
   BAR_ESTORNO_ANOMALO: '/admin/bar/estornos',
+  CANAL_RESTRITO_ATIVADO: '/admin/sedes',
+  CANAL_REATIVACAO_SOLICITADA: '/admin/configuracoes',
+  CANAL_REATIVACAO_RECUSADA: '/admin/sedes',
+  CANAL_REATIVADO: '/admin/sedes',
 }
 
 /** Menu do sidebar admin associado ao tipo, se houver badge operacional. */

@@ -7,7 +7,14 @@ import { Mail, Lock, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Input, SubmitButton, hexToRgb } from '@torcida/ui'
 import Link from 'next/link'
 
-export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
+export function EntrarSenhaForm({
+  corPrimaria = '#7c3aed',
+  callbackUrl,
+}: {
+  corPrimaria?: string
+  /** Destino a retomar depois do login (ex.: convite de unidade). */
+  callbackUrl?: string
+}) {
   const [state, action] = useActionState<LoginSenhaState, FormData>(entrarComSenha, {})
   const [mostrarSenha, setMostrarSenha] = useState(false)
 
@@ -15,6 +22,7 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
     <div className="space-y-3">
       <form action={action} className="space-y-3">
         <AuthRedirectEffect redirectTo={state.redirectTo} />
+        {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
         {state.message && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
             {state.message}

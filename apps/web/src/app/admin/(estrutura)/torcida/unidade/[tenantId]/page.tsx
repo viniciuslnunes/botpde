@@ -1,5 +1,15 @@
 import { redirect } from 'next/navigation'
-import { Beer, Building2, CalendarDays, Lock, MapPin, ShieldCheck, Users, Wallet } from 'lucide-react'
+import {
+  Beer,
+  Building2,
+  CalendarDays,
+  Lock,
+  MapPin,
+  MessageSquare,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
 import { formatarMoedaBRL, formatDataCompetenciaInput, formatNomeTorcida } from '@torcida/types'
@@ -8,9 +18,11 @@ import { listarEventosDaUnidade, type EventoUnidadeItem } from '@/lib/eventos'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
 import {
   listarMembrosDaUnidade,
+  listarPostsDaUnidade,
   resumoBarDaUnidade,
   type BarVendaUnidadeItem,
   type MembroUnidadeItem,
+  type PostUnidadeItem,
 } from '@/lib/unidade-oversight'
 import {
   parseFiltroFinanceiro,
@@ -33,7 +45,7 @@ type Props = {
   searchParams: Promise<FinanceiroSearchParams & { modulo?: string }>
 }
 
-const MODULOS = ['financeiro', 'agenda', 'bar', 'membros'] as const
+const MODULOS = ['financeiro', 'agenda', 'bar', 'membros', 'comunidade'] as const
 type ModuloUnidade = (typeof MODULOS)[number]
 
 function parseModulo(valor: string | undefined): ModuloUnidade {
@@ -84,6 +96,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
     modulo === 'agenda' ? await listarEventosDaUnidade(tenantId) : []
   const bar = modulo === 'bar' ? await resumoBarDaUnidade(tenantId) : null
   const membros = modulo === 'membros' ? await listarMembrosDaUnidade(tenantId) : null
+  const comunidade = modulo === 'comunidade' ? await listarPostsDaUnidade(tenantId) : null
 
   const itens: LancamentoRow[] = (lista?.itens ?? []).map((l) => ({
     id: l.id,
@@ -122,6 +135,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
           { id: 'agenda', label: 'Agenda', icon: <CalendarDays className={ICONE_TAB} /> },
           { id: 'bar', label: 'Bar', icon: <Beer className={ICONE_TAB} /> },
           { id: 'membros', label: 'Membros', icon: <Users className={ICONE_TAB} /> },
+          { id: 'comunidade', label: 'Comunidade', icon: <MessageSquare className={ICONE_TAB} /> },
         ]}
         basePath={basePath}
         activeId={modulo}
@@ -231,8 +245,64 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
         </section>
       </MotionReveal>
       )}
+
+      {modulo === 'comunidade' && comunidade && (
+      <MotionReveal>
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+              {comunidade.total} publicaç{comunidade.total === 1 ? 'ão' : 'ões'}
+            </p>
+            <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+              <Lock className="h-3.5 w-3.5" />
+              Acompanhamento — sem publicar, reagir ou comentar
+            </span>
+          </div>
+
+          {comunidade.itens.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+              Esta unidade ainda não tem publicações.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              {comunidade.itens.map((p) => (
+                <PostLinha key={p.id} p={p} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </MotionReveal>
+      )}
       </div>
     </div>
+  )
+}
+
+function PostLinha({ p }: { p: PostUnidadeItem }) {
+  return (
+    <li className="px-4 py-3">
+      <p className="line-clamp-3 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
+        {p.conteudo}
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[rgb(var(--foreground-muted))]">
+        <span>{p.autorNome ?? 'Autor removido'}</span>
+        <span>·</span>
+        <span>{dtFmt.format(p.criadoEm)}</span>
+        <span className="rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-semibold">
+          {p.visibilidade}
+        </span>
+        {p.oculto && (
+          <span className="rounded bg-[rgb(var(--foreground)_/_0.08)] px-1.5 py-0.5 text-[10px] font-semibold">
+            Oculto
+          </span>
+        )}
+        <span>·</span>
+        <span>
+          {p.totalReacoes} reaç{p.totalReacoes === 1 ? 'ão' : 'ões'} · {p.totalComentarios}{' '}
+          coment{p.totalComentarios === 1 ? 'ário' : 'ários'}
+        </span>
+      </p>
+    </li>
   )
 }
 

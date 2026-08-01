@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -13,14 +12,13 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Categorias — Loja Admin' }
 
 export default async function AdminCategoriasPage() {
+  // Tenant do próprio gate (tenant ativo), não do host.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.STORE_MANAGE)
+    ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
     redirect('/admin')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const categorias = await db.saasCategoria.findMany({
     where: { tenantId: tenant.id },

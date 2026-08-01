@@ -14,6 +14,12 @@ export const PERMISSIONS = /** @type {const} */ ({
   /** Desligamento estatutário (LGE) — distinto de bloqueio. */
   MEMBERS_DISMISS: 'members:dismiss',
   MEMBERS_EXPORT_LGE: 'members:export_lge',
+  /**
+   * Apagar de vez o cadastro (hard delete), depois de reprovado/desligado.
+   * Só Presidente (owner) e super-admin — ver `SYSTEM_ROLE_PERMISSIONS`, que
+   * exclui esta permissão dos pacotes de admin e vice.
+   */
+  MEMBERS_PURGE: 'members:purge',
 
   // Loja
   STORE_VIEW_ORDERS: 'store:view_orders',
@@ -111,6 +117,7 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.MEMBERS_WARN, label: 'Advertir membros' },
       { key: PERMISSIONS.MEMBERS_BLOCK, label: 'Bloquear membros' },
       { key: PERMISSIONS.MEMBERS_DISMISS, label: 'Desligar associado (estatutário)' },
+      { key: PERMISSIONS.MEMBERS_PURGE, label: 'Apagar cadastro definitivamente' },
       { key: PERMISSIONS.MEMBERS_EXPORT_LGE, label: 'Exportar cadastro LGE (CSV)' },
       { key: PERMISSIONS.MEMBERS_IMPORT, label: 'Importar base de associados' },
     ],
@@ -370,14 +377,18 @@ export const SYSTEM_ROLE_PERMISSIONS = {
   [SYSTEM_ROLES.OWNER]: ALL_PERMISSIONS,
   // Admin comum NÃO tem visão global da torcida nem decide afiliação —
   // só Presidente (owner) e Vice.
+  // `MEMBERS_PURGE` é hard delete do cadastro: fica só com o Presidente
+  // (owner) e o super-admin. Sem excluí-la aqui, admin e vice a herdariam de
+  // graça — `ALL_PERMISSIONS` é a base dos dois pacotes.
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
     (p) =>
       p !== PERMISSIONS.SETTINGS_MANAGE &&
       p !== PERMISSIONS.TORCIDA_GLOBAL_VIEW &&
-      p !== PERMISSIONS.AFFILIATION_MANAGE,
+      p !== PERMISSIONS.AFFILIATION_MANAGE &&
+      p !== PERMISSIONS.MEMBERS_PURGE,
   ),
   [SYSTEM_ROLES.VICE]: ALL_PERMISSIONS.filter(
-    (p) => p !== PERMISSIONS.SETTINGS_MANAGE,
+    (p) => p !== PERMISSIONS.SETTINGS_MANAGE && p !== PERMISSIONS.MEMBERS_PURGE,
   ),
   [SYSTEM_ROLES.MEMBER]: [
     PERMISSIONS.COMMUNITY_POST,

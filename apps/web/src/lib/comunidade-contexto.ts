@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
+import { filtrarTenantsRestritos } from '@/lib/isolamento'
 import {
   COR_PRIMARIA_PLATAFORMA,
   designFromPrimary,
@@ -207,14 +208,21 @@ export async function getOrCreateComunidadeNacionalTenant(
   }
 }
 
-/** IDs de tenants ativos do mesmo clube (feed nacional agregado). */
+/**
+ * IDs de tenants ativos do mesmo clube (feed nacional agregado).
+ *
+ * R5 — unidades com canal restrito ficam de fora: este conjunto é a base da
+ * Comunidade Nacional (feed nacional, grupos nacionais, busca), e o isolamento
+ * corta justamente a interação com quem está fora da unidade. Filtro aplicado
+ * aqui, no ponto único, em vez de espalhado por cada consumidor.
+ */
 export const getTenantIdsPorAfiliacao = cache(async (afiliacaoId: string): Promise<string[]> => {
   const tenants: { id: string }[] = await db.tenant.findMany({
     where: { afiliacaoId, ativo: true },
     select: { id: true },
     orderBy: { nome: 'asc' },
   })
-  return tenants.map((t) => t.id)
+  return filtrarTenantsRestritos(tenants.map((t) => t.id))
 })
 
 /**

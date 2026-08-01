@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import type { InboxItemDto } from './mensageria-client'
 import { canFollowUser } from './social'
+import { getTenantsRestritos } from './isolamento'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 
@@ -346,6 +347,64 @@ async function vinculosSocioOuCargo(userIds: string[]): Promise<Array<{ userId: 
   return out
 }
 
+/**
+ * R5 — canal restrito segrega a DM. Ao contrário de `vinculosSocioOuCargo`,
+ * conta também o vínculo TORCEDOR: quem entrou numa unidade isolada pelo
+ * convite é torcedor DELA, e o isolamento vale para ele igual.
+ */
+async function tenantsDoUsuarioParaIsolamento(
+  userIds: string[],
+): Promise<Map<string, Set<string>>> {
+  const [membros, cargos]: [
+    Array<{ userId: string; tenantId: string }>,
+    Array<{ userId: string; tenantId: string }>,
+  ] = await Promise.all([
+    db.saasMembro.findMany({
+      where: { userId: { in: userIds }, status: 'APROVADO', desligadoEm: null },
+      select: { userId: true, tenantId: true },
+    }),
+    db.userRole.findMany({
+      where: { userId: { in: userIds }, tenant: { ativo: true, sintetico: false } },
+      select: { userId: true, tenantId: true },
+    }),
+  ])
+
+  const porUsuario = new Map<string, Set<string>>()
+  for (const id of userIds) porUsuario.set(id, new Set())
+  for (const v of [...membros, ...cargos]) {
+    porUsuario.get(v.userId)?.add(v.tenantId)
+  }
+  return porUsuario
+}
+
+/**
+ * Bloqueia a DM quando um dos lados vive SÓ dentro de unidades com canal
+ * restrito e os dois não compartilham nenhuma delas.
+ *
+ * Quem tem qualquer vínculo aberto (o caso do Presidente da Sede, por exemplo)
+ * não é afetado — o isolamento fecha a unidade para fora, não prende quem tem
+ * vida fora dela.
+ */
+async function isParSeparadoPorCanalRestrito(userA: string, userB: string): Promise<boolean> {
+  const [restritos, tenantsPorUsuario] = await Promise.all([
+    getTenantsRestritos(),
+    tenantsDoUsuarioParaIsolamento([userA, userB]),
+  ])
+  if (restritos.size === 0) return false
+
+  const aTenants = tenantsPorUsuario.get(userA) ?? new Set<string>()
+  const bTenants = tenantsPorUsuario.get(userB) ?? new Set<string>()
+
+  const soRestrito = (tenants: Set<string>): boolean =>
+    tenants.size > 0 && [...tenants].every((t) => restritos.has(t))
+
+  if (!soRestrito(aTenants) && !soRestrito(bTenants)) return false
+
+  // Compartilhar a mesma unidade restrita é justamente o que continua valendo:
+  // a comunidade interna segue funcionando para quem pertence a ela.
+  return ![...aTenants].some((t) => bTenants.has(t))
+}
+
 async function isParRivalSocio(userA: string, userB: string): Promise<boolean> {
   const vinculos = await vinculosSocioOuCargo([userA, userB])
   const aV = vinculos.filter((v) => v.userId === userA)
@@ -455,6 +514,7 @@ export async function avaliarAcessoDm(
   if (remetenteId === destinatarioId) return 'bloqueado'
   if (await temBloqueioMutuo(remetenteId, destinatarioId)) return 'bloqueado'
   if (await isParRivalSocio(remetenteId, destinatarioId)) return 'bloqueado'
+  if (await isParSeparadoPorCanalRestrito(remetenteId, destinatarioId)) return 'bloqueado'
 
   const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
   if (existente) {

@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import { Bell } from 'lucide-react'
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { TipoNotificacao } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { contextoAdmin } from '@/lib/admin-modulos'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AdminMarcarTodasLidasButton } from '@/app/admin/notificacoes/admin-marcar-todas-lidas-button'
@@ -26,11 +25,10 @@ type NotificacaoAdminRow = {
 }
 
 export default async function AdminNotificacoesPage() {
-  const session = await auth()
-  if (!session?.user?.id) redirect('/entrar')
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
+  // Notificação é por (tenant, usuário): o tenant tem de ser o ativo, o mesmo
+  // que gerou o badge no menu — ver `contextoAdmin`.
+  const { session, tenant } = await contextoAdmin()
+  if (!session.user?.id) redirect('/entrar')
 
   await reconciliarPropostasAliancaPendentes(tenant.id)
 

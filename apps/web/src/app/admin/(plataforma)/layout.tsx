@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { KeyRound, Palette, Plug, ScrollText, Scale, Settings, SlidersHorizontal } from 'lucide-react'
-import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
-import { getTenantFromHost } from '@/lib/tenant'
+import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
 import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
@@ -16,10 +15,8 @@ const ICONE = 'h-4 w-4 shrink-0'
  * `/admin/auditoria` mantêm suas URLs — nenhum deep link quebra.
  */
 export default async function PlataformaModuloLayout({ children }: { children: ReactNode }) {
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/admin')
-
-  const permissoes = await permissoesEfetivasNoAdmin()
+  // Tenant e permissões da mesma fonte — ver `contextoAdmin`.
+  const { tenant, permissoes } = await contextoAdmin()
 
   const tabs = montarTabsModulo('plataforma', permissoes, {
     geral: { icon: <SlidersHorizontal className={ICONE} /> },

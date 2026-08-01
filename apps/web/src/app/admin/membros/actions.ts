@@ -28,7 +28,15 @@ import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import { diffCamposMembro } from '@/lib/membro-audit-diff'
 import {
+  executarPurgeMembro,
+  membroPurgeSelect,
+  motivoImpedeApagar,
+  type MembroParaPurge,
+} from '@/lib/membros-purge'
+import {
   AtualizarMembroLgeSchema,
+  BloquearMembroSchema,
+  DesbloquearMembroSchema,
   DesligarMembroSchema,
   formatDataCompetenciaInput,
   formatNomeTorcida,
@@ -700,6 +708,11 @@ export type ReprovarMembroInput = {
   pontos: string[]
   /** false = reprovação definitiva; bloqueia o reenvio pelo solicitante. */
   permiteReenvio: boolean
+  /**
+   * true = além de reprovar, bloqueia novas solicitações na unidade ONDE a
+   * solicitação nasceu. Exige `members:block` — revalidado no servidor.
+   */
+  bloquear?: boolean
 }
 
 export async function reprovarMembro(
@@ -712,7 +725,14 @@ export async function reprovarMembro(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Dados da reprovação inválidos.' }
   }
-  const { categoria, motivo: motivoTrim, pontos, permiteReenvio } = parsed.data
+  const { categoria, motivo: motivoTrim, pontos, permiteReenvio, bloquear } = parsed.data
+
+  // Reprovar é `members:reject`; bloquear é `members:block`. Revalidado ANTES
+  // de reprovar: quem não pode bloquear não deve ter a reprovação aplicada
+  // pela metade, sem o bloqueio que pediu.
+  if (bloquear) {
+    await assertPermission(PERMISSIONS.MEMBERS_BLOCK)
+  }
 
   const aprovadoPorNome = session.user.name ?? 'Admin'
   const aprovadoPorId = session.user.id
@@ -877,11 +897,49 @@ export async function reprovarMembro(
   }
   await marcarSolicitacoesLidas(origem.userId, tenantIdsNotif)
 
+  // Bloqueio vai para o tenant da UNIDADE de origem — é lá que a solicitação
+  // nasceu e é lá que novas tentativas devem bater. Herda para os descendentes
+  // dessa unidade, não para a Sede acima dela.
+  if (bloquear) {
+    const jaBloqueado: { id: string } | null = await db.membroBloqueio.findUnique({
+      where: { tenantId_userId: { tenantId: origem.tenantId, userId: origem.userId } },
+      select: { id: true },
+    })
+    if (!jaBloqueado) {
+      const bloqueio: { id: string } = await db.membroBloqueio.create({
+        data: {
+          tenantId: origem.tenantId,
+          userId: origem.userId,
+          motivo: motivoTrim,
+          bloqueadoPorId: aprovadoPorId,
+          bloqueadoPorNome: aprovadoPorNome,
+        },
+        select: { id: true },
+      })
+      await db.auditLog.create({
+        data: {
+          tenantId: origem.tenantId,
+          atorId: aprovadoPorId,
+          acao: 'MEMBRO_BLOQUEADO',
+          entidade: 'MembroBloqueio',
+          entidadeId: bloqueio.id,
+          detalhes: {
+            userId: origem.userId,
+            motivo: motivoTrim,
+            origem: 'reprovacao',
+            membroOrigemId: origem.id,
+          },
+        },
+      })
+    }
+  }
+
   const detalhesAudit = {
     categoria,
     motivo: motivoTrim,
     pontos,
     permiteReenvio,
+    bloqueado: bloquear,
     membroOrigemId: origem.id,
     espelhoId,
     decididoEmTenantId,
@@ -1171,6 +1229,8 @@ export async function atualizarDadosLge(
   return { ok: true }
 }
 
+type CarteirinhaRevogada = { id: string; numeroSocio: number; nome: string }
+
 export async function desligarMembro(
   _prev: MembroLgeState,
   formData: FormData,
@@ -1218,6 +1278,36 @@ export async function desligarMembro(
       ? await limparMembershipDepartamentos(espelho.tenantId, espelho.userId, tx)
       : null
     await desligarEspelhoDaOrigem(tx, membro.id, parsed.data.motivo)
+
+    // Desligamento revoga a carteirinha: o `numeroSocio` volta ao pool da torcida.
+    const carteirinhas: CarteirinhaRevogada[] = []
+    for (const alvo of [
+      { tenantId: tenant.id, userId: membro.userId },
+      ...(espelho ? [{ tenantId: espelho.tenantId, userId: espelho.userId }] : []),
+    ]) {
+      const socio: CarteirinhaRevogada | null = await tx.saasSocio.findFirst({
+        where: { tenantId: alvo.tenantId, userId: alvo.userId },
+        select: { id: true, numeroSocio: true, nome: true },
+      })
+      if (!socio) continue
+      await tx.saasSocio.delete({ where: { id: socio.id } })
+      await tx.auditLog.create({
+        data: {
+          tenantId: alvo.tenantId,
+          atorId: session.user.id,
+          acao: 'SOCIO_CARTEIRINHA_REVOGADA',
+          entidade: 'SaasSocio',
+          entidadeId: socio.id,
+          detalhes: {
+            nome: socio.nome,
+            numeroSocio: socio.numeroSocio,
+            motivo: 'desligamento',
+          },
+        },
+      })
+      carteirinhas.push(socio)
+    }
+
     await tx.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -1225,7 +1315,12 @@ export async function desligarMembro(
         acao: 'MEMBRO_DESLIGADO',
         entidade: 'SaasMembro',
         entidadeId: membro.id,
-        detalhes: { motivo: parsed.data.motivo, ...limpeza, limpezaEspelho },
+        detalhes: {
+          motivo: parsed.data.motivo,
+          ...limpeza,
+          limpezaEspelho,
+          carteirinhasRevogadas: carteirinhas.map((c) => c.numeroSocio),
+        },
       },
     })
     return { espelhoTenantId: espelho?.tenantId ?? null }
@@ -1239,6 +1334,7 @@ export async function desligarMembro(
   invalidarCachesComunidadeFeed(tenant.id)
   revalidatePath('/admin/membros')
   revalidatePath(`/admin/membros/${membro.id}`)
+  revalidatePath('/admin/socios')
   return { ok: true }
 }
 
@@ -1382,4 +1478,135 @@ export async function reatribuirSedeMembro(
   revalidatePath('/admin/sedes')
   revalidatePath('/admin/torcida')
   return { ok: true }
+}
+
+/**
+ * Bloqueia o usuário nesta torcida/unidade: novas solicitações de cadastro
+ * passam a ser recusadas aqui e em todas as unidades DESCENDENTES
+ * (`estaBloqueadoNoTenant` herda para baixo). O bloqueio é sobre o usuário, não
+ * sobre a linha de `SaasMembro` — sobrevive ao cadastro ser apagado.
+ *
+ * Não desliga ninguém: desligamento é `members:dismiss`, permissão distinta, e
+ * encadear as duas escondido apagaria o rastro de quem decidiu o quê.
+ */
+export async function bloquearMembro(
+  userId: string,
+  motivo: string,
+): Promise<{ error: string } | void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_BLOCK)
+
+  const parsed = BloquearMembroSchema.safeParse({ userId, motivo })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Dados do bloqueio inválidos.' }
+  }
+
+  const jaBloqueado: { id: string } | null = await db.membroBloqueio.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: parsed.data.userId } },
+    select: { id: true },
+  })
+  if (jaBloqueado) return { error: 'Este usuário já está bloqueado nesta torcida.' }
+
+  // Associado ativo precisa ser desligado antes — bloquear sem desligar deixaria
+  // a pessoa dentro da torcida, com acesso, e apenas barrada de recadastrar.
+  const vinculoAtivo: { id: string } | null = await db.saasMembro.findFirst({
+    where: {
+      tenantId: tenant.id,
+      userId: parsed.data.userId,
+      status: 'APROVADO',
+      desligadoEm: null,
+    },
+    select: { id: true },
+  })
+  if (vinculoAtivo) {
+    return { error: 'Desligue o associado antes de bloquear.' }
+  }
+
+  const bloqueio: { id: string } = await db.membroBloqueio.create({
+    data: {
+      tenantId: tenant.id,
+      userId: parsed.data.userId,
+      motivo: parsed.data.motivo,
+      bloqueadoPorId: session.user.id,
+      bloqueadoPorNome: session.user.name ?? 'Admin',
+    },
+    select: { id: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'MEMBRO_BLOQUEADO',
+      entidade: 'MembroBloqueio',
+      entidadeId: bloqueio.id,
+      detalhes: { userId: parsed.data.userId, motivo: parsed.data.motivo },
+    },
+  })
+
+  revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
+}
+
+/** Remove o bloqueio. Apaga a linha — o histórico fica no `AuditLog`. */
+export async function desbloquearMembro(userId: string): Promise<{ error: string } | void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_BLOCK)
+
+  const parsed = DesbloquearMembroSchema.safeParse({ userId })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Usuário inválido.' }
+  }
+
+  const bloqueio: { id: string; motivo: string } | null = await db.membroBloqueio.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: parsed.data.userId } },
+    select: { id: true, motivo: true },
+  })
+  if (!bloqueio) return { error: 'Este usuário não está bloqueado nesta torcida.' }
+
+  await db.membroBloqueio.delete({ where: { id: bloqueio.id } })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'MEMBRO_DESBLOQUEADO',
+      entidade: 'MembroBloqueio',
+      entidadeId: bloqueio.id,
+      detalhes: { userId: parsed.data.userId, motivo: bloqueio.motivo },
+    },
+  })
+
+  revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
+}
+
+/**
+ * Apaga o cadastro DE VEZ (hard delete), junto com o espelho na Sede e a
+ * carteirinha. Só depois de reprovado ou desligado — cadastro ativo não some
+ * por acidente; para tirar alguém de dentro, o caminho é desligar.
+ *
+ * NÃO apaga o `AuditLog` nem o `MembroBloqueio`: o rastro da decisão precisa
+ * sobreviver ao registro, e apagar o cadastro não pode virar a porta dos fundos
+ * para quem está bloqueado voltar a se inscrever.
+ */
+export async function apagarMembroDefinitivo(
+  membroId: string,
+): Promise<{ error: string } | void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_PURGE)
+
+  const membro: MembroParaPurge | null = await db.saasMembro.findFirst({
+    where: { id: membroId, tenantId: tenant.id },
+    select: membroPurgeSelect,
+  })
+  if (!membro) return { error: 'Membro não encontrado.' }
+
+  const impedimento = motivoImpedeApagar(membro)
+  if (impedimento) return { error: impedimento }
+
+  await executarPurgeMembro(membro, session.user.id)
+
+  invalidarCachesComunidadeFeed(tenant.id)
+  invalidatePermissionsCache(membro.userId, tenant.id)
+  revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
+  revalidatePath('/admin')
 }

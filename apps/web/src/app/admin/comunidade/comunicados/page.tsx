@@ -1,9 +1,8 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { auth } from '@/lib/auth'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { ComunicadosManager } from '@/components/admin/comunicado-forms'
 import { ComunicadoComposerAdmin } from '@/components/admin/comunicado-composer'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -22,11 +21,7 @@ interface ComunicadoRaw {
 }
 
 export default async function AdminComunicadosPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/admin')
-
-  const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
-  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  const { session, tenant, permissoes: effective } = await contextoAdmin()
   if (!hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)) redirect('/admin/comunidade')
 
   const comunicadosRaw: ComunicadoRaw[] = await db.announcement.findMany({

@@ -17,6 +17,12 @@ vi.mock('@/lib/hierarquia', () => ({
   getDescendantTenantIds: (...args: unknown[]) => getDescendantTenantIds(...args),
 }))
 
+// Canal restrito (R5) tem cobertura própria em `canal-restrito.test.ts`; aqui
+// nenhum tenant está isolado, então a vitrine do onboarding é a de sempre.
+vi.mock('@/lib/isolamento', () => ({
+  getTenantsRestritos: vi.fn(async () => new Set<string>()),
+}))
+
 vi.mock('@torcida/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@torcida/db')>()
   return {

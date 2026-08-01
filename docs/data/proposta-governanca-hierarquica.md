@@ -167,6 +167,32 @@ fora até pedir entrada manualmente.
 - **Promoção A→B** — fluxo guiado no console da Sede: "promover unidade a portal
   próprio" (cria tenant-filho + diretoria inicial).
 
+### 4.5 R5 — Canal restrito (2026-08-01)
+
+Regra nova, complementar a R1–R4: a **liderança da unidade** (Caso B) pode
+fechar o canal e sair da malha de **interação** (comunidade nacional, coirmãs,
+aliados, salas, lojas, DMs, onboarding público, busca), mantendo intactas a
+administração e a comunidade **internas**.
+
+Pontos que amarram com o que já estava travado aqui:
+
+- **Não conflita com R1.** A Sede continua enxergando a unidade na estrutura
+  (`getTorcidaWorktree` é estrutural e não foi gateada) e o Presidente/Vice
+  continuam com o drill-down read-only — que ganhou a aba **Comunidade**
+  (`?modulo=comunidade`), justamente para o monitoramento não precisar injetar a
+  unidade restrita no feed pessoal deles.
+- **Não conflita com R2.** O isolamento é decisão da unidade sobre si mesma;
+  não concede nenhum poder dela sobre a Sede.
+- **Assimétrico de propósito.** A unidade some para fora, mas continua
+  `descendant` do ancestral — comunicado/evento institucional segue descendo, e
+  o espelho de admissão (`SaasMembro.espelhado`) segue subindo para a Sede.
+- **A Sede tem o último recurso.** Solicitação de reabertura com prazo de 5 dias
+  (silêncio reabre sozinho) e, após recusa, imposição pelo **owner** com
+  justificativa auditada.
+
+Spec completa (modelo, máquina de estados, matriz de cortes por módulo,
+convite direto): `docs/data/modulo-canal-restrito.md`.
+
 ## 5. Fases de entrega (sequenciamento reconciliado pós-validação)
 
 Ajuste-chave dos três agentes: **R1/R3 só têm sujeito depois que existe Caso B na

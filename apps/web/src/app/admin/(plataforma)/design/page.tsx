@@ -3,8 +3,6 @@ import type { Metadata } from 'next'
 import { db } from '@torcida/db'
 import { resolveTenantDesign } from '@torcida/types'
 import type { TenantDesign } from '@torcida/ui'
-import { getTenantFromHost } from '@/lib/tenant'
-import { auth } from '@/lib/auth'
 import { DesignForm } from '@/components/admin/design-form'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
@@ -12,10 +10,10 @@ import { PERMISSIONS } from '@torcida/types'
 export const metadata: Metadata = { title: 'Design — Admin' }
 
 export default async function DesignPage() {
-  await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!tenant || !session?.user?.id) redirect('/')
+  // Sessão e tenant vêm do gate (tenant ativo): personalizar por host
+  // pintaria a torcida errada.
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  if (!session.user?.id) redirect('/')
 
   type AfiliacaoRow = {
     nome: string

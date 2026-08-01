@@ -1,7 +1,21 @@
 import { cache } from 'react'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
-import { canViewRecurso, formatNomeTorcida, ordenarPar, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
+import {
+  aplicarIsolamento,
+  canViewRecurso,
+  formatNomeTorcida,
+  ordenarPar,
+  recursoCascateiaParaIsolado,
+  relationFromLineage,
+  type RECURSO_SENSIBILIDADE,
+} from '@torcida/types'
+import {
+  ISOLAMENTO_CACHE_TAG,
+  estadoIsolamentoDoPar,
+  filtrarTenantsRestritos,
+  isTenantRestrito,
+} from './isolamento'
 
 export const HIERARCHY_CACHE_TAG = 'tenant-hierarchy'
 
@@ -201,6 +215,11 @@ export async function getTorcidaLineageTenantIds(tenantId: string): Promise<stri
  * lineage de B como aliado (decisão #3 — aliança nível torcida).
  */
 async function getAlliedTenantIdsImpl(tenantId: string): Promise<string[]> {
+  // R5 — canal restrito: a unidade isolada não tem aliados enquanto o canal
+  // estiver fechado. As linhas de `Alianca` continuam gravadas e ATIVAS — só
+  // ficam inertes, e voltam sozinhas quando o canal reabre.
+  if (await isTenantRestrito(tenantId)) return []
+
   const lineage = await getTorcidaLineageTenantIds(tenantId)
   if (lineage.length === 0) return []
 
@@ -231,14 +250,19 @@ async function getAlliedTenantIdsImpl(tenantId: string): Promise<string[]> {
       }
     }),
   )
-  return Array.from(allied)
+  // A contraparte também pode ter fechado o próprio canal — aliança com uma
+  // unidade isolada fica inerte nos dois sentidos.
+  return filtrarTenantsRestritos(Array.from(allied))
 }
 
 export const getAlliedTenantIds = cache(async (tenantId: string): Promise<string[]> => {
   return unstable_cache(
     () => getAlliedTenantIdsImpl(tenantId),
     ['allied-tenants', tenantId],
-    { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+    {
+      revalidate: 300,
+      tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId), ISOLAMENTO_CACHE_TAG],
+    },
   )()
 })
 
@@ -248,6 +272,10 @@ export const getAlliedTenantIds = cache(async (tenantId: string): Promise<string
  */
 export async function tenantsAreAllied(tenantAId: string, tenantBId: string): Promise<boolean> {
   if (tenantAId === tenantBId) return true
+
+  // R5 — canal restrito de qualquer um dos lados suspende a aliança.
+  const { atorRestrito, alvoRestrito } = await estadoIsolamentoDoPar(tenantAId, tenantBId)
+  if (atorRestrito || alvoRestrito) return false
 
   const [lineageA, lineageB] = await Promise.all([
     getTorcidaLineageTenantIds(tenantAId),
@@ -312,6 +340,22 @@ async function getTenantRelationImpl(
 ): Promise<TenantRelation> {
   if (actorTenantId === targetTenantId) return 'self'
 
+  // R5 — canal restrito: a relação CRUA é calculada normal e depois rebaixada
+  // por `aplicarIsolamento` (pura, testada em @torcida/types). Manter a ordem
+  // importa: quem é ancestral continua ancestral na ESTRUTURA (governança,
+  // espelho de membro, console do Presidente) — o que muda é só a malha de
+  // interação derivada desta relação.
+  const [crua, estado] = await Promise.all([
+    getTenantRelationCrua(actorTenantId, targetTenantId),
+    estadoIsolamentoDoPar(actorTenantId, targetTenantId),
+  ])
+  return aplicarIsolamento(crua, estado)
+}
+
+async function getTenantRelationCrua(
+  actorTenantId: string,
+  targetTenantId: string,
+): Promise<TenantRelation> {
   const actorSede = await findSedeRaiz(actorTenantId)
 
   if (actorSede) {
@@ -355,6 +399,9 @@ export const getTenantRelation = cache(
           HIERARCHY_CACHE_TAG,
           hierarchyCacheTag(actorTenantId),
           hierarchyCacheTag(targetTenantId),
+          // Sem esta tag, ligar/desligar o canal restrito levaria até 300s
+          // para refletir na relação — o toggle precisa ser imediato.
+          ISOLAMENTO_CACHE_TAG,
         ],
       },
     )()
@@ -379,16 +426,26 @@ async function getVisibleTenantIdsImpl(
   const descendentes = await getDescendantTenantIds(tenantId)
 
   if (!canViewRecurso('descendant', recurso)) {
-    return Array.from(new Set([tenantId, ...descendentes]))
+    return filtrarTenantsRestritos([...new Set([tenantId, ...descendentes])], tenantId)
   }
 
-  const [ancestrais, aliados] = await Promise.all([
+  const [ancestrais, aliados, atorRestrito] = await Promise.all([
     getAncestorTenantIds(tenantId),
     getAlliedTenantIds(tenantId),
+    isTenantRestrito(tenantId),
   ])
 
-  const ids = new Set([tenantId, ...ancestrais, ...descendentes, ...aliados])
-  return Array.from(ids)
+  // R5 — a unidade com canal restrito sai da praça social nos DOIS sentidos:
+  // não é vista e também não vê. O que continua descendo do ancestral é só a
+  // comunicação institucional (comunicado, evento) — daí o corte ser por
+  // recurso, e não uma regra única de hierarquia.
+  const ancestraisVisiveis =
+    atorRestrito && !recursoCascateiaParaIsolado(recurso) ? [] : ancestrais
+
+  const ids = new Set([tenantId, ...ancestraisVisiveis, ...descendentes, ...aliados])
+  // Nenhuma unidade restrita entra no conjunto de ninguém. `manter = tenantId`
+  // preserva o próprio: a comunidade interna dela segue intacta.
+  return filtrarTenantsRestritos(Array.from(ids), tenantId)
 }
 
 export const getVisibleTenantIds = cache(
@@ -399,7 +456,10 @@ export const getVisibleTenantIds = cache(
     return unstable_cache(
       () => getVisibleTenantIdsImpl(tenantId, recurso),
       ['visible-tenants', tenantId, recurso],
-      { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+      {
+        revalidate: 300,
+        tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId), ISOLAMENTO_CACHE_TAG],
+      },
     )()
   },
 )

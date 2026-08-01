@@ -12,6 +12,7 @@ import {
   getTorcidaLineageTenantIds,
   getVisibleTenantIds,
 } from './hierarquia'
+import { getTenantsRestritos } from './isolamento'
 import {
   postInclude,
   projetarPost,
@@ -760,7 +761,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
   afiliacaoId: string,
   userId?: string,
 ): Promise<CanalItem[]> {
-  const rows: Array<{
+  const rowsBrutas: Array<{
     id: string
     tenantId: string
     nome: string | null
@@ -796,6 +797,11 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       _count: { select: { membros: { where: { saiuEm: null } } } },
     },
   })
+
+  // R5 — vitrine da CN não passa por `podeVerCanal` (visibilidade PUBLICO já é
+  // o critério), então o canal de uma unidade restrita precisa ser cortado aqui.
+  const restritos = await getTenantsRestritos()
+  const rows = rowsBrutas.filter((row) => !restritos.has(row.tenantId))
 
   const memberships: Array<{
     conversaId: string

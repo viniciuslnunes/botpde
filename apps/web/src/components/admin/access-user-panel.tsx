@@ -110,13 +110,24 @@ export function AccessUserPanel({
   departamentos,
   tipoSede,
   onClose,
+  variant = 'pagina',
 }: {
   usuario: AccessUsuario
   roles: AccessRoleOpt[]
   departamentos: AccessDepartamentoOpt[]
   tipoSede: string
   onClose: () => void
+  /**
+   * `pagina` — painel autônomo de `/admin/acessos`: card com identidade da
+   * pessoa, back-link e `StickyPersistBar`.
+   * `embutido` — dentro de um contêiner que já identifica a pessoa (aba
+   * Acessos do card de membro). Sem cabeçalho duplicado e com rodapé de ações
+   * **no fluxo**: a `StickyPersistBar` é um portal `fixed z-20` e ficaria atrás
+   * do backdrop do modal (`z-50`).
+   */
+  variant?: 'pagina' | 'embutido'
 }) {
+  const embutido = variant === 'embutido'
   const [aba, setAba] = useState<PainelAba>('perfis')
   const [pending, startTransition] = useTransition()
   const [roles, setRoles] = useState<AccessRoleOpt[]>(rolesProp)
@@ -521,35 +532,54 @@ export function AccessUserPanel({
       id={formId}
       onSubmit={handleSubmit}
       data-persist-bar-root=""
-      className="flex w-full flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
+      className={
+        embutido
+          ? 'flex w-full flex-col overflow-hidden rounded-xl border border-[rgb(var(--border))]'
+          : 'flex w-full flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm'
+      }
     >
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-6">
-        <button
-          type="button"
-          onClick={() => void handleClose()}
-          className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Voltar à lista
-        </button>
+        {!embutido && (
+          <button
+            type="button"
+            onClick={() => void handleClose()}
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar à lista
+          </button>
+        )}
         <div className="flex items-start gap-3 sm:gap-4">
-          {usuario.avatarUrl ? (
-            <img
-              src={usuario.avatarUrl}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
-            />
-          ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-white sm:h-14 sm:w-14">
-              {initials(nomeExibicao)}
-            </div>
-          )}
+          {!embutido &&
+            (usuario.avatarUrl ? (
+              <img
+                src={usuario.avatarUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
+              />
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-white sm:h-14 sm:w-14">
+                {initials(nomeExibicao)}
+              </div>
+            ))}
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold text-[rgb(var(--foreground))] sm:text-xl">
-              {nomeExibicao}
-            </h2>
-            {usuario.email && (
-              <p className="truncate text-sm text-[rgb(var(--foreground-muted))]">{usuario.email}</p>
+            {embutido ? (
+              // O card de membro já mostra quem é; aqui basta confirmar sobre
+              // quem a alteração vai recair, para não restar dúvida.
+              <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                Acesso de {nomeExibicao}
+              </p>
+            ) : (
+              <>
+                <h2 className="truncate text-lg font-semibold text-[rgb(var(--foreground))] sm:text-xl">
+                  {nomeExibicao}
+                </h2>
+                {usuario.email && (
+                  <p className="truncate text-sm text-[rgb(var(--foreground-muted))]">
+                    {usuario.email}
+                  </p>
+                )}
+              </>
             )}
             <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
               <span className="rounded-full bg-[rgb(var(--surface))] px-2 py-0.5">
@@ -744,40 +774,68 @@ export function AccessUserPanel({
         )}
       </div>
 
-      <StickyPersistBar
-        locked={unsavedChanges.length > 0 || pending || salvandoPerfil}
-        dirtyLabel={
-          unsavedChanges.length > 0
-            ? unsavedChanges.length === 1
-              ? unsavedChanges[0]
-              : `${unsavedChanges.length} alterações — ${unsavedChanges.slice(0, 2).join(', ')}${unsavedChanges.length > 2 ? '…' : ''}`
-            : undefined
+      {(() => {
+        const acoes = (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleClose()}
+              disabled={pending || salvandoPerfil}
+              className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            >
+              <X className="h-3.5 w-3.5" />
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              disabled={pending || salvandoPerfil}
+              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {pending || salvandoPerfil ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              Salvar acesso
+            </button>
+          </>
+        )
+
+        // Embutido: rodapé no fluxo, colado no fim do painel. A barra fixa é um
+        // portal no `body` com z-20 — dentro de um modal z-50 ela sumiria atrás
+        // do backdrop, e o usuário ficaria sem botão de salvar.
+        if (embutido) {
+          return (
+            <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 sm:px-6">
+              {unsavedChanges.length > 0 && (
+                <p className="mr-auto text-xs text-[rgb(var(--foreground-muted))]">
+                  {unsavedChanges.length === 1
+                    ? unsavedChanges[0]
+                    : `${unsavedChanges.length} alterações não salvas`}
+                </p>
+              )}
+              {acoes}
+            </div>
+          )
         }
-        hint="Role para explorar. Ao alterar perfis ou permissões, salve aqui."
-      >
-        <button
-          type="button"
-          onClick={() => void handleClose()}
-          disabled={pending || salvandoPerfil}
-          className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <X className="h-3.5 w-3.5" />
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          form={formId}
-          disabled={pending || salvandoPerfil}
-          className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-        >
-          {pending || salvandoPerfil ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Check className="h-3.5 w-3.5" />
-          )}
-          Salvar acesso
-        </button>
-      </StickyPersistBar>
+
+        return (
+          <StickyPersistBar
+            locked={unsavedChanges.length > 0 || pending || salvandoPerfil}
+            dirtyLabel={
+              unsavedChanges.length > 0
+                ? unsavedChanges.length === 1
+                  ? unsavedChanges[0]
+                  : `${unsavedChanges.length} alterações — ${unsavedChanges.slice(0, 2).join(', ')}${unsavedChanges.length > 2 ? '…' : ''}`
+                : undefined
+            }
+            hint="Role para explorar. Ao alterar perfis ou permissões, salve aqui."
+          >
+            {acoes}
+          </StickyPersistBar>
+        )
+      })()}
 
       {modalNovoPerfil && (
         <div

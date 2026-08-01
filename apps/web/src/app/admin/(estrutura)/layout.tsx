@@ -4,8 +4,7 @@ import { Building2, ClipboardCheck, Eye, MapPin, Network } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { tenantIsAdministracaoSede } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
-import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
+import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
 import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
@@ -19,10 +18,9 @@ const ICONE = 'h-4 w-4 shrink-0'
  * deep links e o `Notificacao.link` já gravado de `SOLICITACAO_UNIDADE_CRIADA`.
  */
 export default async function EstruturaModuloLayout({ children }: { children: ReactNode }) {
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/admin')
-
-  const permissoes = await permissoesEfetivasNoAdmin()
+  // Tenant e permissões da mesma fonte: header, contagem e tabs sempre falam do
+  // mesmo tenant ativo (ver `contextoAdmin`).
+  const { tenant, permissoes } = await contextoAdmin()
 
   // Console global e fila de afiliação só existem na Sede principal (tipo SEDE):
   // liderança de subsede/PDE tem owner ('*'), mas as etapas não se aplicam.

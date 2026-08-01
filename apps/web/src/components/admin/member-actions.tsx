@@ -1,14 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, X, RotateCcw, UserPlus } from 'lucide-react'
+import { Ban, Check, X, RotateCcw, Trash2, UserPlus } from 'lucide-react'
 import {
+  apagarMembroDefinitivo,
   aprovarMembro,
+  bloquearMembro,
+  desbloquearMembro,
   efetivarAreaPretendida,
   reprovarMembro,
   reverterMembro,
 } from '@/app/admin/membros/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { BloquearMembroDialog } from './bloquear-membro-dialog'
 import { ReprovarMembroDialog } from './reprovar-membro-dialog'
 
 interface MemberActionsProps {
@@ -33,6 +37,16 @@ interface MemberActionsProps {
    * `undefined` = a tela não calculou; não mostra a ação.
    */
   areaPendenteEfetivacao?: boolean
+  /** `members:block`. Sem ela as ações de bloqueio não aparecem. */
+  podeBloquear?: boolean
+  /** Usuário por trás do cadastro — o bloqueio é sobre ele, não sobre a ficha. */
+  userId?: string | null
+  /** Já bloqueado neste tenant (ou herdado da Sede). */
+  bloqueado?: boolean
+  /** `members:purge` — só Presidente e super-admin. Hard delete do cadastro. */
+  podeApagar?: boolean
+  /** Desligado: junto com REPROVADO, é o que habilita apagar de vez. */
+  desligado?: boolean
 }
 
 export function MemberActions({
@@ -47,9 +61,15 @@ export function MemberActions({
   isSocio,
   pontosIncompletos,
   areaPendenteEfetivacao,
+  podeBloquear = false,
+  userId,
+  bloqueado = false,
+  podeApagar = false,
+  desligado = false,
 }: MemberActionsProps) {
   const confirmAction = useConfirmAction()
   const [reprovarAberto, setReprovarAberto] = useState(false)
+  const [bloquearAberto, setBloquearAberto] = useState(false)
   const depto = departamentoNome?.trim() || null
   const via = aprovadoNaUnidadeNome?.trim()
   const quem = aprovadoPorNome?.trim()
@@ -143,10 +163,75 @@ export function MemberActions({
           ? `Solicitação via ${via}. A reprovação encerra a análise na Sede e na unidade.`
           : null
       }
+      podeBloquear={podeBloquear}
       onFechar={() => setReprovarAberto(false)}
       reprovar={(input) => reprovarMembro(membroId, input)}
     />
   )
+
+  async function handleBloqueio(alvoUserId: string) {
+    if (!bloqueado) {
+      setBloquearAberto(true)
+      return
+    }
+    await confirmAction({
+      titulo: 'Remover o bloqueio?',
+      descricao: 'A pessoa volta a poder enviar solicitações para esta unidade.',
+      labelConfirmar: 'Desbloquear',
+      cancelled: 'Bloqueio mantido.',
+      run: () => desbloquearMembro(alvoUserId),
+      success: 'Bloqueio removido.',
+    })
+  }
+
+  // Bloqueio é sobre o usuário e sobrevive ao cadastro: fica disponível fora da
+  // fila (reprovado/desligado), nunca sobre quem está em análise — para isso o
+  // caminho é reprovar com bloqueio, numa decisão só.
+  const acaoBloqueio =
+    podeBloquear && userId && status !== 'PENDENTE' ? (
+      <button
+        onClick={() => void handleBloqueio(userId)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+      >
+        <Ban className="h-3.5 w-3.5" />
+        {bloqueado ? 'Desbloquear' : 'Bloquear'}
+      </button>
+    ) : null
+
+  async function handleApagar() {
+    await confirmAction({
+      titulo: 'Apagar este cadastro de vez?',
+      descricao:
+        'O cadastro e a carteirinha somem da torcida e das unidades. O registro de auditoria e um bloqueio, se houver, permanecem. Não dá para desfazer.',
+      labelConfirmar: 'Apagar',
+      variante: 'destructive',
+      cancelled: 'Cadastro mantido.',
+      run: () => apagarMembroDefinitivo(membroId),
+      success: 'Cadastro apagado.',
+    })
+  }
+
+  // Hard delete só depois de reprovado/desligado — o servidor repete a regra.
+  const acaoApagar =
+    podeApagar && (status === 'REPROVADO' || desligado) ? (
+      <button
+        onClick={() => void handleApagar()}
+        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--color-danger))] transition-colors hover:underline"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Apagar
+      </button>
+    ) : null
+
+  const dialogoBloquear = userId ? (
+    <BloquearMembroDialog
+      key={bloquearAberto ? 'bloquear-aberto' : 'bloquear-fechado'}
+      aberto={bloquearAberto}
+      nomeMembro={nomeMembro}
+      onFechar={() => setBloquearAberto(false)}
+      bloquear={(motivo) => bloquearMembro(userId, motivo)}
+    />
+  ) : null
 
   if (status === 'PENDENTE') {
     return (
@@ -222,6 +307,9 @@ export function MemberActions({
           )}
         </>
       )}
+      {acaoBloqueio}
+      {acaoApagar}
+      {dialogoBloquear}
     </div>
   )
 }

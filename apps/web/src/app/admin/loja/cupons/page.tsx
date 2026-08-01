@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -18,14 +17,13 @@ function formatarValor(tipo: string, valor: unknown) {
 }
 
 export default async function AdminCuponsPage() {
+  // Tenant do próprio gate (tenant ativo), não do host.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.STORE_MANAGE)
+    ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
     redirect('/admin')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const cupons = await db.saasCupom.findMany({
     where: { tenantId: tenant.id },

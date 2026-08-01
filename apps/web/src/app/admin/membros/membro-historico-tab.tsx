@@ -69,7 +69,8 @@ export function TabHistorico({ membroId }: { membroId: string }) {
           Nenhuma alteração registrada
         </p>
         <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-          Aprovações, reprovações, edições de cadastro e reenvios aparecem aqui.
+          Aprovações, reprovações, edições de cadastro, reenvios e mudanças de acesso
+          (cargo, área, permissões) aparecem aqui.
         </p>
       </div>
     )

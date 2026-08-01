@@ -1,5 +1,5 @@
-import { existsSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ADMIN_MENU,
@@ -59,6 +59,57 @@ function segmentoExiste(rota: string): boolean {
   }
 
   return busca(APP_DIR, segmentos)
+}
+
+/** Arquivos `.tsx` sob um diretório, recursivamente. */
+function arquivosTsx(dir: string): string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const caminho = join(dir, e.name)
+    if (e.isDirectory()) return arquivosTsx(caminho)
+    return e.name.endsWith('.tsx') ? [caminho] : []
+  })
+}
+
+const ADMIN_DIR = join(APP_DIR, 'admin')
+
+/** Shells de módulo: os layouts que montam a barra de tabs. */
+function arquivosQueMontamTabs(): string[] {
+  return arquivosTsx(ADMIN_DIR).filter((f) =>
+    readFileSync(f, 'utf8').includes('montarTabsModulo('),
+  )
+}
+
+/** Páginas cobertas por um shell de módulo — herdam o contexto dele. */
+function paginasSobShellDeModulo(): string[] {
+  const shells = arquivosQueMontamTabs().map((f) => join(f, '..'))
+  return arquivosTsx(ADMIN_DIR).filter(
+    (f) => f.endsWith('page.tsx') && shells.some((shell) => f.startsWith(shell + sep)),
+  )
+}
+
+/**
+ * Arquivos que resolvem tenant ou RBAC por conta própria em vez de herdar o
+ * contexto do módulo. Devolve a lista inteira: uma asserção por arquivo pararia
+ * no primeiro e esconderia os demais.
+ *
+ * `getUserPermissionsInTenant` só acusa quando o arquivo **não** trata o super
+ * admin: quem ramifica em `isSuperAdminEmail` antes de ler o RBAC do tenant
+ * está correto (ele não tem `SaasMembro`, e o conjunto vazio seria lido como
+ * "sem permissão").
+ */
+function contextoDivergente(arquivos: string[]): string[] {
+  return arquivos.flatMap((arquivo) => {
+    const fonte = readFileSync(arquivo, 'utf8')
+    const relativo = arquivo.slice(ADMIN_DIR.length + 1)
+    const rbacCru =
+      fonte.includes('getUserPermissionsInTenant') && !fonte.includes('isSuperAdminEmail')
+    const motivos = [
+      fonte.includes('getTenantFromHost') ? 'tenant divergente do shell' : null,
+      rbacCru ? 'RBAC cru ignora o super admin' : null,
+    ].filter(Boolean)
+    return motivos.length ? [`${relativo}: ${motivos.join(' + ')}`] : []
+  })
 }
 
 describe('ADMIN_MODULOS — invariantes de navegação', () => {
@@ -140,6 +191,21 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
     for (const item of ADMIN_MENU) {
       expect(ids.has(item.secao ?? 'geral'), `${item.id}: seção ${item.secao}`).toBe(true)
     }
+  })
+
+  it('o shell do módulo resolve tenant e permissões pela mesma fonte', () => {
+    // Regressão: `/admin/comunidade` montava as tabs com `permissoesEfetivasNoAdmin`
+    // (tenant ativo, wildcard do super admin) e resolvia o tenant com
+    // `getTenantFromHost` (TENANT_SLUG do deploy / cookie sem vínculo). O menu
+    // mostrava o módulo e a página redirecionava para `/admin`. `contextoAdmin`
+    // é a fonte única — quem monta tabs não pode ter uma segunda.
+    expect(contextoDivergente(arquivosQueMontamTabs())).toEqual([])
+  })
+
+  it('as páginas de um módulo com shell não reabrem tenant/RBAC por conta própria', () => {
+    // Tab que resolve o próprio contexto volta a divergir do shell — inclusive
+    // no gate que escolhe o destino do redirect.
+    expect(contextoDivergente(paginasSobShellDeModulo())).toEqual([])
   })
 
   it('respeita o teto de 6 etapas por módulo', () => {

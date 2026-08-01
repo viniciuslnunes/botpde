@@ -193,6 +193,7 @@ export function mapToAdminMembroItem(
       opts?.areasEfetivadas === undefined || !isSocio || membro.status !== 'APROVADO'
         ? undefined
         : areaPendenteDeEfetivacao(membro.departamento?.id, opts.areasEfetivadas),
+    userId: membro.userId,
     sedeNome: membro.sede?.nome ?? null,
     imagemProva: isSocio ? membro.imagemProva : null,
     numeroAssociado: isSocio ? membro.numeroAssociado : null,

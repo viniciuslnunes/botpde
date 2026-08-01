@@ -6,6 +6,7 @@ import { db } from '@torcida/db'
 import { candidatosNicknameOAuth } from '@/lib/oauth-perfil'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
+import { destinoInternoSeguro } from '@/lib/callback-url'
 import { DefinirApelidoForm } from './definir-apelido-form'
 
 export const metadata: Metadata = { title: 'Completar perfil' }
@@ -23,7 +24,14 @@ async function primeiraSugestaoLivre(
   return ''
 }
 
-export default async function DefinirApelidoPage() {
+export default async function DefinirApelidoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>
+}) {
+  const { callbackUrl } = await searchParams
+  const destino = destinoInternoSeguro(callbackUrl)
+
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
@@ -38,7 +46,10 @@ export default async function DefinirApelidoPage() {
 
   // Perfil completo (nome + e-mail + @) → segue o fluxo normal pós-login.
   if (user && !(await usuarioPrecisaNickname(session.user.id))) {
-    redirect(isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto')
+    redirect(
+      destino ??
+        (isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto'),
+    )
   }
 
   const nome = user?.nome?.trim() || session.user.name?.trim() || ''
@@ -78,6 +89,7 @@ export default async function DefinirApelidoPage() {
             emailAtual={email}
             pedirNome={pedirNome}
             pedirEmail={pedirEmail}
+            callbackUrl={destino}
           />
         </div>
       </div>

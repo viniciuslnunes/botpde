@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -56,14 +55,14 @@ export default async function AuditoriaPage({
 }: {
   searchParams: Promise<{ pagina?: string; q?: string }>
 }) {
+  // O tenant vem do próprio gate (tenant ativo) — reabrir por host traria o
+  // `TENANT_SLUG` do deploy e a trilha de outra torcida.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.AUDIT_VIEW)
+    ;({ tenant } = await assertPermission(PERMISSIONS.AUDIT_VIEW))
   } catch {
     redirect('/admin')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const params = await searchParams
   const busca = (params.q ?? '').trim()

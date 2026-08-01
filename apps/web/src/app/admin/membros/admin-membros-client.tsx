@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import { FilterX, TriangleAlert, Users } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { Badge } from '@torcida/ui'
 import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
@@ -30,6 +31,14 @@ interface AdminMembrosTableProps {
   cabecalho: ReactNode
   spec: ListagemSpec
   params: ListagemParams
+  /** `roles:manage` do admin logado — libera a aba Acessos do card. */
+  podeGerirAcessos: boolean
+  /** `members:block` do admin logado — libera bloquear/desbloquear. */
+  podeBloquear: boolean
+  /** `members:purge` do admin logado — libera apagar de vez. */
+  podeApagar: boolean
+  /** userIds bloqueados neste tenant (ou herdado da Sede). Carregado em lote. */
+  bloqueadosUserIds: string[]
 }
 
 export function AdminMembrosTable({
@@ -37,7 +46,12 @@ export function AdminMembrosTable({
   cabecalho,
   spec,
   params,
+  podeGerirAcessos,
+  podeBloquear,
+  podeApagar,
+  bloqueadosUserIds,
 }: AdminMembrosTableProps) {
+  const bloqueados = useMemo(() => new Set(bloqueadosUserIds), [bloqueadosUserIds])
   // Guarda o id, não o objeto: quando a decisão revalida a lista, o card
   // aberto reflete o novo status/reprovação em vez de mostrar dado velho.
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
@@ -189,7 +203,17 @@ export function AdminMembrosTable({
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.cidade ?? '—'}</span>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
-                    <StatusBadge dominio="membro" status={membro.status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge dominio="membro" status={membro.status} />
+                      {/* Bloqueio não é status do cadastro — é sobre a pessoa,
+                          e convive com qualquer status. Badge separado. */}
+                      {bloqueados.has(membro.userId) && (
+                        <Badge variant="danger">Bloqueado</Badge>
+                      )}
+                      {/* Desligado continua na lista de propósito — some da
+                          operação, não do registro. */}
+                      {membro.desligadoEmLabel && <Badge variant="neutral">Desligado</Badge>}
+                    </div>
                   </td>
                   <td className="px-4 py-3 hidden 2xl:table-cell">
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.criadoEmLabel}</span>
@@ -210,6 +234,11 @@ export function AdminMembrosTable({
                       nomeMembro={membro.nome}
                       isSocio={membro.isSocio}
                       areaPendenteEfetivacao={membro.areaPendenteEfetivacao}
+                      podeBloquear={podeBloquear}
+                      userId={membro.userId}
+                      bloqueado={bloqueados.has(membro.userId)}
+                      podeApagar={podeApagar}
+                      desligado={!!membro.desligadoEmLabel}
                     />
                   </td>
                 </m.tr>
@@ -219,7 +248,14 @@ export function AdminMembrosTable({
         </table>
       </m.div>
 
-      <MembroDetalheModal membro={selecionado} onClose={fecharDetalhe} />
+      <MembroDetalheModal
+        membro={selecionado}
+        onClose={fecharDetalhe}
+        podeGerirAcessos={podeGerirAcessos}
+        podeBloquear={podeBloquear}
+        bloqueado={selecionado ? bloqueados.has(selecionado.userId) : false}
+        podeApagar={podeApagar}
+      />
     </>
   )
 }

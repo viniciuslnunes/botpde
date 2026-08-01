@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/env', () => ({
   env: { AUTH_SECRET: 'test-auth-secret-associacao-32chars!!' },
 }))
+// Lineage da torcida (Sede + afiliadas) — resolvida por banco em runtime.
+vi.mock('@/lib/hierarquia', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getTorcidaLineageTenantIds: vi.fn(async () => ['tenant-sede', 'tenant-pde']),
+}))
 
 import {
   AtualizarMembroLgeSchema,
@@ -20,6 +25,7 @@ import {
   validarTelefoneBr,
 } from '@torcida/types'
 import { montarPayloadQr, parsePayloadQr } from '@/lib/carteirinha-qr'
+import { encontrarConflitoNumeroAssociado } from '@/lib/membros-sede'
 
 describe('associacao — CPF', () => {
   it('validarCpfDigitos aceita CPF válido conhecido', () => {
@@ -133,6 +139,103 @@ describe('associacao — schemas Zod', () => {
         motivo: 'abc',
       }).success,
     ).toBe(false)
+  })
+})
+
+describe('associacao — número de associado ocupado na torcida', () => {
+  type MembroFake = {
+    id: string
+    tenantId: string
+    numeroAssociado: string
+    espelhado: boolean
+    desligadoEm: Date | null
+    userId: string
+    status: string
+  }
+  type WhereNumero = {
+    tenantId: { in: string[] }
+    numeroAssociado: string
+    espelhado: boolean
+    desligadoEm: null
+    userId: { not: string }
+    status?: { not: string }
+    id?: { not: string }
+  }
+
+  /** Reproduz em memória o `where` do findFirst — o filtro é a regra sob teste. */
+  function clienteFake(linhas: MembroFake[]) {
+    const cliente = {
+      saasMembro: {
+        findFirst: async (args: { where: WhereNumero }) => {
+          const w = args.where
+          const achado = linhas.find(
+            (r) =>
+              w.tenantId.in.includes(r.tenantId) &&
+              r.numeroAssociado === w.numeroAssociado &&
+              r.espelhado === w.espelhado &&
+              r.desligadoEm === null &&
+              r.userId !== w.userId.not &&
+              (!w.status || r.status !== w.status.not) &&
+              (!w.id || r.id !== w.id.not),
+          )
+          return achado ? { id: achado.id } : null
+        },
+      },
+    }
+    return cliente as unknown as Parameters<typeof encontrarConflitoNumeroAssociado>[0]
+  }
+
+  const base: MembroFake = {
+    id: 'm-outro',
+    tenantId: 'tenant-pde',
+    numeroAssociado: '1234',
+    espelhado: false,
+    desligadoEm: null,
+    userId: 'user-outro',
+    status: 'APROVADO',
+  }
+  const opts = {
+    tenantOrigemId: 'tenant-pde',
+    userId: 'user-novo',
+    numeroAssociado: '1234',
+  }
+
+  it('vínculo APROVADO de outro torcedor ocupa o número', async () => {
+    const r = await encontrarConflitoNumeroAssociado(clienteFake([base]), opts)
+    expect(r).toEqual({ id: 'm-outro' })
+  })
+
+  it('vínculo PENDENTE de outro torcedor ocupa o número', async () => {
+    const r = await encontrarConflitoNumeroAssociado(
+      clienteFake([{ ...base, status: 'PENDENTE' }]),
+      opts,
+    )
+    expect(r).toEqual({ id: 'm-outro' })
+  })
+
+  it('vínculo REPROVADO devolve o número ao pool', async () => {
+    // O número segue gravado na linha (laudo/histórico) mas não bloqueia ninguém.
+    const r = await encontrarConflitoNumeroAssociado(
+      clienteFake([{ ...base, status: 'REPROVADO' }]),
+      opts,
+    )
+    expect(r).toBeNull()
+  })
+
+  it('vínculo desligado não ocupa o número', async () => {
+    const r = await encontrarConflitoNumeroAssociado(
+      clienteFake([{ ...base, desligadoEm: new Date('2026-01-10') }]),
+      opts,
+    )
+    expect(r).toBeNull()
+  })
+
+  it('mesmo usuário não conflita consigo mesmo', async () => {
+    const r = await encontrarConflitoNumeroAssociado(clienteFake([base]), {
+      ...opts,
+      userId: 'user-outro',
+    })
+    expect(r).toBeNull()
   })
 })
 

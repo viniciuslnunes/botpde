@@ -14,6 +14,7 @@ export function DefinirApelidoForm({
   emailAtual,
   pedirNome,
   pedirEmail,
+  callbackUrl,
 }: {
   sugestao: string
   nicknameAtual: string | null
@@ -21,6 +22,8 @@ export function DefinirApelidoForm({
   emailAtual: string
   pedirNome: boolean
   pedirEmail: boolean
+  /** Destino a retomar depois (convite direto). */
+  callbackUrl?: string | null
 }) {
   const [state, action] = useActionState<DefinirApelidoState, FormData>(definirApelido, {})
   const [nickDisponivel, setNickDisponivel] = useState(Boolean(sugestao || nicknameAtual))
@@ -40,6 +43,7 @@ export function DefinirApelidoForm({
         message="Preparando seu onboarding..."
         description="Estamos configurando seu perfil e carregando os clubes."
       />
+      {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

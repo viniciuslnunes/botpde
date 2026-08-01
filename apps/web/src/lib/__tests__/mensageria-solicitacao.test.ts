@@ -17,6 +17,12 @@ vi.mock('../hierarquia', () => ({
   getTenantRelation: vi.fn(),
 }))
 
+// Canal restrito (R5) não é o assunto destes casos — sem tenant isolado, o
+// guard de isolamento é no-op e as regras de rivalidade/clube seguem intactas.
+vi.mock('../isolamento', () => ({
+  getTenantsRestritos: vi.fn(async () => new Set<string>()),
+}))
+
 vi.mock('@torcida/types', () => ({
   saoRivais: (rel: string) => rel === 'rival',
 }))

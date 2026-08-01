@@ -11,6 +11,7 @@ import {
   Crosshair,
   ImageOff,
   Loader2,
+  Lock,
   MapPin,
   Phone,
   Plus,
@@ -20,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { CriarSedeForm, SedeAcoesMenu } from '@/components/admin/sede-forms'
+import { CanalRestritoUnidade } from '@/components/admin/canal-restrito-unidade'
 import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/(estrutura)/sedes/actions'
 import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
@@ -91,6 +93,20 @@ export type AdminSedeListItem = {
    * `affiliation:manage` e sem liderança vinculada — ver `excluirSede`.
    */
   podeExcluir: boolean
+  /**
+   * R5 — a liderança da unidade fechou o canal. A unidade CONTINUA na árvore
+   * da torcida (a Sede nunca perde a visão da estrutura); o que some é a
+   * participação dela nas interações externas.
+   */
+  canalRestrito?: boolean
+  /** Pedido de reabertura aguardando resposta da liderança. */
+  canalSolicitacaoPendente?: boolean
+  /** Dias restantes do pedido em aberto. */
+  canalDiasRestantes?: number | null
+  /** Presidente/Vice podem pedir a reabertura. */
+  podeSolicitarReativacao?: boolean
+  /** Owner da Sede pode impor a reabertura após recusa. */
+  podeImporReativacao?: boolean
 }
 
 type SedeOption = { id: string; nome: string; tipo: string }
@@ -410,6 +426,15 @@ function SedeCard({
                     Portal próprio
                   </span>
                 )}
+                {sede.canalRestrito && (
+                  <span
+                    title="Por decisão da liderança da unidade. A unidade segue na estrutura da torcida, mas fora das interações externas."
+                    className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--foreground)_/_0.08)] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--foreground-muted))]"
+                  >
+                    <Lock className="h-3 w-3" />
+                    Canal restrito
+                  </span>
+                )}
                 {!sede.ativa && (
                   <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
                     Inativa
@@ -477,6 +502,16 @@ function SedeCard({
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:flex-col sm:items-stretch sm:self-center lg:flex-row">
+              {sede.canalRestrito && sede.portalTenantId ? (
+                <CanalRestritoUnidade
+                  tenantId={sede.portalTenantId}
+                  nome={sede.nome}
+                  solicitacaoPendente={Boolean(sede.canalSolicitacaoPendente)}
+                  diasRestantes={sede.canalDiasRestantes ?? null}
+                  podeSolicitar={Boolean(sede.podeSolicitarReativacao)}
+                  podeImpor={Boolean(sede.podeImporReativacao)}
+                />
+              ) : null}
               {sede.portalProprio && sede.podeGerirPortalProprio ? (
                 <>
                   <Link

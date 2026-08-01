@@ -565,6 +565,10 @@ export function AdminSociosClient({
   statusFiltro,
   tabHrefs,
   podeEmitir,
+  podeGerirAcessos,
+  podeBloquear,
+  podeApagar,
+  bloqueadosUserIds,
   toolbar,
   cabecalho,
   paginacao,
@@ -584,6 +588,14 @@ export function AdminSociosClient({
   statusFiltro: string
   tabHrefs: Record<string, string>
   podeEmitir: boolean
+  /** `roles:manage` do admin logado — libera a aba Acessos do card. */
+  podeGerirAcessos: boolean
+  /** `members:block` — libera bloquear/desbloquear no card. */
+  podeBloquear: boolean
+  /** `members:purge` — libera apagar de vez (Presidente/super-admin). */
+  podeApagar: boolean
+  /** userIds bloqueados no tenant (ou herdado da Sede). Carregado em lote. */
+  bloqueadosUserIds: string[]
   toolbar: ReactNode
   cabecalho: ReactNode
   paginacao: ReactNode
@@ -1039,7 +1051,14 @@ export function AdminSociosClient({
         />
       )}
 
-      <MembroDetalheModal membro={selecionado} onClose={fecharDetalhe} />
+      <MembroDetalheModal
+        membro={selecionado}
+        onClose={fecharDetalhe}
+        podeGerirAcessos={podeGerirAcessos}
+        podeBloquear={podeBloquear}
+        podeApagar={podeApagar}
+        bloqueado={selecionado ? bloqueadosUserIds.includes(selecionado.userId) : false}
+      />
     </>
   )
 }

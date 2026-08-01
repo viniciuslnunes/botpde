@@ -8,6 +8,7 @@ import {
   PERMISSIONS,
 } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminMembroLgeForm } from '../admin-membro-lge-form'
@@ -37,6 +38,7 @@ export default async function MembroDetalhePage({ params }: Props) {
 
   type MembroRow = {
     id: string
+    userId: string
     nome: string
     tipo: string
     status: string
@@ -74,6 +76,7 @@ export default async function MembroDetalhePage({ params }: Props) {
       where: { id, tenantId: tenant.id },
       select: {
         id: true,
+        userId: true,
         nome: true,
         tipo: true,
         status: true,
@@ -132,6 +135,16 @@ export default async function MembroDetalhePage({ params }: Props) {
     isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
   const podeReatribuirSede =
     isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
+  const podeBloquear = isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_BLOCK)
+  const podeApagar = isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_PURGE)
+  const bloqueado =
+    (await db.membroBloqueio.findFirst({
+      where: {
+        userId: membro.userId,
+        tenantId: { in: [tenant.id, ...(await getAncestorTenantIds(tenant.id))] },
+      },
+      select: { id: true },
+    })) !== null
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
@@ -199,6 +212,12 @@ export default async function MembroDetalhePage({ params }: Props) {
             aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
             aprovadoPorNome={membro.aprovadoPorNome}
             aprovadoEmLabel={aprovadoEmLabel}
+            nomeMembro={membro.nome}
+            podeBloquear={podeBloquear}
+            userId={membro.userId}
+            bloqueado={bloqueado}
+            podeApagar={podeApagar}
+            desligado={!!membro.desligadoEm}
           />
         </div>
       </MotionReveal>

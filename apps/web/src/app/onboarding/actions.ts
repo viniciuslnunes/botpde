@@ -28,6 +28,7 @@ import {
   encontrarConflitoNumeroAssociado,
   encontrarConflitoRg,
   encontrarConflitoTelefone,
+  estaBloqueadoNoTenant,
   lockNumeroAssociadoDaTorcida,
   resolverTenantRaizId,
   REPROVACAO_LIMPA,
@@ -1039,6 +1040,16 @@ export async function solicitarVinculo(
         fallbackCriadoPorId: userId,
       })
       return { message: 'Você já é membro aprovado desta torcida.' }
+    }
+
+    // Bloqueio da diretoria: barra o usuário mesmo sem cadastro anterior, e
+    // herda da Sede para as unidades. Precede a checagem de reprovação porque
+    // é uma decisão sobre a pessoa, não sobre esta solicitação.
+    if (await estaBloqueadoNoTenant(userId, tenantDestino.id)) {
+      return {
+        message:
+          'A diretoria bloqueou seu acesso a esta torcida. Novas solicitações não são aceitas. Fale com a diretoria.',
+      }
     }
 
     // Reprovação definitiva: só um admin revertendo para PENDENTE reabre a fila.

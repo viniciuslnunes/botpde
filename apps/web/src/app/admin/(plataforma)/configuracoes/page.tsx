@@ -3,7 +3,14 @@ import { db } from '@torcida/db'
 import { formatNomeAfiliacao, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { isExpectedError } from '@/lib/expected-error'
-import { Flag, IdCard, Radio, Settings } from 'lucide-react'
+import { Flag, IdCard, Link2, Lock, Radio, Settings } from 'lucide-react'
+import { ConviteForm } from './_components/convite-form'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { getEstadoCanalRestrito } from '@/lib/canal-restrito'
+import {
+  CanalRestritoForm,
+  type SolicitacaoReativacaoView,
+} from './_components/canal-restrito-form'
 import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, CanalOficialForm } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
@@ -117,6 +124,31 @@ export default async function ConfiguracoesGeralPage({
 
   const plano = PLANO_LABEL[tenant.plano] ?? PLANO_LABEL.FREE!
 
+  // R5 — só faz sentido restringir o canal de uma UNIDADE: a Sede raiz não tem
+  // de quem se isolar, e fechá-la esconderia a torcida inteira.
+  const conviteRow: { conviteSlug: string | null; conviteAtivo: boolean } | null =
+    await db.tenant.findUnique({
+      where: { id: tenant.id },
+      select: { conviteSlug: true, conviteAtivo: true },
+    })
+  const convite = {
+    slug: conviteRow?.conviteSlug ?? null,
+    ativo: conviteRow?.conviteAtivo ?? false,
+  }
+
+  const ancestrais = await getAncestorTenantIds(tenant.id)
+  const ehUnidadeDaTorcida = ancestrais.length > 0
+  const estadoCanal = await getEstadoCanalRestrito(tenant.id)
+  const pendente = estadoCanal.solicitacaoPendente
+  const solicitacaoView: SolicitacaoReativacaoView | null = pendente
+    ? {
+        solicitadoPorNome: pendente.solicitadoPorNome,
+        mensagem: pendente.mensagem,
+        prazoIso: pendente.prazoEm.toISOString(),
+        diasRestantes: Math.floor(pendente.restanteMs / (24 * 60 * 60 * 1000)),
+      }
+    : null
+
   return (
     <div className="space-y-6">
       <ConfigSectionCard
@@ -178,7 +210,45 @@ export default async function ConfiguracoesGeralPage({
         ) : null}
       </ConfigSectionCard>
 
-      <MotionReveal index={4}>
+      <ConfigSectionCard
+        id="convite"
+        icon={<Link2 className={ICONE} />}
+        title="Convite"
+        description="Link que adianta as etapas do onboarding e leva direto ao vínculo"
+        index={4}
+      >
+        <ConviteForm
+          key={`${convite.slug ?? 'sem'}-${String(convite.ativo)}`}
+          slug={convite.slug}
+          ativo={convite.ativo}
+          canalRestrito={estadoCanal.restrito}
+        />
+      </ConfigSectionCard>
+
+      {ehUnidadeDaTorcida ? (
+        <ConfigSectionCard
+          id="canal-restrito"
+          icon={<Lock className={ICONE} />}
+          title="Canal restrito"
+          description="Isolar esta unidade das interações externas, mantendo a operação interna"
+          ownerOnly
+          blocked={!isOwner}
+          index={5}
+        >
+          <CanalRestritoForm
+            key={String(estadoCanal.restrito)}
+            restrito={estadoCanal.restrito}
+            solicitacao={solicitacaoView}
+            ultimaRecusaMotivo={
+              estadoCanal.ultimaDecisao?.status === 'RECUSADA'
+                ? estadoCanal.ultimaDecisao.motivo
+                : null
+            }
+          />
+        </ConfigSectionCard>
+      ) : null}
+
+      <MotionReveal index={ehUnidadeDaTorcida ? 6 : 5}>
         <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
           <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">

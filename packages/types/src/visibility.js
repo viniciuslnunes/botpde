@@ -21,7 +21,38 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
   sedes: SENSIBILIDADE.PUBLICO,
   eventos: SENSIBILIDADE.PUBLICO,
   comunidade: SENSIBILIDADE.PUBLICO,
+  /**
+   * Comunicado oficial (`Announcement`). Mesma sensibilidade de `comunidade`,
+   * mas recurso PRÓPRIO de propósito: com canal restrito (R5) a unidade deixa
+   * de ver o FEED da Sede e continua recebendo os COMUNICADOS dela. Sem essa
+   * separação as duas coisas cairiam juntas — ver RECURSOS_CASCATA_INSTITUCIONAL.
+   */
+  comunicados: SENSIBILIDADE.PUBLICO,
 })
+
+/**
+ * R5 — recursos que atravessam o canal restrito de cima para baixo.
+ *
+ * Isolar o canal corta a INTERAÇÃO, não a comunicação institucional: a unidade
+ * some do feed, das salas, das lojas e das conversas, mas continua recebendo
+ * comunicado e evento da Sede. Qualquer recurso fora desta lista deixa de
+ * cascatear para a unidade isolada.
+ */
+export const RECURSOS_CASCATA_INSTITUCIONAL = /** @type {const} */ ([
+  'comunicados',
+  'eventos',
+])
+
+/**
+ * O ancestral continua alcançando a unidade isolada neste recurso?
+ * @param {keyof typeof RECURSO_SENSIBILIDADE} recurso
+ * @returns {boolean}
+ */
+export function recursoCascateiaParaIsolado(recurso) {
+  return RECURSOS_CASCATA_INSTITUCIONAL.includes(
+    /** @type {'comunicados' | 'eventos'} */ (recurso),
+  )
+}
 
 /**
  * Relação entre dois tenants na árvore de Sede — computada por quem tem
@@ -52,6 +83,40 @@ export function resolveVisibility(relation, sensibilidade) {
   // mecanismo anti-infiltração entre torcidas (spec-onboarding §3.2).
   if (relation === 'rival') return false
   return false
+}
+
+/**
+ * R5 — canal restrito: rebaixa a relação entre dois tenants quando um dos lados
+ * isolou o próprio canal. Função pura; quem lê o estado é `lib/isolamento.ts`.
+ *
+ * A regra é ASSIMÉTRICA de propósito:
+ * - alvo restrito → ninguém de fora enxerga a unidade ('unrelated'), nem o
+ *   ancestral no fluxo social (o monitoramento da Sede é um caminho separado,
+ *   por permissão de usuário: `assertPresidentePodeLerUnidade`);
+ * - ator restrito → a unidade perde aliados, coirmãs, a comunidade nacional
+ *   E o feed da Sede: fechar o canal é deixar de participar da praça social,
+ *   nos dois sentidos. Continua 'ancestor' das próprias sub-unidades — isolar-se
+ *   para fora não pode cegá-la para dentro.
+ *   A comunicação institucional descendente (comunicado, evento) NÃO passa por
+ *   aqui: ela é resolvida por recurso em `getVisibleTenantIds`, via
+ *   `RECURSOS_CASCATA_INSTITUCIONAL`;
+ * - 'self' nunca é afetado: a comunidade e a administração internas seguem
+ *   intactas para quem pertence à unidade.
+ *
+ * @param {import('./visibility.js').TenantRelation} relation
+ * @param {{ atorRestrito?: boolean, alvoRestrito?: boolean }} estado
+ * @returns {import('./visibility.js').TenantRelation}
+ */
+export function aplicarIsolamento(relation, estado) {
+  const atorRestrito = estado?.atorRestrito === true
+  const alvoRestrito = estado?.alvoRestrito === true
+
+  if (!atorRestrito && !alvoRestrito) return relation
+  if (relation === 'self') return 'self'
+  // Alvo restrito vence: é o corte que protege a unidade isolada.
+  if (alvoRestrito) return 'unrelated'
+  // Ator restrito: só a visão para BAIXO (suas próprias sub-unidades) sobrevive.
+  return relation === 'ancestor' ? 'ancestor' : 'unrelated'
 }
 
 /**

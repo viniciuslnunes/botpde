@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -49,14 +48,13 @@ const STATUS_BADGE: Record<ImportacaoLite['status'], { label: string; className:
 }
 
 export default async function ImportarMembrosPage() {
+  // Tenant do próprio gate (tenant ativo), não do host.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.MEMBERS_VIEW)
+    ;({ tenant } = await assertPermission(PERMISSIONS.MEMBERS_VIEW))
   } catch {
     redirect('/admin')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   const importacoes: ImportacaoLite[] = await db.importacaoMembros.findMany({
     where: { tenantId: tenant.id },

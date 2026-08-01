@@ -12,6 +12,8 @@ export interface MembroReprovacaoDetalhe {
 
 export interface AdminMembroItem {
   id: string
+  /** Usuário por trás do cadastro — chave do bloqueio, que não é da ficha. */
+  userId: string
   nome: string
   discordTag: string | null
   discordId?: string | null

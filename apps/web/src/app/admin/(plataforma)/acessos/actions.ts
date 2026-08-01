@@ -6,6 +6,7 @@ import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { notificarSafe } from '@/lib/notificacoes'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission, assertPodeDelegar } from '@/lib/authz'
+import { diffAcessoUsuario } from '@/lib/acesso-audit-diff'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import {
   ALL_PERMISSIONS,
@@ -42,6 +43,7 @@ interface RoleLite {
 }
 interface DepartamentoLite {
   id: string
+  nome: string
   permissions: string[]
   permissionsGestor: string[]
 }
@@ -144,7 +146,7 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   })
   const departamentosTenant: DepartamentoLite[] = await db.departamento.findMany({
     where: { tenantId: tenant.id },
-    select: { id: true, permissions: true, permissionsGestor: true },
+    select: { id: true, nome: true, permissions: true, permissionsGestor: true },
   })
   const deptoById = new Map(departamentosTenant.map((d) => [d.id, d]))
 
@@ -225,6 +227,29 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   )
   assertPodeDelegar(ctx, overridesConcedidos, 'como permissão avulsa')
 
+  // ── Diff legível para o histórico ─────────────────────────────────────────
+  // Calculado ANTES da transação, quando o estado anterior ainda está em mão.
+  // Cargo de sistema aparece com o rótulo da unidade (Presidente/Liderança),
+  // não com o nome interno do papel.
+  const sedeParaRotulo: { tipo: string } | null = rolesTenant.some((r) => r.isSystem)
+    ? await db.sede.findFirst({
+        where: { tenantId: tenant.id, tipo: 'SEDE' },
+        select: { tipo: true },
+      })
+    : null
+  const tipoSedeRotulo = sedeParaRotulo?.tipo ?? 'PONTO_ENCONTRO'
+
+  const alteracoes = diffAcessoUsuario({
+    rolesTenant,
+    deptoById,
+    tipoSede: tipoSedeRotulo,
+    perfilIdsAntes: roleIdsAtuais,
+    perfilIdsDepois: perfilIds,
+    overridesAntes: userPermissionsAtuais,
+    permissoesDepois: permissoesEfetivas,
+    cobertoDepois: cobertoPorPerfis,
+  })
+
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     if (atribuiPerfilDepartamento) {
       await assertMembroElegivelParaDepartamento(userId, tenant.id, tx)
@@ -270,6 +295,12 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
         entidade: 'User',
         entidadeId: userId,
         detalhes: {
+          // `alteracoes` é o formato que o histórico do cadastro já sabe ler
+          // (campo · de → para). Sem ele, o log guardava só ids crus, que não
+          // dizem a ninguém o que mudou nem de onde saiu.
+          ...(alteracoes.length > 0
+            ? { alteracoes }
+            : { resumo: 'Nenhuma alteração efetiva' }),
           perfilIds: [...perfilIds],
           permissoesEfetivas: [...permissoesEfetivas],
         },

@@ -1,7 +1,5 @@
 import { Suspense } from 'react'
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, TIPO_EVENTO_LABEL, TipoEventoSchema } from '@torcida/types'
 import { redirect } from 'next/navigation'
@@ -123,14 +121,16 @@ async function EventosInsights({ tenantId }: { tenantId: string }) {
 }
 
 export default async function AdminEventosPage({ searchParams }: Props) {
+  // Sessão e tenant vêm do próprio gate (tenant ativo) — reabrir por host
+  // traria a agenda de outra torcida.
+  let session: Awaited<ReturnType<typeof assertPermission>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+    ;({ session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE))
   } catch {
     redirect('/admin')
   }
-
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/portal')
+  if (!session.user?.id) redirect('/portal')
 
   const sp = await searchParams
   const tipoParsed = TipoEventoSchema.safeParse(sp.tipo)

@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { diffCamposMembro } from '@/lib/membro-audit-diff'
-import { REPROVACAO_LIMPA } from '@/lib/membros-sede'
+import { estaBloqueadoNoTenant, REPROVACAO_LIMPA } from '@/lib/membros-sede'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -90,6 +90,15 @@ export async function solicitarCadastro(
       return { errors: { sedeId: ['Selecione sua unidade'] } }
     }
     sedeId = data.sedeId
+  }
+
+  // Bloqueio da diretoria: barra mesmo sem cadastro anterior, e herda da Sede
+  // para as unidades. Decisão sobre a pessoa, não sobre esta solicitação.
+  if (await estaBloqueadoNoTenant(session.user.id, tenant.id)) {
+    return {
+      message:
+        'A diretoria bloqueou seu acesso a esta torcida. Novas solicitações não são aceitas. Fale com a diretoria.',
+    }
   }
 
   // Verifica se já existe um cadastro

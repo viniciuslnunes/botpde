@@ -29,6 +29,13 @@ export type MembroHistoricoResultado =
 
 const HISTORICO_LIMITE = 100
 
+/**
+ * Ações gravadas contra `User` que pertencem a este cadastro. Lista fechada de
+ * propósito: `entidade: 'User'` também guarda coisas de outra natureza
+ * (moderação, conta), que não são histórico do vínculo com a torcida.
+ */
+const ACOES_ACESSO = ['ACESSO_USUARIO_ATUALIZADO']
+
 /** Ids internos que não dizem nada para quem lê o histórico. */
 const CHAVES_IGNORADAS = new Set([
   'membroOrigemId',
@@ -167,23 +174,45 @@ export async function listarHistoricoMembro(
     atorId: string | null
     ator: { nome: string | null; email: string | null } | null
   }
-  const logs: LogRow[] = await db.auditLog.findMany({
-    where: {
-      tenantId: tenant.id,
-      entidade: 'SaasMembro',
-      entidadeId: { in: entidadeIds },
-    },
-    orderBy: { criadoEm: 'desc' },
-    take: HISTORICO_LIMITE,
-    select: {
-      id: true,
-      acao: true,
-      criadoEm: true,
-      detalhes: true,
-      atorId: true,
-      ator: { select: { nome: true, email: true } },
-    },
-  })
+  const selectLog = {
+    id: true,
+    acao: true,
+    criadoEm: true,
+    detalhes: true,
+    atorId: true,
+    ator: { select: { nome: true, email: true } },
+  }
+
+  // O histórico é o do CADASTRO, mas cargo/área/permissão são gravados contra
+  // o `User` (é o usuário que tem acesso, não a ficha). Sem esta segunda
+  // leitura, mexer no acesso pela aba Acessos não deixaria rastro nenhum aqui.
+  const [logsMembro, logsAcesso]: [LogRow[], LogRow[]] = await Promise.all([
+    db.auditLog.findMany({
+      where: {
+        tenantId: tenant.id,
+        entidade: 'SaasMembro',
+        entidadeId: { in: entidadeIds },
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: HISTORICO_LIMITE,
+      select: selectLog,
+    }),
+    db.auditLog.findMany({
+      where: {
+        tenantId: tenant.id,
+        entidade: 'User',
+        entidadeId: membro.userId,
+        acao: { in: ACOES_ACESSO },
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: HISTORICO_LIMITE,
+      select: selectLog,
+    }),
+  ])
+
+  const logs: LogRow[] = [...logsMembro, ...logsAcesso]
+    .sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime())
+    .slice(0, HISTORICO_LIMITE)
 
   return {
     ok: true,

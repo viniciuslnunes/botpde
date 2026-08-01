@@ -310,6 +310,8 @@ model Tenant {
 
   denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
 
+  membroBloqueios   MembroBloqueio[]
+
   hashtags          Hashtag[]
 
   perfilDestaques   PerfilDestaque[]
@@ -347,6 +349,27 @@ model Tenant {
   barComandas             BarComanda[]
 
   solicitacoesUnidade     SolicitacaoUnidade[]     @relation("TenantSolicitacoesUnidade")
+
+  solicitacoesReativacao  SolicitacaoReativacaoCanal[] @relation("TenantSolicitacoesReativacao")
+
+
+  /// Canal restrito (R5): por decisão da liderança da unidade, o tenant sai da
+  /// malha de INTERAÇÃO (comunidade nacional, aliados, salas, lojas, DMs,
+  /// onboarding público, busca). Administração e comunidade internas seguem
+  /// intactas, e a cascata institucional da Sede continua descendo.
+  /// Nunca ler este campo direto na UI — usar `lib/isolamento.ts`, que desconta
+  /// a expiração automática da solicitação de reativação.
+  canalRestrito      Boolean   @default(false) @map("canal_restrito")
+
+  canalRestritoDesde DateTime? @map("canal_restrito_desde")
+
+  canalRestritoPorId String?   @map("canal_restrito_por_id")
+
+  /// Convite direto: link que adianta as etapas de clube/torcida/unidade no
+  /// onboarding. Para unidade restrita é o único caminho de entrada.
+  conviteSlug        String?   @unique @map("convite_slug")
+
+  conviteAtivo       Boolean   @default(false) @map("convite_ativo")
 
 
   /// Config: exibir o balanço financeiro consolidado aos associados no portal.
@@ -496,6 +519,8 @@ model User {
   bloqueiosFeitos             BloqueioUsuario[]  @relation("BloqueioBloqueador")
 
   bloqueiosRecebidos          BloqueioUsuario[]  @relation("BloqueioBloqueado")
+
+  membroBloqueios             MembroBloqueio[]
 
   denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
 
@@ -1758,6 +1783,67 @@ enum StatusSolicitacaoUnidade {
   APROVADA
 
   RECUSADA
+
+}
+
+
+
+/// R5 — pedido da Sede para a liderança reabrir um canal restrito.
+/// Silêncio até `prazoEm` (5 dias) reativa automaticamente: a expiração é
+/// DERIVADA na leitura (`lib/isolamento.ts`), o cron só materializa a linha.
+model SolicitacaoReativacaoCanal {
+
+  id String @id @default(uuid())
+
+  /// Unidade com o canal restrito.
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation("TenantSolicitacoesReativacao", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Tenant da Sede que solicitou (registro — não é FK para evitar ciclo de cascade).
+  solicitanteTenantId String @map("solicitante_tenant_id")
+
+  solicitadoPorId String? @map("solicitado_por_id")
+
+  mensagem String?
+
+  /// criadoEm + 5 dias. Passado este instante sem decisão, o canal volta sozinho.
+  prazoEm DateTime @map("prazo_em")
+
+  status StatusReativacaoCanal @default(PENDENTE)
+
+  decididoPorId String? @map("decidido_por_id")
+
+  decididoEm DateTime? @map("decidido_em")
+
+  /// Justificativa da recusa da liderança OU da imposição pelo owner da Sede.
+  motivo String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  @@index([tenantId, status])
+
+  @@index([status, prazoEm])
+
+  @@map("saas_solicitacoes_reativacao_canal")
+
+}
+
+
+
+enum StatusReativacaoCanal {
+
+  PENDENTE
+
+  APROVADA
+
+  RECUSADA
+
+  EXPIRADA
+
+  IMPOSTA
 
 }
 
@@ -3511,6 +3597,14 @@ enum TipoNotificacao {
 
   SOLICITACAO_UNIDADE_CRIADA
 
+  CANAL_RESTRITO_ATIVADO
+
+  CANAL_REATIVACAO_SOLICITADA
+
+  CANAL_REATIVACAO_RECUSADA
+
+  CANAL_REATIVADO
+
 }
 
 
@@ -3772,6 +3866,58 @@ model BloqueioUsuario {
   @@index([bloqueadoId])
 
   @@map("saas_bloqueios_usuario")
+
+}
+
+
+
+// Bloqueio administrativo de um usuário numa torcida: a diretoria barra novas
+
+// solicitações de vínculo (onboarding e /portal/cadastro).
+
+//
+
+// Escopo HERDADO, sem cópia por unidade: bloqueio gravado na Sede vale para as
+
+// subsedes/PDEs descendentes; bloqueio numa unidade vale só nela (não sobe).
+
+// Ver `estaBloqueadoNoTenant` em `apps/web/src/lib/membros-sede.ts`.
+
+//
+
+// Desbloquear APAGA a linha — o histórico (quem, quando, motivo) vive no
+
+// `AuditLog` (`MEMBRO_BLOQUEADO` / `MEMBRO_DESBLOQUEADO`).
+
+model MembroBloqueio {
+
+  id               String   @id @default(uuid())
+
+  tenantId         String   @map("tenant_id")
+
+  userId           String   @map("user_id")
+
+  motivo           String
+
+  bloqueadoPorId   String?  @map("bloqueado_por_id")
+
+  bloqueadoPorNome String?  @map("bloqueado_por_nome")
+
+  criadoEm         DateTime @default(now()) @map("criado_em")
+
+
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+
+  @@unique([tenantId, userId])
+
+  @@index([userId])
+
+  @@map("saas_membro_bloqueios")
 
 }
 

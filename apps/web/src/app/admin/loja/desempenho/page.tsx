@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { formatarMoedaBRL, PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
 import {
   listarMaisVendidosLoja,
   resumirUsoCupons,
@@ -124,14 +123,13 @@ async function LojaInsights({ tenantId }: { tenantId: string }) {
 }
 
 export default async function AdminLojaDesempenhoPage() {
+  // Tenant do próprio gate (tenant ativo), não do host.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    await assertPermission(PERMISSIONS.STORE_MANAGE)
+    ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
     redirect('/admin/loja')
   }
-
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
 
   return (
     <Suspense fallback={<LojaInsightsSkeleton />}>
