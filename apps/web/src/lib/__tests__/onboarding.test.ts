@@ -78,7 +78,16 @@ vi.mock('@/lib/tenant', () => ({
   buildPortalUrl: (slug: string) => `/portal/comunidade?torcida=${slug}`,
 }))
 // `setTenantContextSlug`/`clearTenantContextSlug` usam cookies() do Next — indisponível fora de request.
-vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn(), clearTenantContextSlug: vi.fn() }))
+const setTenantContextSlugFn = vi.hoisted(() => vi.fn())
+const clearTenantContextSlugFn = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/tenant-context', () => ({
+  setTenantContextSlug: (...args: unknown[]) => setTenantContextSlugFn(...args),
+  clearTenantContextSlug: (...args: unknown[]) => clearTenantContextSlugFn(...args),
+}))
+vi.mock('@/lib/convite-cookie-server', () => ({ limparSlugConviteCookie: vi.fn() }))
+vi.mock('@/lib/convite', () => ({
+  resolverAfiliacaoIdEfetiva: vi.fn(async (_id: string, direto: string | null) => direto),
+}))
 // `notificacoes.ts` valida env vars no import (fora do escopo deste teste).
 const notificarSafeFn = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/notificacoes', () => ({ notificarSafe: notificarSafeFn }))
@@ -385,8 +394,9 @@ describe('solicitarVinculo — validação', () => {
     membroFindUnique.mockResolvedValue(null)
     membroCreate.mockResolvedValue({ id: 'novo' })
     const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' })
-    expect(r.redirectTo).toContain('/onboarding/solicitado')
+    expect(r.redirectTo).toBe('/portal/comunidade')
     expect(r.ok).toBe(true)
+    expect(setTenantContextSlugFn).toHaveBeenCalledWith('torcida-teste')
     expect(membroCreate).toHaveBeenCalled()
     expect(auditLogCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ acao: 'CADASTRO_SOLICITADO' }) }),

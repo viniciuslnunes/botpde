@@ -77,18 +77,50 @@ export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
  * Slug da torcida do usuário (vínculo real). Sem fallback TENANT_SLUG —
  * use em roteamento pós-login; TENANT_SLUG é só contexto do deploy.
  *
- * Só sócio APROVADO abre tenant próprio. Vínculo TORCEDOR (torcedor de uma
- * torcida específica, sem aprovação/comprovante) e sócio ainda PENDENTE não
- * têm acesso à comunidade da torcida — caem no fallback de torcedor global
- * (Comunidade Nacional) em getActiveTenant até a diretoria aprovar o cadastro.
+ * Ordem: sócio APROVADO → torcedor APROVADO → sócio PENDENTE (aguarda
+ * análise na comunidade da própria torcida). Sem isso, TORCEDOR/PENDENTE
+ * caíam no TENANT_SLUG do deploy (ex.: Gaviões) — vazamento cross-torcida.
  */
 export async function resolveUserTenantSlugForUser(userId: string): Promise<string | null> {
-  const aprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
+  const socioAprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
     where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
     orderBy: { criadoEm: 'desc' },
     select: { tenant: { select: { slug: true } } },
   })
-  return aprovado?.tenant.slug ?? null
+  if (socioAprovado) return socioAprovado.tenant.slug
+
+  const torcedorAprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'APROVADO', tipo: 'TORCEDOR' },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenant: { select: { slug: true } } },
+  })
+  if (torcedorAprovado) return torcedorAprovado.tenant.slug
+
+  const socioPendente: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'PENDENTE', tipo: 'SOCIO' },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenant: { select: { slug: true } } },
+  })
+  return socioPendente?.tenant.slug ?? null
+}
+
+/** Vínculo que autoriza cookie/contexto de portal nesta torcida. */
+export async function vinculoAutorizaContextoTenant(
+  userId: string,
+  tenantSlug: string,
+): Promise<boolean> {
+  const vinculo: { id: string } | null = await db.saasMembro.findFirst({
+    where: {
+      userId,
+      tenant: { slug: tenantSlug },
+      OR: [
+        { status: 'APROVADO', tipo: { in: ['SOCIO', 'TORCEDOR'] } },
+        { status: 'PENDENTE', tipo: 'SOCIO' },
+      ],
+    },
+    select: { id: true },
+  })
+  return Boolean(vinculo)
 }
 
 /**

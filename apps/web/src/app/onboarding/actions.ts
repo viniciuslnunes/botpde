@@ -21,8 +21,9 @@ import {
   buscarMunicipiosBrasil,
   type MunicipioBrasil,
 } from '@/lib/municipios-ibge'
-import { clearTenantContextSlug } from '@/lib/tenant-context'
+import { clearTenantContextSlug, setTenantContextSlug } from '@/lib/tenant-context'
 import { limparSlugConviteCookie } from '@/lib/convite-cookie-server'
+import { resolverAfiliacaoIdEfetiva } from '@/lib/convite'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
   encontrarConflitoCpf,
@@ -855,11 +856,18 @@ export async function solicitarVinculo(
   try {
     const tenant = await db.tenant.findFirst({
       where: { id: data.tenantId, ativo: true },
-      select: { id: true, slug: true, nome: true, exigirDocumentosCadastro: true },
+      select: {
+        id: true,
+        slug: true,
+        nome: true,
+        exigirDocumentosCadastro: true,
+        afiliacaoId: true,
+      },
     })
     if (!tenant) {
       return { message: 'Torcida não encontrada.' }
     }
+    const afiliacaoIdEfetiva = await resolverAfiliacaoIdEfetiva(tenant.id, tenant.afiliacaoId)
 
     if (data.tipo === 'SOCIO' && tenant.exigirDocumentosCadastro) {
       const docErrors: Record<string, string[]> = {}
@@ -1017,10 +1025,9 @@ export async function solicitarVinculo(
     }
     dadosMembro.departamentoSedeId = departamentoSedeId
 
-    // TORCEDOR entra sem fila de aprovação (copy do wizard: "entrada imediata,
-    // sem aprovação nem comprovante") — só não abre tenant próprio no portal
-    // (resolveUserTenantSlugForUser filtra tipo: 'SOCIO'), cai na Comunidade
-    // Nacional do clube. Só SOCIO passa pela fila de aprovação do admin.
+    // TORCEDOR entra sem fila (entrada imediata). SOCIO fica PENDENTE até a
+    // diretoria aprovar. Ambos abrem a comunidade da própria torcida no portal
+    // (cookie + resolveUserTenantSlugForUser) — nunca o TENANT_SLUG do deploy.
     const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
     const existing:
@@ -1249,10 +1256,19 @@ export async function solicitarVinculo(
 
     // Conclui o onboarding (garante que o perfil exista) ANTES do fan-out /
     // notificações — se o espelho falhar, o sócio já está na fila da unidade.
+    // Grava afiliacaoId do tenant (ou ancestral): convite pula o passo Clube e
+    // sem isso o portal caía no TENANT_SLUG do deploy.
     await db.perfilTorcedor.upsert({
       where: { userId },
-      create: { userId, onboardingConcluidoEm: new Date() },
-      update: { onboardingConcluidoEm: new Date() },
+      create: {
+        userId,
+        onboardingConcluidoEm: new Date(),
+        ...(afiliacaoIdEfetiva ? { afiliacaoId: afiliacaoIdEfetiva } : {}),
+      },
+      update: {
+        onboardingConcluidoEm: new Date(),
+        ...(afiliacaoIdEfetiva ? { afiliacaoId: afiliacaoIdEfetiva } : {}),
+      },
     })
 
     // Torcedor entra APROVADO e seu perfil social deve ser público na torcida escolhida.
@@ -1366,13 +1382,15 @@ export async function solicitarVinculo(
       }
     }
 
-    // Nunca fixa cookie de torcida aqui — SOCIO recém-solicitado ainda está
-    // PENDENTE e não deve acessar a comunidade da torcida, só a Comunidade
-    // Nacional do clube, até a diretoria aprovar (resolveUserTenantSlugForUser
-    // só resolve tenant pra SOCIO APROVADO). Limpa explicitamente pra não
-    // herdar um cookie de uma tentativa anterior.
-    await clearTenantContextSlug()
+    // Fixa o contexto na torcida do vínculo. Limpar e cair no TENANT_SLUG do
+    // deploy (ex.: Gaviões) vazava feed/salas de outra organizada.
+    await setTenantContextSlug(tenantDestino.slug)
     await limparSlugConviteCookie()
+
+    if (data.tipo === 'TORCEDOR') {
+      return { ok: true, redirectTo: '/portal/comunidade' }
+    }
+
     return {
       ok: true,
       redirectTo: `/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`,

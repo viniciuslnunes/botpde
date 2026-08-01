@@ -68,8 +68,8 @@ export default async function SolicitacaoEnviadaPage({
         {torcida ? (
           <>
             Sua solicitação foi registrada na <strong>{torcida.nome}</strong>. Enquanto a
-            liderança analisa, você pode usar o feed de torcedor e interagir com outros
-            torcedores do clube.
+            liderança analisa, você já pode usar a comunidade dessa torcida — a aprovação
+            libera o mural e os benefícios de sócio.
           </>
         ) : (
           <>Sua solicitação foi registrada. A liderança da torcida vai analisar em breve.</>
@@ -121,14 +121,14 @@ export default async function SolicitacaoEnviadaPage({
             href={portalUrl}
             className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
           >
-            Ir para o feed de torcedor
+            Ir para a comunidade
           </a>
         ) : (
           <Link
             href={portalUrl}
             className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
           >
-            Voltar ao portal
+            Ir para a comunidade
           </Link>
         )}
         <Link
