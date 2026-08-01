@@ -26,9 +26,12 @@ export default async function ConvitePage({
     redirect(`/entrar?callbackUrl=${encodeURIComponent(`/convite/${slug}`)}`)
   }
 
-  // Convite inválido/desativado não vira erro: cai no onboarding normal.
   const convite = await resolverConvite(slug)
-  if (!convite) redirect('/onboarding')
+  if (!convite) {
+    // Mantém o slug na URL do onboarding: se o resolve falhar por cache/dado
+    // transitório, a página ainda tenta de novo em vez de abrir no Clube.
+    redirect(`/onboarding?convite=${encodeURIComponent(slug)}`)
+  }
 
   if (await usuarioPrecisaNickname(session.user.id)) {
     redirect(`/definir-apelido?callbackUrl=${encodeURIComponent(`/convite/${slug}`)}`)

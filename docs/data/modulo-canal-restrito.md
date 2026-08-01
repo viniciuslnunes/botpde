@@ -212,7 +212,9 @@ apagava e um refresh caía no passo Clube). Ao mexer em login/cadastro, refaça 
 teste em aba anônima com **conta nova por e-mail**.
 
 `lib/convite.ts` `resolverConvite(slug)` monta clube + torcida + unidade **sem**
-passar pelos filtros de isolamento: quem tem o link foi convidado.
+passar pelos filtros de isolamento: quem tem o link foi convidado. Se a unidade
+Caso B estiver sem `afiliacaoId`, herda o clube do ancestral
+(`resolverAfiliacaoIdEfetiva`) — sem isso o link “válido” caía no passo Clube.
 
 Torcedor da unidade: o caminho `tipo: 'TORCEDOR'` de `solicitarVinculo` já cria
 `SaasMembro` APROVADO no tenant da unidade. Com o tenant restrito, o gate de §3.4

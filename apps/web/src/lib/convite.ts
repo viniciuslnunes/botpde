@@ -5,6 +5,7 @@ import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
 import { calcularStatsClubesOnboarding } from '@/lib/onboarding-clube-stats'
 import { calcularStatsTorcidasOnboarding } from '@/lib/onboarding-torcida-stats'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import type {
   AfiliacaoOnboarding,
   SedeOnboarding,
@@ -12,6 +13,37 @@ import type {
   TorcidaOnboarding,
 } from '@/lib/onboarding'
 import { isTenantRestrito } from '@/lib/isolamento'
+
+/**
+ * Afiliação efetiva do tenant: a própria, ou a do ancestral mais próximo
+ * (unidade Caso B promovida sem espelhar `afiliacaoId` da Sede).
+ *
+ * Sem isso o convite da unidade resolve `null` e o usuário cai no passo Clube
+ * mesmo com link válido — exatamente o sintoma de
+ * `pde-fiel-baixada-praia-grande-praia-grande`.
+ */
+export async function resolverAfiliacaoIdEfetiva(
+  tenantId: string,
+  afiliacaoIdDireto: string | null,
+): Promise<string | null> {
+  if (afiliacaoIdDireto) return afiliacaoIdDireto
+
+  const ancestrais = await getAncestorTenantIds(tenantId)
+  if (ancestrais.length === 0) return null
+
+  const comAfiliacao: { id: string; afiliacaoId: string | null }[] = await db.tenant.findMany({
+    where: { id: { in: ancestrais }, afiliacaoId: { not: null } },
+    select: { id: true, afiliacaoId: true },
+  })
+  const porId = new Map(comAfiliacao.map((t) => [t.id, t.afiliacaoId]))
+
+  // `getAncestorTenantIds` devolve do mais próximo ao mais distante.
+  for (const id of ancestrais) {
+    const afiliacaoId = porId.get(id)
+    if (afiliacaoId) return afiliacaoId
+  }
+  return null
+}
 
 /**
  * Convite direto: link da própria torcida/unidade que adianta as etapas de
@@ -116,8 +148,8 @@ function mapSede(s: SedeConviteRow): SedeOnboarding {
 
 /**
  * Resolve o convite e monta o estado inicial do wizard. Retorna `null` quando
- * o slug não existe, o convite foi desativado ou a torcida está inativa —
- * nesses casos o onboarding cai no fluxo normal, sem erro para o usuário.
+ * o slug não existe, o convite foi desativado, a torcida está inativa ou
+ * nenhum clube é resolvível (próprio nem ancestral).
  */
 export const resolverConvite = cache(
   async (slug: string): Promise<ConviteOnboarding | null> => {
@@ -138,11 +170,15 @@ export const resolverConvite = cache(
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
       },
     })
-    if (!tenant?.afiliacaoId) return null
+    if (!tenant) return null
+
+    // Unidade Caso B pode ter nascido sem espelhar o clube da Sede.
+    const afiliacaoId = await resolverAfiliacaoIdEfetiva(tenant.id, tenant.afiliacaoId)
+    if (!afiliacaoId) return null
 
     const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito] = await Promise.all([
       db.afiliacao.findUnique({
-        where: { id: tenant.afiliacaoId },
+        where: { id: afiliacaoId },
         select: {
           id: true,
           nome: true,
@@ -163,7 +199,7 @@ export const resolverConvite = cache(
       }) as Promise<SedeConviteRow[]>,
       calcularStatsTorcidasOnboarding([tenant.id]),
       calcularStatsClubesOnboarding([
-        { canonicalId: tenant.afiliacaoId, afiliacaoIds: [tenant.afiliacaoId] },
+        { canonicalId: afiliacaoId, afiliacaoIds: [afiliacaoId] },
       ]),
       isTenantRestrito(tenant.id),
     ])

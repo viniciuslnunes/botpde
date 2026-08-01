@@ -375,10 +375,28 @@ export async function responderReativacaoCanal(formData: FormData): Promise<void
 export async function gerarConviteTenant(): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
+  // Convite sem clube resolvível vira onboarding no passo Clube — herda da
+  // Sede (Caso B) e materializa o campo se estiver órfão.
+  const atual: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { afiliacaoId: true },
+  })
+  const { resolverAfiliacaoIdEfetiva } = await import('@/lib/convite')
+  const afiliacaoId = await resolverAfiliacaoIdEfetiva(tenant.id, atual?.afiliacaoId ?? null)
+  if (!afiliacaoId) {
+    throw new ExpectedError(
+      'Não foi possível vincular um clube a esta unidade. Confira a afiliação da Sede antes de gerar o convite.',
+    )
+  }
+
   const slug = generateInviteSlug()
   await db.tenant.update({
     where: { id: tenant.id },
-    data: { conviteSlug: slug, conviteAtivo: true },
+    data: {
+      conviteSlug: slug,
+      conviteAtivo: true,
+      ...(atual?.afiliacaoId ? {} : { afiliacaoId }),
+    },
   })
 
   await db.auditLog.create({
@@ -388,7 +406,10 @@ export async function gerarConviteTenant(): Promise<void> {
       acao: 'TENANT_CONVITE_GERADO',
       entidade: 'Tenant',
       entidadeId: tenant.id,
-      detalhes: { rotacionado: true },
+      detalhes: {
+        rotacionado: true,
+        ...(atual?.afiliacaoId ? {} : { afiliacaoIdHerdada: afiliacaoId }),
+      },
     },
   })
 
