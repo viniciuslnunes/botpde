@@ -62,6 +62,21 @@ export const proxy = auth((req) => {
   }
 
   if (pathname === '/entrar') {
+    // Já logado: honra o destino do link (convite de unidade) em vez de jogar
+    // tudo em /auth/contexto — descartar o `callbackUrl` aqui perde o convite.
+    // Só caminho interno relativo (anti open redirect).
+    const callbackUrl = req.nextUrl.searchParams.get('callbackUrl')
+    const destinoSeguro =
+      callbackUrl &&
+      callbackUrl.startsWith('/') &&
+      !callbackUrl.startsWith('//') &&
+      !callbackUrl.startsWith('/\\')
+        ? callbackUrl
+        : null
+
+    if (destinoSeguro) {
+      return NextResponse.redirect(new URL(destinoSeguro, req.nextUrl))
+    }
     const dest = req.nextUrl.clone()
     dest.pathname = '/auth/contexto'
     dest.search = ''

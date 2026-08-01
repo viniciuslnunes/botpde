@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Loader2, Lock, LockOpen, ShieldOff } from 'lucide-react'
-import { useConfirmDialog } from '@/lib/confirm-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import {
   ativarCanalRestrito,
@@ -64,29 +64,26 @@ export function CanalRestritoForm({
   solicitacao,
   ultimaRecusaMotivo,
 }: CanalRestritoFormProps) {
-  const confirmar = useConfirmDialog()
+  const confirmarAcao = useConfirmAction()
   const [pending, startTransition] = useTransition()
   const [recusando, setRecusando] = useState(false)
   const [motivo, setMotivo] = useState('')
 
+  /**
+   * Confirmação fora de `startTransition`: esperar o modal dentro da transição
+   * trava o componente em pending para sempre (o modal só monta quando a
+   * transição termina, e a transição só termina depois do clique no modal).
+   */
   function alternar(proximo: boolean) {
-    startTransition(async () => {
-      const ok = await confirmar({
-        titulo: proximo ? 'Restringir o canal da unidade?' : 'Reabrir o canal da unidade?',
-        descricao: proximo ? DESCRICAO_ATIVAR : DESCRICAO_DESATIVAR,
-        labelConfirmar: proximo ? 'Restringir canal' : 'Reabrir canal',
-        variante: proximo ? 'destructive' : 'success',
-      })
-      if (!ok) return
-
-      await runPersistAction(
-        () => (proximo ? ativarCanalRestrito() : desativarCanalRestrito()),
-        {
-          success: proximo
-            ? 'Canal restrito. A unidade saiu das interações externas.'
-            : 'Canal reaberto. Os vínculos da unidade foram reestabelecidos.',
-        },
-      )
+    void confirmarAcao({
+      titulo: proximo ? 'Restringir o canal da unidade?' : 'Reabrir o canal da unidade?',
+      descricao: proximo ? DESCRICAO_ATIVAR : DESCRICAO_DESATIVAR,
+      labelConfirmar: proximo ? 'Restringir canal' : 'Reabrir canal',
+      variante: proximo ? 'destructive' : 'success',
+      run: () => (proximo ? ativarCanalRestrito() : desativarCanalRestrito()),
+      success: proximo
+        ? 'Canal restrito. A unidade saiu das interações externas.'
+        : 'Canal reaberto. Os vínculos da unidade foram reestabelecidos.',
     })
   }
 

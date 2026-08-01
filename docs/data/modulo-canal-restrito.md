@@ -192,6 +192,22 @@ O convite **não** pula identidade: e-mail + apelido (`@`) continuam obrigatóri
 inclusive no login social. `/definir-apelido` ganhou suporte a `callbackUrl`
 (validado como caminho interno relativo — nada de open redirect).
 
+**O `callbackUrl` tem que sobreviver à cadeia inteira (2026-08-01).** Basta um
+elo perder o parâmetro para o convidado cair em `/onboarding?passo=clube` — o
+sintoma é o wizard começar do zero mesmo com link válido. Elos que carregam o
+destino hoje:
+
+```
+/entrar (link "Criar conta")  → /entrar/criar-conta?callbackUrl=…
+/entrar/criar-conta (page)    → hidden input no form + "Voltar" preserva o destino
+criarContaComSenha            → entra com `callbackUrl` (fallback /onboarding)
+proxy.ts, já logado em /entrar → honra `callbackUrl` em vez de /auth/contexto
+```
+
+Cada um valida com `destinoInternoSeguro` (no proxy, a mesma checagem inline —
+Edge runtime). Ao mexer em login/cadastro, refaça o teste em aba anônima com
+**conta nova por e-mail**, que é o caminho que quebrou.
+
 `lib/convite.ts` `resolverConvite(slug)` monta clube + torcida + unidade **sem**
 passar pelos filtros de isolamento: quem tem o link foi convidado.
 

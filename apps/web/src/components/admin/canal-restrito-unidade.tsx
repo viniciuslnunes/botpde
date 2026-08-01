@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Loader2, LockOpen, ShieldAlert } from 'lucide-react'
-import { useConfirmDialog } from '@/lib/confirm-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import {
   imporReativacaoCanal,
@@ -45,25 +45,26 @@ export function CanalRestritoUnidade({
   podeSolicitar,
   podeImpor,
 }: CanalRestritoUnidadeProps) {
-  const confirmar = useConfirmDialog()
+  const confirmarAcao = useConfirmAction()
   const [pending, startTransition] = useTransition()
   const [impondo, setImpondo] = useState(false)
   const [motivo, setMotivo] = useState('')
 
+  /**
+   * Confirmação fora de `startTransition`: esperar o modal dentro da transição
+   * trava o botão em pending para sempre (o modal só monta quando a transição
+   * termina, e a transição só termina depois do clique no modal).
+   */
   function solicitar() {
-    startTransition(async () => {
-      const ok = await confirmar({
-        titulo: `Pedir a reabertura do canal de ${nome}?`,
-        descricao: DESCRICAO_SOLICITAR,
-        labelConfirmar: 'Enviar solicitação',
-      })
-      if (!ok) return
+    const fd = new FormData()
+    fd.set('tenantId', tenantId)
 
-      const fd = new FormData()
-      fd.set('tenantId', tenantId)
-      await runPersistAction(() => solicitarReativacaoCanal(fd), {
-        success: 'Solicitação enviada à liderança da unidade.',
-      })
+    void confirmarAcao({
+      titulo: `Pedir a reabertura do canal de ${nome}?`,
+      descricao: DESCRICAO_SOLICITAR,
+      labelConfirmar: 'Enviar solicitação',
+      run: () => solicitarReativacaoCanal(fd),
+      success: 'Solicitação enviada à liderança da unidade.',
     })
   }
 

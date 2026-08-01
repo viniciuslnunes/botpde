@@ -142,12 +142,15 @@ export async function criarContaComSenha(
 
   // Conta nova já tem nickname e precisa de onboarding — pula /auth/contexto
   // (1 RTT + checks) e vai direto; cookie de tenant só importa com SaasMembro.
+  // Com convite de unidade o destino é o próprio `/convite/<slug>`, que já
+  // adianta clube, torcida e unidade; sem isso o cadastro cai no passo Clube.
   // Em paralelo, aquece o catálogo (unstable_cache) pra /onboarding chegar quente.
+  const destino = destinoInternoSeguro(formData.get('callbackUrl')) ?? '/onboarding'
   const [, login] = await Promise.all([
     import('@/lib/onboarding').then((m) =>
       Promise.all([m.getAfiliacoesParaOnboarding(), m.getRegioesOnboarding()]),
     ),
-    entrarComCredenciais(email, senha, '/onboarding'),
+    entrarComCredenciais(email, senha, destino),
   ])
 
   if (login.message) {

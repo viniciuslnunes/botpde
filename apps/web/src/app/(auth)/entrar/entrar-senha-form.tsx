@@ -83,7 +83,11 @@ export function EntrarSenhaForm({
       <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
         Não tem conta?{' '}
         <Link
-          href="/entrar/criar-conta"
+          href={
+            callbackUrl
+              ? `/entrar/criar-conta?callbackUrl=${encodeURIComponent(callbackUrl)}`
+              : '/entrar/criar-conta'
+          }
           className="font-medium text-[rgb(var(--foreground))] underline underline-offset-2 hover:no-underline"
         >
           Criar conta com e-mail

@@ -7,7 +7,14 @@ import { UserCircle2, Mail, Lock, ChevronRight, Eye, EyeOff } from 'lucide-react
 import { FieldError, Input, SubmitButton, hexToRgb } from '@torcida/ui'
 import { NicknameField } from '@/components/nickname-field'
 
-export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
+export function CriarContaForm({
+  corPrimaria = '#7c3aed',
+  callbackUrl,
+}: {
+  corPrimaria?: string
+  /** Destino a retomar depois do cadastro (ex.: convite de unidade). */
+  callbackUrl?: string | null
+}) {
   const [state, action] = useActionState<ContaState, FormData>(criarContaComSenha, {})
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [nome, setNome] = useState('')
@@ -26,6 +33,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
         message="Preparando seu onboarding..."
         description="Estamos configurando sua conta e carregando os clubes."
       />
+      {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

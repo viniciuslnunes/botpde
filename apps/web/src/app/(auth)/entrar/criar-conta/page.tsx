@@ -1,4 +1,5 @@
 import { getTenantFromHost } from '@/lib/tenant'
+import { destinoInternoSeguro } from '@/lib/callback-url'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { CriarContaForm } from './criar-conta-form'
 import Link from 'next/link'
@@ -7,7 +8,17 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Criar conta' }
 
-export default async function CriarContaPage() {
+export default async function CriarContaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>
+}) {
+  const { callbackUrl } = await searchParams
+  // Convite de unidade (`/convite/<slug>`) chega até aqui pelo link "Criar
+  // conta" da tela de login. Sem carregar o destino, a conta nova cai no
+  // onboarding do zero e o convite se perde.
+  const destino = destinoInternoSeguro(callbackUrl)
+
   const tenant = await getTenantFromHost()
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
@@ -25,7 +36,7 @@ export default async function CriarContaPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         <Link
-          href="/entrar"
+          href={destino ? `/entrar?callbackUrl=${encodeURIComponent(destino)}` : '/entrar'}
           className="mb-6 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -42,7 +53,7 @@ export default async function CriarContaPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 shadow-xl shadow-black/5">
-          <CriarContaForm corPrimaria={cor} />
+          <CriarContaForm corPrimaria={cor} callbackUrl={destino} />
         </div>
       </div>
     </div>

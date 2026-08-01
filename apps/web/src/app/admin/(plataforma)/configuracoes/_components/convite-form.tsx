@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Check, Copy, Link2, Loader2, RefreshCw } from 'lucide-react'
-import { useConfirmDialog } from '@/lib/confirm-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import { alternarConviteTenant, gerarConviteTenant } from '../actions'
 
@@ -14,26 +14,36 @@ interface ConviteFormProps {
 }
 
 export function ConviteForm({ slug, ativo, canalRestrito }: ConviteFormProps) {
-  const confirmar = useConfirmDialog()
+  const confirmarAcao = useConfirmAction()
   const [pending, startTransition] = useTransition()
   const [copiado, setCopiado] = useState(false)
 
   const link = slug && typeof window !== 'undefined' ? `${window.location.origin}/convite/${slug}` : null
 
+  /**
+   * Rotacionar pede confirmação. O diálogo NÃO pode ser esperado dentro de
+   * `startTransition`: montar o modal viraria uma atualização da própria
+   * transição, que só termina quando o callback resolve — e o callback espera
+   * o clique num modal que nunca chega a aparecer. Resultado: botão travado em
+   * "Salvando…" para sempre. `useConfirmAction` roda a mutação dentro do modal.
+   */
   function gerar() {
+    if (slug) {
+      void confirmarAcao({
+        titulo: 'Gerar um novo link?',
+        descricao:
+          'O link atual para de funcionar imediatamente. Use isto se o convite tiver vazado — quem já entrou continua na torcida.',
+        labelConfirmar: 'Gerar novo link',
+        variante: 'destructive',
+        run: () => gerarConviteTenant(),
+        success: 'Novo link gerado. O anterior foi invalidado.',
+      })
+      return
+    }
+
     startTransition(async () => {
-      if (slug) {
-        const ok = await confirmar({
-          titulo: 'Gerar um novo link?',
-          descricao:
-            'O link atual para de funcionar imediatamente. Use isto se o convite tiver vazado — quem já entrou continua na torcida.',
-          labelConfirmar: 'Gerar novo link',
-          variante: 'destructive',
-        })
-        if (!ok) return
-      }
       await runPersistAction(() => gerarConviteTenant(), {
-        success: slug ? 'Novo link gerado. O anterior foi invalidado.' : 'Link de convite criado.',
+        success: 'Link de convite criado.',
       })
     })
   }
