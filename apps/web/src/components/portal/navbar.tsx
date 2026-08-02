@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
-  ArrowLeftRight,
   Briefcase,
   CreditCard,
   Calendar,
@@ -13,7 +12,7 @@ import {
   Users,
   MapPin,
   MessageCircle,
-  Shield,
+  Lock,
   UserCircle2,
   LogOut,
   Menu,
@@ -30,8 +29,6 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { LogoImage } from '@/components/media/logo-image'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
-import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
 /** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
  * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`.
@@ -72,8 +69,6 @@ interface PortalNavbarProps {
   modoNacional?: boolean
   /** Slug da torcida ativa — só preenchido no modo torcida. */
   tenantSlugAtual?: string | null
-  /** Vínculos de sócio APROVADO do usuário em mais de uma torcida. */
-  vinculos?: TorcidaOpcao[]
 }
 
 export function PortalNavbar({
@@ -83,9 +78,9 @@ export function PortalNavbar({
   temDepartamentos = false,
   modoNacional = false,
   tenantSlugAtual = null,
-  vinculos = [],
 }: PortalNavbarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
   const { override: brandOverride } = useNavbarBrandOverride()
@@ -94,9 +89,6 @@ export function PortalNavbar({
   const brandTenant = brandOverride ?? tenant
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
-  const [trocarTorcidaOpen, setTrocarTorcidaOpen] = useState(false)
-  const [trocarTorcidaOpenMobile, setTrocarTorcidaOpenMobile] = useState(false)
-  const podeTrocarTorcida = vinculos.length > 1
 
   // O layout do portal não remonta ao trocar de torcida (redirect client-side
   // dentro da mesma rota) — o cache de 20s de useNavbarContext (hasAdminAreaAccess
@@ -111,8 +103,6 @@ export function PortalNavbar({
     // de deixá-los presos abertos, já que o layout não remonta na navegação.
     setUserDropOpen(false)
     setMenuOpen(false)
-    setTrocarTorcidaOpen(false)
-    setTrocarTorcidaOpenMobile(false)
   }, [tenantSlugAtual])
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
@@ -123,6 +113,15 @@ export function PortalNavbar({
   const links = temDepartamentos
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
+
+  // CN não tem área admin — esconde o cadeado no escopo nacional da comunidade.
+  const naComunidade = pathname.startsWith('/portal/comunidade')
+  const escopoParam = searchParams.get('escopo')
+  const emEscopoNacional =
+    naComunidade &&
+    (escopoParam === 'nacional' ||
+      (modoNacional && (escopoParam == null || escopoParam === '')))
+  const mostrarCadeadoAdmin = hasAdminAreaAccess && !emEscopoNacional
 
   function isActive(href: string) {
     return pathname.startsWith(href)
@@ -145,6 +144,13 @@ export function PortalNavbar({
         : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
     ].join(' ')
   }
+
+  const adminIconClass = [
+    'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
+    pathname.startsWith('/admin')
+      ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+  ].join(' ')
 
   return (
     <NavPendingProvider>
@@ -221,6 +227,17 @@ export function PortalNavbar({
               unreadCount={unreadNotifications}
               onMarkRead={markNavbarNotificationRead}
             />
+            {mostrarCadeadoAdmin && (
+              <Link
+                href="/admin"
+                prefetch={false}
+                aria-label="Área administrativa"
+                title="Área administrativa"
+                className={adminIconClass}
+              >
+                <Lock className="h-4 w-4" />
+              </Link>
+            )}
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
@@ -272,45 +289,6 @@ export function PortalNavbar({
                       <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                       Meu Perfil
                     </Link>
-                    {podeTrocarTorcida && (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setTrocarTorcidaOpen((v) => !v)}
-                          aria-expanded={trocarTorcidaOpen}
-                          className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                        >
-                          <ArrowLeftRight className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                          Trocar Canal
-                          <ChevronDown
-                            className={[
-                              'ml-auto h-3.5 w-3.5 text-[rgb(var(--foreground-muted))] transition-transform',
-                              trocarTorcidaOpen ? 'rotate-180' : '',
-                            ].join(' ')}
-                          />
-                        </button>
-                        {trocarTorcidaOpen && (
-                          <div className="px-2 pb-1">
-                            <TorcidaContextSwitcher
-                              torcidas={vinculos}
-                              atualSlug={tenantSlugAtual}
-                              destino="portal"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {hasAdminAreaAccess && (
-                      <Link
-                        href="/admin"
-                        prefetch={false}
-                        onClick={() => setUserDropOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                      >
-                        <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
-                        Área Admin
-                      </Link>
-                    )}
                     <div className="my-1 border-t border-[rgb(var(--border))]" />
                     <button
                       onClick={() => signOut({ callbackUrl: '/entrar' })}
@@ -391,45 +369,6 @@ export function PortalNavbar({
                   </PortalNavLink>
                 )
               })}
-              {podeTrocarTorcida && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setTrocarTorcidaOpenMobile((v) => !v)}
-                    aria-expanded={trocarTorcidaOpenMobile}
-                    className={mobileLinkClass(false)}
-                  >
-                    <ArrowLeftRight className="h-4 w-4" />
-                    Trocar Canal
-                    <ChevronDown
-                      className={[
-                        'ml-auto h-3.5 w-3.5 transition-transform',
-                        trocarTorcidaOpenMobile ? 'rotate-180' : '',
-                      ].join(' ')}
-                    />
-                  </button>
-                  {trocarTorcidaOpenMobile && (
-                    <div className="px-2 pb-1">
-                      <TorcidaContextSwitcher
-                        torcidas={vinculos}
-                        atualSlug={tenantSlugAtual}
-                        destino="portal"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-              {hasAdminAreaAccess && (
-                <Link
-                  href="/admin"
-                  prefetch={false}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.1)]"
-                >
-                  <Shield className="h-4 w-4" />
-                  Área Admin
-                </Link>
-              )}
               <ThemeToggle variant="row" />
               <button
                 onClick={() => signOut({ callbackUrl: '/entrar' })}

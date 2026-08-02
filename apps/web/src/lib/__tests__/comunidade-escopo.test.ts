@@ -20,6 +20,7 @@ function ctxTorcida(): ContextoComunidadePortal {
     modo: 'torcida',
     tenant: {
       id: 't-1',
+      slug: 'gavioes',
       nome: 'Gaviões',
       afiliacaoId: 'af-1',
       logoUrl: null,
@@ -38,7 +39,13 @@ function ctxSocioComUnidade(): ContextoComunidadePortal {
   return {
     ...base,
     escopos: { torcida: true, unidade: true },
-    unidade: { canalId: 'canal-1', tenantId: 't-1', nome: 'Subsede Jundiaí', logoUrl: null },
+    unidade: {
+      canalId: 'canal-1',
+      tenantId: 't-1',
+      tenantSlug: 'gavioes',
+      nome: 'Subsede Jundiaí',
+      logoUrl: null,
+    },
   }
 }
 
@@ -64,13 +71,20 @@ function ctxTorcedorComUnidade(): ContextoComunidadePortal {
     escopos: { torcida: false, unidade: true },
     torcidaReal: {
       id: 't-furia',
+      slug: 'furia-jovem',
       nome: 'Fúria Jovem',
       afiliacaoId: 'af-1',
       logoUrl: null,
       corPrimaria: '#000',
       balancoFinanceiroVisivel: false,
     },
-    unidade: { canalId: 'canal-2', tenantId: 't-furia', nome: 'PDE Baixada', logoUrl: null },
+    unidade: {
+      canalId: 'canal-2',
+      tenantId: 't-furia',
+      tenantSlug: 'furia-jovem',
+      nome: 'PDE Baixada',
+      logoUrl: null,
+    },
   }
 }
 

@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: 'Comunidade' }
 export default async function ComunidadePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string; filtro?: string; eventoId?: string; escopo?: string }>
+  searchParams: Promise<{ filtro?: string; eventoId?: string; escopo?: string }>
 }) {
   const params = await searchParams
   const filtro =
@@ -59,6 +59,9 @@ export default async function ComunidadePage({
   }
 
   const torcidaReal = ctx.torcidaReal ?? (ctx.modo === 'torcida' ? ctx.tenant : null)
+  const atualSlug = ctx.modo === 'torcida' ? ctx.tenant.slug : null
+  const slugTorcida = torcidaReal?.slug ?? null
+  const slugUnidade = ctx.unidade?.tenantSlug ?? null
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
@@ -78,7 +81,6 @@ export default async function ComunidadePage({
             balancoFinanceiroVisivel: false,
           }}
           currentUser={currentUser}
-          cursor={params.cursor}
           filtro={filtro}
           clubeNacional={afiliacao}
           torcidasNacionalCount={tenantIdsClube.length}
@@ -91,6 +93,9 @@ export default async function ComunidadePage({
           modoContexto={ctx.modo}
           afiliacao={afiliacao}
           torcidaReal={torcidaReal}
+          slugTorcida={slugTorcida}
+          slugUnidade={slugUnidade}
+          atualSlug={atualSlug}
           solicitacaoPendente={solicitacaoPendente}
         />
       </div>
@@ -137,7 +142,6 @@ export default async function ComunidadePage({
           canal={canal}
           currentUser={currentUser}
           podePublicar={podePublicar}
-          cursor={params.cursor}
           viewerTenantId={unidade.tenantId}
           permissoes={permissoes}
         />
@@ -162,7 +166,6 @@ export default async function ComunidadePage({
           canal={canal}
           currentUser={currentUser}
           podePublicar={podePublicar}
-          cursor={params.cursor}
           viewerTenantId={torcidaReal.id}
           permissoes={permissoes}
         />
@@ -180,7 +183,6 @@ export default async function ComunidadePage({
           balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
         }}
         currentUser={currentUser}
-        cursor={params.cursor}
         filtro={conteudoCanal ? 'canal' : filtro}
         conversaId={conversaIdCanal}
         conteudoCanal={conteudoCanal}
@@ -194,6 +196,9 @@ export default async function ComunidadePage({
         modoContexto={ctx.modo}
         afiliacao={ctx.afiliacao}
         torcidaReal={torcidaReal}
+        slugTorcida={slugTorcida}
+        slugUnidade={slugUnidade}
+        atualSlug={atualSlug}
       />
     </div>
   )

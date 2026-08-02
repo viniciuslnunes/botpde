@@ -121,6 +121,7 @@ export async function vinculoAutorizaContextoTenant(
  */
 export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
   id: string
+  slug: string
   nome: string
   afiliacaoId: string | null
   logoUrl: string | null
@@ -130,6 +131,7 @@ export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
   const vinculo: {
     tenant: {
       id: string
+      slug: string
       nome: string
       afiliacaoId: string | null
       logoUrl: string | null
@@ -151,6 +153,7 @@ export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
       tenant: {
         select: {
           id: true,
+          slug: true,
           nome: true,
           afiliacaoId: true,
           logoUrl: true,

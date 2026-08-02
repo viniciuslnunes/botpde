@@ -1154,11 +1154,16 @@ export async function getPostsDoCanal(
   const viewerTenantId = opts.viewerTenantId ?? tenantId
   const feedInternoTenantId = opts.incluirFeedInterno ? viewerTenantId : null
 
+  // `buildCursorWhere` também devolve `{ OR: [...] }`. Espalhar os dois no
+  // mesmo nível faz o OR do mural sobrescrever o do cursor — a página 2+
+  // repete a primeira e o infinite scroll trava no skeleton.
   const postsRaw = (await db.post.findMany({
     where: {
       oculto: false,
-      ...cursorWhere,
-      OR: orPostsDoMuralCanal(conversaId, feedInternoTenantId),
+      AND: [
+        { OR: orPostsDoMuralCanal(conversaId, feedInternoTenantId) },
+        ...(cursorWhere ? [cursorWhere] : []),
+      ],
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,

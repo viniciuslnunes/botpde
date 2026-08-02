@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
@@ -71,17 +71,6 @@ export function ComunidadeRedeInfinite({
 
   const refreshDebounceRef = useRef<number | null>(null)
 
-  const replaceUrlCursor = useCallback((nextCursor: string) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('cursor', nextCursor)
-    window.history.replaceState({}, '', url.toString())
-  }, [])
-
-  const loadMoreWithDeeplink = useCallback(async () => {
-    const cursor = await loadMore()
-    if (typeof cursor === 'string') replaceUrlCursor(cursor)
-  }, [loadMore, replaceUrlCursor])
-
   useFeedStream(() => {
     if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
@@ -113,6 +102,8 @@ export function ComunidadeRedeInfinite({
   )
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef(loadMore)
+  loadMoreRef.current = loadMore
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -120,16 +111,15 @@ export function ComunidadeRedeInfinite({
 
     const obs = new IntersectionObserver(
       (entries) => {
-        const visible = entries.some((x) => x.isIntersecting)
-        if (!visible) return
-        void loadMoreWithDeeplink()
+        if (!entries.some((x) => x.isIntersecting)) return
+        void loadMoreRef.current()
       },
       { root: null, rootMargin: '300px' },
     )
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [loadMoreWithDeeplink])
+  }, [])
 
   // Um único retorno: o rodapé é dono da sentinela do observer e precisa ficar
   // montado em todos os estados, senão a paginação não volta depois do vazio.
@@ -200,7 +190,7 @@ export function ComunidadeRedeInfinite({
         hasMore={pageInfo.hasMore}
         loading={loadingMore}
         error={error}
-        onRetry={() => void loadMoreWithDeeplink()}
+        onRetry={() => void loadMore()}
         temConteudo={posts.length > 0}
       />
     </>

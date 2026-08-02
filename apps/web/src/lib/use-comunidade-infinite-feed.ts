@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
@@ -144,8 +144,14 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         signal,
       }),
     initialPageParam: (shouldSeed ? initialCursor : null) as string | null,
-    getNextPageParam: (last) =>
-      last.pageInfo.hasMore ? last.pageInfo.nextCursor : undefined,
+    getNextPageParam: (last, _pages, lastPageParam) => {
+      if (!last.pageInfo.hasMore || !last.pageInfo.nextCursor) return undefined
+      // Cursor idêntico ao que acabamos de pedir = API não avançou (ex.: OR
+      // do filtro sobrescrevendo o do cursor). Sem isto o observer dispara
+      // fetch eterno e a UI fica no skeleton "Carregando mais…".
+      if (last.pageInfo.nextCursor === lastPageParam) return undefined
+      return last.pageInfo.nextCursor
+    },
     // Só seeda se não há cache — senão o QueryClient (layout) já tem a lista.
     ...(shouldSeed
       ? {
@@ -159,10 +165,14 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     gcTime: COMUNIDADE_FEED_GC_MS,
   })
 
+  const { fetchNextPage, isFetchingNextPage, isPending, hasNextPage, error: queryError, data: queryData } =
+    query
+  const loadMoreInFlight = useRef(false)
+
   const posts = useMemo(() => {
     const seen = new Set<string>()
     const flat: TPost[] = []
-    for (const page of query.data?.pages ?? []) {
+    for (const page of queryData?.pages ?? []) {
       for (const post of page.posts) {
         if (seen.has(post.id)) continue
         seen.add(post.id)
@@ -170,22 +180,35 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
       }
     }
     return flat
-  }, [query.data?.pages])
+  }, [queryData?.pages])
 
-  const lastPage = query.data?.pages[query.data.pages.length - 1]
-  const pageInfo: PageInfo = lastPage?.pageInfo ?? initialPageInfo
+  const lastPage = queryData?.pages[queryData.pages.length - 1]
+  // `hasNextPage` respeita getNextPageParam (incl. guarda de cursor preso).
+  // Não usar só `pageInfo.hasMore` da API — senão o observer continua
+  // pedindo página depois que o cursor parou de avançar.
+  const pageInfo: PageInfo = {
+    hasMore: Boolean(hasNextPage),
+    nextCursor: lastPage?.pageInfo.nextCursor ?? null,
+  }
   const currentCursor =
-    (query.data?.pageParams[query.data.pageParams.length - 1] as string | null | undefined) ??
+    (queryData?.pageParams[queryData.pageParams.length - 1] as string | null | undefined) ??
     initialCursor
 
   const loadMore = useCallback(async (): Promise<string | undefined> => {
-    if (!pageInfo.hasMore || !pageInfo.nextCursor) return
-    if (query.isFetchingNextPage) return
+    if (!hasNextPage || !pageInfo.nextCursor) return
+    if (isFetchingNextPage || loadMoreInFlight.current) return
 
     const cursor = pageInfo.nextCursor
-    await query.fetchNextPage()
-    return cursor
-  }, [pageInfo.hasMore, pageInfo.nextCursor, query])
+    loadMoreInFlight.current = true
+    try {
+      // cancelRefetch:false — o observer não deve abortar a página em voo
+      // (senão isFetchingNextPage oscila e o skeleton trava).
+      await fetchNextPage({ cancelRefetch: false })
+      return cursor
+    } finally {
+      loadMoreInFlight.current = false
+    }
+  }, [hasNextPage, pageInfo.nextCursor, isFetchingNextPage, fetchNextPage])
 
   const refreshCurrentPage = useCallback(
     async (cursorOverride?: string | null) => {
@@ -330,14 +353,14 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     posts,
     pageInfo,
     currentCursor,
-    loadingMore: query.isFetchingNextPage,
+    loadingMore: isFetchingNextPage,
     /**
      * Primeira página ainda em voo (bootstrap com cache frio, sem seed do SSR).
      * Sem isso a lista vazia cai no empty state enquanto o fetch acontece.
      */
-    loadingInicial: query.isPending,
+    loadingInicial: isPending,
     isRefreshing,
-    error: query.error instanceof Error ? query.error.message : null,
+    error: queryError instanceof Error ? queryError.message : null,
     loadMore,
     refreshCurrentPage,
     prependPost,

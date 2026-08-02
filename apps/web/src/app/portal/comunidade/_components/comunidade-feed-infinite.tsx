@@ -122,36 +122,6 @@ export function ComunidadeFeedInfinite({
 
   const showRefreshIndicator = isRefreshing || isPullRefreshing || pullProgress > 0.08
 
-  const replaceUrlCursor = useCallback(
-    (nextCursor: string) => {
-      const url = new URL(window.location.href)
-      url.searchParams.set('cursor', nextCursor)
-      if (isNacional) {
-        url.searchParams.set('escopo', 'nacional')
-        if (filtro === 'seguindo') {
-          url.searchParams.set('filtro', 'seguindo')
-        } else if (filtro === 'grupos') {
-          url.searchParams.set('filtro', 'grupos')
-        } else {
-          url.searchParams.delete('filtro')
-        }
-      } else if (filtro === 'seguindo') {
-        url.searchParams.set('filtro', 'seguindo')
-      } else if (filtro === 'grupos') {
-        url.searchParams.set('filtro', 'grupos')
-      } else {
-        url.searchParams.delete('filtro')
-      }
-      window.history.replaceState({}, '', url.toString())
-    },
-    [filtro, isNacional],
-  )
-
-  const loadMoreWithDeeplink = useCallback(async () => {
-    const cursor = await loadMore()
-    if (typeof cursor === 'string') replaceUrlCursor(cursor)
-  }, [loadMore, replaceUrlCursor])
-
   useFeedStream(() => {
     if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
@@ -190,12 +160,6 @@ export function ComunidadeFeedInfinite({
           window.scrollTo({ top: 0, behavior: 'smooth' })
         }
       }
-
-      const url = new URL(window.location.href)
-      if (url.searchParams.has('cursor')) {
-        url.searchParams.delete('cursor')
-        window.history.replaceState({}, '', url.toString())
-      }
     }
 
     function onPostExcluido(ev: Event) {
@@ -225,6 +189,10 @@ export function ComunidadeFeedInfinite({
   )
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  // Ref estável: recriar o observer a cada mudança de `loadMore` abortava
+  // fetches em voo e deixava o skeleton "Carregando mais…" preso.
+  const loadMoreRef = useRef(loadMore)
+  loadMoreRef.current = loadMore
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -232,16 +200,15 @@ export function ComunidadeFeedInfinite({
 
     const obs = new IntersectionObserver(
       (entries) => {
-        const visible = entries.some((x) => x.isIntersecting)
-        if (!visible) return
-        void loadMoreWithDeeplink()
+        if (!entries.some((x) => x.isIntersecting)) return
+        void loadMoreRef.current()
       },
       { root: null, rootMargin: '300px' },
     )
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [loadMoreWithDeeplink])
+  }, [])
 
   return (
     <>
@@ -310,7 +277,7 @@ export function ComunidadeFeedInfinite({
         hasMore={pageInfo.hasMore}
         loading={loadingMore}
         error={error}
-        onRetry={() => void loadMoreWithDeeplink()}
+        onRetry={() => void loadMore()}
         temConteudo={posts.length > 0}
       />
     </>

@@ -34,6 +34,7 @@ export type AfiliacaoComunidade = {
 
 export type TorcidaRealComunidade = {
   id: string
+  slug: string
   nome: string
   afiliacaoId: string | null
   logoUrl: string | null
@@ -61,6 +62,8 @@ export type UnidadeComunidade = {
   canalId: string
   /** Tenant dono do canal — Caso A é o da Sede; Caso B, o da própria unidade. */
   tenantId: string
+  /** Slug do tenant dono — troca de sessão nas abas-escudo. */
+  tenantSlug: string
   nome: string
   /** Foto da unidade (`Sede.fotoUrl`) — escudo da aba "Minha unidade". */
   logoUrl: string | null
@@ -121,6 +124,7 @@ const resolverUnidadeDoVinculo = cache(
 
     const vinculo: {
       tenantId: string
+      tenant: { slug: string }
       sede: {
         nome: string
         tipo: string
@@ -138,6 +142,7 @@ const resolverUnidadeDoVinculo = cache(
       orderBy: { criadoEm: 'desc' },
       select: {
         tenantId: true,
+        tenant: { select: { slug: true } },
         sede: { select: { nome: true, tipo: true, canalConversaId: true, fotoUrl: true } },
       },
     })
@@ -158,7 +163,13 @@ const resolverUnidadeDoVinculo = cache(
       logoUrl = canal?.avatarUrl ?? null
     }
 
-    return { canalId, tenantId: vinculo.tenantId, nome: sede.nome, logoUrl }
+    return {
+      canalId,
+      tenantId: vinculo.tenantId,
+      tenantSlug: vinculo.tenant.slug,
+      nome: sede.nome,
+      logoUrl,
+    }
   },
 )
 
@@ -169,6 +180,7 @@ const resolverUnidadeDoVinculo = cache(
  */
 async function projetarTorcidaOrganizada(tenant: {
   id: string
+  slug: string
   nome: string
   afiliacaoId: string | null
   logoUrl: string | null
@@ -180,6 +192,7 @@ async function projetarTorcidaOrganizada(tenant: {
     const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
     return {
       id: tenant.id,
+      slug: tenant.slug,
       nome: formatNomeTorcida(tenant.nome),
       afiliacaoId: tenant.afiliacaoId,
       logoUrl,
@@ -190,6 +203,7 @@ async function projetarTorcidaOrganizada(tenant: {
 
   const raiz: {
     id: string
+    slug: string
     nome: string
     afiliacaoId: string | null
     logoUrl: string | null
@@ -199,6 +213,7 @@ async function projetarTorcidaOrganizada(tenant: {
     where: { id: raizId, ativo: true, sintetico: false },
     select: {
       id: true,
+      slug: true,
       nome: true,
       afiliacaoId: true,
       logoUrl: true,
@@ -210,6 +225,7 @@ async function projetarTorcidaOrganizada(tenant: {
     const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
     return {
       id: tenant.id,
+      slug: tenant.slug,
       nome: formatNomeTorcida(tenant.nome),
       afiliacaoId: tenant.afiliacaoId,
       logoUrl,
@@ -221,6 +237,7 @@ async function projetarTorcidaOrganizada(tenant: {
   const logoUrl = await resolveTenantLogoUrl(raiz.id, raiz.logoUrl)
   return {
     id: raiz.id,
+    slug: raiz.slug,
     nome: formatNomeTorcida(raiz.nome),
     afiliacaoId: raiz.afiliacaoId,
     logoUrl,
@@ -258,6 +275,7 @@ export const resolverContextoComunidade = cache(
 
       const portalAtivo: TorcidaRealComunidade = {
         id: tenant.id,
+        slug: tenant.slug,
         nome: formatNomeTorcida(tenant.nome),
         afiliacaoId: tenant.afiliacaoId,
         logoUrl: logoPortal,

@@ -9,6 +9,7 @@ import { setTenantContextSlug } from '@/lib/tenant-context'
 const schema = z.object({
   slug: z.string().min(1),
   destino: z.enum(['admin', 'portal']).optional().default('portal'),
+  escopo: z.enum(['nacional', 'torcida', 'unidade']).optional(),
 })
 
 export type TrocarTorcidaState = {
@@ -21,6 +22,9 @@ export type TrocarTorcidaState = {
  * é owner de uma Subsede/PDE promovida). Diferente de `selecionarTorcidaAction`
  * (admin/tenant-context-actions.ts), que é exclusiva de super-admin e não
  * valida vínculo — aqui a lista nunca vem do client, sempre confirmada no banco.
+ *
+ * Também usada pelas abas-escudo da Comunidade (Sede ↔ unidade Caso B): o
+ * `escopo` opcional monta o redirect para `/portal/comunidade?escopo=…`.
  */
 export async function trocarTorcidaAction(
   _prev: TrocarTorcidaState,
@@ -34,13 +38,14 @@ export async function trocarTorcidaAction(
   const parsed = schema.safeParse({
     slug: formData.get('slug'),
     destino: formData.get('destino') ?? 'portal',
+    escopo: formData.get('escopo') || undefined,
   })
 
   if (!parsed.success) {
     return { message: 'Torcida inválida.' }
   }
 
-  const { slug, destino } = parsed.data
+  const { slug, destino, escopo } = parsed.data
 
   const vinculo: { id: string } | null = await db.saasMembro.findFirst({
     where: {
@@ -59,5 +64,8 @@ export async function trocarTorcidaAction(
   await setTenantContextSlug(slug)
 
   if (destino === 'admin') redirect('/admin')
+  if (escopo && escopo !== 'nacional') {
+    redirect(`/portal/comunidade?escopo=${escopo}`)
+  }
   redirect('/portal/comunidade')
 }

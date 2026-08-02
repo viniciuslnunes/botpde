@@ -739,23 +739,29 @@ async function getDescobrirPostsBaseCached(
   const cached = await unstable_cache(
     async () => {
       const cursorWhere = buildCursorWhere(cursor)
+      // Mesmo cuidado de `getPostsDoCanal`: cursor e visibilidade usam `OR` —
+      // combinar no mesmo nível faz um apagar o outro.
       const postsRaw = (await db.post.findMany({
         where: {
           oculto: false,
           ...escopoFeedSemConversa,
-          ...cursorWhere,
-          OR: compactOr([
+          AND: [
             {
-              tenantId: { in: visibleTenantIds },
-              visibilidade: 'PUBLICO',
-              OR: [
-                { tipo: 'MEMBRO' },
-                { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } },
-              ],
+              OR: compactOr([
+                {
+                  tenantId: { in: visibleTenantIds },
+                  visibilidade: 'PUBLICO',
+                  OR: [
+                    { tipo: 'MEMBRO' },
+                    { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } },
+                  ],
+                },
+                orFeedInternoDoTenant(tenantId),
+                ...orSomenteComunicadoOficial(somenteComunicado),
+              ]),
             },
-            orFeedInternoDoTenant(tenantId),
-            ...orSomenteComunicadoOficial(somenteComunicado),
-          ]),
+            ...(cursorWhere ? [cursorWhere] : []),
+          ],
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: fetchLimit,
@@ -969,15 +975,21 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
-        // O `visibilidade` aqui não é redundante com o conjunto de tenants:
-        // sem ele, um post "Só torcida" de OUTRO tenant, de alguém que o viewer
-        // segue, entraria pela rede. Interno só do tenant ativo, onde o viewer
-        // é sócio.
-        OR: [{ visibilidade: 'PUBLICO' }, { tenantId, visibilidade: 'TENANT' }],
         oculto: false,
         ...escopoFeedSemConversa,
-        ...cursorWhere,
         autorId: { in: redeIds },
+        // Cursor e visibilidade ambos usam `OR` — AND evita um apagar o outro
+        // (paginação parada ou vazamento de PRIVADO na fatia da rede).
+        AND: [
+          {
+            // O `visibilidade` aqui não é redundante com o conjunto de tenants:
+            // sem ele, um post "Só torcida" de OUTRO tenant, de alguém que o viewer
+            // segue, entraria pela rede. Interno só do tenant ativo, onde o viewer
+            // é sócio.
+            OR: [{ visibilidade: 'PUBLICO' }, { tenantId, visibilidade: 'TENANT' }],
+          },
+          ...(cursorWhere ? [cursorWhere] : []),
+        ],
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
       take: take + 1,

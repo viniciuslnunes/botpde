@@ -164,6 +164,9 @@ export function labelVisibilidadeCanal(v: VisibilidadeCanal): string {
  *   canal emprestado publica com o tenant do viewer).
  * - Com `viewerTenantIdForFeedInterno` (só canal **oficial**): também posts
  *   "Só torcida" do feed aberto (`TENANT` + sem conversa) daquele tenant.
+ *
+ * Quem monta o `findMany` precisa **AND** este OR com o de `buildCursorWhere`
+ * — os dois usam a chave `OR` e um espalhamento no mesmo nível apaga o cursor.
  */
 export function orPostsDoMuralCanal(
   conversaId: string,

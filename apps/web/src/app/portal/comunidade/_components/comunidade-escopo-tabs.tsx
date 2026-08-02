@@ -1,10 +1,18 @@
 'use client'
 
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 import { m } from 'motion/react'
+import { toast } from '@torcida/ui'
 import { springSnappy } from '@/lib/motion-presets'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { LogoImage } from '@/components/media/logo-image'
+import { useReportNavPending } from '@/components/portal/nav-pending-context'
+import {
+  trocarTorcidaAction,
+  type TrocarTorcidaState,
+} from '@/app/portal/tenant-context-actions'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 
 type Props = {
@@ -17,6 +25,12 @@ type Props = {
   /** Nome da torcida (organizada) — acessibilidade da aba. */
   nomeTorcida?: string | null
   logoTorcida?: string | null
+  /** Slug da Sede raiz — troca de sessão ao sair da unidade Caso B. */
+  slugTorcida?: string | null
+  /** Slug do tenant da unidade — Caso A = mesmo da Sede; Caso B = PDE. */
+  slugUnidade?: string | null
+  /** Cookie / tenant ativo da sessão. */
+  atualSlug?: string | null
   /**
    * Default do usuário: sócio = torcida; TORCEDOR = nacional.
    * A aba do default omite `?escopo=`; as outras forçam o param.
@@ -32,12 +46,18 @@ type TabDef = {
   /** Inicial de fallback quando não há escudo. */
   inicial: string
   href: string
+  /** Quando definido e diferente de `atualSlug`, o clique troca o cookie. */
+  slugAlvo: string | null
 }
 
 /**
  * Alterna entre Nacional (praça do clube), Minha torcida (organizada — só
  * sócio) e Minha unidade (canal da subsede/PDE). As abas são **escudos**,
  * não títulos: nomes longos de PDE/torcida estouravam a barra.
+ *
+ * Torcida/unidade com tenant distinto (Caso B) disparam `trocarTorcidaAction`
+ * para alinhar o cookie da sessão — o cadeado admin do header segue o tenant
+ * ativo. Nacional só navega (`?escopo=nacional`), sem gravar o sintético.
  *
  * Torcedor vê Nacional + Minha unidade; torcedor global, só Nacional.
  */
@@ -49,9 +69,28 @@ export function ComunidadeEscopoTabs({
   logoUnidade,
   nomeTorcida,
   logoTorcida,
+  slugTorcida = null,
+  slugUnidade = null,
+  atualSlug = null,
   modoContexto = 'torcida',
 }: Props) {
   const params = useSearchParams()
+  const [state, action, pending] = useActionState<TrocarTorcidaState, FormData>(
+    trocarTorcidaAction,
+    {},
+  )
+  const wasPending = useRef(false)
+  const [slugPendente, setSlugPendente] = useState<string | null>(null)
+
+  useReportNavPending(pending)
+
+  useEffect(() => {
+    if (wasPending.current && !pending && state.message) {
+      toast.error(state.message)
+      setSlugPendente(null)
+    }
+    wasPending.current = pending
+  }, [pending, state.message])
 
   if (!afiliacao) return null
 
@@ -73,6 +112,7 @@ export function ComunidadeEscopoTabs({
       logoUrl: afiliacao.escudoUrl,
       inicial: nomeClube.charAt(0).toUpperCase(),
       href: hrefPara('nacional'),
+      slugAlvo: null,
     },
     ...(escopos.torcida
       ? [
@@ -82,6 +122,7 @@ export function ComunidadeEscopoTabs({
             logoUrl: logoTorcida ?? null,
             inicial: (nomeTorcida || 'T').charAt(0).toUpperCase(),
             href: hrefPara('torcida'),
+            slugAlvo: slugTorcida,
           },
         ]
       : []),
@@ -93,6 +134,7 @@ export function ComunidadeEscopoTabs({
             logoUrl: logoUnidade ?? null,
             inicial: (nomeUnidade || 'U').charAt(0).toUpperCase(),
             href: hrefPara('unidade'),
+            slugAlvo: slugUnidade,
           },
         ]
       : []),
@@ -104,19 +146,15 @@ export function ComunidadeEscopoTabs({
     <nav className="relative flex items-center gap-5 border-b border-[rgb(var(--border))]">
       {tabs.map((tab) => {
         const ativo = tab.id === escopoAtivo
-        return (
-          <ComunidadePrefetchLink
-            key={tab.id}
-            href={tab.href}
-            scroll={false}
-            aria-current={ativo ? 'page' : undefined}
-            aria-label={tab.nome}
-            title={tab.nome}
-            className={[
-              'relative -mb-px flex items-center justify-center pb-2.5 pt-1 transition-opacity',
-              ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
-            ].join(' ')}
-          >
+        const precisaTrocarSessao =
+          tab.slugAlvo != null &&
+          tab.slugAlvo !== '' &&
+          atualSlug != null &&
+          tab.slugAlvo !== atualSlug
+        const carregandoEsta = pending && slugPendente === tab.slugAlvo
+
+        const visual = (
+          <>
             {tab.logoUrl ? (
               <LogoImage
                 src={tab.logoUrl}
@@ -137,6 +175,12 @@ export function ComunidadeEscopoTabs({
                 {tab.inicial}
               </span>
             )}
+            {carregandoEsta ? (
+              <Loader2
+                className="absolute -right-1 -top-1 h-3.5 w-3.5 animate-spin text-[rgb(var(--foreground-muted))]"
+                aria-hidden
+              />
+            ) : null}
             {ativo && (
               <m.span
                 layoutId="comunidade-escopo-tab-indicator"
@@ -144,6 +188,51 @@ export function ComunidadeEscopoTabs({
                 transition={springSnappy}
               />
             )}
+          </>
+        )
+
+        const className = [
+          'relative -mb-px flex items-center justify-center pb-2.5 pt-1 transition-opacity',
+          ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
+          pending && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
+        ].join(' ')
+
+        if (precisaTrocarSessao && tab.slugAlvo) {
+          return (
+            <form
+              key={tab.id}
+              action={action}
+              onSubmit={() => setSlugPendente(tab.slugAlvo)}
+              className="contents"
+            >
+              <input type="hidden" name="slug" value={tab.slugAlvo} />
+              <input type="hidden" name="destino" value="portal" />
+              <input type="hidden" name="escopo" value={tab.id} />
+              <button
+                type="submit"
+                disabled={pending}
+                aria-current={ativo ? 'page' : undefined}
+                aria-label={tab.nome}
+                title={tab.nome}
+                className={className}
+              >
+                {visual}
+              </button>
+            </form>
+          )
+        }
+
+        return (
+          <ComunidadePrefetchLink
+            key={tab.id}
+            href={tab.href}
+            scroll={false}
+            aria-current={ativo ? 'page' : undefined}
+            aria-label={tab.nome}
+            title={tab.nome}
+            className={className}
+          >
+            {visual}
           </ComunidadePrefetchLink>
         )
       })}

@@ -68,7 +68,13 @@ interface ComunidadeFeedShellProps {
   modoContexto?: 'nacional' | 'torcida'
   afiliacao?: AfiliacaoComunidade | null
   /** Sócio com torcida real — card/composer na aba Nacional usam cargo da torcida. */
-  torcidaReal?: { id: string; nome: string; logoUrl?: string | null } | null
+  torcidaReal?: { id: string; nome: string; logoUrl?: string | null; slug?: string | null } | null
+  /** Slug da Sede raiz — troca de sessão nas abas-escudo. */
+  slugTorcida?: string | null
+  /** Slug do tenant da unidade de vínculo. */
+  slugUnidade?: string | null
+  /** Cookie / tenant ativo da sessão. */
+  atualSlug?: string | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
 }
@@ -96,6 +102,9 @@ export function ComunidadeFeedShell({
   modoContexto = 'torcida',
   afiliacao = null,
   torcidaReal = null,
+  slugTorcida = null,
+  slugUnidade = null,
+  atualSlug = null,
   solicitacaoPendente = null,
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
@@ -120,6 +129,9 @@ export function ComunidadeFeedShell({
           logoUnidade={logoUnidade}
           nomeTorcida={torcidaReal?.nome ?? null}
           logoTorcida={torcidaReal?.logoUrl ?? null}
+          slugTorcida={slugTorcida ?? torcidaReal?.slug ?? null}
+          slugUnidade={slugUnidade}
+          atualSlug={atualSlug}
           modoContexto={modoContexto}
         />
 

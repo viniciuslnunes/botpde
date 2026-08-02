@@ -75,6 +75,8 @@ só `assertPermission` (quebra torcedor global e posts da CN). Sem
 `revalidatePath` do feed no hot path; notifs em `after()`; UI otimista em
 `PostEngagement`. Ver `docs/data/modulo-comunidade.md` § engajamento e
 `modulo-comunidade-performance.md` § engajamento.
+**Autor (editar/excluir/fixar):** `assertMutacaoProprioPost` — mesmo cuidado
+com tenant sintético da CN; não filtrar pelo cookie ativo.
 **Publicar post:** sem `revalidatePath` do feed; composer emite
 `comunidade:post-publicado` para prepend no infinite (TanStack). Crítico =
 create + timeline autor; hashtags/menções/audit em `after()`. Descobrir =

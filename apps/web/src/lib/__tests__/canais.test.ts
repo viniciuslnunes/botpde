@@ -113,4 +113,22 @@ describe('orPostsDoMuralCanal', () => {
     expect(ramoCanal).toEqual({ conversaId: CANAL })
     expect(ramoCanal).not.toHaveProperty('tenantId')
   })
+
+  it('paginação: OR do mural e OR do cursor convivem via AND (não no mesmo nível)', () => {
+    // Espalhar `{ ...cursorWhere, OR: mural }` apaga o cursor — a página 2
+    // repete a 1ª e o infinite scroll trava. Forma correta:
+    const cursorWhere = {
+      OR: [
+        { criadoEm: { lt: new Date('2026-01-01') } },
+        { criadoEm: new Date('2026-01-01'), id: { lt: 'post-z' } },
+      ],
+    }
+    const where = {
+      oculto: false,
+      AND: [{ OR: orPostsDoMuralCanal(CANAL, TENANT) }, cursorWhere],
+    }
+    expect(where.AND).toHaveLength(2)
+    expect(where.AND[0]).toEqual({ OR: orPostsDoMuralCanal(CANAL, TENANT) })
+    expect(where.AND[1]).toBe(cursorWhere)
+  })
 })

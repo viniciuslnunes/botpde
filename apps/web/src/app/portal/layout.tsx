@@ -4,11 +4,8 @@ import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, getNomeAtualDoUsuario } from '@/lib/perfil-social'
 import { getEstadoOnboarding } from '@/lib/onboarding'
-import {
-  isSuperAdminEmail,
-  listarVinculosAprovadosDoUsuario,
-  usuarioPrecisaNickname,
-} from '@/lib/tenant-context'
+import { Suspense } from 'react'
+import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
@@ -82,14 +79,21 @@ export default async function PortalLayout({
         ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
         : null
 
-  // Seletor de troca de torcida: só para quem tem vínculo aprovado em mais
-  // de uma (super-admin não usa isso — ele já tem o switcher no admin).
-  const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
-
   const [avatarUrl, userName] = await Promise.all([
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
   ])
+
+  const navbar = (
+    <PortalNavbar
+      userName={userName ?? session.user.name ?? null}
+      userAvatar={avatarUrl}
+      tenant={navbarTenant}
+      temDepartamentos={totalDepartamentos > 0}
+      modoNacional={ctx?.modo === 'nacional'}
+      tenantSlugAtual={hostTenant?.slug ?? null}
+    />
+  )
 
   return (
     <div className="app-shell-bg min-h-screen">
@@ -100,15 +104,7 @@ export default async function PortalLayout({
         />
       ) : null}
       <NavbarBrandOverrideProvider>
-        <PortalNavbar
-          userName={userName ?? session.user.name ?? null}
-          userAvatar={avatarUrl}
-          tenant={navbarTenant}
-          temDepartamentos={totalDepartamentos > 0}
-          modoNacional={ctx?.modo === 'nacional'}
-          tenantSlugAtual={hostTenant?.slug ?? null}
-          vinculos={vinculos}
-        />
+        <Suspense fallback={navbar}>{navbar}</Suspense>
         <main className="app-container relative py-4 sm:py-8">
           <PortalMotionShell>{children}</PortalMotionShell>
         </main>
