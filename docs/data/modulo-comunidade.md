@@ -476,6 +476,12 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   de tenant mostram o mesmo escudo. Sócio Caso B também é inscrito no canal
   oficial da Sede mãe em `vincularMembroCanaisAposAprovacao` (+ repair).
 
+  **Aba da unidade some no portal da Sede (Caso B)**: o canônico
+  (`espelhado: false` + `sedeId` da PDE) vive no tenant da unidade; na Sede
+  só há espelho sem `sedeId`. `resolverUnidadeDoVinculo` recebe a
+  **worktree** (`getTorcidaLineageTenantIds`), não só o tenant ativo —
+  senão Chucky (sócio da PDE, logado em Gaviões) ficava só com clube + Sede.
+
   **A aba de unidade é ancorada num CANAL, não num tenant**
   (`UnidadeComunidade` = `{ canalId, tenantId, nome, logoUrl }`). Unidade Caso A
   (subsede no tenant da Sede) não tem tenant próprio, só

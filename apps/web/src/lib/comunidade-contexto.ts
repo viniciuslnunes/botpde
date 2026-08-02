@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { filtrarTenantsRestritos } from '@/lib/isolamento'
+import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import { resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
 import {
@@ -108,6 +109,11 @@ export function resolverEscopoComunidade(
  *
  * Só devolve unidade quando ela é SUBSEDE/PONTO_ENCONTRO: quem está vinculado
  * à SEDE raiz não precisa de uma aba que repete a da torcida.
+ *
+ * **Caso B:** o canônico (`espelhado: false`) vive no tenant da PDE; na Sede
+ * há só o espelho (`espelhado: true`, sem `sedeId`). Por isso `tenantIds` tem
+ * que ser a **worktree** (raiz + descendentes), não só o portal ativo —
+ * senão sócio aprovado na PDE, logado na Sede, perde a terceira aba.
  */
 const resolverUnidadeDoVinculo = cache(
   async (userId: string, tenantIds: string[]): Promise<UnidadeComunidade | null> => {
@@ -259,12 +265,10 @@ export const resolverContextoComunidade = cache(
         balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
       }
 
-      // Vínculo na unidade OU na própria worktree (sócio na Sede com sedeId
-      // de PDE Caso A; liderança Caso B com portal na unidade).
-      const unidade = await resolverUnidadeDoVinculo(userId, [
-        tenant.id,
-        ...(torcidaReal.id !== tenant.id ? [torcidaReal.id] : []),
-      ])
+      // Worktree inteira: canônico Caso B está no tenant da PDE; no portal da
+      // Sede o sócio só tem espelho (sem sedeId) — sem a lineage a 3ª aba some.
+      const lineageIds = await getTorcidaLineageTenantIds(torcidaReal.id)
+      const unidade = await resolverUnidadeDoVinculo(userId, lineageIds)
 
       return {
         modo: 'torcida',
@@ -312,7 +316,13 @@ export const resolverContextoComunidade = cache(
 
     // Torcedor: a aba dele é a da UNIDADE que o convidou — nunca a da
     // torcida, que é de sócio. Sem canal da unidade, sobra só a Nacional.
-    const unidade = torcidaReal ? await resolverUnidadeDoVinculo(userId, [torcidaReal.id]) : null
+    // Worktree: convite pode ter sido na PDE Caso B com canônico lá.
+    const unidade = torcidaReal
+      ? await resolverUnidadeDoVinculo(
+          userId,
+          await getTorcidaLineageTenantIds(torcidaReal.id),
+        )
+      : null
 
     return {
       modo: 'nacional',
