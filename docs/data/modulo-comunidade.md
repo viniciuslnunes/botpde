@@ -477,6 +477,25 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   `getOrCreateCanalOficial` num GET. Unidade sem canal provisionado
   simplesmente não ganha a aba. Testes:
   `lib/__tests__/comunidade-escopo.test.ts`.
+- **Mural da unidade e quem publica nele (2026-08-02)**: o escopo `unidade`
+  renderiza `CanalFeedView` — a mesma view da rota `/canais/[id]` — injetada no
+  shell por `conteudoCanal`. Com ela vêm de graça o composer, o gate de
+  `MembroConversa` e o pedido de entrada; o shell entrega só o cromo (abas,
+  salas) e **não** monta composer genérico nem feed agregado, que é justamente
+  o que a aba da unidade não é.
+
+  **Publicar é de sócio**: `podeVerFeedSocios` ∧ `podePublicarNoCanal`. Torcedor
+  lê o mural e participa de grupos, salas e loja, mas não publica no canal
+  oficial. O canal **nasce privado** (`publica: false`) porque a unidade pode
+  ainda não ter liderança vinculada — a liderança da subsede/PDE abre depois
+  nas configurações do canal. Até lá o não-membro vê o pedido de entrada, não
+  um mural vazio sem explicação.
+
+  **Torcedor entra só no canal da unidade**: `vincularMembroCanaisAposAprovacao`
+  ganhou `tipo`; com `TORCEDOR` **e** canal de unidade resolvido, o canal da
+  Sede não entra. Sem canal de unidade (vínculo direto na Sede), o principal é
+  o dele mesmo. Sem `tipo`, mantém o comportamento de sócio. Testes em
+  `lib/__tests__/canais-elegibilidade.test.ts`.
 - **Composição do feed Nacional (2026-08-02)**: a CN é a praça do torcedor, e
   o feed precisa **garantir** isso — não basta ordenar por recência.
   `getPostsFeedNacional` roda **dois baldes**:

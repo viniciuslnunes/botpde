@@ -6,6 +6,11 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
+import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
+import { podeVerFeedSocios } from '@/lib/feed'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { calculateEffectivePermissions } from '@torcida/types'
+import { CanalFeedView } from './canais/[id]/canal-feed-view'
 
 export const metadata: Metadata = { title: 'Comunidade' }
 
@@ -103,6 +108,40 @@ export default async function ComunidadePage({
 
   const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
+  // Mural da unidade: reusa a view do canal, que já resolve composer, gate de
+  // membership e pedido de entrada. Canal oficial nasce privado (pode não ter
+  // liderança vinculada ainda) — a liderança da subsede/PDE abre depois nas
+  // configurações do canal; até lá o não-membro vê o pedido de entrada, não
+  // um mural vazio sem explicação.
+  let conteudoCanal: React.ReactNode = null
+  if (unidade) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      unidade.tenantId,
+    )
+    const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
+    const canal = await getCanalPorId(unidade.canalId, unidade.tenantId, session.user.id)
+
+    if (canal) {
+      // Publicar no mural da unidade é de sócio: torcedor lê, participa de
+      // grupos/salas/loja, mas não publica no canal oficial.
+      const ehSocio = await podeVerFeedSocios(session.user.id, unidade.tenantId)
+      const podePublicar =
+        ehSocio && (await podePublicarNoCanal(canal, unidade.tenantId, permissoes))
+
+      conteudoCanal = (
+        <CanalFeedView
+          canal={canal}
+          currentUser={currentUser}
+          podePublicar={podePublicar}
+          cursor={params.cursor}
+          viewerTenantId={unidade.tenantId}
+          permissoes={permissoes}
+        />
+      )
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <ComunidadeFeedShell
@@ -116,6 +155,7 @@ export default async function ComunidadePage({
         cursor={params.cursor}
         filtro={unidade ? 'canal' : filtro}
         conversaId={unidade?.canalId}
+        conteudoCanal={conteudoCanal}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
         eventoIdInicial={eventoIdComposer}

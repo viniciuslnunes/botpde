@@ -140,4 +140,55 @@ describe('assertElegibilidadeMembroCanal', () => {
       }),
     )
   })
+
+  it('TORCEDOR entra só no canal da unidade — nunca no da Sede', async () => {
+    // Ele pertence à subsede/PDE que o convidou, não à organizada; o canal da
+    // Sede é espaço de sócio.
+    mocks.membroFindUnique.mockResolvedValue({
+      status: 'APROVADO',
+      tipo: 'TORCEDOR',
+      desligadoEm: null,
+    })
+    mocks.sedeFindFirst.mockResolvedValueOnce({ canalConversaId: 'canal-unidade' })
+    mocks.membroConversaUpsert.mockResolvedValue({})
+
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: 'tenant-local',
+      userId: 'torcedor',
+      sedeId: 'unidade',
+      tipo: 'TORCEDOR',
+    })
+
+    expect(mocks.membroConversaUpsert).toHaveBeenCalledTimes(1)
+    expect(mocks.membroConversaUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { conversaId_userId: { conversaId: 'canal-unidade', userId: 'torcedor' } },
+      }),
+    )
+  })
+
+  it('TORCEDOR vinculado direto na Sede (sem unidade) entra no canal principal', async () => {
+    // Sem canal de unidade não há o que preservar: o principal é o dele mesmo.
+    mocks.membroFindUnique.mockResolvedValue({
+      status: 'APROVADO',
+      tipo: 'TORCEDOR',
+      desligadoEm: null,
+    })
+    // `sedeId: null` pula a busca da unidade — o único findFirst é o da raiz.
+    mocks.sedeFindFirst.mockResolvedValueOnce({ canalConversaId: 'canal-sede' })
+    mocks.membroConversaUpsert.mockResolvedValue({})
+
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: 'tenant-local',
+      userId: 'torcedor',
+      sedeId: null,
+      tipo: 'TORCEDOR',
+    })
+
+    expect(mocks.membroConversaUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { conversaId_userId: { conversaId: 'canal-sede', userId: 'torcedor' } },
+      }),
+    )
+  })
 })

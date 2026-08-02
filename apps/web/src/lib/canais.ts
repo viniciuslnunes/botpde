@@ -492,26 +492,40 @@ export async function vincularMembroCanaisAposAprovacao(opts: {
   sedeId: string | null
   /** Fallback de `criadoPorId` se o canal principal ainda não existir. */
   fallbackCriadoPorId?: string | null
+  /**
+   * TORCEDOR entra **só** no canal da unidade que o convidou — nunca no da
+   * Sede. Ele pertence à subsede/PDE, não à organizada; o canal da Sede é
+   * espaço de sócio. Sem `tipo`, mantém o comportamento de sócio.
+   */
+  tipo?: 'SOCIO' | 'TORCEDOR'
 }): Promise<void> {
   const canalIds = new Set<string>()
+  let canalDaUnidade: string | null = null
 
   if (opts.sedeId) {
     const sedeUnidade: { canalConversaId: string | null } | null = await db.sede.findFirst({
       where: { id: opts.sedeId, tenantId: opts.tenantId },
       select: { canalConversaId: true },
     })
-    if (sedeUnidade?.canalConversaId) canalIds.add(sedeUnidade.canalConversaId)
+    if (sedeUnidade?.canalConversaId) {
+      canalDaUnidade = sedeUnidade.canalConversaId
+      canalIds.add(sedeUnidade.canalConversaId)
+    }
   }
 
-  const sedeRaiz: { canalConversaId: string | null } | null = await db.sede.findFirst({
-    where: { tenantId: opts.tenantId, tipo: 'SEDE', canalConversaId: { not: null } },
-    select: { canalConversaId: true },
-  })
-  if (sedeRaiz?.canalConversaId) {
-    canalIds.add(sedeRaiz.canalConversaId)
-  } else {
-    const principal = await getOrCreateCanalOficial(opts.tenantId, opts.fallbackCriadoPorId)
-    canalIds.add(principal.id)
+  // Torcedor com canal de unidade resolvido para por aqui. Sem canal de
+  // unidade (vínculo direto na Sede), o canal principal é o dele mesmo.
+  if (!(opts.tipo === 'TORCEDOR' && canalDaUnidade)) {
+    const sedeRaiz: { canalConversaId: string | null } | null = await db.sede.findFirst({
+      where: { tenantId: opts.tenantId, tipo: 'SEDE', canalConversaId: { not: null } },
+      select: { canalConversaId: true },
+    })
+    if (sedeRaiz?.canalConversaId) {
+      canalIds.add(sedeRaiz.canalConversaId)
+    } else {
+      const principal = await getOrCreateCanalOficial(opts.tenantId, opts.fallbackCriadoPorId)
+      canalIds.add(principal.id)
+    }
   }
 
   for (const conversaId of canalIds) {

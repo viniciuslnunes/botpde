@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered, Scale, Clock } from 'lucide-react'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadePostsSection } from './comunidade-posts-section'
@@ -42,6 +42,13 @@ interface ComunidadeFeedShellProps {
   eventoIdInicial?: string
   /** Canal do escopo `unidade` (mural oficial da subsede/PDE). */
   conversaId?: string
+  /**
+   * Conteúdo do escopo `unidade`: o mural do canal, já com composer, gate de
+   * membership e pedido de entrada (`CanalFeedView`). Quando presente, o shell
+   * entrega só o cromo (abas, salas) — nada de composer genérico nem feed
+   * agregado, que é justamente o que a aba da unidade não é.
+   */
+  conteudoCanal?: ReactNode
   /** Escopo ativo (Nacional × Minha torcida × Minha unidade). */
   escopo?: EscopoComunidade
   escopos?: EscoposDisponiveis
@@ -70,6 +77,7 @@ export function ComunidadeFeedShell({
   salasAtivas = [],
   eventoIdInicial,
   conversaId,
+  conteudoCanal = null,
   escopo = 'torcida',
   escopos = { torcida: false, unidade: false },
   nomeUnidade = null,
@@ -167,13 +175,15 @@ export function ComunidadeFeedShell({
           <ComunidadeSalasMobile salas={salasAtivas} />
         </Suspense>
 
-        {!modoNacional && currentUser.id && (
+        {conteudoCanal}
+
+        {!conteudoCanal && !modoNacional && currentUser.id && (
           <Suspense fallback={<FeedStoriesSkeleton />}>
             <ComunidadeStoriesSection tenantId={tenant.id} currentUser={currentUser} />
           </Suspense>
         )}
 
-        {currentUser.id && (
+        {!conteudoCanal && currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
             {modoNacional ? (
               <ComunidadeNacionalComposerSection
@@ -197,34 +207,38 @@ export function ComunidadeFeedShell({
           </Suspense>
         )}
 
-        <FeedLiveBanner
-          filtro={filtro}
-          escopo={escopo}
-          afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
-        />
-
-        <Suspense
-          fallback={
-            <ComunidadeFeedBootstrap
-              tenantId={tenant.id}
-              currentUser={currentUser}
+        {!conteudoCanal && (
+          <>
+            <FeedLiveBanner
               filtro={filtro}
-              cursor={cursor ?? null}
               escopo={escopo}
               afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
             />
-          }
-        >
-          <ComunidadePostsSection
-            tenantId={tenant.id}
-            currentUser={currentUser}
-            cursor={cursor}
-            filtro={filtro}
-            conversaId={conversaId}
-            escopo={escopo}
-            afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
-          />
-        </Suspense>
+
+            <Suspense
+              fallback={
+                <ComunidadeFeedBootstrap
+                  tenantId={tenant.id}
+                  currentUser={currentUser}
+                  filtro={filtro}
+                  cursor={cursor ?? null}
+                  escopo={escopo}
+                  afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
+                />
+              }
+            >
+              <ComunidadePostsSection
+                tenantId={tenant.id}
+                currentUser={currentUser}
+                cursor={cursor}
+                filtro={filtro}
+                conversaId={conversaId}
+                escopo={escopo}
+                afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
+              />
+            </Suspense>
+          </>
+        )}
       </main>
     </>
   )

@@ -858,6 +858,8 @@ async function vincularCanaisBestEffort(opts: {
   tenantId: string
   userId: string
   sedeId: string | null
+  /** TORCEDOR entra só no canal da unidade — o da Sede é espaço de sócio. */
+  tipo?: 'SOCIO' | 'TORCEDOR'
 }): Promise<void> {
   try {
     await vincularMembroCanaisAposAprovacao({
@@ -865,6 +867,7 @@ async function vincularCanaisBestEffort(opts: {
       userId: opts.userId,
       sedeId: opts.sedeId,
       fallbackCriadoPorId: opts.userId,
+      tipo: opts.tipo,
     })
   } catch (err) {
     if (isExpectedError(err)) {
@@ -1104,6 +1107,12 @@ export async function solicitarVinculo(
         tenantId: tenantDestino.id,
         userId,
         sedeId: existing.sedeId,
+        // Mesma leitura de `tipoExistente` abaixo: o vínculo já gravado manda,
+        // e o do wizard só cobre o registro legado sem `tipo`.
+        tipo:
+          (typeof existing.tipo === 'string' ? existing.tipo : data.tipo) === 'TORCEDOR'
+            ? 'TORCEDOR'
+            : 'SOCIO',
       })
       // Já é membro: isso não é erro. Conclui o onboarding e segue para a
       // comunidade — antes o wizard travava na última etapa sem saída.
@@ -1334,6 +1343,7 @@ export async function solicitarVinculo(
         tenantId: tenantDestino.id,
         userId,
         sedeId: dadosMembro.sedeId ?? null,
+        tipo: data.tipo === 'TORCEDOR' ? 'TORCEDOR' : 'SOCIO',
       })
 
       // Caso B: o registro na unidade espelha na Sede (quadro da diretoria).

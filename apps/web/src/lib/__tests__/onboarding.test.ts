@@ -448,6 +448,8 @@ describe('solicitarVinculo — validação', () => {
       userId: 'u1',
       sedeId: null,
       fallbackCriadoPorId: 'u1',
+      // Torcedor não entra no canal da Sede — o tipo precisa descer.
+      tipo: 'TORCEDOR',
     })
     expect(sincronizarSocioNaSedeRaizFn).toHaveBeenCalled()
   })
@@ -580,6 +582,7 @@ describe('solicitarVinculo — validação', () => {
       userId: 'u1',
       sedeId: UUID2,
       fallbackCriadoPorId: 'u1',
+      tipo: 'TORCEDOR',
     })
   })
 
