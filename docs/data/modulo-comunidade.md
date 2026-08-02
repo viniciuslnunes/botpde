@@ -468,6 +468,14 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   inscrito no canal da Sede. Escopo pedido mas indisponível cai no default em
   vez de erro (link colado não pode dar 403 na cara de quem abriu).
 
+  **Escudos das abas (2026-08-02)**: Nacional = escudo do clube; Minha
+  torcida = logo da **Sede raiz** da worktree (nunca da PDE/subsede ativa);
+  Minha unidade = foto/`avatar` da unidade. Liderança Caso B com portal na
+  unidade via `getActiveTenant` → `torcidaReal` sobe com
+  `resolverTenantRaizId` / `projetarTorcidaOrganizada`, senão as duas abas
+  de tenant mostram o mesmo escudo. Sócio Caso B também é inscrito no canal
+  oficial da Sede mãe em `vincularMembroCanaisAposAprovacao` (+ repair).
+
   **A aba de unidade é ancorada num CANAL, não num tenant**
   (`UnidadeComunidade` = `{ canalId, tenantId, nome, logoUrl }`). Unidade Caso A
   (subsede no tenant da Sede) não tem tenant próprio, só

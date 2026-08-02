@@ -12,6 +12,7 @@ import {
   getTorcidaLineageTenantIds,
   getVisibleTenantIds,
 } from './hierarquia'
+import { resolverTenantRaizId } from './membros-sede'
 import { getTenantsRestritos } from './isolamento'
 import {
   postInclude,
@@ -525,6 +526,25 @@ export async function vincularMembroCanaisAposAprovacao(opts: {
     } else {
       const principal = await getOrCreateCanalOficial(opts.tenantId, opts.fallbackCriadoPorId)
       canalIds.add(principal.id)
+    }
+
+    // Caso B: sócio aprovado na unidade também entra no canal oficial da
+    // Sede (organizada). Sem isso, liderança de PDE ficava só no canal da
+    // unidade e a aba "Minha torcida" apontava pra Sede sem membership.
+    if (opts.tipo !== 'TORCEDOR') {
+      const raizId = await resolverTenantRaizId(opts.tenantId)
+      if (raizId !== opts.tenantId) {
+        const sedeMae: { canalConversaId: string | null } | null = await db.sede.findFirst({
+          where: { tenantId: raizId, tipo: 'SEDE', canalConversaId: { not: null } },
+          select: { canalConversaId: true },
+        })
+        if (sedeMae?.canalConversaId) {
+          canalIds.add(sedeMae.canalConversaId)
+        } else {
+          const principalMae = await getOrCreateCanalOficial(raizId, opts.fallbackCriadoPorId)
+          canalIds.add(principalMae.id)
+        }
+      }
     }
   }
 

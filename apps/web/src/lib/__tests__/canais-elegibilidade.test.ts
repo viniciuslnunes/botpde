@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   socioFindUnique: vi.fn(),
   sedeFindFirst: vi.fn(),
   membroConversaUpsert: vi.fn(),
+  resolverTenantRaizId: vi.fn(async (id: string) => id),
 }))
 
 vi.mock('@torcida/db', () => ({
@@ -16,6 +17,10 @@ vi.mock('@torcida/db', () => ({
     sede: { findFirst: mocks.sedeFindFirst },
     membroConversa: { upsert: mocks.membroConversaUpsert },
   },
+}))
+
+vi.mock('../membros-sede', () => ({
+  resolverTenantRaizId: (id: string) => mocks.resolverTenantRaizId(id),
 }))
 
 import { assertElegibilidadeMembroCanal, vincularMembroCanaisAposAprovacao } from '../canais'
@@ -109,6 +114,7 @@ describe('assertElegibilidadeMembroCanal', () => {
       tipo: 'TORCEDOR',
       desligadoEm: null,
     })
+    mocks.resolverTenantRaizId.mockResolvedValue('tenant-local')
     mocks.sedeFindFirst
       .mockResolvedValueOnce({ canalConversaId: 'canal-unidade' })
       .mockResolvedValueOnce({ canalConversaId: 'canal-sede' })
@@ -139,6 +145,36 @@ describe('assertElegibilidadeMembroCanal', () => {
         where: { conversaId_userId: { conversaId: 'canal-unidade', userId: 'membro' } },
       }),
     )
+  })
+
+  it('SOCIO Caso B também entra no canal oficial da Sede mãe', async () => {
+    mocks.membroFindUnique.mockResolvedValue({
+      status: 'APROVADO',
+      tipo: 'SOCIO',
+      desligadoEm: null,
+    })
+    mocks.resolverTenantRaizId.mockResolvedValue('tenant-gavioes')
+    mocks.sedeFindFirst
+      .mockResolvedValueOnce({ canalConversaId: 'canal-cubatao' })
+      .mockResolvedValueOnce({ canalConversaId: 'canal-oficial-cubatao' })
+      .mockResolvedValueOnce({ canalConversaId: 'canal-gavioes' })
+    mocks.membroConversaUpsert.mockResolvedValue({})
+
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: 'tenant-cubatao',
+      userId: 'lider',
+      sedeId: 'unidade-cubatao',
+      tipo: 'SOCIO',
+    })
+
+    const canais = mocks.membroConversaUpsert.mock.calls.map(
+      (c) => (c[0] as { where: { conversaId_userId: { conversaId: string } } }).where
+        .conversaId_userId.conversaId,
+    )
+    expect(canais).toEqual(
+      expect.arrayContaining(['canal-cubatao', 'canal-oficial-cubatao', 'canal-gavioes']),
+    )
+    expect(canais).toHaveLength(3)
   })
 
   it('TORCEDOR entra só no canal da unidade — nunca no da Sede', async () => {

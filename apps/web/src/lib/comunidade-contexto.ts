@@ -4,6 +4,7 @@ import type { Tenant } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { filtrarTenantsRestritos } from '@/lib/isolamento'
 import { resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
+import { resolverTenantRaizId } from '@/lib/membros-sede'
 import {
   COR_PRIMARIA_PLATAFORMA,
   designFromPrimary,
@@ -140,13 +141,87 @@ const resolverUnidadeDoVinculo = cache(
 
     const sede = vinculo.sede!
     let logoUrl = sede.fotoUrl
+    // Sem foto da unidade: avatar do canal — NÃO cair no logo do tenant
+    // (Caso A compartilha tenant com a Sede e duplicaria o escudo da
+    // aba "Minha torcida").
     if (!logoUrl) {
-      logoUrl = await resolveTenantLogoUrl(vinculo.tenantId, null)
+      const canal: { avatarUrl: string | null } | null = await db.conversa.findFirst({
+        where: { id: canalId },
+        select: { avatarUrl: true },
+      })
+      logoUrl = canal?.avatarUrl ?? null
     }
 
     return { canalId, tenantId: vinculo.tenantId, nome: sede.nome, logoUrl }
   },
 )
+
+/**
+ * Organizada (Sede principal) a partir de qualquer tenant da worktree.
+ * Liderança de PDE/subsede Caso B tem portal na unidade — "Minha torcida"
+ * é sempre a raiz (ex.: Gaviões), não a PDE (ex.: Fiel Cubatão).
+ */
+async function projetarTorcidaOrganizada(tenant: {
+  id: string
+  nome: string
+  afiliacaoId: string | null
+  logoUrl: string | null
+  corPrimaria: string
+  balancoFinanceiroVisivel: boolean
+}): Promise<TorcidaRealComunidade> {
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId === tenant.id) {
+    const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
+    return {
+      id: tenant.id,
+      nome: formatNomeTorcida(tenant.nome),
+      afiliacaoId: tenant.afiliacaoId,
+      logoUrl,
+      corPrimaria: tenant.corPrimaria,
+      balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+    }
+  }
+
+  const raiz: {
+    id: string
+    nome: string
+    afiliacaoId: string | null
+    logoUrl: string | null
+    corPrimaria: string
+    balancoFinanceiroVisivel: boolean
+  } | null = await db.tenant.findFirst({
+    where: { id: raizId, ativo: true, sintetico: false },
+    select: {
+      id: true,
+      nome: true,
+      afiliacaoId: true,
+      logoUrl: true,
+      corPrimaria: true,
+      balancoFinanceiroVisivel: true,
+    },
+  })
+  if (!raiz) {
+    const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
+    return {
+      id: tenant.id,
+      nome: formatNomeTorcida(tenant.nome),
+      afiliacaoId: tenant.afiliacaoId,
+      logoUrl,
+      corPrimaria: tenant.corPrimaria,
+      balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+    }
+  }
+
+  const logoUrl = await resolveTenantLogoUrl(raiz.id, raiz.logoUrl)
+  return {
+    id: raiz.id,
+    nome: formatNomeTorcida(raiz.nome),
+    afiliacaoId: raiz.afiliacaoId,
+    logoUrl,
+    corPrimaria: raiz.corPrimaria,
+    balancoFinanceiroVisivel: raiz.balancoFinanceiroVisivel,
+  }
+}
 
 /**
  * Resolve tenant ativo ou modo comunidade nacional (torcedor global sem torcida
@@ -165,29 +240,35 @@ export const resolverContextoComunidade = cache(
         afiliacao = raw ? projetarAfiliacaoComunidade(raw) : null
       }
 
-      // Subsede/PDE promovida a tenant próprio: sem logo de marca definido,
-      // usa a foto da Sede raiz do tenant (ou o avatar do canal oficial) —
-      // senão a topbar mostra a inicial da unidade mesmo com foto já cadastrada.
-      const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
+      // Portal ativo (pode ser PDE Caso B) × organizada (sempre a Sede raiz).
+      // Sem essa distinção, as abas de escudo duplicavam o logo da unidade.
+      const [logoPortal, torcidaReal, tenantSintetico] = await Promise.all([
+        resolveTenantLogoUrl(tenant.id, tenant.logoUrl),
+        projetarTorcidaOrganizada(tenant),
+        tenant.afiliacaoId
+          ? getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
+          : Promise.resolve(null),
+      ])
 
-      const tenantSintetico = tenant.afiliacaoId
-        ? await getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
-        : null
-
-      const torcidaReal: TorcidaRealComunidade = {
+      const portalAtivo: TorcidaRealComunidade = {
         id: tenant.id,
         nome: formatNomeTorcida(tenant.nome),
         afiliacaoId: tenant.afiliacaoId,
-        logoUrl,
+        logoUrl: logoPortal,
         corPrimaria: tenant.corPrimaria,
         balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
       }
 
-      const unidade = await resolverUnidadeDoVinculo(userId, [tenant.id])
+      // Vínculo na unidade OU na própria worktree (sócio na Sede com sedeId
+      // de PDE Caso A; liderança Caso B com portal na unidade).
+      const unidade = await resolverUnidadeDoVinculo(userId, [
+        tenant.id,
+        ...(torcidaReal.id !== tenant.id ? [torcidaReal.id] : []),
+      ])
 
       return {
         modo: 'torcida',
-        tenant: torcidaReal,
+        tenant: portalAtivo,
         afiliacao,
         tenantSintetico,
         // Sócio vê a torcida inteira; a aba da unidade só quando ele está

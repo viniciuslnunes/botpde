@@ -38,7 +38,7 @@ function ctxSocioComUnidade(): ContextoComunidadePortal {
   return {
     ...base,
     escopos: { torcida: true, unidade: true },
-    unidade: { canalId: 'canal-1', tenantId: 't-1', nome: 'Subsede Jundiaí' },
+    unidade: { canalId: 'canal-1', tenantId: 't-1', nome: 'Subsede Jundiaí', logoUrl: null },
   }
 }
 
@@ -70,7 +70,7 @@ function ctxTorcedorComUnidade(): ContextoComunidadePortal {
       corPrimaria: '#000',
       balancoFinanceiroVisivel: false,
     },
-    unidade: { canalId: 'canal-2', tenantId: 't-furia', nome: 'PDE Baixada' },
+    unidade: { canalId: 'canal-2', tenantId: 't-furia', nome: 'PDE Baixada', logoUrl: null },
   }
 }
 
