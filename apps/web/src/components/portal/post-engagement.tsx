@@ -123,6 +123,7 @@ export function PostEngagement({
   const [motivo, setMotivo] = useState('')
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
+  const comentarioCampoRef = useRef<HTMLDivElement>(null)
   const comentariosCarregadosRef = useRef(false)
 
   const carregarComentarios = useCallback(async () => {
@@ -613,7 +614,7 @@ export function PostEngagement({
             {comentariosAbertos && (
               <form onSubmit={enviarComentario} className="flex items-center gap-2">
                 <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
-                <div className="relative min-w-0 flex-1">
+                <div ref={comentarioCampoRef} className="relative min-w-0 flex-1">
                   <input
                     ref={inputRef}
                     value={comentario}
@@ -628,6 +629,7 @@ export function PostEngagement({
                       query={mencaoQuery}
                       onSelect={inserirMencaoComentario}
                       onClose={() => setMencaoQuery(null)}
+                      anchorRef={comentarioCampoRef}
                     />
                   )}
                 </div>

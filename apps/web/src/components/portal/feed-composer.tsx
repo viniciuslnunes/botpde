@@ -51,6 +51,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import { AnchoredPopover } from './anchored-popover'
 import { ComposerMentionHighlight } from './composer-mention-highlight'
 import { ExpandableText } from './expandable-text'
 import { PostMedia } from './post-media'
@@ -540,6 +541,9 @@ function ComposerBody({
   const fileDrag = useFileDragOver(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const composerFieldRef = useRef<HTMLDivElement>(null)
+  const emojiDesktopRef = useRef<HTMLDivElement>(null)
+  const stickerDesktopRef = useRef<HTMLDivElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
   const alcanceRef = useRef<HTMLDivElement>(null)
   const [, startTransition] = useTransition()
@@ -604,7 +608,8 @@ function ComposerBody({
     PRIORIDADE_OPCOES.find((opcao) => opcao.value === prioridade) ?? PRIORIDADE_OPCOES[0]!
   const PrioridadeIcon = opcaoPrioridadeAtual.Icon
 
-  const popoverAberto = alcanceOpen || emojiOpen || stickerOpen || extrasOpen
+  const popoverAberto =
+    alcanceOpen || emojiOpen || stickerOpen || extrasOpen || mencaoQuery !== null
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -742,8 +747,10 @@ function ComposerBody({
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
       const target = e.target as Node
-      if (!extrasRef.current?.contains(target)) setExtrasOpen(false)
-      if (!alcanceRef.current?.contains(target)) setAlcanceOpen(false)
+      const inPortal =
+        target instanceof Element && Boolean(target.closest('[data-anchored-popover]'))
+      if (!extrasRef.current?.contains(target) && !inPortal) setExtrasOpen(false)
+      if (!alcanceRef.current?.contains(target) && !inPortal) setAlcanceOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -933,7 +940,7 @@ function ComposerBody({
 
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
-        <div className="relative min-w-0 flex-1 space-y-2">
+        <div ref={composerFieldRef} className="relative min-w-0 flex-1 space-y-2">
           {comunicado && expanded && (
             <input
               type="text"
@@ -1023,6 +1030,7 @@ function ComposerBody({
               onSelect={inserirMencao}
               onClose={() => setMencaoQuery(null)}
               escopo={nacional ? 'nacional' : undefined}
+              anchorRef={composerFieldRef}
             />
           )}
         </div>
@@ -1254,7 +1262,7 @@ function ComposerBody({
 
                 {/* Desktop: todas as opções visíveis */}
                 <div className="hidden items-center gap-1 sm:flex">
-                  <div className="relative">
+                  <div ref={emojiDesktopRef} className="relative">
                     <button
                       type="button"
                       onClick={() => {
@@ -1266,13 +1274,8 @@ function ComposerBody({
                     >
                       <Smile className="h-5 w-5" />
                     </button>
-                    <AnimatePresence>
-                      {emojiOpen && (
-                        <EmojiPicker key="emoji" onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
-                      )}
-                    </AnimatePresence>
                   </div>
-                  <div className="relative">
+                  <div ref={stickerDesktopRef} className="relative">
                     <button
                       type="button"
                       onClick={() => {
@@ -1284,11 +1287,6 @@ function ComposerBody({
                     >
                       <StickerIcon className="h-5 w-5" />
                     </button>
-                    <AnimatePresence>
-                      {stickerOpen && (
-                        <StickerPicker key="sticker" onSelect={addSticker} onClose={() => setStickerOpen(false)} />
-                      )}
-                    </AnimatePresence>
                   </div>
                   {ferramentasTorcida && (
                     <button
@@ -1355,110 +1353,130 @@ function ComposerBody({
 
                   <AnimatePresence>
                     {extrasOpen && (
-                      <m.div
-                        key="extras-menu"
-                        variants={popoverPanel}
-                        initial="hidden"
-                        animate="show"
-                        exit="exit"
-                        transition={springGentle}
-                        className="card-soft absolute bottom-full left-0 z-20 mb-2 min-w-[11rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1"
+                      <AnchoredPopover
+                        open
+                        anchorRef={extrasRef}
+                        placement="top-start"
+                        offset={8}
+                        minWidth={176}
+                        zIndex={60}
                       >
-                        <m.button
-                          type="button"
-                          custom={0}
-                          variants={menuItemStagger}
+                        <m.div
+                          key="extras-menu"
+                          variants={popoverPanel}
                           initial="hidden"
                           animate="show"
-                          onClick={() => {
-                            fecharExtras()
-                            setStickerOpen(false)
-                            setEmojiOpen(true)
-                          }}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                          exit="exit"
+                          transition={springGentle}
+                          className="card-soft min-w-[11rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
                         >
-                          <Smile className="h-4 w-4 shrink-0" />
-                          Emoji
-                        </m.button>
-                        <m.button
-                          type="button"
-                          custom={1}
-                          variants={menuItemStagger}
-                          initial="hidden"
-                          animate="show"
-                          onClick={() => {
-                            fecharExtras()
-                            setEmojiOpen(false)
-                            setStickerOpen(true)
-                          }}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                        >
-                          <StickerIcon className="h-4 w-4 shrink-0" />
-                          Sticker
-                        </m.button>
-                        {ferramentasTorcida && (
                           <m.button
                             type="button"
-                            custom={2}
+                            custom={0}
                             variants={menuItemStagger}
                             initial="hidden"
                             animate="show"
-                            onClick={toggleEnquete}
-                            className={[
-                              'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                              modoEnquete ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
-                            ].join(' ')}
+                            onClick={() => {
+                              fecharExtras()
+                              setStickerOpen(false)
+                              setEmojiOpen(true)
+                            }}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                           >
-                            <BarChart3 className="h-4 w-4 shrink-0" />
-                            Enquete
+                            <Smile className="h-4 w-4 shrink-0" />
+                            Emoji
                           </m.button>
-                        )}
-                        {ferramentasTorcida && eventos.length > 0 && (
                           <m.button
                             type="button"
-                            custom={3}
+                            custom={1}
                             variants={menuItemStagger}
                             initial="hidden"
                             animate="show"
-                            onClick={toggleEvento}
-                            className={[
-                              'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                              modoEvento ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
-                            ].join(' ')}
+                            onClick={() => {
+                              fecharExtras()
+                              setEmojiOpen(false)
+                              setStickerOpen(true)
+                            }}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                           >
-                            <CalendarDays className="h-4 w-4 shrink-0" />
-                            Evento
+                            <StickerIcon className="h-4 w-4 shrink-0" />
+                            Sticker
                           </m.button>
-                        )}
-                        <m.button
-                          type="button"
-                          custom={ferramentasTorcida && eventos.length > 0 ? 4 : 3}
-                          variants={menuItemStagger}
-                          initial="hidden"
-                          animate="show"
-                          onClick={inserirArroba}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                        >
-                          <AtSign className="h-4 w-4 shrink-0" />
-                          Mencionar
-                        </m.button>
-                      </m.div>
-                    )}
-                  </AnimatePresence>
-
-                  <AnimatePresence>
-                    {emojiOpen && (
-                      <m.div key="emoji-mobile" className="absolute bottom-full left-0 z-30 mb-2">
-                        <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
-                      </m.div>
-                    )}
-                    {stickerOpen && (
-                      <m.div key="sticker-mobile" className="absolute bottom-full left-0 z-30 mb-2">
-                        <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
-                      </m.div>
+                          {ferramentasTorcida && (
+                            <m.button
+                              type="button"
+                              custom={2}
+                              variants={menuItemStagger}
+                              initial="hidden"
+                              animate="show"
+                              onClick={toggleEnquete}
+                              className={[
+                                'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                                modoEnquete ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
+                              ].join(' ')}
+                            >
+                              <BarChart3 className="h-4 w-4 shrink-0" />
+                              Enquete
+                            </m.button>
+                          )}
+                          {ferramentasTorcida && eventos.length > 0 && (
+                            <m.button
+                              type="button"
+                              custom={3}
+                              variants={menuItemStagger}
+                              initial="hidden"
+                              animate="show"
+                              onClick={toggleEvento}
+                              className={[
+                                'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                                modoEvento ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
+                              ].join(' ')}
+                            >
+                              <CalendarDays className="h-4 w-4 shrink-0" />
+                              Evento
+                            </m.button>
+                          )}
+                          <m.button
+                            type="button"
+                            custom={ferramentasTorcida && eventos.length > 0 ? 4 : 3}
+                            variants={menuItemStagger}
+                            initial="hidden"
+                            animate="show"
+                            onClick={inserirArroba}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                          >
+                            <AtSign className="h-4 w-4 shrink-0" />
+                            Mencionar
+                          </m.button>
+                        </m.div>
+                      </AnchoredPopover>
                     )}
                   </AnimatePresence>
                 </div>
+
+                {/* Pickers únicos — portal; âncora = trigger visível (desktop vs + mobile) */}
+                {emojiOpen && (
+                  <EmojiPicker
+                    anchorRef={
+                      extrasRef.current && extrasRef.current.getClientRects().length > 0
+                        ? extrasRef
+                        : emojiDesktopRef
+                    }
+                    onSelect={(e) => insertEmoji(e)}
+                    onClose={() => setEmojiOpen(false)}
+                  />
+                )}
+                {stickerOpen && (
+                  <StickerPicker
+                    anchorRef={
+                      extrasRef.current && extrasRef.current.getClientRects().length > 0
+                        ? extrasRef
+                        : stickerDesktopRef
+                    }
+                    onSelect={addSticker}
+                    onClose={() => setStickerOpen(false)}
+                  />
+                )}
 
                 <input
                   ref={fileInputRef}
@@ -1508,73 +1526,82 @@ function ComposerBody({
                   </button>
                   <AnimatePresence>
                     {alcanceOpen && (
-                      <m.div
-                        key="prioridade-menu"
-                        role="listbox"
-                        aria-label="Prioridade do comunicado"
-                        variants={popoverPanel}
-                        initial="hidden"
-                        animate="show"
-                        exit="exit"
-                        transition={springGentle}
-                        className="card-soft absolute top-full right-0 z-40 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                      <AnchoredPopover
+                        open
+                        anchorRef={alcanceRef}
+                        placement="bottom-end"
+                        offset={8}
+                        minWidth={248}
+                        zIndex={60}
                       >
-                        {PRIORIDADE_OPCOES.map((opcao, index) => {
-                          const selecionada = opcao.value === prioridade
-                          const Icon = opcao.Icon
-                          return (
-                            <m.button
-                              key={opcao.value}
-                              type="button"
-                              role="option"
-                              aria-selected={selecionada}
-                              custom={index}
-                              variants={menuItemStagger}
-                              initial="hidden"
-                              animate="show"
-                              onClick={() => {
-                                setPrioridade(opcao.value)
-                                setAlcanceOpen(false)
-                              }}
-                              className={[
-                                'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                                selecionada ? 'bg-[rgb(var(--color-primary)_/_0.08)]' : '',
-                              ].join(' ')}
-                            >
-                              <Icon
-                                aria-hidden
+                        <m.div
+                          key="prioridade-menu"
+                          role="listbox"
+                          aria-label="Prioridade do comunicado"
+                          variants={popoverPanel}
+                          initial="hidden"
+                          animate="show"
+                          exit="exit"
+                          transition={springGentle}
+                          className="card-soft min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                        >
+                          {PRIORIDADE_OPCOES.map((opcao, index) => {
+                            const selecionada = opcao.value === prioridade
+                            const Icon = opcao.Icon
+                            return (
+                              <m.button
+                                key={opcao.value}
+                                type="button"
+                                role="option"
+                                aria-selected={selecionada}
+                                custom={index}
+                                variants={menuItemStagger}
+                                initial="hidden"
+                                animate="show"
+                                onClick={() => {
+                                  setPrioridade(opcao.value)
+                                  setAlcanceOpen(false)
+                                }}
                                 className={[
-                                  'mt-0.5 h-4 w-4 shrink-0',
-                                  selecionada
-                                    ? 'text-[rgb(var(--color-primary-fg))]'
-                                    : 'text-[rgb(var(--foreground-muted))]',
+                                  'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                                  selecionada ? 'bg-[rgb(var(--color-primary)_/_0.08)]' : '',
                                 ].join(' ')}
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span
+                              >
+                                <Icon
+                                  aria-hidden
                                   className={[
-                                    'block text-sm font-medium',
+                                    'mt-0.5 h-4 w-4 shrink-0',
                                     selecionada
                                       ? 'text-[rgb(var(--color-primary-fg))]'
-                                      : 'text-[rgb(var(--foreground))]',
+                                      : 'text-[rgb(var(--foreground-muted))]',
                                   ].join(' ')}
-                                >
-                                  {opcao.label}
-                                </span>
-                                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
-                                  {opcao.descricao}
-                                </span>
-                              </span>
-                              {selecionada && (
-                                <Check
-                                  aria-hidden
-                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
                                 />
-                              )}
-                            </m.button>
-                          )
-                        })}
-                      </m.div>
+                                <span className="min-w-0 flex-1">
+                                  <span
+                                    className={[
+                                      'block text-sm font-medium',
+                                      selecionada
+                                        ? 'text-[rgb(var(--color-primary-fg))]'
+                                        : 'text-[rgb(var(--foreground))]',
+                                    ].join(' ')}
+                                  >
+                                    {opcao.label}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                                    {opcao.descricao}
+                                  </span>
+                                </span>
+                                {selecionada && (
+                                  <Check
+                                    aria-hidden
+                                    className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                                  />
+                                )}
+                              </m.button>
+                            )
+                          })}
+                        </m.div>
+                      </AnchoredPopover>
                     )}
                   </AnimatePresence>
                 </div>
@@ -1620,86 +1647,95 @@ function ComposerBody({
                   </button>
                   <AnimatePresence>
                     {alcanceOpen && (
-                      <m.div
-                        key="alcance-menu"
-                        role="listbox"
-                        aria-label="Visibilidade do post"
-                        variants={popoverPanel}
-                        initial="hidden"
-                        animate="show"
-                        exit="exit"
-                        transition={springGentle}
-                        className="card-soft absolute top-full right-0 z-40 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                      <AnchoredPopover
+                        open
+                        anchorRef={alcanceRef}
+                        placement="bottom-end"
+                        offset={8}
+                        minWidth={248}
+                        zIndex={60}
                       >
-                        {VISIBILIDADE_OPCOES.map((opcao, index) => {
-                          const selecionada = opcao.value === visibilidadeEfetiva
-                          const bloqueada = opcao.value === 'PUBLICO' && perfilPrivado
-                          const Icon = opcao.Icon
-                          return (
-                            <m.button
-                              key={opcao.value}
-                              type="button"
-                              role="option"
-                              aria-selected={selecionada}
-                              aria-disabled={bloqueada || undefined}
-                              custom={index}
-                              variants={menuItemStagger}
-                              initial="hidden"
-                              animate="show"
-                              onClick={() => onEscolherVisibilidade(opcao.value)}
-                              className={[
-                                'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
-                                bloqueada
-                                  ? 'cursor-pointer opacity-55 hover:bg-[rgb(var(--background-subtle))]'
-                                  : 'hover:bg-[rgb(var(--background-subtle))]',
-                                selecionada && !bloqueada
-                                  ? 'bg-[rgb(var(--color-primary)_/_0.08)]'
-                                  : '',
-                              ].join(' ')}
-                            >
-                              <Icon
-                                aria-hidden
+                        <m.div
+                          key="alcance-menu"
+                          role="listbox"
+                          aria-label="Visibilidade do post"
+                          variants={popoverPanel}
+                          initial="hidden"
+                          animate="show"
+                          exit="exit"
+                          transition={springGentle}
+                          className="card-soft min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                        >
+                          {VISIBILIDADE_OPCOES.map((opcao, index) => {
+                            const selecionada = opcao.value === visibilidadeEfetiva
+                            const bloqueada = opcao.value === 'PUBLICO' && perfilPrivado
+                            const Icon = opcao.Icon
+                            return (
+                              <m.button
+                                key={opcao.value}
+                                type="button"
+                                role="option"
+                                aria-selected={selecionada}
+                                aria-disabled={bloqueada || undefined}
+                                custom={index}
+                                variants={menuItemStagger}
+                                initial="hidden"
+                                animate="show"
+                                onClick={() => onEscolherVisibilidade(opcao.value)}
                                 className={[
-                                  'mt-0.5 h-4 w-4 shrink-0',
+                                  'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
+                                  bloqueada
+                                    ? 'cursor-pointer opacity-55 hover:bg-[rgb(var(--background-subtle))]'
+                                    : 'hover:bg-[rgb(var(--background-subtle))]',
                                   selecionada && !bloqueada
-                                    ? 'text-[rgb(var(--color-primary-fg))]'
-                                    : 'text-[rgb(var(--foreground-muted))]',
+                                    ? 'bg-[rgb(var(--color-primary)_/_0.08)]'
+                                    : '',
                                 ].join(' ')}
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span
+                              >
+                                <Icon
+                                  aria-hidden
                                   className={[
-                                    'block text-sm font-medium',
+                                    'mt-0.5 h-4 w-4 shrink-0',
                                     selecionada && !bloqueada
                                       ? 'text-[rgb(var(--color-primary-fg))]'
-                                      : 'text-[rgb(var(--foreground))]',
+                                      : 'text-[rgb(var(--foreground-muted))]',
                                   ].join(' ')}
-                                >
-                                  {opcao.label}
-                                  {bloqueada ? ' (indisponível)' : ''}
-                                </span>
-                                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
-                                  {bloqueada
-                                    ? 'Perfil privado — toque para alterar a privacidade'
-                                    : opcao.descricao}
-                                </span>
-                              </span>
-                              {selecionada && !bloqueada && (
-                                <Check
-                                  aria-hidden
-                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
                                 />
-                              )}
-                              {bloqueada && (
-                                <Lock
-                                  aria-hidden
-                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]"
-                                />
-                              )}
-                            </m.button>
-                          )
-                        })}
-                      </m.div>
+                                <span className="min-w-0 flex-1">
+                                  <span
+                                    className={[
+                                      'block text-sm font-medium',
+                                      selecionada && !bloqueada
+                                        ? 'text-[rgb(var(--color-primary-fg))]'
+                                        : 'text-[rgb(var(--foreground))]',
+                                    ].join(' ')}
+                                  >
+                                    {opcao.label}
+                                    {bloqueada ? ' (indisponível)' : ''}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                                    {bloqueada
+                                      ? 'Perfil privado — toque para alterar a privacidade'
+                                      : opcao.descricao}
+                                  </span>
+                                </span>
+                                {selecionada && !bloqueada && (
+                                  <Check
+                                    aria-hidden
+                                    className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                                  />
+                                )}
+                                {bloqueada && (
+                                  <Lock
+                                    aria-hidden
+                                    className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]"
+                                  />
+                                )}
+                              </m.button>
+                            )
+                          })}
+                        </m.div>
+                      </AnchoredPopover>
                     )}
                   </AnimatePresence>
                 </div>
