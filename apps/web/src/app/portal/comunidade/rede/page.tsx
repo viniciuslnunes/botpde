@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getPostIdsSalvos, getPostsDaRede } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadeRedeInfinite } from '../_components/comunidade-rede-infinite'
@@ -15,13 +15,10 @@ export default async function RedeComunidadePage({
 }: {
   searchParams: Promise<{ cursor?: string }>
 }) {
-  const [params, session, tenant] = await Promise.all([
-    searchParams,
-    auth(),
-    getTenantFromHost(),
-  ])
+  const [params, session] = await Promise.all([searchParams, auth()])
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const { posts, pageInfo } = await getPostsDaRede(tenant.id, session.user.id, {
     cursor: params.cursor,

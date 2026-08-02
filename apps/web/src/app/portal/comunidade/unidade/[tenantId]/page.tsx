@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getOrCreateCanalOficial, podeVerCanal } from '@/lib/canais'
 import type { Metadata } from 'next'
 
@@ -25,9 +25,10 @@ export default async function UnidadePerfilPage({
   params: Promise<{ tenantId: string }>
 }) {
   const { tenantId: targetTenantId } = await params
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const alvo: { id: string } | null = await db.tenant.findFirst({
     where: { id: targetTenantId, ativo: true },

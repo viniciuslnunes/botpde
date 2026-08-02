@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
       tenantId = ctx.tenantSintetico.id
     } else if (ctx.modo === 'torcida') {
       tenantId = ctx.tenant.id
+    } else if (ctx.torcidaReal) {
+      // TORCEDOR na aba Minha torcida — não cair no sintético da CN.
+      tenantId = ctx.torcidaReal.id
     } else if (ctx.tenantSintetico) {
       tenantId = ctx.tenantSintetico.id
     }

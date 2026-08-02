@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     } else if (ctx.modo === 'torcida') {
       tenantId = ctx.tenant.id
       await assertMembroAtivo(tenantId, session.user.id)
+    } else if (ctx.torcidaReal) {
+      tenantId = ctx.torcidaReal.id
     } else if (ctx.tenantSintetico) {
       tenantId = ctx.tenantSintetico.id
     } else {

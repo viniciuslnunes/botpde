@@ -79,6 +79,7 @@ export async function ComunidadePostsSection({
         currentUser={currentUser}
         filtro={filtro}
         conversaId={conversaId}
+        escopo="torcida"
         initialPosts={feed.posts}
         initialPageInfo={feed.pageInfo}
         initialCursor={cursor ?? null}
@@ -94,6 +95,7 @@ export async function ComunidadePostsSection({
         tenantId={tenantId}
         currentUser={currentUser}
         filtro={filtro}
+        escopo="torcida"
         initialPosts={feed.posts}
         initialPageInfo={feed.pageInfo}
         initialCursor={cursor ?? null}
@@ -109,6 +111,7 @@ export async function ComunidadePostsSection({
         tenantId={tenantId}
         currentUser={currentUser}
         filtro={filtro}
+        escopo="torcida"
         initialPosts={feed.posts}
         initialPageInfo={feed.pageInfo}
         initialCursor={cursor ?? null}
@@ -124,6 +127,7 @@ export async function ComunidadePostsSection({
       tenantId={tenantId}
       currentUser={currentUser}
       filtro={filtro}
+      escopo="torcida"
       initialPosts={feed.posts}
       initialPageInfo={feed.pageInfo}
       initialCursor={cursor ?? null}

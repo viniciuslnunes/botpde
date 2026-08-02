@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getPostsDoGrupo } from '@/lib/feed'
 
 const querySchema = z.object({
@@ -17,9 +17,13 @@ export async function GET(
 ) {
   try {
     const { id: conversaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
+    const session = await auth()
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+    const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+    if (!tenant) {
+      return NextResponse.json({ error: 'Sem torcida para este feed.' }, { status: 403 })
     }
 
     const parsed = querySchema.safeParse({

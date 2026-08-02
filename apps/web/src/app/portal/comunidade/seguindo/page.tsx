@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { UserPlus } from 'lucide-react'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { db } from '@torcida/db'
 import { getPodeSeguirDeVoltaPorSeguidor } from '@/lib/social'
 import { SeguimentoPendentesList } from '../_components/seguimento-pendentes-list'
@@ -22,9 +22,10 @@ interface SeguimentoPendenteRow {
 }
 
 export default async function SeguindoPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   // Sem filtro por tenantContextoId: esse campo é o contexto do SEGUIDOR
   // (ex.: CN do torcedor), não o tenant do perfil do sócio que recebe o pedido.

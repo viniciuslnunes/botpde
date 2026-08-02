@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPodeAcessarSalaNacional } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { db } from '@torcida/db'
 
 /**
@@ -15,8 +15,10 @@ import { db } from '@torcida/db'
  * chamadores — não é equivalente a `SaasMembro` real.
  */
 export async function assertSalaMembro(salaId: string) {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado.')
+  // Vínculo do usuário — nunca TENANT_SLUG (sala/chat de rival no deploy).
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
 
   if (tenant) {
     try {

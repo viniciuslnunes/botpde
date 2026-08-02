@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { assertComunidadeNacional } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { subscribeFeedNacionalPing, subscribeFeedPing } from '@/lib/feed-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * "tem post novo" e mostra o banner de novos posts — a lista em si continua
  * SSR, atualizada quando o membro clica para voltar ao topo do feed.
  *
- * Torcida: canal por tenant (host).
+ * Torcida: canal por vínculo do usuário (nunca TENANT_SLUG do deploy).
  * Nacional: `?escopo=nacional&afiliacaoId=` — torcedor global sem subdomínio de torcida.
  */
 export async function GET(request: Request) {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       )
     }
 
-    const tenant = await getTenantFromHost()
+    const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
     if (!tenant) {
       return new Response('Tenant não encontrado', { status: 404 })
     }

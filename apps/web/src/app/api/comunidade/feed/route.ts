@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import {
   getPostsDaRede,
   getPostsParaFeed,
@@ -87,9 +87,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ posts, pageInfo })
     }
 
-    const tenant = await getTenantFromHost()
+    // Minha torcida: vínculo do usuário — nunca TENANT_SLUG do deploy
+    // (vazava posts de rivais no refetch do TORCEDOR).
+    const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
     if (!tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+      return NextResponse.json({ error: 'Sem torcida para este feed.' }, { status: 403 })
     }
 
     const filtro = parsed.data.filtro ?? 'descobrir'

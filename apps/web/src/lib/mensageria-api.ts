@@ -2,8 +2,8 @@ import type { Session } from 'next-auth'
 import { auth } from '@/lib/auth'
 import { assertComunidadeNacional, assertMembroAtivo } from '@/lib/authz'
 import { db } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { assertMembroConversa } from './mensageria'
 
@@ -42,8 +42,11 @@ export async function getStatusInboxMensageria(
 
 /** Sessão + tenant + elegível para mensageria (membro ativo ou cargo no tenant). */
 export async function assertUsuarioMensageria() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) throw new Error('Não autenticado.')
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado.')
+  // Vínculo do usuário — nunca TENANT_SLUG (rivais no single-tenant).
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) throw new Error('Não autenticado.')
 
   const status = await getStatusInboxMensageria(session.user.id, tenant.id)
   if (!status.podeListar) {

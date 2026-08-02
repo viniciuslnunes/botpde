@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getPostsPorHashtag } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
@@ -14,13 +14,10 @@ export default async function HashtagPage({
 }: {
   params: Promise<{ tag: string }>
 }) {
-  const [{ tag }, session, tenant] = await Promise.all([
-    params,
-    auth(),
-    getTenantFromHost(),
-  ])
+  const [{ tag }, session] = await Promise.all([params, auth()])
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const { tag: normalized, posts } = await getPostsPorHashtag(
     tenant.id,

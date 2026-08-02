@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
+import type { Tenant } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { filtrarTenantsRestritos } from '@/lib/isolamento'
 import { resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
@@ -275,5 +276,28 @@ export const resolveTenantIdPortalComunidade = cache(
 
     const sintetico = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
     return sintetico.id
+  },
+)
+
+/**
+ * Tenant da aba "Minha torcida" (sócio ativo ou TORCEDOR APROVADO na unidade).
+ *
+ * **Nunca** usa `getTenantFromHost()` / `TENANT_SLUG` — em single-tenant o
+ * deploy (ex.: Gaviões) vazava posts de rivais no refetch do feed do TORCEDOR
+ * de outra torcida (Tricolor, Mancha, Fúria…).
+ */
+export const resolveTenantMinhaTorcida = cache(
+  async (userId: string, email?: string | null): Promise<Tenant | null> => {
+    const ativo = await getActiveTenant(userId, email)
+    if (ativo) return ativo
+
+    const torcida = await resolverTorcidaDoTorcedor(userId)
+    if (!torcida) return null
+
+    const row: Tenant | null = await db.tenant.findFirst({
+      where: { id: torcida.id, ativo: true, sintetico: false },
+    })
+    if (!row) return null
+    return { ...row, nome: formatNomeTorcida(row.nome) }
   },
 )

@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
 import {
   avaliarAcessoDm,
   criarDmComSolicitacao,
@@ -24,7 +23,7 @@ import {
 } from '@/lib/mensageria-api'
 import { emitMensagemNova } from '@/lib/mensageria-bus'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
-import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
@@ -159,7 +158,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
-    const tenant = await getTenantFromHost()
+    const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
     if (tenant) {
       const status = await getStatusInboxMensageria(session.user.id, tenant.id)
       if (status.podeListar) {

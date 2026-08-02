@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getPostIdsSalvos, getPostsPublicosDoTenant } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { LogoImage } from '@/components/media/logo-image'
@@ -16,9 +16,10 @@ export default async function TorcidaComunidadePublicaPage({
   params: Promise<{ tenantId: string }>
 }) {
   const { tenantId: targetTenantId } = await params
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const [perfil, salvoIds] = await Promise.all([
     getPostsPublicosDoTenant(targetTenantId, session.user.id, tenant.id),

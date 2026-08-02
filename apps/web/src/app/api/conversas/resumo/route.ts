@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
 import { contarMensagensNaoLidas } from '@/lib/mensageria'
 import { getStatusInboxMensageria } from '@/lib/mensageria-api'
-import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
-    const tenant = await getTenantFromHost()
+    const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
     if (tenant) {
       const status = await getStatusInboxMensageria(session.user.id, tenant.id)
       if (status.podeListar) {

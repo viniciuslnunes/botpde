@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadeAsideRail } from '../../_components/comunidade-aside-rail'
@@ -21,9 +22,10 @@ export default async function CanalDetalhePage({
 }) {
   const { id } = await params
   const { cursor } = await searchParams
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(
     session.user.id,

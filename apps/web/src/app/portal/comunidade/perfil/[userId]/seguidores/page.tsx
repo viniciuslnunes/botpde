@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { listarRedeSocial, podeVerListasRede } from '@/lib/perfil-social'
 import { ComunidadeMemberList } from '../../../_components/comunidade-member-list'
 import { getSeguimentoStatus } from '@/lib/social'
@@ -15,9 +15,10 @@ export default async function PerfilSeguidoresPage({
 }: {
   params: Promise<{ userId: string }>
 }) {
-  const [{ userId }, session, tenant] = await Promise.all([params, auth(), getTenantFromHost()])
+  const [{ userId }, session] = await Promise.all([params, auth()])
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const user = await db.user.findUnique({
     where: { id: userId },

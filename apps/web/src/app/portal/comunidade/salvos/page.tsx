@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { Bookmark } from 'lucide-react'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getPostsSalvos } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadePostsAnimated } from '../_components/comunidade-posts-animated'
@@ -11,9 +11,10 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Salvos — Comunidade' }
 
 export default async function SalvosPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
   const posts = await getPostsSalvos(tenant.id, session.user.id)
 
