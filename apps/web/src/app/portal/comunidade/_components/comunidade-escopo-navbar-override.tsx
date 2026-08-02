@@ -34,12 +34,15 @@ type TorcidaBrand = {
 export function ComunidadeEscopoNavbarOverride({
   afiliacao,
   torcidaReal,
+  unidade = null,
   escopos,
   modoContexto = 'torcida',
   corPrimariaNacional,
 }: {
   afiliacao: AfiliacaoBrand | null
   torcidaReal: TorcidaBrand | null
+  /** Marca da aba unidade (subsede/PDE) — senão o header volta ao clube. */
+  unidade?: { nome: string; logoUrl: string | null } | null
   escopos: EscoposDisponiveis
   /** TORCEDOR = nacional (default CN); sócio = torcida. */
   modoContexto?: 'nacional' | 'torcida'
@@ -76,6 +79,12 @@ export function ComunidadeEscopoNavbarOverride({
         corPrimaria: torcidaReal.corPrimaria,
         logoUrl: torcidaReal.logoUrl,
       }
+    } else if (escopo === 'unidade' && unidade) {
+      brand = {
+        nome: unidade.nome,
+        corPrimaria: torcidaReal?.corPrimaria ?? corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
+        logoUrl: unidade.logoUrl,
+      }
     }
 
     if (!brand) {
@@ -96,6 +105,9 @@ export function ComunidadeEscopoNavbarOverride({
     torcidaReal?.nome,
     torcidaReal?.corPrimaria,
     torcidaReal?.logoUrl,
+    unidade,
+    unidade?.nome,
+    unidade?.logoUrl,
     corPrimariaNacional,
     setOverride,
   ])

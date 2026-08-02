@@ -125,6 +125,14 @@ export function PortalNavbar({
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
 
+  // Abaixo de xl os labels somem da barra (só hamburger). Torcedor do convite
+  // precisa ver Loja/Sedes/Agenda sem abrir o menu — ícones na faixa de ações.
+  const atalhosTopbarMobile = links.filter((link) =>
+    link.href === '/portal/eventos' ||
+    link.href === '/portal/sedes' ||
+    link.href === '/portal/loja',
+  )
+
   // CN não tem área admin — esconde o cadeado no escopo nacional da comunidade.
   const naComunidade = pathname.startsWith('/portal/comunidade')
   const escopoParam = searchParams.get('escopo')
@@ -210,6 +218,28 @@ export function PortalNavbar({
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            {atalhosTopbarMobile.map((link) => {
+              const Icon = link.icon
+              const active = isActive(link.href)
+              return (
+                <PortalNavLink
+                  key={link.href}
+                  href={link.href}
+                  prefetch={link.prefetch}
+                  aria-label={link.label}
+                  title={link.label}
+                  className={[
+                    'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors xl:hidden',
+                    active
+                      ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+                  ].join(' ')}
+                  showSpinner={false}
+                >
+                  <Icon className="h-4 w-4" />
+                </PortalNavLink>
+              )
+            })}
             <PortalNavLink
               href="/portal/mensagens"
               prefetch="hover"

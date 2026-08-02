@@ -16,6 +16,8 @@ interface PortalNavLinkProps {
   className: string
   children: React.ReactNode
   showSpinner?: boolean
+  'aria-label'?: string
+  title?: string
 }
 
 function LinkPendingSpinner() {
@@ -31,6 +33,8 @@ export function PortalNavLink({
   className,
   children,
   showSpinner = true,
+  'aria-label': ariaLabel,
+  title,
 }: PortalNavLinkProps) {
   const router = useRouter()
   const prefetched = useRef(false)
@@ -50,6 +54,8 @@ export function PortalNavLink({
       onClick={onClick}
       onMouseEnter={prefetch === 'hover' ? prefetchOnIntent : undefined}
       onFocus={prefetch === 'hover' ? prefetchOnIntent : undefined}
+      aria-label={ariaLabel}
+      title={title}
       data-cursor-action=""
       className={['cursor-pointer', className].filter(Boolean).join(' ')}
     >

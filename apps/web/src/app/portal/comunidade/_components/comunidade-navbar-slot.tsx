@@ -36,6 +36,11 @@ export async function ComunidadeNavbarSlot() {
       <ComunidadeEscopoNavbarOverride
         afiliacao={afiliacao}
         torcidaReal={torcidaReal}
+        unidade={
+          ctx.unidade
+            ? { nome: ctx.unidade.nome, logoUrl: ctx.unidade.logoUrl }
+            : null
+        }
         escopos={ctx.escopos}
         modoContexto={ctx.modo}
         corPrimariaNacional={corPrimaria}

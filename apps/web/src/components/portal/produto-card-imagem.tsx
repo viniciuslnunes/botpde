@@ -7,7 +7,7 @@ import { resolveProdutoImagens } from '@/lib/produto-imagem'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 const CARD_IMG_CLASS =
-  'rounded-xl object-cover object-[center_18%] transition-opacity duration-300'
+  'object-cover object-[center_18%] transition-opacity duration-300'
 
 interface ProdutoCardImagemProps {
   imagensUrl: string[]
@@ -90,7 +90,7 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
   return (
     <div
       className={[
-        'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))] p-2.5 sm:p-3',
+        'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
         className,
       ]
         .filter(Boolean)
@@ -98,12 +98,9 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Padding no container + rounded-xl na foto: cada imagem vira uma
-          "peça numa vitrine" com respiro, em vez de papel de parede colado
-          na borda do card — disfarça a inconsistência entre fundos/fotos. */}
       {showPlaceholder && (
         <div
-          className="absolute inset-2.5 animate-pulse rounded-xl bg-[rgb(var(--border)_/_0.45)] sm:inset-3"
+          className="absolute inset-0 animate-pulse bg-[rgb(var(--border)_/_0.45)]"
           aria-hidden
         />
       )}
@@ -123,14 +120,8 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
           onLoad={() => setLoaded((s) => new Set(s).add(1))}
         />
       )}
-      {/* Anel sutil + sombra no rodapé: define a borda da foto e unifica o
-          contraste entre fotos com fundos/exposições diferentes. */}
       <div
-        className="pointer-events-none absolute inset-2.5 rounded-xl ring-1 ring-[rgb(var(--border)_/_0.5)] sm:inset-3"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-2.5 rounded-xl bg-gradient-to-t from-black/15 via-transparent to-transparent sm:inset-3"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent"
         aria-hidden
       />
       {verso && !failed.has(1) && (

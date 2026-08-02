@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { getActiveTenant } from '@/lib/tenant'
+import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { listLojasDoSocio, tenantsPermitidosLoja, type LojaResumo } from '@/lib/loja-lojas'
 import { labelTipoUnidade } from '@/lib/canais-shared'
 import { redirect } from 'next/navigation'
@@ -34,13 +34,14 @@ export default async function PortalLojaListagemPage() {
   if (lojas.length === 0) {
     const tenant = await getActiveTenant(userId, session.user.email)
     if (tenant) {
+      const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl ?? null)
       lojas = [
         {
           tenantId: tenant.id,
           nome: tenant.nome,
           tipo: 'SEDE',
           cidade: null,
-          logoUrl: tenant.logoUrl ?? null,
+          logoUrl,
           corPrimaria: tenant.corPrimaria ?? '220 90% 50%',
           principal: true,
           totalProdutos: await db.saasProduto.count({

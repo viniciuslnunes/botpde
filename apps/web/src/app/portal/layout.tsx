@@ -91,7 +91,11 @@ export default async function PortalLayout({
       tenant={navbarTenant}
       temDepartamentos={totalDepartamentos > 0}
       modoNacional={ctx?.modo === 'nacional'}
-      temVinculoTorcida={Boolean(ctx?.modo === 'nacional' && ctx.torcidaReal)}
+      // Convite TORCEDOR: torcidaReal (sede/unidade) ou aba unidade — ambos
+      // liberam Loja/Sedes/Agenda; Carteirinha/Departamentos continuam fora.
+      temVinculoTorcida={Boolean(
+        ctx?.modo === 'nacional' && (ctx.torcidaReal || ctx.unidade),
+      )}
       tenantSlugAtual={hostTenant?.slug ?? null}
     />
   )

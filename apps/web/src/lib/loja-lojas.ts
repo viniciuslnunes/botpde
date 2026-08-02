@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getTenantsRestritos } from '@/lib/isolamento'
+import { resolveTenantLogoUrl } from '@/lib/tenant'
 
 /**
  * Tenants com vínculo APROVADO que liberam a loja: sócio (qualquer registro,
@@ -115,7 +116,13 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
 
   const [tenants, sedes, produtosPorTenant]: [
     Array<{ id: string; nome: string; logoUrl: string | null; corPrimaria: string }>,
-    Array<{ tenantId: string | null; tipo: string; cidade: string | null }>,
+    Array<{
+      id: string
+      tenantId: string | null
+      sedeId: string | null
+      tipo: string
+      cidade: string | null
+    }>,
     Array<{ tenantId: string; _count: { _all: number } }>,
   ] = await Promise.all([
     db.tenant.findMany({
@@ -124,7 +131,7 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
     }),
     db.sede.findMany({
       where: { tenantId: { in: tenantIds } },
-      select: { tenantId: true, tipo: true, cidade: true },
+      select: { id: true, tenantId: true, sedeId: true, tipo: true, cidade: true },
     }),
     db.saasProduto.groupBy({
       by: ['tenantId'],
@@ -133,7 +140,27 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
     }),
   ])
 
-  const sedeMap = new Map(sedes.filter((s) => s.tenantId).map((s) => [s.tenantId!, s]))
+  // PDE/subsede: logo vive em Sede.fotoUrl / canal — não em Tenant.logoUrl.
+  const logos = await Promise.all(
+    tenants.map((t) => resolveTenantLogoUrl(t.id, t.logoUrl)),
+  )
+  const logoPorTenant = new Map(tenants.map((t, i) => [t.id, logos[i] ?? null]))
+
+  // Preferir a sede raiz do tenant (mesma regra de resolveTenantLogoUrl).
+  const sedeMap = new Map<string, { tipo: string; cidade: string | null }>()
+  const sedesPorTenant = new Map<string, typeof sedes>()
+  for (const s of sedes) {
+    if (!s.tenantId) continue
+    const list = sedesPorTenant.get(s.tenantId) ?? []
+    list.push(s)
+    sedesPorTenant.set(s.tenantId, list)
+  }
+  for (const [tenantId, list] of sedesPorTenant) {
+    const ids = new Set(list.map((s) => s.id))
+    const raiz = list.find((s) => !s.sedeId || !ids.has(s.sedeId)) ?? list[0]
+    if (raiz) sedeMap.set(tenantId, { tipo: raiz.tipo, cidade: raiz.cidade })
+  }
+
   const produtosMap = new Map(produtosPorTenant.map((p) => [p.tenantId, p._count._all]))
 
   const resumos: LojaResumo[] = tenants.map((t) => {
@@ -143,7 +170,7 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
       nome: formatNomeTorcida(t.nome),
       tipo: sede?.tipo ?? 'SEDE',
       cidade: sede?.cidade ?? null,
-      logoUrl: t.logoUrl,
+      logoUrl: logoPorTenant.get(t.id) ?? null,
       corPrimaria: t.corPrimaria,
       principal: raizes.has(t.id),
       totalProdutos: produtosMap.get(t.id) ?? 0,
