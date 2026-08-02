@@ -452,6 +452,29 @@ describe('solicitarVinculo — validação', () => {
     expect(sincronizarSocioNaSedeRaizFn).toHaveBeenCalled()
   })
 
+  it('torcedor conclui mesmo se a inscrição nos canais oficiais falhar', async () => {
+    // Regressão: unidade Caso B com canal emprestado no tenant da mãe fazia o
+    // gate de elegibilidade estourar e o wizard travava na etapa de vínculo.
+    tenantFindFirst.mockResolvedValue({
+      id: UUID,
+      slug: 'torcida-teste',
+      nome: 'Torcida Teste',
+      exigirDocumentosCadastro: true,
+    })
+    sedeFindMany.mockResolvedValue([])
+    membroFindUnique.mockResolvedValue(null)
+    membroCreate.mockResolvedValue({ id: 'novo' })
+    vincularMembroCanaisFn.mockRejectedValueOnce(
+      new Error('Você precisa ter vínculo com a torcida deste canal para participar.'),
+    )
+
+    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' })
+
+    expect(r.ok).toBe(true)
+    expect(r.redirectTo).toBe('/portal/comunidade?escopo=nacional')
+    expect(perfilUpsert).toHaveBeenCalled()
+  })
+
   it('sócio com departamento grava preferência sem UserDepartamento', async () => {
     tenantFindFirst.mockResolvedValue({
       id: UUID,
@@ -533,7 +556,7 @@ describe('solicitarVinculo — validação', () => {
     expect(userDepartamentoUpsert).not.toHaveBeenCalled()
   })
 
-  it('bloqueia quando já APROVADO', async () => {
+  it('conclui (em vez de travar) quando já APROVADO, curando os canais', async () => {
     tenantFindFirst.mockResolvedValue({
       id: UUID,
       slug: 'torcida-teste',
@@ -548,7 +571,10 @@ describe('solicitarVinculo — validação', () => {
       sedeId: UUID2,
     })
     const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
-    expect(r.message).toContain('já é membro aprovado')
+    // Já ser membro não é erro: o wizard tem que sair da etapa de vínculo.
+    expect(r.ok).toBe(true)
+    expect(r.redirectTo).toBe('/portal/comunidade?escopo=nacional')
+    expect(r.message).toBeUndefined()
     expect(vincularMembroCanaisFn).toHaveBeenCalledWith({
       tenantId: UUID,
       userId: 'u1',

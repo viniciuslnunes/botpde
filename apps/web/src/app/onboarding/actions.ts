@@ -829,6 +829,55 @@ export async function registrarInteresseUnidade(input: {
   return { ok: true, emailHref }
 }
 
+/** Marca o onboarding como concluído e fixa a afiliação resolvida do tenant. */
+async function concluirPerfilTorcedor(
+  userId: string,
+  afiliacaoId: string | null,
+): Promise<void> {
+  await db.perfilTorcedor.upsert({
+    where: { userId },
+    create: {
+      userId,
+      onboardingConcluidoEm: new Date(),
+      ...(afiliacaoId ? { afiliacaoId } : {}),
+    },
+    update: {
+      onboardingConcluidoEm: new Date(),
+      ...(afiliacaoId ? { afiliacaoId } : {}),
+    },
+  })
+}
+
+/**
+ * Inscreve nos canais oficiais sem poder derrubar o onboarding: o vínculo
+ * canônico já está gravado, e uma falha aqui (canal sem responsável, canal
+ * emprestado no tenant da mãe) deixava o usuário preso na etapa de vínculo,
+ * inclusive nas tentativas seguintes. `repair-*-canal-membro` cobre a sobra.
+ */
+async function vincularCanaisBestEffort(opts: {
+  tenantId: string
+  userId: string
+  sedeId: string | null
+}): Promise<void> {
+  try {
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: opts.tenantId,
+      userId: opts.userId,
+      sedeId: opts.sedeId,
+      fallbackCriadoPorId: opts.userId,
+    })
+  } catch (err) {
+    if (isExpectedError(err)) {
+      console.warn(
+        '[solicitarVinculo] inscrição nos canais oficiais:',
+        err instanceof Error ? err.message : err,
+      )
+    } else {
+      console.error('[solicitarVinculo] inscrição nos canais oficiais falhou', err)
+    }
+  }
+}
+
 /**
  * Cria (ou reenvia, se REPROVADO) um SaasMembro PENDENTE no tenant escolhido,
  * reaproveitando a lógica de dedup / re-tentativa / AuditLog do fluxo de cadastro.
@@ -1050,13 +1099,23 @@ export async function solicitarVinculo(
     if (existing?.status === 'APROVADO') {
       // Também cura tentativas anteriores em que o vínculo foi persistido,
       // mas o provisionamento dos canais falhou depois da transação.
-      await vincularMembroCanaisAposAprovacao({
+      // Best-effort: canal com problema não pode prender a pessoa no wizard.
+      await vincularCanaisBestEffort({
         tenantId: tenantDestino.id,
         userId,
         sedeId: existing.sedeId,
-        fallbackCriadoPorId: userId,
       })
-      return { message: 'Você já é membro aprovado desta torcida.' }
+      // Já é membro: isso não é erro. Conclui o onboarding e segue para a
+      // comunidade — antes o wizard travava na última etapa sem saída.
+      await concluirPerfilTorcedor(userId, afiliacaoIdEfetiva)
+      await limparSlugConviteCookie()
+      const tipoExistente = typeof existing.tipo === 'string' ? existing.tipo : data.tipo
+      if (tipoExistente === 'TORCEDOR') {
+        await clearTenantContextSlug()
+        return { ok: true, redirectTo: '/portal/comunidade?escopo=nacional' }
+      }
+      await setTenantContextSlug(tenantDestino.slug)
+      return { ok: true, redirectTo: '/portal/comunidade' }
     }
 
     // Bloqueio da diretoria: barra o usuário mesmo sem cadastro anterior, e
@@ -1258,18 +1317,7 @@ export async function solicitarVinculo(
     // notificações — se o espelho falhar, o sócio já está na fila da unidade.
     // Grava afiliacaoId do tenant (ou ancestral): convite pula o passo Clube e
     // sem isso o portal caía no TENANT_SLUG do deploy.
-    await db.perfilTorcedor.upsert({
-      where: { userId },
-      create: {
-        userId,
-        onboardingConcluidoEm: new Date(),
-        ...(afiliacaoIdEfetiva ? { afiliacaoId: afiliacaoIdEfetiva } : {}),
-      },
-      update: {
-        onboardingConcluidoEm: new Date(),
-        ...(afiliacaoIdEfetiva ? { afiliacaoId: afiliacaoIdEfetiva } : {}),
-      },
-    })
+    await concluirPerfilTorcedor(userId, afiliacaoIdEfetiva)
 
     // Torcedor entra APROVADO e seu perfil social deve ser público na torcida escolhida.
     // Criamos (ou reforçamos) PerfilMembro para não depender de interações futuras.
@@ -1279,11 +1327,13 @@ export async function solicitarVinculo(
         create: { userId, tenantId: tenantDestino.id, perfilPrivado: false },
         update: { perfilPrivado: false },
       })
-      await vincularMembroCanaisAposAprovacao({
+      // Best-effort: o vínculo já está gravado e APROVADO. Um canal oficial
+      // com problema (ex.: emprestado no tenant da mãe) não pode derrubar o
+      // onboarding inteiro e prender a pessoa na última etapa do wizard.
+      await vincularCanaisBestEffort({
         tenantId: tenantDestino.id,
         userId,
         sedeId: dadosMembro.sedeId ?? null,
-        fallbackCriadoPorId: userId,
       })
 
       // Caso B: o registro na unidade espelha na Sede (quadro da diretoria).

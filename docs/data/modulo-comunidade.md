@@ -288,6 +288,16 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     ter pedido aprovado. `DIRETA`, comunidade e tenant sintético são exceções.
     O gate único é `assertElegibilidadeMembroCanal` (`lib/canais.ts`) e cobre
     entrada explícita, inscrição implícita ao publicar, aprovação e convite.
+  - **Canal emprestado (Caso B), 2026-08-01:** "tenant do canal" não é só
+    `Conversa.tenantId`. Unidade promovida a tenant próprio costuma manter o
+    canal oficial hospedado no tenant da mãe (`Sede.canalConversaId` aponta para
+    fora). `assertElegibilidadeMembroCanal` resolve a unidade dona pelo ponteiro
+    (`Sede.canalConversaId` + `tenantId` diferente) e aceita o vínculo **de
+    qualquer um dos dois** tenants — a consulta extra só acontece quando o
+    vínculo no hospedeiro não resolve. Sem isso, quem entrava pelo link da
+    subsede/PDE era barrado do próprio canal e o onboarding travava na etapa de
+    vínculo. Onboarding também trata a inscrição em canal como **best-effort**:
+    vínculo já gravado nunca é desfeito por falha de canal.
   - **Grupos** (`tipo: GRUPO`) criados por torcedores **não** entram nesta
     listagem — ficam em `/portal/comunidade/grupos` (superfície distinta).
 - **Comunidades temáticas** — sócios com `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` criam

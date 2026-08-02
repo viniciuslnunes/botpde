@@ -2608,7 +2608,7 @@ function PassoVinculo({
                 </span>
 
                 {fotoUnidade ? (
-                  <span className="relative block h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+                  <span className="relative block h-20 w-20 shrink-0">
                     <Image
                       src={fotoUnidade}
                       alt={`Foto da unidade ${nomeUnidade}`}

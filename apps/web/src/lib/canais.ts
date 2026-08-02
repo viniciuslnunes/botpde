@@ -111,6 +111,12 @@ export type NivelElegibilidadeCanal = 'PENDENTE' | 'ATIVO'
 /**
  * Gate único para materializar roster. Descoberta cross-tenant não concede
  * participação: canal real exige vínculo local; ativação exige vínculo ativo.
+ *
+ * "Local" é o tenant **dono** do canal, que nem sempre é `Conversa.tenantId`:
+ * unidade Caso B (tenant próprio) promovida depois costuma manter o canal
+ * oficial *emprestado* no tenant da mãe (`Sede.canalConversaId` aponta para uma
+ * Conversa de outro tenant). Aí o vínculo na própria unidade também vale — sem
+ * isso, quem entra pelo link da subsede/PDE é barrado do próprio canal.
  */
 export async function assertElegibilidadeMembroCanal(
   conversaId: string,
@@ -134,21 +140,45 @@ export async function assertElegibilidadeMembroCanal(
   if (!conversa) throw new ExpectedError('Canal não encontrado.')
   if (conversa.tipo === 'DIRETA' || conversa.comunidade || conversa.tenant.sintetico) return
 
-  const membro: { status: string; tipo: string; desligadoEm: Date | null } | null =
-    await db.saasMembro.findUnique({
+  type VinculoCanal = { status: string; tipo: string; desligadoEm: Date | null }
+  const estaAtivo = (m: VinculoCanal | null): boolean =>
+    Boolean(m && m.status === 'APROVADO' && !m.desligadoEm)
+
+  let tenantVinculoId = conversa.tenantId
+  let membro: VinculoCanal | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: conversa.tenantId, userId } },
     select: { status: true, tipo: true, desligadoEm: true },
+  })
+
+  // Canal emprestado: só consulta a unidade dona quando o vínculo no tenant
+  // hospedeiro não resolve — mantém o caminho comum em uma query.
+  if (!estaAtivo(membro)) {
+    const unidadeDona: { tenantId: string | null } | null = await db.sede.findFirst({
+      where: { canalConversaId: conversaId, tenantId: { not: conversa.tenantId } },
+      select: { tenantId: true },
     })
+    if (unidadeDona?.tenantId) {
+      const naUnidade: VinculoCanal | null = await db.saasMembro.findUnique({
+        where: { tenantId_userId: { tenantId: unidadeDona.tenantId, userId } },
+        select: { status: true, tipo: true, desligadoEm: true },
+      })
+      if (naUnidade && (!membro || estaAtivo(naUnidade))) {
+        membro = naUnidade
+        tenantVinculoId = unidadeDona.tenantId
+      }
+    }
+  }
+
   if (!membro) {
     throw new ExpectedError('Você precisa ter vínculo com a torcida deste canal para participar.')
   }
   if (nivel === 'PENDENTE') return
-  if (membro.status !== 'APROVADO' || membro.desligadoEm) {
+  if (!estaAtivo(membro)) {
     throw new ExpectedError('O vínculo com a torcida deste canal ainda não foi aprovado.')
   }
   if (membro.tipo === 'SOCIO') {
     const socio: { validade: Date } | null = await db.saasSocio.findUnique({
-      where: { tenantId_userId: { tenantId: conversa.tenantId, userId } },
+      where: { tenantId_userId: { tenantId: tenantVinculoId, userId } },
       select: { validade: true },
     })
     if (socio && socio.validade < new Date()) {

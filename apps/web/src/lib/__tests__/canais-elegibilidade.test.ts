@@ -77,6 +77,32 @@ describe('assertElegibilidadeMembroCanal', () => {
     expect(mocks.membroFindUnique).not.toHaveBeenCalled()
   })
 
+  it('aceita vínculo na unidade dona quando o canal está emprestado no tenant da mãe', async () => {
+    // Caso B: PDE promovido a tenant próprio cujo `Sede.canalConversaId` ainda
+    // aponta para uma Conversa do tenant da mãe. Sem isso, quem entra pelo link
+    // da unidade era barrado do próprio canal e travava o onboarding.
+    mocks.membroFindUnique.mockImplementation(
+      async ({ where }: { where: { tenantId_userId: { tenantId: string } } }) =>
+        where.tenantId_userId.tenantId === 'tenant-unidade'
+          ? { status: 'APROVADO', tipo: 'TORCEDOR', desligadoEm: null }
+          : null,
+    )
+    mocks.sedeFindFirst.mockResolvedValueOnce({ tenantId: 'tenant-unidade' })
+
+    await expect(
+      assertElegibilidadeMembroCanal('canal', 'torcedor-da-unidade', 'ATIVO'),
+    ).resolves.toBeUndefined()
+  })
+
+  it('recusa quem não tem vínculo nem no tenant do canal nem na unidade dona', async () => {
+    mocks.membroFindUnique.mockResolvedValue(null)
+    mocks.sedeFindFirst.mockResolvedValueOnce({ tenantId: 'tenant-unidade' })
+
+    await expect(
+      assertElegibilidadeMembroCanal('canal', 'estranho', 'ATIVO'),
+    ).rejects.toThrow('vínculo com a torcida deste canal')
+  })
+
   it('vincula unidade + SEDE de forma idempotente', async () => {
     mocks.membroFindUnique.mockResolvedValue({
       status: 'APROVADO',
