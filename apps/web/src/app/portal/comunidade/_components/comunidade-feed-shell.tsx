@@ -42,6 +42,8 @@ interface ComunidadeFeedShellProps {
   /** Escopo ativo do feed dual (Nacional × Minha torcida). */
   escopo?: 'nacional' | 'torcida'
   podeEscopoTorcida?: boolean
+  /** Default do usuário (sócio=torcida, TORCEDOR=nacional) — abas de escopo. */
+  modoContexto?: 'nacional' | 'torcida'
   afiliacao?: AfiliacaoComunidade | null
   /** Sócio com torcida real — card/composer na aba Nacional usam cargo da torcida. */
   torcidaReal?: { id: string; nome: string } | null
@@ -64,12 +66,15 @@ export function ComunidadeFeedShell({
   eventoIdInicial,
   escopo = 'torcida',
   podeEscopoTorcida = false,
+  modoContexto = 'torcida',
   afiliacao = null,
   torcidaReal = null,
   solicitacaoPendente = null,
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
-  const sufixoEscopo = modoNacional ? '?escopo=nacional' : ''
+  // TORCEDOR default nacional: sem `?escopo=` ainda precisa preservar CN nas subrotas.
+  const sufixoEscopo =
+    escopo === modoContexto ? '' : escopo === 'nacional' ? '?escopo=nacional' : '?escopo=torcida'
 
   return (
     <>
@@ -85,6 +90,7 @@ export function ComunidadeFeedShell({
           afiliacao={afiliacao}
           podeEscopoTorcida={podeEscopoTorcida}
           escopoAtivo={escopo}
+          modoContexto={modoContexto}
         />
 
         {modoNacional && (
@@ -118,7 +124,7 @@ export function ComunidadeFeedShell({
           </div>
         )}
 
-        <ComunidadeStickySearchChrome />
+        <ComunidadeStickySearchChrome escopo={escopo} modoContexto={modoContexto} />
 
         <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
           {[

@@ -23,6 +23,7 @@ export async function ComunidadeNavbarSlot() {
       <ComunidadeEscopoNavbarOverride
         afiliacao={afiliacao}
         podeEscopoTorcida={ctx.podeEscopoTorcida}
+        modoContexto={ctx.modo}
         corPrimaria={corPrimaria}
       />
       {afiliacao && corPrimaria ? (

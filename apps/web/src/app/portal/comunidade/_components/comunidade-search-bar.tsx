@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { Search, Loader2, Hash, X, ArrowRight } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -17,10 +17,17 @@ interface BuscaRapidaResponse {
   posts: PostSocialItem[]
 }
 
-export function ComunidadeSearchBar() {
+export function ComunidadeSearchBar({
+  escopo = 'torcida',
+  modoContexto = 'torcida',
+}: {
+  escopo?: 'nacional' | 'torcida'
+  modoContexto?: 'nacional' | 'torcida'
+}) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const modoNacional = searchParams.get('escopo') === 'nacional'
+  const modoNacional = escopo === 'nacional'
+  const sufixoEscopo =
+    escopo === modoContexto ? '' : escopo === 'nacional' ? '&escopo=nacional' : '&escopo=torcida'
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -118,8 +125,7 @@ export function ComunidadeSearchBar() {
     const termo = q.trim()
     if (termo.length < 2) return
     setAberto(false)
-    const escopo = modoNacional ? '&escopo=nacional' : ''
-    router.push(`/portal/comunidade/busca?q=${encodeURIComponent(termo)}${escopo}`)
+    router.push(`/portal/comunidade/busca?q=${encodeURIComponent(termo)}${sufixoEscopo}`)
   }
 
   return (

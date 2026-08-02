@@ -20,20 +20,15 @@ describe('resolveUserTenantSlugForUser', () => {
     expect(findFirst).toHaveBeenCalledTimes(1)
   })
 
-  it('usa TORCEDOR APROVADO quando não há sócio', async () => {
-    findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ tenant: { slug: 'furia-jovem' } })
+  it('usa SOCIO PENDENTE quando não há aprovado (comunidade enquanto analisa)', async () => {
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ tenant: { slug: 'furia-jovem' } })
     const { resolveUserTenantSlugForUser } = await import('@/lib/tenant-context')
     await expect(resolveUserTenantSlugForUser('u1')).resolves.toBe('furia-jovem')
   })
 
-  it('usa SOCIO PENDENTE como fallback (comunidade enquanto analisa)', async () => {
-    findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ tenant: { slug: 'furia-jovem' } })
+  it('não abre tenant para TORCEDOR — fica na CN do clube', async () => {
+    findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
     const { resolveUserTenantSlugForUser } = await import('@/lib/tenant-context')
-    await expect(resolveUserTenantSlugForUser('u1')).resolves.toBe('furia-jovem')
+    await expect(resolveUserTenantSlugForUser('u1')).resolves.toBeNull()
   })
 })

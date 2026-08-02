@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolverEscopoComunidade,
+  resolverEscopoComunidadePorModo,
   type ContextoComunidadePortal,
 } from '@/lib/comunidade-contexto'
 import { decidePodeVerCanal } from '@/lib/canais-shared'
@@ -38,6 +39,25 @@ function ctxNacional(): ContextoComunidadePortal {
     afiliacao,
     tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
     podeEscopoTorcida: false,
+    torcidaReal: null,
+  }
+}
+
+function ctxTorcedorComUnidade(): ContextoComunidadePortal {
+  return {
+    modo: 'nacional',
+    tenant: null,
+    afiliacao,
+    tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
+    podeEscopoTorcida: true,
+    torcidaReal: {
+      id: 't-furia',
+      nome: 'Fúria Jovem',
+      afiliacaoId: 'af-1',
+      logoUrl: null,
+      corPrimaria: '#000',
+      balancoFinanceiroVisivel: false,
+    },
   }
 }
 
@@ -49,11 +69,25 @@ describe('resolverEscopoComunidade', () => {
     expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
   })
 
-  it('torcedor: sempre nacional, mesmo com ?escopo=torcida', () => {
+  it('torcedor global: sempre nacional, mesmo com ?escopo=torcida', () => {
     const ctx = ctxNacional()
     expect(resolverEscopoComunidade(ctx, undefined)).toBe('nacional')
     expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
     expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('nacional')
+  })
+
+  it('torcedor com unidade: default nacional; honra ?escopo=torcida', () => {
+    const ctx = ctxTorcedorComUnidade()
+    expect(resolverEscopoComunidade(ctx, undefined)).toBe('nacional')
+    expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
+    expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('torcida')
+  })
+
+  it('por modo: TORCEDOR sem query fica nacional; sócio sem query fica torcida', () => {
+    expect(resolverEscopoComunidadePorModo('nacional', true, null)).toBe('nacional')
+    expect(resolverEscopoComunidadePorModo('nacional', true, 'torcida')).toBe('torcida')
+    expect(resolverEscopoComunidadePorModo('torcida', true, null)).toBe('torcida')
+    expect(resolverEscopoComunidadePorModo('torcida', true, 'nacional')).toBe('nacional')
   })
 })
 

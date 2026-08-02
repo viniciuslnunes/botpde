@@ -11,7 +11,15 @@ import { springSnappy } from '@/lib/motion-presets'
  * Barra sticky (busca + tabs): some no scroll pra baixo / parado;
  * reaparece no scroll pra cima (e no topo). Permanece se a busca estiver em foco.
  */
-export function ComunidadeStickySearchChrome({ children }: { children?: ReactNode }) {
+export function ComunidadeStickySearchChrome({
+  children,
+  escopo = 'torcida',
+  modoContexto = 'torcida',
+}: {
+  children?: ReactNode
+  escopo?: 'nacional' | 'torcida'
+  modoContexto?: 'nacional' | 'torcida'
+}) {
   const scrollVisible = useScrollChromeVisibilityShared()
   const reduceMotion = useReducedMotion()
   const [focusLocked, setFocusLocked] = useState(false)
@@ -45,10 +53,10 @@ export function ComunidadeStickySearchChrome({ children }: { children?: ReactNod
     >
       <div className="space-y-3 overflow-x-clip px-4 pb-2 pt-1 lg:px-0">
         <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-[rgb(var(--border))]" />}>
-          <ComunidadeSearchBar />
+          <ComunidadeSearchBar escopo={escopo} modoContexto={modoContexto} />
         </Suspense>
         <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
-          <ComunidadeFeedTabs />
+          <ComunidadeFeedTabs escopo={escopo} modoContexto={modoContexto} />
         </Suspense>
         {children}
       </div>

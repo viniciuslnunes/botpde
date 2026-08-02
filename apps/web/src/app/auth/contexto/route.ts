@@ -54,7 +54,8 @@ export async function GET(request: Request) {
       select: { onboardingConcluidoEm: true, afiliacaoId: true },
     })
     if (perfil?.onboardingConcluidoEm) {
-      return NextResponse.redirect(publicUrl('/portal/comunidade', request))
+      // TORCEDOR / sem sócio: CN do clube (default nacional).
+      return NextResponse.redirect(publicUrl('/portal/comunidade?escopo=nacional', request))
     }
     return NextResponse.redirect(publicUrl(destinoOnboarding, request))
   }

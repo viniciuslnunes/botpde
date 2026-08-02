@@ -24,7 +24,9 @@ export async function ComunidadeChromeRailSlot() {
   const modoComunidade = ctx.modo === 'torcida' || Boolean(ctx.afiliacao)
   if (!modoComunidade) return null
 
-  const tenantId = ctx.modo === 'torcida' ? ctx.tenant.id : null
+  // Sócio: tenant ativo. TORCEDOR: unidade do vínculo (aba Minha torcida).
+  const tenantId =
+    ctx.modo === 'torcida' ? ctx.tenant.id : (ctx.torcidaReal?.id ?? null)
   const afiliacaoId = ctx.afiliacao?.id ?? null
 
   let salasTorcida: SalaAtivaListItem[] = []
@@ -66,6 +68,7 @@ export async function ComunidadeChromeRailSlot() {
       tenantId={tenantId}
       tenantSinteticoId={ctx.tenantSintetico?.id ?? null}
       podeEscopoTorcida={ctx.podeEscopoTorcida}
+      modoContexto={ctx.modo}
       salasTorcida={salasTorcida}
       canaisTorcida={canaisTorcida}
       salasNacional={salasNacional}

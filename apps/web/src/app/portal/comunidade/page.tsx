@@ -53,6 +53,8 @@ export default async function ComunidadePage({
     avatarUrl,
   }
 
+  const torcidaReal = ctx.torcidaReal ?? (ctx.modo === 'torcida' ? ctx.tenant : null)
+
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
     const [salasAtivas, solicitacaoPendente] = await Promise.all([
@@ -77,27 +79,28 @@ export default async function ComunidadePage({
           eventoIdInicial={eventoIdComposer}
           escopo="nacional"
           podeEscopoTorcida={ctx.podeEscopoTorcida}
+          modoContexto={ctx.modo}
           afiliacao={afiliacao}
-          torcidaReal={ctx.modo === 'torcida' ? ctx.tenant : null}
+          torcidaReal={torcidaReal}
           solicitacaoPendente={solicitacaoPendente}
         />
       </div>
     )
   }
 
-  if (ctx.modo !== 'torcida') redirect('/portal/comunidade?escopo=nacional')
+  // Minha torcida: sócio (modo torcida) ou TORCEDOR com vínculo (torcidaReal).
+  if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')
 
-  const tenant = ctx.tenant
-  const salasAtivas = await listSalasAtivas(tenant.id)
+  const salasAtivas = await listSalasAtivas(torcidaReal.id)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <ComunidadeFeedShell
         tenant={{
-          id: tenant.id,
-          nome: tenant.nome,
-          afiliacaoId: tenant.afiliacaoId,
-          balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+          id: torcidaReal.id,
+          nome: torcidaReal.nome,
+          afiliacaoId: torcidaReal.afiliacaoId,
+          balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
         }}
         currentUser={currentUser}
         cursor={params.cursor}
@@ -107,7 +110,9 @@ export default async function ComunidadePage({
         eventoIdInicial={eventoIdComposer}
         escopo="torcida"
         podeEscopoTorcida={ctx.podeEscopoTorcida}
+        modoContexto={ctx.modo}
         afiliacao={ctx.afiliacao}
+        torcidaReal={torcidaReal}
       />
     </div>
   )

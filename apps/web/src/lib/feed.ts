@@ -1163,18 +1163,19 @@ export interface HashtagEmAlta {
 }
 
 /**
- * Gate do feed de sócios: só vínculo APROVADO no tenant libera posts TENANT.
- * PENDENTE/REPROVADO/sem vínculo → só feed de torcedor (ver spec §3.1).
+ * Gate do feed de sócios: só SOCIO APROVADO no tenant libera posts TENANT.
+ * TORCEDOR (mesmo APROVADO) e PENDENTE/REPROVADO ficam no feed público da
+ * unidade — mural interno é privilégio de sócio (spec §3.1 + onboarding).
  * Super admin (oversight cross-tenant, sem SaasMembro) sempre passa.
  */
 export const podeVerFeedSocios = cache(
   async (userId: string | undefined, tenantId: string): Promise<boolean> => {
     if (!userId) return false
-    const membro: { status: string } | null = await db.saasMembro.findUnique({
+    const membro: { status: string; tipo: string } | null = await db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
-      select: { status: true },
+      select: { status: true, tipo: true },
     })
-    if (membro?.status === 'APROVADO') return true
+    if (membro?.status === 'APROVADO' && membro.tipo === 'SOCIO') return true
 
     const user: { email: string | null } | null = await db.user.findUnique({
       where: { id: userId },

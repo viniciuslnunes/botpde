@@ -77,9 +77,10 @@ export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
  * Slug da torcida do usuário (vínculo real). Sem fallback TENANT_SLUG —
  * use em roteamento pós-login; TENANT_SLUG é só contexto do deploy.
  *
- * Ordem: sócio APROVADO → torcedor APROVADO → sócio PENDENTE (aguarda
- * análise na comunidade da própria torcida). Sem isso, TORCEDOR/PENDENTE
- * caíam no TENANT_SLUG do deploy (ex.: Gaviões) — vazamento cross-torcida.
+ * Só sócio APROVADO (ou PENDENTE aguardando análise) abre modo "Minha
+ * torcida" como contexto ativo. TORCEDOR fica na Comunidade Nacional do
+ * clube (`PerfilTorcedor.afiliacaoId`) — abrir tenant para TORCEDOR
+ * jogava o portal de sócios no lugar errado.
  */
 export async function resolveUserTenantSlugForUser(userId: string): Promise<string | null> {
   const socioAprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
@@ -89,13 +90,6 @@ export async function resolveUserTenantSlugForUser(userId: string): Promise<stri
   })
   if (socioAprovado) return socioAprovado.tenant.slug
 
-  const torcedorAprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'APROVADO', tipo: 'TORCEDOR' },
-    orderBy: { criadoEm: 'desc' },
-    select: { tenant: { select: { slug: true } } },
-  })
-  if (torcedorAprovado) return torcedorAprovado.tenant.slug
-
   const socioPendente: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
     where: { userId, status: 'PENDENTE', tipo: 'SOCIO' },
     orderBy: { criadoEm: 'desc' },
@@ -104,7 +98,7 @@ export async function resolveUserTenantSlugForUser(userId: string): Promise<stri
   return socioPendente?.tenant.slug ?? null
 }
 
-/** Vínculo que autoriza cookie/contexto de portal nesta torcida. */
+/** Vínculo que autoriza cookie/contexto de portal nesta torcida (só sócio). */
 export async function vinculoAutorizaContextoTenant(
   userId: string,
   tenantSlug: string,
@@ -112,15 +106,61 @@ export async function vinculoAutorizaContextoTenant(
   const vinculo: { id: string } | null = await db.saasMembro.findFirst({
     where: {
       userId,
+      tipo: 'SOCIO',
+      status: { in: ['APROVADO', 'PENDENTE'] },
       tenant: { slug: tenantSlug },
-      OR: [
-        { status: 'APROVADO', tipo: { in: ['SOCIO', 'TORCEDOR'] } },
-        { status: 'PENDENTE', tipo: 'SOCIO' },
-      ],
     },
     select: { id: true },
   })
   return Boolean(vinculo)
+}
+
+/**
+ * Unidade/torcida do vínculo TORCEDOR APROVADO mais recente — alimenta a aba
+ * "Minha torcida" sem abrir o modo sócio (`getActiveTenant` continua null).
+ */
+export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
+  id: string
+  nome: string
+  afiliacaoId: string | null
+  logoUrl: string | null
+  corPrimaria: string
+  balancoFinanceiroVisivel: boolean
+} | null> {
+  const vinculo: {
+    tenant: {
+      id: string
+      nome: string
+      afiliacaoId: string | null
+      logoUrl: string | null
+      corPrimaria: string
+      balancoFinanceiroVisivel: boolean
+    }
+  } | null = await db.saasMembro.findFirst({
+    where: {
+      userId,
+      status: 'APROVADO',
+      tipo: 'TORCEDOR',
+      // Espelho na Sede existe para a diretoria ver o quadro; "Minha torcida"
+      // é sempre a unidade/origem onde o torcedor entrou.
+      espelhado: false,
+      tenant: { ativo: true, sintetico: false },
+    },
+    orderBy: { criadoEm: 'desc' },
+    select: {
+      tenant: {
+        select: {
+          id: true,
+          nome: true,
+          afiliacaoId: true,
+          logoUrl: true,
+          corPrimaria: true,
+          balancoFinanceiroVisivel: true,
+        },
+      },
+    },
+  })
+  return vinculo?.tenant ?? null
 }
 
 /**

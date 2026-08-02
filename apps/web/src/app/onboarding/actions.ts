@@ -33,6 +33,7 @@ import {
   estaBloqueadoNoTenant,
   lockNumeroAssociadoDaTorcida,
   resolverTenantRaizId,
+  sincronizarSocioNaSedeRaiz,
   REPROVACAO_LIMPA,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
@@ -1025,9 +1026,8 @@ export async function solicitarVinculo(
     }
     dadosMembro.departamentoSedeId = departamentoSedeId
 
-    // TORCEDOR entra sem fila (entrada imediata). SOCIO fica PENDENTE até a
-    // diretoria aprovar. Ambos abrem a comunidade da própria torcida no portal
-    // (cookie + resolveUserTenantSlugForUser) — nunca o TENANT_SLUG do deploy.
+    // TORCEDOR entra sem fila (CN do clube). SOCIO fica PENDENTE e abre a
+    // comunidade da própria torcida até a diretoria aprovar.
     const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
     const existing:
@@ -1285,6 +1285,68 @@ export async function solicitarVinculo(
         sedeId: dadosMembro.sedeId ?? null,
         fallbackCriadoPorId: userId,
       })
+
+      // Caso B: o registro na unidade espelha na Sede (quadro da diretoria).
+      // Best-effort — falha não desfaz o vínculo na unidade nem a inscrição nos canais.
+      try {
+        const membroOrigem: MembroParaEspelho | null = await db.saasMembro.findUnique({
+          where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
+          select: {
+            id: true,
+            userId: true,
+            tipo: true,
+            nome: true,
+            idade: true,
+            telefone: true,
+            cidade: true,
+            numeroAssociado: true,
+            anosSocio: true,
+            cep: true,
+            numero: true,
+            bloco: true,
+            complemento: true,
+            imagemProva: true,
+            rg: true,
+            cpf: true,
+            filiacao: true,
+            escolaridade: true,
+            profissao: true,
+            dataNascimento: true,
+            sexo: true,
+            estadoCivil: true,
+            nacionalidade: true,
+            logradouro: true,
+            bairro: true,
+            uf: true,
+            fotoDocumentoUrl: true,
+            comprovanteResidenciaUrl: true,
+            responsavelNome: true,
+            responsavelDocumento: true,
+            autorizacaoMenorAceitaEm: true,
+            termoResponsabilidadeAceitoEm: true,
+            departamentoSedeId: true,
+          },
+        })
+        if (membroOrigem) {
+          await db.$transaction(async (tx: Prisma.TransactionClient) =>
+            sincronizarSocioNaSedeRaiz(tx, {
+              tenantOrigemId: tenantDestino.id,
+              membro: membroOrigem,
+              aprovadoPorUserId: userId,
+              aprovadoPorNome: data.nome,
+            }),
+          )
+        }
+      } catch (err) {
+        if (isExpectedError(err)) {
+          console.warn(
+            '[solicitarVinculo] espelho TORCEDOR na sede:',
+            err instanceof Error ? err.message : err,
+          )
+        } else {
+          console.error('[solicitarVinculo] espelho TORCEDOR na sede falhou', err)
+        }
+      }
     }
 
     // Avisa o solicitante do fluxo até a aprovação — só SOCIO fica PENDENTE
@@ -1382,15 +1444,18 @@ export async function solicitarVinculo(
       }
     }
 
-    // Fixa o contexto na torcida do vínculo. Limpar e cair no TENANT_SLUG do
-    // deploy (ex.: Gaviões) vazava feed/salas de outra organizada.
-    await setTenantContextSlug(tenantDestino.slug)
     await limparSlugConviteCookie()
 
     if (data.tipo === 'TORCEDOR') {
-      return { ok: true, redirectTo: '/portal/comunidade' }
+      // Torcedor fica na Comunidade Nacional do clube (afiliacaoId), com aba
+      // Minha torcida só para posts públicos — não abre o portal de sócios.
+      // Limpa cookie para não herdar TENANT_SLUG/contexto de outra torcida.
+      await clearTenantContextSlug()
+      return { ok: true, redirectTo: '/portal/comunidade?escopo=nacional' }
     }
 
+    // Sócio pendente: comunidade da própria torcida até a aprovação.
+    await setTenantContextSlug(tenantDestino.slug)
     return {
       ok: true,
       redirectTo: `/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`,

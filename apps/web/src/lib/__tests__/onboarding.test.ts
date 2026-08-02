@@ -38,6 +38,7 @@ const getAncestorTenantIdsFn = vi.hoisted(() => vi.fn(async () => [] as string[]
 const criarPendenciaEspelhoFn = vi.hoisted(() =>
   vi.fn(async () => ({ raizTenantId: null, espelhoId: null, ignoradoJaMembroDireto: false })),
 )
+const sincronizarSocioNaSedeRaizFn = vi.hoisted(() => vi.fn(async () => undefined))
 const notificarNovoMembroPendenteFn = vi.hoisted(() => vi.fn(async () => undefined))
 const vincularMembroCanaisFn = vi.hoisted(() => vi.fn(async () => undefined))
 const userFindFirst = vi.hoisted(() => vi.fn(async () => null))
@@ -108,8 +109,11 @@ vi.mock('@/lib/isolamento', () => ({
 const estaBloqueadoNoTenantFn = vi.hoisted(() => vi.fn(async () => false))
 vi.mock('@/lib/membros-sede', () => ({
   criarOuAtualizarPendenciaEspelhoNaSede: criarPendenciaEspelhoFn,
+  sincronizarSocioNaSedeRaiz: sincronizarSocioNaSedeRaizFn,
   estaBloqueadoNoTenant: estaBloqueadoNoTenantFn,
   lockNumeroAssociadoDaTorcida: vi.fn(async () => undefined),
+  resolverTenantRaizId: vi.fn(async (id: string) => id),
+  REPROVACAO_LIMPA: {},
   encontrarConflitoNumeroAssociado: vi.fn(async () => null),
   encontrarConflitoCpf: vi.fn(async () => null),
   encontrarConflitoRg: vi.fn(async () => null),
@@ -391,12 +395,49 @@ describe('solicitarVinculo — validação', () => {
       exigirDocumentosCadastro: true,
     })
     sedeFindMany.mockResolvedValue([])
-    membroFindUnique.mockResolvedValue(null)
+    membroFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'novo',
+        userId: 'u1',
+        tipo: 'TORCEDOR',
+        nome: 'Fulano da Silva',
+        idade: null,
+        telefone: null,
+        cidade: null,
+        numeroAssociado: null,
+        anosSocio: null,
+        cep: null,
+        numero: null,
+        bloco: null,
+        complemento: null,
+        imagemProva: null,
+        rg: null,
+        cpf: null,
+        filiacao: null,
+        escolaridade: null,
+        profissao: null,
+        dataNascimento: null,
+        sexo: null,
+        estadoCivil: null,
+        nacionalidade: null,
+        logradouro: null,
+        bairro: null,
+        uf: null,
+        fotoDocumentoUrl: null,
+        comprovanteResidenciaUrl: null,
+        responsavelNome: null,
+        responsavelDocumento: null,
+        autorizacaoMenorAceitaEm: null,
+        termoResponsabilidadeAceitoEm: null,
+        departamentoSedeId: null,
+      })
     membroCreate.mockResolvedValue({ id: 'novo' })
     const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' })
-    expect(r.redirectTo).toBe('/portal/comunidade')
+    expect(r.redirectTo).toBe('/portal/comunidade?escopo=nacional')
     expect(r.ok).toBe(true)
-    expect(setTenantContextSlugFn).toHaveBeenCalledWith('torcida-teste')
+    expect(clearTenantContextSlugFn).toHaveBeenCalled()
+    expect(setTenantContextSlugFn).not.toHaveBeenCalled()
     expect(membroCreate).toHaveBeenCalled()
     expect(auditLogCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ acao: 'CADASTRO_SOLICITADO' }) }),
@@ -408,6 +449,7 @@ describe('solicitarVinculo — validação', () => {
       sedeId: null,
       fallbackCriadoPorId: 'u1',
     })
+    expect(sincronizarSocioNaSedeRaizFn).toHaveBeenCalled()
   })
 
   it('sócio com departamento grava preferência sem UserDepartamento', async () => {

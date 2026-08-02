@@ -9,14 +9,24 @@ type Props = {
   afiliacao: { nome: string; apelido: string | null } | null
   podeEscopoTorcida: boolean
   escopoAtivo: 'nacional' | 'torcida'
+  /**
+   * Default do usuário: sócio = torcida; TORCEDOR = nacional.
+   * A aba do default omite `?escopo=`; a outra força o param.
+   */
+  modoContexto?: 'nacional' | 'torcida'
 }
 
 /**
  * Alterna entre o feed "Nacional" (torcedores do clube na plataforma) e
- * "Minha torcida" (feed do tenant real do sócio) — só sócio aprovado com
- * afiliação vê as duas abas; torcedor global fica preso ao Nacional.
+ * "Minha torcida" (unidade do vínculo). Sócio e TORCEDOR com unidade vêem
+ * as duas abas; torcedor global fica só no Nacional.
  */
-export function ComunidadeEscopoTabs({ afiliacao, podeEscopoTorcida, escopoAtivo }: Props) {
+export function ComunidadeEscopoTabs({
+  afiliacao,
+  podeEscopoTorcida,
+  escopoAtivo,
+  modoContexto = 'torcida',
+}: Props) {
   const params = useSearchParams()
 
   if (!afiliacao) return null
@@ -24,8 +34,8 @@ export function ComunidadeEscopoTabs({ afiliacao, podeEscopoTorcida, escopoAtivo
   function hrefPara(escopo: 'nacional' | 'torcida'): string {
     const next = new URLSearchParams(params.toString())
     next.delete('cursor')
-    if (escopo === 'torcida') next.delete('escopo')
-    else next.set('escopo', 'nacional')
+    if (escopo === modoContexto) next.delete('escopo')
+    else next.set('escopo', escopo)
     const qs = next.toString()
     return qs ? `/portal/comunidade?${qs}` : '/portal/comunidade'
   }

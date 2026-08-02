@@ -7,6 +7,7 @@ import { CanaisSugeridosAside } from './canais-sugeridos-aside'
 import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
 import { useShellDeFeed } from './comunidade-shell-rotas'
 import { Skeleton } from '@/components/portal/feed-skeletons'
+import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-contexto'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
@@ -29,6 +30,7 @@ export function ComunidadeChromeRail({
   tenantId,
   tenantSinteticoId,
   podeEscopoTorcida,
+  modoContexto = 'torcida',
   salasTorcida,
   canaisTorcida = [],
   salasNacional,
@@ -38,6 +40,8 @@ export function ComunidadeChromeRail({
   tenantId: string | null
   tenantSinteticoId: string | null
   podeEscopoTorcida: boolean
+  /** TORCEDOR = nacional (default CN); sócio = torcida. */
+  modoContexto?: 'nacional' | 'torcida'
   salasTorcida: SalaAtivaListItem[]
   canaisTorcida?: SugestaoCanalAside[]
   salasNacional: SalaAtivaListItem[]
@@ -46,11 +50,11 @@ export function ComunidadeChromeRail({
   const searchParams = useSearchParams()
   const noFeed = useShellDeFeed()
 
-  const escopo = !podeEscopoTorcida
-    ? 'nacional'
-    : searchParams.get('escopo') === 'nacional'
-      ? 'nacional'
-      : 'torcida'
+  const escopo = resolverEscopoComunidadePorModo(
+    modoContexto,
+    podeEscopoTorcida,
+    searchParams.get('escopo'),
+  )
   const modoNacional = escopo === 'nacional'
 
   const salas = modoNacional ? salasNacional : salasTorcida

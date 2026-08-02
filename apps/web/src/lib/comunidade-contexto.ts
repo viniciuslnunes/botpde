@@ -2,10 +2,12 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { filtrarTenantsRestritos } from '@/lib/isolamento'
+import { resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
 import {
   COR_PRIMARIA_PLATAFORMA,
   designFromPrimary,
   formatNomeAfiliacao,
+  formatNomeTorcida,
   isCorPadraoPlataforma,
   nomeExibicaoAfiliacao,
   paletaDoClube,
@@ -17,6 +19,15 @@ export type AfiliacaoComunidade = {
   apelido: string | null
   slug: string | null
   escudoUrl: string | null
+}
+
+export type TorcidaRealComunidade = {
+  id: string
+  nome: string
+  afiliacaoId: string | null
+  logoUrl: string | null
+  corPrimaria: string
+  balancoFinanceiroVisivel: boolean
 }
 
 function projetarAfiliacaoComunidade(a: AfiliacaoComunidade): AfiliacaoComunidade {
@@ -33,39 +44,51 @@ export type EscopoComunidade = 'nacional' | 'torcida'
 export type ContextoComunidadePortal =
   | {
       modo: 'torcida'
-      tenant: {
-        id: string
-        nome: string
-        afiliacaoId: string | null
-        logoUrl: string | null
-        corPrimaria: string
-        balancoFinanceiroVisivel: boolean
-      }
+      tenant: TorcidaRealComunidade
       afiliacao: AfiliacaoComunidade | null
       /** Container operacional da Comunidade Nacional do clube (get-or-create). */
       tenantSintetico?: TenantSintetico | null
       /** Sócio com tenant real — pode alternar para a aba "Minha torcida". */
       podeEscopoTorcida: boolean
+      torcidaReal?: TorcidaRealComunidade | null
     }
   | {
       modo: 'nacional'
       tenant: null
       afiliacao: AfiliacaoComunidade
       tenantSintetico?: TenantSintetico | null
+      /**
+       * TORCEDOR com vínculo APROVADO: tem a aba "Minha torcida" (só posts
+       * públicos), mas o default continua Nacional do clube.
+       */
       podeEscopoTorcida: boolean
+      torcidaReal?: TorcidaRealComunidade | null
     }
 
 /**
  * Resolve o escopo efetivo a partir do parâmetro de query e do contexto do
- * usuário. Torcedor (sem tenant real) é sempre forçado a `nacional`; sócio
- * aprovado tem as duas abas e cai em `torcida` por padrão.
+ * usuário.
+ * - Sem aba Minha torcida → sempre nacional
+ * - Modo nacional (TORCEDOR) → default nacional; honra `?escopo=torcida`
+ * - Modo torcida (sócio) → default torcida; honra `?escopo=nacional`
  */
+export function resolverEscopoComunidadePorModo(
+  modo: 'nacional' | 'torcida',
+  podeEscopoTorcida: boolean,
+  escopoParam: string | undefined | null,
+): EscopoComunidade {
+  if (!podeEscopoTorcida) return 'nacional'
+  if (modo === 'nacional') {
+    return escopoParam === 'torcida' ? 'torcida' : 'nacional'
+  }
+  return escopoParam === 'nacional' ? 'nacional' : 'torcida'
+}
+
 export function resolverEscopoComunidade(
   ctx: ContextoComunidadePortal,
   escopoParam: string | undefined,
 ): EscopoComunidade {
-  if (!ctx.podeEscopoTorcida) return 'nacional'
-  return escopoParam === 'nacional' ? 'nacional' : 'torcida'
+  return resolverEscopoComunidadePorModo(ctx.modo, ctx.podeEscopoTorcida, escopoParam)
 }
 
 /**
@@ -94,19 +117,22 @@ export const resolverContextoComunidade = cache(
         ? await getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
         : null
 
+      const torcidaReal: TorcidaRealComunidade = {
+        id: tenant.id,
+        nome: formatNomeTorcida(tenant.nome),
+        afiliacaoId: tenant.afiliacaoId,
+        logoUrl,
+        corPrimaria: tenant.corPrimaria,
+        balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+      }
+
       return {
         modo: 'torcida',
-        tenant: {
-          id: tenant.id,
-          nome: tenant.nome,
-          afiliacaoId: tenant.afiliacaoId,
-          logoUrl,
-          corPrimaria: tenant.corPrimaria,
-          balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
-        },
+        tenant: torcidaReal,
         afiliacao,
         tenantSintetico,
         podeEscopoTorcida: true,
+        torcidaReal,
       }
     }
 
@@ -126,9 +152,29 @@ export const resolverContextoComunidade = cache(
     if (!afiliacaoRaw) return null
 
     const afiliacao = projetarAfiliacaoComunidade(afiliacaoRaw)
-    const tenantSintetico = await getOrCreateComunidadeNacionalTenant(afiliacaoRaw.id)
+    const [tenantSintetico, torcidaVinculo] = await Promise.all([
+      getOrCreateComunidadeNacionalTenant(afiliacaoRaw.id),
+      resolverTorcidaDoTorcedor(userId),
+    ])
 
-    return { modo: 'nacional', tenant: null, afiliacao, tenantSintetico, podeEscopoTorcida: false }
+    let torcidaReal: TorcidaRealComunidade | null = null
+    if (torcidaVinculo) {
+      const logoUrl = await resolveTenantLogoUrl(torcidaVinculo.id, torcidaVinculo.logoUrl)
+      torcidaReal = {
+        ...torcidaVinculo,
+        nome: formatNomeTorcida(torcidaVinculo.nome),
+        logoUrl,
+      }
+    }
+
+    return {
+      modo: 'nacional',
+      tenant: null,
+      afiliacao,
+      tenantSintetico,
+      podeEscopoTorcida: Boolean(torcidaReal),
+      torcidaReal,
+    }
   },
 )
 

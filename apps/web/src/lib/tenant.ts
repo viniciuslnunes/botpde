@@ -160,18 +160,16 @@ export function torcidaAcessivelNoHost(_tenantSlug: string): boolean {
 }
 
 /**
- * Torcida ativa no portal logado.
- * Ordem: subdomínio real → cookie com vínculo autorizado → vínculo resolvido
- * (sócio/torcedor APROVADO ou sócio PENDENTE) → cookie do clube do
- * PerfilTorcedor → cookie genérico → TENANT_SLUG do deploy.
+ * Torcida ativa no portal logado (modo "Minha torcida" / sócio).
+ * Ordem: subdomínio real → cookie com vínculo SOCIO autorizado → slug do
+ * sócio APROVADO/PENDENTE → TENANT_SLUG do deploy (só super-admin / sem user).
  *
- * TORCEDOR APROVADO e SOCIO PENDENTE abrem a comunidade da própria torcida —
- * sem isso o single-tenant caía no TENANT_SLUG do deploy (vazamento).
- * Torcedor global (só PerfilTorcedor, sem vínculo) recebe `null` e cai no
- * modo "comunidade nacional" via resolverContextoComunidade.
+ * TORCEDOR (mesmo APROVADO na unidade) retorna `null`: fica na Comunidade
+ * Nacional do clube (`resolverContextoComunidade`). Cookie do mesmo clube
+ * não pode reabrir tenant — isso empurrava o portal de sócios no lugar da CN.
  *
- * Não delega a getTenantFromHost() inteiro — em single-tenant o TENANT_SLUG do deploy
- * (ex.: Gaviões) não pode vencer o contexto correto de outro usuário.
+ * Não delega a getTenantFromHost() inteiro — em single-tenant o TENANT_SLUG do
+ * deploy (ex.: Gaviões) não pode vencer o contexto correto de outro usuário.
  */
 /** Deduplica layout + page (e portal) no mesmo request RSC. */
 export const getActiveTenant = cache(async function getActiveTenant(
@@ -189,8 +187,7 @@ export const getActiveTenant = cache(async function getActiveTenant(
   } = await import('@/lib/tenant-context')
 
   if (userId && !isSuperAdminEmail(email)) {
-    // Cookie só vence quando corresponde a um vínculo real do usuário
-    // (sócio/torcedor aprovado ou sócio pendente naquela torcida).
+    // Cookie só vence com vínculo SOCIO (APROVADO/PENDENTE) naquela torcida.
     const cookieStore = await cookies()
     const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
     if (slugFromCookie && (await vinculoAutorizaContextoTenant(userId, slugFromCookie))) {
@@ -201,20 +198,13 @@ export const getActiveTenant = cache(async function getActiveTenant(
     const userSlug = await resolveUserTenantSlugForUser(userId)
     if (userSlug) return fetchTenantBySlug(userSlug)
 
+    // Sem sócio: TORCEDOR / só PerfilTorcedor → CN (null). Não cair no
+    // TENANT_SLUG do deploy nem reabrir tenant via cookie do clube.
     const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
       where: { userId },
       select: { afiliacaoId: true },
     })
-    if (perfil?.afiliacaoId) {
-      const slugCookieClube = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
-      if (slugCookieClube) {
-        const fromCookie = await fetchTenantBySlug(slugCookieClube)
-        if (fromCookie?.afiliacaoId === perfil.afiliacaoId) return fromCookie
-      }
-      // Torcedor global: sem vínculo e sem cookie do clube, não há tenant ativo —
-      // o TENANT_SLUG do deploy não pode empurrá-lo para uma torcida específica.
-      return null
-    }
+    if (perfil?.afiliacaoId) return null
   }
 
   const cookieStore = await cookies()
