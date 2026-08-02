@@ -34,6 +34,7 @@
  * Uso:
  *   pnpm --filter @torcida/db seed:nacional-teste
  *   FASES=1,4 pnpm --filter @torcida/db seed:nacional-teste
+ *   FASES=2b pnpm --filter @torcida/db seed:nacional-teste   # só posts CN torcedor
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
@@ -51,7 +52,7 @@ const PESSOAS_POR_UNIDADE = 30
 const UNIDADES_POR_TORCIDA = 2
 const GLOBAIS_POR_CLUBE = 25
 
-const FASES = (process.env.FASES ?? '1,2,3,4,5,6')
+const FASES = (process.env.FASES ?? '1,2,2b,3,4,5,6')
   .split(',')
   .map((f) => f.trim())
   .filter(Boolean)
@@ -376,6 +377,127 @@ async function seedTorcedoresGlobais(contexto, resumo) {
   }
 }
 
+/**
+ * Get-or-create do tenant sintético da CN (mesmo slug que
+ * `getOrCreateComunidadeNacionalTenant` no web).
+ */
+async function ensureTenantSinteticoCn(afiliacao) {
+  const slugReservado = `${afiliacao.slug ?? afiliacao.id}-nacional`
+  const existente = await db.tenant.findFirst({
+    where: { slug: slugReservado },
+    select: { id: true, slug: true },
+  })
+  if (existente) return existente
+
+  return db.tenant.create({
+    data: {
+      nome: `${afiliacao.nome} — Comunidade Nacional`,
+      slug: slugReservado,
+      afiliacaoId: afiliacao.id,
+      sintetico: true,
+      ativo: true,
+    },
+    select: { id: true, slug: true },
+  })
+}
+
+/**
+ * Fase 2b: posts de torcedores na CN (tenant sintético).
+ *
+ * O Descobrir nacional só lista MEMBRO PUBLICO em tenant sintético, OU
+ * alcanceNacional na torcida real, OU autores seguidos. A Fase 3 semeava
+ * só na torcida real (muitos sem alcance) e os globais da Fase 2 não
+ * publicavam — o feed parecia "só sócio". Aqui os torcedores globais e
+ * TORCEDOR APROVADO da unidade postam no sintético (como `publicarPostNacional`).
+ */
+async function seedPostsTorcedoresCn(contexto, resumo) {
+  const POSTS_POR_CLUBE_MIN = 18
+
+  for (const t of contexto) {
+    const sintetico = await ensureTenantSinteticoCn(t.afiliacao)
+    const jaTem = await db.post.count({
+      where: {
+        tenantId: sintetico.id,
+        tipo: 'MEMBRO',
+        OR: [{ titulo: { startsWith: MARCA } }, { conteudo: { startsWith: MARCA } }],
+      },
+    })
+    if (jaTem >= POSTS_POR_CLUBE_MIN) {
+      console.log(
+        `  ↔  ${t.clube}: posts CN de torcedor já semeados (${jaTem}) — pulando`,
+      )
+      continue
+    }
+
+    const globais = await db.perfilTorcedor.findMany({
+      where: { afiliacaoId: t.afiliacao.id, user: filtroUserTeste },
+      select: { userId: true },
+    })
+    const torcedoresUnidade = await db.saasMembro.findMany({
+      where: {
+        tenantId: t.tenantId,
+        tipo: 'TORCEDOR',
+        status: 'APROVADO',
+        user: filtroUserTeste,
+      },
+      select: { userId: true },
+    })
+
+    const autores = [
+      ...new Set([
+        ...globais.map((g) => g.userId),
+        ...torcedoresUnidade.map((m) => m.userId),
+      ]),
+    ]
+    if (autores.length === 0) {
+      console.log(`  ↔  ${t.clube}: sem torcedores para posts CN — pulando`)
+      continue
+    }
+
+    const textos = templatesMembro(t.afiliacao.nome)
+    const faltam = POSTS_POR_CLUBE_MIN - jaTem
+    const postsRows = []
+    const autoresPost = embaralhar(autores)
+    for (let i = 0; i < faltam; i++) {
+      const autorId = autoresPost[i % autoresPost.length]
+      postsRows.push({
+        id: crypto.randomUUID(),
+        tenantId: sintetico.id,
+        autorId,
+        titulo: `${MARCA} Torcedor CN ${i + 1}`,
+        conteudo: pick(textos),
+        tipo: 'MEMBRO',
+        visibilidade: 'PUBLICO',
+        // Sintético: Descobrir já inclui por tenant.sintetico; flag reforça.
+        alcanceNacional: true,
+        criadoEm: diasAtras(Math.floor(Math.random() * 30)),
+      })
+    }
+
+    await createManyBatched('post', postsRows, `${t.clube}: Post CN torcedor`)
+    resumo.posts += postsRows.length
+    resumo.postsCnTorcedor += postsRows.length
+
+    const reacoes = []
+    const tipos = ['CURTIR', 'FORCA', 'VAMOS', 'PRESENTE']
+    for (const post of postsRows) {
+      const reagentes = new Set(
+        embaralhar(autores).slice(0, 1 + Math.floor(Math.random() * 4)),
+      )
+      for (const userId of reagentes) {
+        reacoes.push({
+          id: crypto.randomUUID(),
+          postId: post.id,
+          userId,
+          tipo: pick(tipos),
+        })
+      }
+    }
+    await createManyBatched('reacao', reacoes, `${t.clube}: Reacao CN torcedor`, 800)
+    resumo.reacoes += reacoes.length
+  }
+}
+
 // ── Fase 3: posts (peso em alcance nacional) ─────────────────────────────
 async function seedPosts(contexto, resumo) {
   for (const t of contexto) {
@@ -409,9 +531,29 @@ async function seedPosts(contexto, resumo) {
       })
     }
 
+    const torcedorIds = new Set(
+      (
+        await db.saasMembro.findMany({
+          where: {
+            tenantId: t.tenantId,
+            tipo: 'TORCEDOR',
+            status: 'APROVADO',
+            userId: { in: t.aprovadosUserIds },
+          },
+          select: { userId: true },
+        })
+      ).map((m) => m.userId),
+    )
+
     const mem = templatesMembro(t.afiliacao.nome)
     for (const autorId of t.aprovadosUserIds.filter(() => Math.random() < 0.5)) {
       const visibilidade = pickPonderado([['PUBLICO', 70], ['TENANT', 25], ['PRIVADO', 5]])
+      const ehTorcedor = torcedorIds.has(autorId)
+      // TORCEDOR PUBLICO: maioria com alcance nacional (Descobrir da CN).
+      // Sócio: ~30% (peso histórico do lote).
+      const alcanceNacional =
+        visibilidade === 'PUBLICO' &&
+        (ehTorcedor ? Math.random() < 0.75 : Math.random() < 0.3)
       postsRows.push({
         id: crypto.randomUUID(),
         tenantId: t.tenantId,
@@ -419,7 +561,7 @@ async function seedPosts(contexto, resumo) {
         conteudo: pick(mem),
         tipo: 'MEMBRO',
         visibilidade,
-        alcanceNacional: visibilidade === 'PUBLICO' && Math.random() < 0.3,
+        alcanceNacional,
         criadoEm: diasAtras(Math.floor(Math.random() * 30)),
       })
     }
@@ -622,6 +764,7 @@ async function main() {
     perfilTorcedor: 0,
     posts: 0,
     postsNacionais: 0,
+    postsCnTorcedor: 0,
     reacoes: 0,
     comentarios: 0,
     rivalidadesClube: 0,
@@ -641,6 +784,11 @@ async function main() {
       },
     ],
     ['2', 'torcedores globais por clube', () => seedTorcedoresGlobais(contexto, resumo)],
+    [
+      '2b',
+      'posts de torcedores na Comunidade Nacional (tenant sintético)',
+      () => seedPostsTorcedoresCn(contexto, resumo),
+    ],
     ['3', 'posts + engajamento (peso em alcance nacional)', () => seedPosts(contexto, resumo)],
     ['4', 'rivalidades clube × clube e torcida × torcida', () => seedRivalidades(contexto, resumo)],
     ['5', 'alianças cross-clube', () => seedAliancas(contexto, resumo)],
