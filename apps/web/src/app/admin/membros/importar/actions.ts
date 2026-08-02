@@ -34,7 +34,13 @@ const ImportarMockSchema = z.object({
 /** Erro de linha registrado em ImportacaoMembros.erros (Json). */
 type ErroLinha = { linha: number; motivo: string }
 
-type VinculoAprovado = { linha: number; userId: string; sedeId: string | null }
+type VinculoAprovado = {
+  linha: number
+  userId: string
+  sedeId: string | null
+  /** Torcedor não entra no canal da Sede — mesma regra do onboarding. */
+  tipo: 'SOCIO' | 'TORCEDOR'
+}
 
 const CONCORRENCIA_VINCULOS_CANAIS = 8
 
@@ -94,10 +100,14 @@ async function processarLote(
 
       // Já é membro deste tenant → duplicado (não sobrescreve, só conta)
       if (userId) {
-        const membroExistente: { id: string; status: string; sedeId: string | null } | null =
-          await db.saasMembro.findUnique({
+        const membroExistente: {
+          id: string
+          status: string
+          sedeId: string | null
+          tipo: string
+        } | null = await db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId, userId } },
-          select: { id: true, status: true, sedeId: true },
+          select: { id: true, status: true, sedeId: true, tipo: true },
         })
         if (membroExistente) {
           if (membroExistente.status === 'APROVADO') {
@@ -105,6 +115,9 @@ async function processarLote(
               linha: i + 1,
               userId,
               sedeId: membroExistente.sedeId,
+              // O vínculo já gravado manda: reimportar não pode promover um
+              // torcedor ao canal da Sede.
+              tipo: membroExistente.tipo === 'TORCEDOR' ? 'TORCEDOR' : 'SOCIO',
             })
           }
           duplicados++
@@ -147,7 +160,12 @@ async function processarLote(
       if (input.tipo === 'SOCIO') {
         await privatizarPerfilAoAprovarSocio(userId, tenantId)
       }
-      vinculosAprovados.set(userId, { linha: i + 1, userId, sedeId: null })
+      vinculosAprovados.set(userId, {
+        linha: i + 1,
+        userId,
+        sedeId: null,
+        tipo: input.tipo === 'TORCEDOR' ? ('TORCEDOR' as const) : ('SOCIO' as const),
+      })
       importados++
     } catch (e) {
       erros.push({ linha: i + 1, motivo: e instanceof Error ? e.message : 'Erro desconhecido' })
@@ -167,6 +185,7 @@ async function processarLote(
           userId: vinculo.userId,
           sedeId: vinculo.sedeId,
           fallbackCriadoPorId: vinculo.userId,
+          tipo: vinculo.tipo,
         })
       } catch (error) {
         erros.push({

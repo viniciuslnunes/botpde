@@ -86,6 +86,8 @@ describe('importarMock — canais de aprovados', () => {
       userId: 'user-torcedor',
       sedeId: null,
       fallbackCriadoPorId: 'user-torcedor',
+      // Torcedor importado não pode ser inscrito no canal da Sede.
+      tipo: 'TORCEDOR',
     })
   })
 
@@ -95,6 +97,7 @@ describe('importarMock — canais de aprovados', () => {
       id: 'membro-existente',
       status: 'APROVADO',
       sedeId: 'unidade-1',
+      tipo: 'TORCEDOR',
     })
 
     mocks.importacaoCreate.mockResolvedValue({ id: 'importacao-2' })
@@ -115,6 +118,8 @@ describe('importarMock — canais de aprovados', () => {
       userId: 'user-existente',
       sedeId: 'unidade-1',
       fallbackCriadoPorId: 'user-existente',
+      // O vínculo já gravado manda: reimportar não promove torcedor à Sede.
+      tipo: 'TORCEDOR',
     })
   })
 })

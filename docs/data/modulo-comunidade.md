@@ -494,8 +494,15 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   **Torcedor entra só no canal da unidade**: `vincularMembroCanaisAposAprovacao`
   ganhou `tipo`; com `TORCEDOR` **e** canal de unidade resolvido, o canal da
   Sede não entra. Sem canal de unidade (vínculo direto na Sede), o principal é
-  o dele mesmo. Sem `tipo`, mantém o comportamento de sócio. Testes em
-  `lib/__tests__/canais-elegibilidade.test.ts`.
+  o dele mesmo. Sem `tipo`, mantém o comportamento de sócio.
+
+  A regra vale nos **três** caminhos que vinculam canal, não só no onboarding:
+  `solicitarVinculo`, `aprovarMembro` (a fila `/admin/membros` lista os dois
+  tipos) e a importação em lote — nos dois últimos o `tipo` **já gravado** no
+  `SaasMembro` manda. Promoção a liderança e promoção de unidade
+  (`promover-actions`) são sócio por definição e seguem sem `tipo`. Testes em
+  `lib/__tests__/canais-elegibilidade.test.ts` e
+  `lib/__tests__/importacao-actions.test.ts`.
 - **Composição do feed Nacional (2026-08-02)**: a CN é a praça do torcedor, e
   o feed precisa **garantir** isso — não basta ordenar por recência.
   `getPostsFeedNacional` roda **dois baldes**:

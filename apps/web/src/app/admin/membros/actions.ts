@@ -620,6 +620,9 @@ export async function aprovarMembro(
     userId: origem.userId,
     sedeId: origem.sedeId,
     fallbackCriadoPorId: aprovadoPorId,
+    // A fila lista os dois tipos: aprovar um torcedor aqui não pode inscrevê-lo
+    // no canal da Sede (mesma regra do onboarding — ele é da unidade).
+    tipo: origem.tipo === 'TORCEDOR' ? 'TORCEDOR' : 'SOCIO',
   })
 
   const detalhesAudit = {
