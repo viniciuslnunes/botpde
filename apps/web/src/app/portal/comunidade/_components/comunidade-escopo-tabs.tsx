@@ -4,16 +4,19 @@ import { useSearchParams } from 'next/navigation'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import { LogoImage } from '@/components/media/logo-image'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 
 type Props = {
-  afiliacao: { nome: string; apelido: string | null } | null
+  afiliacao: { nome: string; apelido: string | null; escudoUrl: string | null } | null
   escopos: EscoposDisponiveis
   escopoAtivo: EscopoComunidade
-  /** Nome da unidade de vínculo — rotula a aba dela. */
+  /** Nome da unidade de vínculo — acessibilidade da aba. */
   nomeUnidade?: string | null
-  /** Nome da torcida (organizada) — rotula a aba de sócio. */
+  logoUnidade?: string | null
+  /** Nome da torcida (organizada) — acessibilidade da aba. */
   nomeTorcida?: string | null
+  logoTorcida?: string | null
   /**
    * Default do usuário: sócio = torcida; TORCEDOR = nacional.
    * A aba do default omite `?escopo=`; as outras forçam o param.
@@ -21,19 +24,31 @@ type Props = {
   modoContexto?: 'nacional' | 'torcida'
 }
 
+type TabDef = {
+  id: EscopoComunidade
+  /** Nome completo para aria-label / title (não aparece no layout). */
+  nome: string
+  logoUrl: string | null
+  /** Inicial de fallback quando não há escudo. */
+  inicial: string
+  href: string
+}
+
 /**
- * Alterna entre "Nacional" (a praça do clube), "Minha torcida" (a organizada
- * inteira — só sócio) e "Minha unidade" (o canal da subsede/PDE que convidou).
+ * Alterna entre Nacional (praça do clube), Minha torcida (organizada — só
+ * sócio) e Minha unidade (canal da subsede/PDE). As abas são **escudos**,
+ * não títulos: nomes longos de PDE/torcida estouravam a barra.
  *
- * Torcedor vê Nacional + Minha unidade: ele pertence à unidade, não à
- * organizada. Torcedor global, sem unidade, fica só no Nacional.
+ * Torcedor vê Nacional + Minha unidade; torcedor global, só Nacional.
  */
 export function ComunidadeEscopoTabs({
   afiliacao,
   escopos,
   escopoAtivo,
   nomeUnidade,
+  logoUnidade,
   nomeTorcida,
+  logoTorcida,
   modoContexto = 'torcida',
 }: Props) {
   const params = useSearchParams()
@@ -51,13 +66,21 @@ export function ComunidadeEscopoTabs({
 
   const nomeClube = afiliacao.apelido || afiliacao.nome
 
-  const tabs: Array<{ id: EscopoComunidade; label: string; href: string }> = [
-    { id: 'nacional', label: `Nacional (${nomeClube})`, href: hrefPara('nacional') },
+  const tabs: TabDef[] = [
+    {
+      id: 'nacional',
+      nome: `Nacional — ${nomeClube}`,
+      logoUrl: afiliacao.escudoUrl,
+      inicial: nomeClube.charAt(0).toUpperCase(),
+      href: hrefPara('nacional'),
+    },
     ...(escopos.torcida
       ? [
           {
             id: 'torcida' as const,
-            label: nomeTorcida ? `Minha torcida (${nomeTorcida})` : 'Minha torcida',
+            nome: nomeTorcida ? `Minha torcida — ${nomeTorcida}` : 'Minha torcida',
+            logoUrl: logoTorcida ?? null,
+            inicial: (nomeTorcida || 'T').charAt(0).toUpperCase(),
             href: hrefPara('torcida'),
           },
         ]
@@ -66,7 +89,9 @@ export function ComunidadeEscopoTabs({
       ? [
           {
             id: 'unidade' as const,
-            label: nomeUnidade ? `Minha unidade (${nomeUnidade})` : 'Minha unidade',
+            nome: nomeUnidade ? `Minha unidade — ${nomeUnidade}` : 'Minha unidade',
+            logoUrl: logoUnidade ?? null,
+            inicial: (nomeUnidade || 'U').charAt(0).toUpperCase(),
             href: hrefPara('unidade'),
           },
         ]
@@ -76,7 +101,7 @@ export function ComunidadeEscopoTabs({
   if (tabs.length < 2) return null
 
   return (
-    <nav className="relative flex items-center gap-6 border-b border-[rgb(var(--border))]">
+    <nav className="relative flex items-center gap-5 border-b border-[rgb(var(--border))]">
       {tabs.map((tab) => {
         const ativo = tab.id === escopoAtivo
         return (
@@ -85,14 +110,33 @@ export function ComunidadeEscopoTabs({
             href={tab.href}
             scroll={false}
             aria-current={ativo ? 'page' : undefined}
+            aria-label={tab.nome}
+            title={tab.nome}
             className={[
-              'relative -mb-px pb-3 pt-1 text-[15px] font-semibold transition-colors',
-              ativo
-                ? 'text-[rgb(var(--foreground))]'
-                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+              'relative -mb-px flex items-center justify-center pb-2.5 pt-1 transition-opacity',
+              ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
             ].join(' ')}
           >
-            {tab.label}
+            {tab.logoUrl ? (
+              <LogoImage
+                src={tab.logoUrl}
+                alt=""
+                size={28}
+                className="h-7 w-7 object-contain"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className={[
+                  'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold',
+                  ativo
+                    ? 'bg-[rgb(var(--primary))] text-white'
+                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                ].join(' ')}
+              >
+                {tab.inicial}
+              </span>
+            )}
             {ativo && (
               <m.span
                 layoutId="comunidade-escopo-tab-indicator"

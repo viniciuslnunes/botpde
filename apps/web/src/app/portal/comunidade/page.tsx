@@ -85,6 +85,7 @@ export default async function ComunidadePage({
           escopo="nacional"
           escopos={ctx.escopos}
           nomeUnidade={ctx.unidade?.nome ?? null}
+          logoUnidade={ctx.unidade?.logoUrl ?? null}
           modoContexto={ctx.modo}
           afiliacao={afiliacao}
           torcidaReal={torcidaReal}
@@ -166,6 +167,7 @@ export default async function ComunidadePage({
         escopo={unidade ? 'unidade' : 'torcida'}
         escopos={ctx.escopos}
         nomeUnidade={ctx.unidade?.nome ?? null}
+        logoUnidade={ctx.unidade?.logoUrl ?? null}
         modoContexto={ctx.modo}
         afiliacao={ctx.afiliacao}
         torcidaReal={torcidaReal}

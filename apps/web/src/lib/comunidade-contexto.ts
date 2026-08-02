@@ -60,6 +60,8 @@ export type UnidadeComunidade = {
   /** Tenant dono do canal — Caso A é o da Sede; Caso B, o da própria unidade. */
   tenantId: string
   nome: string
+  /** Foto da unidade (`Sede.fotoUrl`) — escudo da aba "Minha unidade". */
+  logoUrl: string | null
 }
 
 export type ContextoComunidadePortal =
@@ -112,7 +114,12 @@ const resolverUnidadeDoVinculo = cache(
 
     const vinculo: {
       tenantId: string
-      sede: { nome: string; tipo: string; canalConversaId: string | null } | null
+      sede: {
+        nome: string
+        tipo: string
+        canalConversaId: string | null
+        fotoUrl: string | null
+      } | null
     } | null = await db.saasMembro.findFirst({
       where: {
         userId,
@@ -124,14 +131,20 @@ const resolverUnidadeDoVinculo = cache(
       orderBy: { criadoEm: 'desc' },
       select: {
         tenantId: true,
-        sede: { select: { nome: true, tipo: true, canalConversaId: true } },
+        sede: { select: { nome: true, tipo: true, canalConversaId: true, fotoUrl: true } },
       },
     })
 
     const canalId = vinculo?.sede?.canalConversaId
     if (!vinculo || !canalId) return null
 
-    return { canalId, tenantId: vinculo.tenantId, nome: vinculo.sede!.nome }
+    const sede = vinculo.sede!
+    let logoUrl = sede.fotoUrl
+    if (!logoUrl) {
+      logoUrl = await resolveTenantLogoUrl(vinculo.tenantId, null)
+    }
+
+    return { canalId, tenantId: vinculo.tenantId, nome: sede.nome, logoUrl }
   },
 )
 

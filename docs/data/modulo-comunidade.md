@@ -469,7 +469,7 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   vez de erro (link colado não pode dar 403 na cara de quem abriu).
 
   **A aba de unidade é ancorada num CANAL, não num tenant**
-  (`UnidadeComunidade` = `{ canalId, tenantId, nome }`). Unidade Caso A
+  (`UnidadeComunidade` = `{ canalId, tenantId, nome, logoUrl }`). Unidade Caso A
   (subsede no tenant da Sede) não tem tenant próprio, só
   `Sede.canalConversaId`; Caso B tem os dois. Ancorar no canal cobre as duas
   sem ramo especial — e o canal é o que a liderança de fato controla. A

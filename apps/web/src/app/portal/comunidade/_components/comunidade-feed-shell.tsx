@@ -54,11 +54,13 @@ interface ComunidadeFeedShellProps {
   escopos?: EscoposDisponiveis
   /** Rótulo da aba de unidade — nome da subsede/PDE de vínculo. */
   nomeUnidade?: string | null
+  /** Escudo/foto da unidade — aba "Minha unidade". */
+  logoUnidade?: string | null
   /** Default do usuário (sócio=torcida, TORCEDOR=nacional) — abas de escopo. */
   modoContexto?: 'nacional' | 'torcida'
   afiliacao?: AfiliacaoComunidade | null
   /** Sócio com torcida real — card/composer na aba Nacional usam cargo da torcida. */
-  torcidaReal?: { id: string; nome: string } | null
+  torcidaReal?: { id: string; nome: string; logoUrl?: string | null } | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
 }
@@ -81,6 +83,7 @@ export function ComunidadeFeedShell({
   escopo = 'torcida',
   escopos = { torcida: false, unidade: false },
   nomeUnidade = null,
+  logoUnidade = null,
   modoContexto = 'torcida',
   afiliacao = null,
   torcidaReal = null,
@@ -105,7 +108,9 @@ export function ComunidadeFeedShell({
           escopos={escopos}
           escopoAtivo={escopo}
           nomeUnidade={nomeUnidade}
+          logoUnidade={logoUnidade}
           nomeTorcida={torcidaReal?.nome ?? null}
+          logoTorcida={torcidaReal?.logoUrl ?? null}
           modoContexto={modoContexto}
         />
 
