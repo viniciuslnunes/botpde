@@ -68,10 +68,11 @@ export function ConviteForm({ slug, ativo, canalRestrito }: ConviteFormProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        O link de convite adianta as etapas de clube, torcida e unidade: quem
-        abrir vai direto para a escolha entre sócio e torcedor. Criar a conta,
-        confirmar o e-mail e definir o apelido (@) continuam sendo pedidos —
-        são a identidade da pessoa na plataforma.
+        O link de convite adianta as etapas de clube, torcida e unidade e
+        vincula quem abrir a esta torcida/unidade: a pessoa vai direto para a
+        escolha entre sócio e torcedor. Criar a conta, confirmar o e-mail e
+        definir o apelido (@) continuam sendo pedidos — são a identidade na
+        plataforma.
         {canalRestrito
           ? ' Como o canal desta unidade está restrito, este é o único caminho de entrada.'
           : ''}

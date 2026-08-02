@@ -107,13 +107,12 @@ export interface ConviteOnboarding {
   torcidaMae: TorcidaMaeConvite | null
   clube: AfiliacaoOnboarding
   torcida: TorcidaOnboarding
-  /** Unidade sugerida (única do tenant convidado), quando houver só uma. */
+  /** Unidade pré-selecionada pelo convite (sede do link ou única do tenant). */
   unidadeId: string | null
   /**
-   * Onde o wizard abre. Com mais de uma unidade o passo Unidade continua
-   * necessário — `solicitarVinculo` exige a escolha, e pular direto para o
-   * Vínculo deixaria o usuário num beco sem saída ("Selecione sua unidade"
-   * sem ter onde selecionar).
+   * Onde o wizard abre. Convite da Sede (raiz) ou com uma única unidade vai
+   * direto ao Vínculo. Só pede Unidade quando o tenant convidado tem várias
+   * sedes e não é a Sede raiz (caso raro em unidade Caso B).
    */
   passoInicial: 'unidade' | 'vinculo'
   uf: string
@@ -183,6 +182,34 @@ function mapSede(s: SedeConviteRow): SedeOnboarding {
     streetViewPitch: s.streetViewPitch,
     streetViewFov: s.streetViewFov,
   }
+}
+
+/**
+ * Decide unidade pré-selecionada e passo inicial do wizard a partir do
+ * convite. Pura — coberta por teste sem DB.
+ *
+ * - 0/1 sede → vínculo (com id quando houver uma)
+ * - Convite da Sede raiz (sem torcidaMae) com várias sedes → vínculo na sede
+ *   territorial `tipo === 'SEDE'` (não força o usuário a escolher Campinas etc.)
+ * - Unidade Caso B com várias sedes locais → ainda pede Unidade
+ */
+export function decidirPassoInicialConvite(opts: {
+  sedes: Array<{ id: string; tipo: string }>
+  /** `true` quando o tenant do link é a Sede (sem ancestral de torcida). */
+  conviteDaSedeRaiz: boolean
+}): { unidadeId: string | null; passoInicial: 'unidade' | 'vinculo' } {
+  const { sedes, conviteDaSedeRaiz } = opts
+  if (sedes.length === 0) {
+    return { unidadeId: null, passoInicial: 'vinculo' }
+  }
+  if (sedes.length === 1) {
+    return { unidadeId: sedes[0]!.id, passoInicial: 'vinculo' }
+  }
+  if (conviteDaSedeRaiz) {
+    const raiz = sedes.find((s) => s.tipo === 'SEDE') ?? sedes[0]!
+    return { unidadeId: raiz.id, passoInicial: 'vinculo' }
+  }
+  return { unidadeId: null, passoInicial: 'unidade' }
 }
 
 /**
@@ -307,6 +334,11 @@ export const resolverConvite = cache(
       exigirDocumentosCadastro: tenant.exigirDocumentosCadastro,
     }
 
+    const { unidadeId, passoInicial } = decidirPassoInicialConvite({
+      sedes: sedesOnboarding,
+      conviteDaSedeRaiz: torcidaMae === null,
+    })
+
     return {
       conviteSlug: termo,
       tenantId: tenant.id,
@@ -315,9 +347,8 @@ export const resolverConvite = cache(
       torcidaMae,
       clube,
       torcida,
-      // Uma única unidade = escolha óbvia; várias, o usuário decide no passo.
-      unidadeId: sedesOnboarding.length === 1 ? (sedesOnboarding[0]?.id ?? null) : null,
-      passoInicial: sedesOnboarding.length > 1 ? 'unidade' : 'vinculo',
+      unidadeId,
+      passoInicial,
       uf: raiz?.estado ?? afiliacao.estado ?? '',
       cidade: raiz?.cidade ?? afiliacao.cidade ?? '',
     }
