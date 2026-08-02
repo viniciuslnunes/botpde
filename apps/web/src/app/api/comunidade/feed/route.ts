@@ -10,7 +10,7 @@ import {
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
-import { getCanalPorId, getPostsDoCanal } from '@/lib/canais'
+import { getCanalDaUnidadeDoVinculo, getCanalPorId, getPostsDoCanal } from '@/lib/canais'
 import { resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
 
 const querySchema = z.object({
@@ -117,7 +117,12 @@ export async function GET(request: NextRequest) {
       if (!parsed.data.conversaId) {
         return NextResponse.json({ error: 'conversaId obrigatório.' }, { status: 400 })
       }
-      const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+      // Aba "Minha unidade": o gate é o vínculo, não a descoberta cross-tenant
+      // (`getCanalPorId` exige sócio fora de canal PÚBLICO e devolveria 404
+      // para o torcedor no mural da própria unidade).
+      const canal =
+        (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
+        (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id))
       if (!canal || !canal.souMembro) {
         return NextResponse.json({ error: 'Canal não encontrado.' }, { status: 404 })
       }

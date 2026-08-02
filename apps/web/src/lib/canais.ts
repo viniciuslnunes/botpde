@@ -953,26 +953,55 @@ export async function getCanalPorId(
   viewerTenantId: string,
   userId: string,
 ): Promise<CanalItem | null> {
-  const row: {
-    id: string
-    tenantId: string
-    nome: string | null
-    descricao: string | null
-    avatarUrl: string | null
-    institucional: boolean
-    canalOficial: boolean
-    visibilidadeCanal: VisibilidadeCanal
-    somenteAdminPublica: boolean
-    publica: boolean
-    tipo: string
-    tenant: { nome: string }
-    _count: { membros: number }
-    membros: Array<{
-      papel: 'ADMIN' | 'MEMBRO'
-      status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
-      silenciada: boolean
-    }>
-  } | null = await db.conversa.findFirst({
+  const row = await carregarCanalRow(conversaId, userId)
+  if (!row) return null
+
+  const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId)
+  if (!podeVer) return null
+
+  return projetarCanalItem(row)
+}
+
+/**
+ * Canal oficial da unidade em que a pessoa tem vínculo APROVADO — a aba
+ * "Minha unidade".
+ *
+ * **Não** passa por `podeVerCanal`: aquele é o gate de *descoberta*
+ * cross-tenant e `decidePodeVerCanal` barra qualquer não-sócio fora de canal
+ * `PUBLICO`. A aba da unidade é do torcedor por definição — ele pertence à
+ * subsede/PDE que o convidou, e o canal dela nasce fechado. O gate aqui é o
+ * **vínculo**: só devolve o canal quando ele é o `Sede.canalConversaId` de uma
+ * unidade onde a pessoa é `SaasMembro` APROVADO. O acesso ao conteúdo continua
+ * sendo `MembroConversa` (`souMembro`) — quem ainda não entrou vê o pedido de
+ * entrada, não o mural.
+ *
+ * Cobre também o **canal emprestado** (mesma armadilha de
+ * `assertElegibilidadeMembroCanal`): unidade Caso B cujo canal oficial ficou no
+ * tenant da mãe, com `Conversa.tenantId` ≠ tenant do vínculo.
+ */
+export async function getCanalDaUnidadeDoVinculo(
+  conversaId: string,
+  userId: string,
+): Promise<CanalItem | null> {
+  const vinculo: { id: string } | null = await db.saasMembro.findFirst({
+    where: {
+      userId,
+      status: 'APROVADO',
+      espelhado: false,
+      sede: { canalConversaId: conversaId },
+    },
+    select: { id: true },
+  })
+  if (!vinculo) return null
+
+  const row = await carregarCanalRow(conversaId, userId)
+  return row ? projetarCanalItem(row) : null
+}
+
+type CanalRow = NonNullable<Awaited<ReturnType<typeof carregarCanalRow>>>
+
+async function carregarCanalRow(conversaId: string, userId: string) {
+  return db.conversa.findFirst({
     where: { id: conversaId, tipo: 'CANAL' },
     select: {
       id: true,
@@ -995,11 +1024,9 @@ export async function getCanalPorId(
       },
     },
   })
-  if (!row) return null
+}
 
-  const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId)
-  if (!podeVer) return null
-
+async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
   const fallbackAvatars =
     row.canalOficial && !row.avatarUrl
       ? await resolveFallbackAvatarsCanalOficial([row.tenantId])

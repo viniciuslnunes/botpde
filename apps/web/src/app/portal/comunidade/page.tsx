@@ -6,7 +6,7 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
-import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
+import { getCanalDaUnidadeDoVinculo, podePublicarNoCanal } from '@/lib/canais'
 import { podeVerFeedSocios } from '@/lib/feed'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { calculateEffectivePermissions } from '@torcida/types'
@@ -120,7 +120,11 @@ export default async function ComunidadePage({
       unidade.tenantId,
     )
     const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
-    const canal = await getCanalPorId(unidade.canalId, unidade.tenantId, session.user.id)
+    // Gate pelo VÍNCULO, não por `podeVerCanal`: a aba é do torcedor por
+    // definição e o gate de descoberta barra todo não-sócio fora de canal
+    // PÚBLICO. Também cobre o canal emprestado (Caso B com a Conversa no
+    // tenant da mãe), onde a relação de tenant nem seria `self`.
+    const canal = await getCanalDaUnidadeDoVinculo(unidade.canalId, session.user.id)
 
     if (canal) {
       // Publicar no mural da unidade é de sócio: torcedor lê, participa de

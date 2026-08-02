@@ -484,6 +484,17 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   salas) e **não** monta composer genérico nem feed agregado, que é justamente
   o que a aba da unidade não é.
 
+  **O gate da aba é o VÍNCULO, não `podeVerCanal`** (`getCanalDaUnidadeDoVinculo`
+  em `lib/canais.ts`): `decidePodeVerCanal` barra todo não-sócio fora de canal
+  `PUBLICO`, e o canal da unidade nasce fechado — então o torcedor, dono da
+  aba, recebia `null` e o mural virava "Canal não encontrado". A função só
+  devolve o canal quando ele é o `Sede.canalConversaId` de uma unidade onde a
+  pessoa é `SaasMembro` APROVADO; o acesso ao conteúdo continua sendo
+  `MembroConversa`. Cobre também o **canal emprestado** (Caso B com a
+  `Conversa` no tenant da mãe), onde a relação de tenant nem seria `self`. A
+  rota `/api/comunidade/feed?filtro=canal` faz o mesmo fallback — senão o
+  scroll infinito devolvia 404 no mural da própria unidade.
+
   **Publicar é de sócio**: `podeVerFeedSocios` ∧ `podePublicarNoCanal`. Torcedor
   lê o mural e participa de grupos, salas e loja, mas não publica no canal
   oficial. O canal **nasce privado** (`publica: false`) porque a unidade pode

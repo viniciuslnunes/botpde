@@ -56,7 +56,7 @@ for (const s of sedes) {
 
 const aprovados = await db.saasMembro.findMany({
   where: { status: 'APROVADO', ...tenantFilter },
-  select: { userId: true, tenantId: true, sedeId: true },
+  select: { userId: true, tenantId: true, sedeId: true, tipo: true },
 })
 
 /** @type {Map<string, Set<string>>} conversaId → userIds desejados */
@@ -65,12 +65,21 @@ let semCanal = 0
 
 for (const m of aprovados) {
   const canalIds = new Set()
+  let canalDaUnidade = null
   if (m.sedeId) {
     const c = canalPorSedeId.get(m.sedeId)
-    if (c) canalIds.add(c)
+    if (c) {
+      canalDaUnidade = c
+      canalIds.add(c)
+    }
   }
-  const sede = canalSedePorTenant.get(m.tenantId)
-  if (sede) canalIds.add(sede)
+  // TORCEDOR com canal de unidade resolvido para por aqui: o canal da Sede é
+  // espaço de sócio (mesma regra de `vincularMembroCanaisAposAprovacao`).
+  // Sem canal de unidade, o da Sede é o dele mesmo.
+  if (!(m.tipo === 'TORCEDOR' && canalDaUnidade)) {
+    const sede = canalSedePorTenant.get(m.tenantId)
+    if (sede) canalIds.add(sede)
+  }
 
   if (canalIds.size === 0) {
     semCanal++
