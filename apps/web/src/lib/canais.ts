@@ -1186,7 +1186,12 @@ export async function podePublicarNoCanal(
   viewerTenantId: string,
   permissoes: string[],
 ): Promise<boolean> {
-  if (canal.tenantId !== viewerTenantId) return false
+  // Canal emprestado (Caso B): Conversa.tenantId = Sede; viewer = PDE/subsede.
+  // Exigir igualdade barrava sócio da unidade no próprio mural oficial.
+  if (canal.tenantId !== viewerTenantId) {
+    const lineage = await getTorcidaLineageTenantIds(viewerTenantId)
+    if (!lineage.includes(canal.tenantId)) return false
+  }
   if (!canal.somenteAdminPublica) return true
   const { PERMISSIONS, hasPermission } = await import('@torcida/types')
   return (

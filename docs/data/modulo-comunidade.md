@@ -482,6 +482,12 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   **worktree** (`getTorcidaLineageTenantIds`), não só o tenant ativo —
   senão Chucky (sócio da PDE, logado em Gaviões) ficava só com clube + Sede.
 
+  **Publicação Caso B (2026-08-02)**: canal oficial emprestado na Sede —
+  `podePublicarNoCanal` aceita viewer na worktree (não só `tenantId` igual).
+  Espelho na Sede ganha cargo `member` em `sincronizarSocioNaSedeRaiz` (+
+  `db:repair-espelho-member-role`); sem isso o sócio da PDE não publica no
+  feed "Minha torcida".
+
   **A aba de unidade é ancorada num CANAL, não num tenant**
   (`UnidadeComunidade` = `{ canalId, tenantId, nome, logoUrl }`). Unidade Caso A
   (subsede no tenant da Sede) não tem tenant próprio, só

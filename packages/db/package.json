@@ -48,6 +48,7 @@
     "db:repair-lideranca-canal-membro": "node scripts/repair-lideranca-canal-membro.js",
     "db:repair-canal-membro-pendente-aprovado": "node scripts/repair-canal-membro-pendente-aprovado.js",
     "db:repair-aprovado-canal-membro": "node scripts/repair-aprovado-canal-membro.js",
+    "db:repair-espelho-member-role": "node scripts/repair-espelho-member-role.js",
     "db:ensure-canais-oficiais-unidades": "node scripts/ensure-canais-oficiais-unidades.js",
     "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
     "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",

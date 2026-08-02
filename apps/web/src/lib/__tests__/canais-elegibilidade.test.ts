@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   sedeFindFirst: vi.fn(),
   membroConversaUpsert: vi.fn(),
   resolverTenantRaizId: vi.fn(async (id: string) => id),
+  getTorcidaLineageTenantIds: vi.fn(async (id: string) => [id]),
 }))
 
 vi.mock('@torcida/db', () => ({
@@ -23,7 +24,18 @@ vi.mock('../membros-sede', () => ({
   resolverTenantRaizId: (id: string) => mocks.resolverTenantRaizId(id),
 }))
 
-import { assertElegibilidadeMembroCanal, vincularMembroCanaisAposAprovacao } from '../canais'
+vi.mock('../hierarquia', () => ({
+  getTorcidaLineageTenantIds: (id: string) => mocks.getTorcidaLineageTenantIds(id),
+  getDescendantTenantIds: vi.fn(async () => []),
+  getTenantRelation: vi.fn(async () => 'self'),
+  getVisibleTenantIds: vi.fn(async () => []),
+}))
+
+import {
+  assertElegibilidadeMembroCanal,
+  podePublicarNoCanal,
+  vincularMembroCanaisAposAprovacao,
+} from '../canais'
 
 describe('assertElegibilidadeMembroCanal', () => {
   beforeEach(() => {
@@ -226,5 +238,36 @@ describe('assertElegibilidadeMembroCanal', () => {
         where: { conversaId_userId: { conversaId: 'canal-sede', userId: 'torcedor' } },
       }),
     )
+  })
+})
+
+describe('podePublicarNoCanal (canal emprestado Caso B)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getTorcidaLineageTenantIds.mockImplementation(async (id: string) => [id])
+  })
+
+  it('libera quando o canal mora na Sede e o viewer é a PDE da worktree', async () => {
+    mocks.getTorcidaLineageTenantIds.mockResolvedValueOnce(['tenant-cubatao', 'tenant-gavioes'])
+
+    await expect(
+      podePublicarNoCanal(
+        { tenantId: 'tenant-gavioes', somenteAdminPublica: false, souAdmin: false },
+        'tenant-cubatao',
+        [],
+      ),
+    ).resolves.toBe(true)
+  })
+
+  it('bloqueia canal de worktree estranha', async () => {
+    mocks.getTorcidaLineageTenantIds.mockResolvedValueOnce(['tenant-cubatao'])
+
+    await expect(
+      podePublicarNoCanal(
+        { tenantId: 'tenant-outra', somenteAdminPublica: false, souAdmin: false },
+        'tenant-cubatao',
+        [],
+      ),
+    ).resolves.toBe(false)
   })
 })

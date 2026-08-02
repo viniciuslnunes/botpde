@@ -1,5 +1,6 @@
 import { db, Prisma } from '@torcida/db'
 import { ExpectedError } from '@/lib/expected-error'
+import { SYSTEM_ROLES } from '@torcida/types'
 import {
   getAncestorTenantIds,
   getDescendantTenantIds,
@@ -647,6 +648,27 @@ export async function sincronizarSocioNaSedeRaiz(
     update: dadosEspelho,
     select: { id: true },
   })
+
+  // Sem o cargo `member` na Sede, o sócio Caso B (canônico na unidade) não
+  // publica no feed "Minha torcida" — checarPodePublicarNoFeed / community:post
+  // resolvem no tenant da raiz, onde só havia o espelho sem UserRole.
+  const memberRole: { id: string } | null = await tx.role.findFirst({
+    where: { tenantId: raizId, nome: SYSTEM_ROLES.MEMBER, isSystem: true },
+    select: { id: true },
+  })
+  if (memberRole) {
+    await tx.userRole.upsert({
+      where: {
+        userId_tenantId_roleId: {
+          userId: membro.userId,
+          tenantId: raizId,
+          roleId: memberRole.id,
+        },
+      },
+      create: { userId: membro.userId, tenantId: raizId, roleId: memberRole.id },
+      update: {},
+    })
+  }
 
   await tx.auditLog.create({
     data: {

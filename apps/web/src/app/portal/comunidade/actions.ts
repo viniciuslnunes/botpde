@@ -48,6 +48,7 @@ import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
+  getCanalDaUnidadeDoVinculo,
   assertElegibilidadeMembroCanal,
   inscreverCanal,
   podePublicarNoCanal,
@@ -3549,7 +3550,11 @@ export async function publicarPostCanal(
     if (erroMencoes) return { message: erroMencoes }
 
     const efetivas = await permissoesEfetivas(session.user.id, tenant.id)
-    const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+    // Canal emprestado Caso B: getCanalPorId (descoberta) devolve null no
+    // tenant da unidade — mesmo fallback da aba "Minha unidade".
+    const canal =
+      (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
+      (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id))
     if (!canal) return { message: 'Canal não encontrado.' }
 
     if (!canal.souMembro) {
