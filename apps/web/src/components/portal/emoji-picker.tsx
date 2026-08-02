@@ -63,7 +63,7 @@ export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) 
           animate="show"
           exit="exit"
           transition={springSnappy}
-          className="card-soft w-72 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-xl"
+          className="card-soft w-72 overflow-x-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-xl"
         >
           <div className="relative mb-2 flex items-center gap-1 border-b border-[rgb(var(--border))] pb-2">
             {EMOJI_CATEGORIES.map((c) => (
@@ -99,7 +99,7 @@ export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={springSnappy}
-              className="grid max-h-48 grid-cols-8 gap-0.5 overflow-y-auto"
+              className="grid max-h-48 grid-cols-8 gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
               {active.emojis.map((emoji, i) => (
                 <m.button

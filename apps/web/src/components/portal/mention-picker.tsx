@@ -111,7 +111,9 @@ export function MentionPicker({
         offset={4}
         matchAnchorWidth
         minWidth={256}
+        maxWidth={360}
         zIndex={60}
+        className="overflow-y-auto overscroll-contain rounded-xl"
       >
         <m.div
           ref={panelRef}
@@ -120,7 +122,7 @@ export function MentionPicker({
           animate="show"
           exit="exit"
           transition={springSnappy}
-          className="card-soft max-h-[min(50vh,18rem)] w-full overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg"
+          className="card-soft min-w-0 overflow-x-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg"
         >
           <AnimatePresence mode="wait">
             {carregando ? (
@@ -150,6 +152,7 @@ export function MentionPicker({
                 initial="hidden"
                 animate="show"
                 variants={{ show: { transition: { staggerChildren: 0.04 } } }}
+                className="min-w-0"
               >
                 {membros.map((membro, i) => {
                   const nome = membro.nome?.trim() || 'Membro'
@@ -160,7 +163,6 @@ export function MentionPicker({
                       type="button"
                       custom={i}
                       variants={menuItemStagger}
-                      whileHover={{ x: 2 }}
                       whileTap={{ scale: 0.98 }}
                       transition={springSnappy}
                       onClick={() =>
@@ -170,10 +172,10 @@ export function MentionPicker({
                           texto: formatarMencaoLegivel(nome),
                         })
                       }
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                      className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
                       <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="xs" />
-                      <span className="min-w-0 flex-1">
+                      <span className="min-w-0 flex-1 overflow-hidden">
                         <span className="block truncate font-medium text-[rgb(var(--foreground))]">
                           {nome}
                         </span>

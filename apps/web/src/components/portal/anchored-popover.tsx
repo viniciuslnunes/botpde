@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -22,6 +23,8 @@ interface AnchoredPopoverProps {
   minWidth?: number
   /** Se true, a largura segue o âncora (útil em menções). */
   matchAnchorWidth?: boolean
+  /** Largura máxima (px). Evita painel largo demais no composer. */
+  maxWidth?: number
   className?: string
   style?: CSSProperties
   children: ReactNode
@@ -32,6 +35,7 @@ interface Coords {
   top: number
   left: number
   width?: number
+  maxHeight?: number
   transform?: string
 }
 
@@ -39,59 +43,72 @@ function medir(
   anchor: HTMLElement,
   placement: AnchoredPlacement,
   offset: number,
-  opts: { minWidth?: number; matchAnchorWidth?: boolean },
+  opts: { minWidth?: number; matchAnchorWidth?: boolean; maxWidth?: number },
 ): Coords {
   const rect = anchor.getBoundingClientRect()
-  const width = opts.matchAnchorWidth
+  let width = opts.matchAnchorWidth
     ? Math.max(opts.minWidth ?? 0, rect.width)
     : opts.minWidth
+  if (width != null && opts.maxWidth != null) {
+    width = Math.min(width, opts.maxWidth)
+  }
 
   let top: number
   let left: number
   let transform: string | undefined
+  let preferBottom = placement.startsWith('bottom')
 
-  if (placement.startsWith('top')) {
-    top = rect.top - offset
-    transform = placement.endsWith('end') ? 'translate(-100%, -100%)' : 'translateY(-100%)'
-  } else {
+  const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - offset - 8)
+  const spaceAbove = Math.max(0, rect.top - offset - 8)
+
+  if (preferBottom && spaceBelow < 160 && spaceAbove > spaceBelow) {
+    preferBottom = false
+  } else if (!preferBottom && spaceAbove < 160 && spaceBelow > spaceAbove) {
+    preferBottom = true
+  }
+
+  const available = preferBottom ? spaceBelow : spaceAbove
+  const maxHeight = Math.max(120, Math.min(available, Math.floor(window.innerHeight * 0.5), 288))
+
+  if (preferBottom) {
     top = rect.bottom + offset
     transform = placement.endsWith('end') ? 'translateX(-100%)' : undefined
+  } else {
+    top = rect.top - offset
+    transform = placement.endsWith('end') ? 'translate(-100%, -100%)' : 'translateY(-100%)'
   }
 
   left = placement.endsWith('end') ? rect.right : rect.left
 
-  // Mantém o painel dentro da viewport horizontalmente.
   const paneWidth = width ?? 288
   const maxLeft = window.innerWidth - paneWidth - 8
   if (!transform?.includes('translateX') && !transform?.includes('translate(-100%')) {
     left = Math.max(8, Math.min(left, maxLeft))
   } else {
-    // Alinhado à direita: garante que a borda esquerda não saia da tela.
     const estimatedLeft = left - paneWidth
     if (estimatedLeft < 8) left = 8 + paneWidth
     if (left > window.innerWidth - 8) left = window.innerWidth - 8
   }
 
-  // Flip vertical se não couber na direção preferida.
-  const spaceBelow = window.innerHeight - rect.bottom
-  const spaceAbove = rect.top
-  const needFlipBottom = placement.startsWith('bottom') && spaceBelow < 160 && spaceAbove > spaceBelow
-  const needFlipTop = placement.startsWith('top') && spaceAbove < 160 && spaceBelow > spaceAbove
+  return { top, left, width, maxHeight, transform }
+}
 
-  if (needFlipBottom) {
-    top = rect.top - offset
-    transform = placement.endsWith('end') ? 'translate(-100%, -100%)' : 'translateY(-100%)'
-  } else if (needFlipTop) {
-    top = rect.bottom + offset
-    transform = placement.endsWith('end') ? 'translateX(-100%)' : undefined
-  }
-
-  return { top, left, width, transform }
+function coordsIguais(a: Coords | null, b: Coords): boolean {
+  if (!a) return false
+  return (
+    a.top === b.top &&
+    a.left === b.left &&
+    a.width === b.width &&
+    a.maxHeight === b.maxHeight &&
+    a.transform === b.transform
+  )
 }
 
 /**
  * Renderiza o painel em `document.body` com `position: fixed`, escapando de
  * qualquer `overflow` ancestral (composer, AnimatePresence, chrome sticky).
+ *
+ * Scroll **dentro** do painel não reposiciona (evita resetar o scroll da lista).
  */
 export function AnchoredPopover({
   open,
@@ -100,6 +117,7 @@ export function AnchoredPopover({
   offset = 8,
   minWidth,
   matchAnchorWidth = false,
+  maxWidth,
   className,
   style,
   children,
@@ -107,6 +125,7 @@ export function AnchoredPopover({
 }: AnchoredPopoverProps) {
   const [mounted, setMounted] = useState(false)
   const [coords, setCoords] = useState<Coords | null>(null)
+  const portalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -115,8 +134,9 @@ export function AnchoredPopover({
   const atualizar = useCallback(() => {
     const anchor = anchorRef.current
     if (!anchor) return
-    setCoords(medir(anchor, placement, offset, { minWidth, matchAnchorWidth }))
-  }, [anchorRef, placement, offset, minWidth, matchAnchorWidth])
+    const next = medir(anchor, placement, offset, { minWidth, matchAnchorWidth, maxWidth })
+    setCoords((prev) => (coordsIguais(prev, next) ? prev : next))
+  }, [anchorRef, placement, offset, minWidth, matchAnchorWidth, maxWidth])
 
   useLayoutEffect(() => {
     if (!open) {
@@ -124,11 +144,26 @@ export function AnchoredPopover({
       return
     }
     atualizar()
+
+    function onScroll(e: Event) {
+      const target = e.target
+      // Scroll da própria lista do menu — não reposicionar (senão o scroll
+      // interno “quebra” / volta pro topo a cada frame).
+      if (
+        target instanceof Node &&
+        portalRef.current &&
+        (target === portalRef.current || portalRef.current.contains(target))
+      ) {
+        return
+      }
+      atualizar()
+    }
+
     window.addEventListener('resize', atualizar)
-    window.addEventListener('scroll', atualizar, true)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('resize', atualizar)
-      window.removeEventListener('scroll', atualizar, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [open, atualizar])
 
@@ -136,15 +171,19 @@ export function AnchoredPopover({
 
   return createPortal(
     <div
-      className={className}
+      ref={portalRef}
+      className={['min-w-0 overflow-x-hidden', className].filter(Boolean).join(' ')}
       data-anchored-popover=""
       style={{
         position: 'fixed',
         top: coords.top,
         left: coords.left,
         width: coords.width,
+        maxHeight: coords.maxHeight,
         transform: coords.transform,
         zIndex,
+        // Garante que overflow-y do className não reabra eixo X no Chrome.
+        overflowX: 'hidden',
         ...style,
       }}
     >

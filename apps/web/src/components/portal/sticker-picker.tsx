@@ -61,10 +61,10 @@ export function StickerPicker({ onSelect, onClose, anchorRef }: StickerPickerPro
           animate="show"
           exit="exit"
           transition={springSnappy}
-          className="card-soft w-64 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-xl"
+          className="card-soft w-64 overflow-x-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-xl"
         >
           <m.div
-            className="grid max-h-[min(50vh,16rem)] grid-cols-3 gap-1 overflow-y-auto"
+            className="grid max-h-[min(50vh,16rem)] grid-cols-3 gap-1 overflow-x-hidden overflow-y-auto overscroll-contain"
             variants={{ show: { transition: { staggerChildren: 0.03 } } }}
             initial="hidden"
             animate="show"
