@@ -45,7 +45,7 @@ export async function MembrosSection({
           <StatCard
             label="Novos no período"
             value={novosNoPeriodo}
-            href="/admin/membros"
+            href="/admin/torcedores"
             delta={{ atual: novosNoPeriodo, anterior: novosAnterior }}
             sparkline={serie.map((ponto) => ponto.valor)}
           />
@@ -53,9 +53,9 @@ export async function MembrosSection({
             label="Aguardando aprovação"
             value={pendentes}
             tone={pendentes > 0 ? 'warning' : 'default'}
-            href="/admin/membros"
+            href="/admin/socios?status=solicitacoes"
           />
-          <StatCard label="Membros aprovados" value={aprovados} href="/admin/membros" />
+          <StatCard label="Torcedores aprovados" value={aprovados} href="/admin/torcedores" />
           <StatCard
             label="Desligamentos no período"
             value={funil.atual.desligados}

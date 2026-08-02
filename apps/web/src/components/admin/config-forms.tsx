@@ -11,6 +11,9 @@ import {
   isDepartamentoCanonico,
   PAPEL_DEPARTAMENTO,
   permissionsDoPacoteDepartamento,
+  PERIODICIDADE_PLANO_LABEL,
+  PeriodicidadePlanoSchema,
+  resolverPeriodicidadesOnboarding,
 } from '@torcida/types'
 import { AccessPermissionPreview, AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { ImageUploadField } from '@/components/media/image-upload-field'
@@ -24,6 +27,7 @@ import {
   salvarLojaVisivelNasUnidades,
   salvarAgendaVisivelNasUnidades,
   salvarExigirDocumentosCadastro,
+  salvarPeriodicidadesOnboarding,
   salvarCanalOficial,
   criarRole,
   atualizarRole,
@@ -418,6 +422,81 @@ export function DocumentosCadastroForm({ exigir }: DocumentosCadastroFormProps) 
           </span>
         </span>
       </label>
+    </div>
+  )
+}
+
+// ── Periodicidades do onboarding «Já sou sócio» ───────────────────────────────
+
+interface PeriodicidadesOnboardingFormProps {
+  periodicidades: string[]
+}
+
+export function PeriodicidadesOnboardingForm({
+  periodicidades,
+}: PeriodicidadesOnboardingFormProps) {
+  const iniciais = resolverPeriodicidadesOnboarding(periodicidades)
+  const [selecionadas, setSelecionadas] = useState<string[]>([...iniciais])
+  const [pending, startTransition] = useTransition()
+  const todas = Object.keys(PERIODICIDADE_PLANO_LABEL)
+
+  function toggle(p: string) {
+    setSelecionadas((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
+    )
+  }
+
+  function salvar() {
+    const fd = new FormData()
+    for (const p of selecionadas) fd.append('periodicidades', p)
+    startTransition(async () => {
+      await runPersistAction(() => salvarPeriodicidadesOnboarding(fd), {
+        success: 'Periodicidades do onboarding atualizadas.',
+      })
+    })
+  }
+
+  const dirty =
+    selecionadas.length !== iniciais.length ||
+    selecionadas.some((p) => !iniciais.includes(p as (typeof iniciais)[number]))
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Opções de plano exibidas no onboarding para quem já é sócio (expedição +
+        periodicidade). Sem seleção salva, o sistema usa quadrimensal e anual.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {todas.map((p) => {
+          const ok = PeriodicidadePlanoSchema.safeParse(p).success
+          if (!ok) return null
+          return (
+            <label
+              key={p}
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3"
+            >
+              <input
+                type="checkbox"
+                checked={selecionadas.includes(p)}
+                disabled={pending}
+                onChange={() => toggle(p)}
+                className="h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+              />
+              <span className="text-sm font-medium text-[rgb(var(--foreground))]">
+                {PERIODICIDADE_PLANO_LABEL[p as keyof typeof PERIODICIDADE_PLANO_LABEL]}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        disabled={pending || !dirty || selecionadas.length === 0}
+        onClick={salvar}
+        className="rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+      >
+        {pending ? 'Salvando…' : 'Salvar periodicidades'}
+      </button>
     </div>
   )
 }

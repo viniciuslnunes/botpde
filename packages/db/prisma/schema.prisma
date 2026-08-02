@@ -393,6 +393,9 @@ model Tenant {
   /// Desligável em /admin/configuracoes → Cadastro de sócios.
   exigirDocumentosCadastro Boolean @default(true) @map("exigir_documentos_cadastro")
 
+  /// Periodicidades oferecidas no onboarding «Já sou sócio».
+  /// Vazio = fallback de app (QUADRIMENSAL + ANUAL). Config em /admin/configuracoes.
+  periodicidadesOnboarding PeriodicidadePlanoAssociacao[] @default([]) @map("periodicidades_onboarding")
 
   @@map("saas_tenants")
 
@@ -963,6 +966,12 @@ model SaasMembro {
 
   planoAssociacao   PlanoAssociacao?  @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
 
+  /// Data de expedição da carteirinha física — onboarding «Já sou sócio».
+  dataExpedicaoCarteirinha DateTime? @map("data_expedicao_carteirinha")
+
+  /// Periodicidade pretendida no onboarding (quando ainda não há PlanoAssociacao).
+  periodicidadePretendida PeriodicidadePlanoAssociacao? @map("periodicidade_pretendida")
+
   /// Espelho operacional: false se há cobrança vencida/pendente relevante.
 
   adimplente Boolean @default(true)
@@ -1278,6 +1287,9 @@ model SaasSocio {
 
   validade    DateTime
 
+  /// Data de expedição usada no cálculo da validade (onboarding ou emissão).
+  expedidoEm  DateTime? @map("expedido_em")
+
   criadoEm    DateTime @default(now()) @map("criado_em")
 
   discordId   String?  @map("discord_id")
@@ -1365,6 +1377,10 @@ enum PeriodicidadePlanoAssociacao {
   MENSAL
 
   TRIMESTRAL
+
+  QUADRIMENSAL
+
+  SEMESTRAL
 
   ANUAL
 

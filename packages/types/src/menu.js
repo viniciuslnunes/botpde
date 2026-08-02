@@ -48,15 +48,23 @@ export const ADMIN_MENU = /** @type {const} */ ([
     ],
     secao: 'governanca',
   },
-  // Aprovar sócios/membros sem members:view ainda precisa ver a fila de pendentes.
+  // Aprovar torcedores/sócios sem members:view ainda precisa ver a fila.
+  // Solicitações de sócio ficam em /admin/socios; torcedores em /admin/torcedores.
   {
-    id: 'membros',
-    label: 'Membros',
-    href: '/admin/membros',
+    id: 'torcedores',
+    label: 'Torcedores',
+    href: '/admin/torcedores',
     permissao: [PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_APPROVE],
     secao: 'pessoas',
   },
-  { id: 'socios', label: 'Sócios', href: '/admin/socios', permissao: PERMISSIONS.MEMBERS_VIEW, secao: 'pessoas' },
+  {
+    id: 'socios',
+    label: 'Sócios',
+    href: '/admin/socios',
+    // MEMBERS_APPROVE: fila de solicitações (SOCIO PENDENTE) mora neste hub.
+    permissao: [PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_APPROVE],
+    secao: 'pessoas',
+  },
   {
     id: 'eventos',
     label: 'Agenda',

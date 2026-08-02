@@ -14,6 +14,7 @@ function resolverIntervalo(intervalo: Periodo | IntervaloAnalise): IntervaloAnal
   return typeof intervalo === 'string' ? resolverIntervaloPeriodo(intervalo) : intervalo
 }
 
+
 export type FunilMembrosPeriodo = {
   novos: number
   aprovados: number

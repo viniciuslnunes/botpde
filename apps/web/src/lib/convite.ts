@@ -126,6 +126,7 @@ interface TenantConviteRow {
   logoUrl: string | null
   corPrimaria: string
   exigirDocumentosCadastro: boolean
+  periodicidadesOnboarding: string[]
   afiliacaoId: string | null
   torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
   _count: { membros: number }
@@ -231,6 +232,7 @@ export const resolverConvite = cache(
         logoUrl: true,
         corPrimaria: true,
         exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: true,
         afiliacaoId: true,
         torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
@@ -332,6 +334,7 @@ export const resolverConvite = cache(
       },
       acessivelNoHost: torcidaAcessivelNoHost(tenant.slug),
       exigirDocumentosCadastro: tenant.exigirDocumentosCadastro,
+      periodicidadesOnboarding: tenant.periodicidadesOnboarding ?? [],
     }
 
     const { unidadeId, passoInicial } = decidirPassoInicialConvite({

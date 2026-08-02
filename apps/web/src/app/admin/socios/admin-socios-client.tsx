@@ -561,6 +561,8 @@ export function AdminSociosClient({
   socios,
   elegiveis,
   elegiveisModal,
+  solicitacoes,
+  solicitacoesTabela,
   contagens,
   statusFiltro,
   tabHrefs,
@@ -578,12 +580,17 @@ export function AdminSociosClient({
   elegiveis: MembroElegivelItem[]
   /** Opções do select de emissão (cap server-side). */
   elegiveisModal: MembroElegivelItem[]
+  /** Sócios PENDENTE — fila de admissão (aba Solicitações). */
+  solicitacoes: AdminMembroItem[]
+  /** Tabela de aprovação reusada de membros (server monta o cabecalho). */
+  solicitacoesTabela: ReactNode
   contagens: {
     emitidas: number
     ativos: number
     vencendo: number
     vencidos: number
     aguardando: number
+    solicitacoes: number
   }
   statusFiltro: string
   tabHrefs: Record<string, string>
@@ -607,6 +614,7 @@ export function AdminSociosClient({
   const fecharDetalhe = useCallback(() => setSelecionado(null), [])
 
   const isAguardando = statusFiltro === 'aguardando'
+  const isSolicitacoes = statusFiltro === 'solicitacoes'
 
   function abrirDetalhe(detalhe: AdminMembroItem | null | undefined) {
     if (detalhe) setSelecionado(detalhe)
@@ -619,8 +627,15 @@ export function AdminSociosClient({
 
   const tabs = [
     {
+      key: 'solicitacoes',
+      label: 'Solicitações',
+      count: contagens.solicitacoes,
+      countClass:
+        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+    },
+    {
       key: 'aguardando',
-      label: 'Aguardando',
+      label: 'Aguardando emissão',
       count: contagens.aguardando,
       countClass:
         'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
@@ -653,6 +668,16 @@ export function AdminSociosClient({
                 {contagens.emitidas} carteirinha
                 {contagens.emitidas !== 1 ? 's' : ''} emitida
                 {contagens.emitidas !== 1 ? 's' : ''}
+                {contagens.solicitacoes > 0 && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                      {contagens.solicitacoes} solicitaç
+                      {contagens.solicitacoes !== 1 ? 'ões' : 'ão'}
+                    </span>
+                  </>
+                )}
                 {contagens.aguardando > 0 && (
                   <>
                     {' '}
@@ -662,9 +687,31 @@ export function AdminSociosClient({
                     </span>
                   </>
                 )}
+                {contagens.vencendo > 0 && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <span className="font-medium text-amber-800 dark:text-amber-200">
+                      {contagens.vencendo} próximo
+                      {contagens.vencendo !== 1 ? 's' : ''} de inadimplência
+                      {' '}
+                      (≤30 dias)
+                    </span>
+                  </>
+                )}
+                {contagens.vencidos > 0 && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <span className="font-medium text-red-700 dark:text-red-300">
+                      {contagens.vencidos} inadimplente
+                      {contagens.vencidos !== 1 ? 's' : ''}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
-            {podeEmitir && (
+            {podeEmitir && !isSolicitacoes && (
               <button
                 type="button"
                 onClick={() => abrirEmit()}
@@ -702,7 +749,28 @@ export function AdminSociosClient({
 
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
-          {isAguardando ? (
+          {isSolicitacoes ? (
+            solicitacoes.length === 0 ? (
+              <MotionEmptyState
+                icon={
+                  <Users className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
+                }
+                title={
+                  temFiltroAtivo
+                    ? 'Nenhuma solicitação encontrada'
+                    : 'Nenhuma solicitação pendente'
+                }
+                description={
+                  temFiltroAtivo
+                    ? 'Tente outro termo de busca ou limpe os filtros.'
+                    : 'Quando alguém pedir associação como sócio, a solicitação aparece aqui.'
+                }
+                className="flex flex-col items-center justify-center py-16 text-center"
+              />
+            ) : (
+              <MotionReveal index={0}>{solicitacoesTabela}</MotionReveal>
+            )
+          ) : isAguardando ? (
             elegiveis.length === 0 ? (
               <MotionEmptyState
                 icon={
@@ -722,7 +790,7 @@ export function AdminSociosClient({
                     ? 'Tente outro termo de busca ou limpe os filtros.'
                     : contagens.emitidas > 0
                       ? 'Todos os sócios aprovados já têm carteirinha.'
-                      : 'Quando um sócio for aprovado em Membros, ele aparece aqui para emissão.'
+                      : 'Quando um sócio for aprovado nas Solicitações, ele aparece aqui para emissão.'
                 }
                 className="flex flex-col items-center justify-center py-16 text-center"
               />
@@ -912,7 +980,7 @@ export function AdminSociosClient({
                     </Link>
                   </span>
                 ) : (
-                  'Aprove sócios em Membros e emita a carteirinha numerada aqui.'
+                  'Aprove sócios nas Solicitações e emita a carteirinha numerada aqui.'
                 )
               }
               className="flex flex-col items-center justify-center py-16 text-center"

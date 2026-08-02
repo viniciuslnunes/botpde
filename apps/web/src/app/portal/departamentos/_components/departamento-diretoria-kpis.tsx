@@ -80,13 +80,13 @@ export function DepartamentoDiretoriaKpis({ kpis }: { kpis: DiretoriaKpis }) {
           label="Ativos"
           value={kpis.aprovados}
           icon={UserCheck}
-          href="/admin/membros?status=APROVADO"
+          href="/admin/torcedores?status=APROVADO"
         />
         <Kpi
           label="Reprovados"
           value={kpis.reprovados}
           icon={UserX}
-          href="/admin/membros?status=REPROVADO"
+          href="/admin/torcedores?status=REPROVADO"
         />
         <Kpi
           label="Carteirinhas"

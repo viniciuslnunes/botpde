@@ -17,6 +17,7 @@ export type PlanoState = {
 
 function revalidatePlanos() {
   revalidatePath('/admin/financeiro/planos')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
 }
 

@@ -84,8 +84,8 @@ async function DashboardKpis({ tenantId }: { tenantId: string }) {
   const alertas: DashboardAlerta[] = []
   if (kpis.pendentes > 0) {
     alertas.push({
-      href: '/admin/membros',
-      label: `${kpis.pendentes} ${kpis.pendentes === 1 ? 'membro aguarda' : 'membros aguardam'} aprovação`,
+      href: '/admin/socios?status=solicitacoes',
+      label: `${kpis.pendentes} ${kpis.pendentes === 1 ? 'sócio aguarda' : 'sócios aguardam'} aprovação`,
       variant: 'yellow',
     })
   }
@@ -110,10 +110,10 @@ async function DashboardKpis({ tenantId }: { tenantId: string }) {
 
       <KpiGrid>
         <StatCard
-          label="Membros ativos"
+          label="Torcedores ativos"
           value={kpis.totalMembros}
           icon={<Users className="h-5 w-5" />}
-          href="/admin/membros"
+          href="/admin/torcedores"
           badge={kpis.novosUltimos30d > 0 ? `+${kpis.novosUltimos30d} este mês` : undefined}
           sparkline={serieNovos.map((p) => p.valor)}
         />
@@ -121,7 +121,7 @@ async function DashboardKpis({ tenantId }: { tenantId: string }) {
           label="Aguardando aprovação"
           value={kpis.pendentes}
           icon={<Clock className="h-5 w-5" />}
-          href="/admin/membros"
+          href="/admin/socios?status=solicitacoes"
         />
         <StatCard
           label="Sócios com carteirinha"

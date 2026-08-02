@@ -248,6 +248,7 @@ export async function importarMock(formData: FormData): Promise<ResultadoImporta
   })
 
   revalidatePath('/admin/membros/importar')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
 
@@ -313,6 +314,7 @@ export async function desfazerImportacao(importacaoId: string): Promise<Resultad
   })
 
   revalidatePath('/admin/membros/importar')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
 

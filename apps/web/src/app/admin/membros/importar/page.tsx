@@ -75,7 +75,7 @@ export default async function ImportarMembrosPage() {
     <div className="space-y-6">
       <AdminDetailHeader
         title="Importar base de associados"
-        backHref="/admin/membros"
+        backHref="/admin/torcedores"
         backLabel="Membros"
         icon={<Upload className="h-5 w-5" />}
         description="Traga a base existente da torcida para o sistema. Nesta fase, use dados de demonstração para validar a apresentação."

@@ -120,7 +120,7 @@ export function DashboardListas({
               Membros aprovados recentemente
             </h2>
             <Link
-              href="/admin/membros"
+              href="/admin/torcedores"
               className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
             >
               Ver todos →

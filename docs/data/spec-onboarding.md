@@ -13,8 +13,11 @@ Ao logar, o usuário deve passar por um **onboarding** que garante direcionament
 1. Escolhe o **clube** que torce (seleção por escudo, 1 clique).
 2. Informa a **região** (cidade/estado) que torce.
 3. Escolhe a **torcida organizada** do clube (ou "só torcedor").
-4. Se escolher torcida: **sócio** (com dados + prova + departamento) ou **torcedor da torcida**.
-5. Sócio entra como `PENDENTE`; **até ser aprovado só vê o feed de torcedor**.
+4. Se escolher torcida: **torcedor da torcida**, **já sou sócio** (nº + expedição +
+   plano + prova) ou **quero me associar** (ficha LGE sem nº).
+5. Sócio entra como `PENDENTE` na fila de `/admin/socios`; **até ser aprovado só vê o feed de torcedor**.
+   Quem já é sócio, ao ser aprovado, recebe carteirinha digital automaticamente
+   (`validade = expedição + periodicidade`). Quem é novo fica em Aguardando emissão.
 
 Regras de relacionamento (decisão do usuário, 2026-07-11):
 - **Torcedor** se relaciona cross-torcida livremente — inclusive com torcedores de

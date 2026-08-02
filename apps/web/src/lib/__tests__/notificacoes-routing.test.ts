@@ -69,7 +69,7 @@ describe('TIPOS_NOTIFICACAO_ADMIN', () => {
 
 describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
   it('mapeia tipos operacionais para ids do ADMIN_MENU', () => {
-    expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('membros')
+    expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('socios')
     expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
     expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
     expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
@@ -112,7 +112,7 @@ describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
       { tipo: 'COMUNICADO_URGENTE', _count: { tipo: 5 } },
     ])
     expect(badges).toEqual({
-      membros: 2,
+      socios: 2,
       aliancas: 4,
     })
   })

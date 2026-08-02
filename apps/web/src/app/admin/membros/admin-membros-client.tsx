@@ -74,7 +74,7 @@ export function AdminMembrosTable({
           )
         }
         title={
-          filtrando ? 'Nenhum resultado para estes filtros' : 'Nenhum membro cadastrado'
+          filtrando ? 'Nenhum resultado para estes filtros' : 'Nenhum torcedor cadastrado'
         }
         description={
           filtrando ? (
@@ -89,7 +89,7 @@ export function AdminMembrosTable({
               .
             </>
           ) : (
-            'Aguarde novos candidatos ou importe uma base existente.'
+            'Aguarde novos cadastros ou importe uma base existente.'
           )
         }
         className="flex flex-col items-center justify-center py-20 text-center"

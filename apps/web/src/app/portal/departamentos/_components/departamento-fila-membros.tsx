@@ -43,7 +43,7 @@ export function DepartamentoFilaMembros({
           </p>
         </div>
         <Link
-          href="/admin/membros?status=PENDENTE"
+          href="/admin/socios?status=solicitacoes"
           prefetch={false}
           className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >

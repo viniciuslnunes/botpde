@@ -11,7 +11,7 @@ import {
   CanalRestritoForm,
   type SolicitacaoReativacaoView,
 } from './_components/canal-restrito-form'
-import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, CanalOficialForm } from '@/components/admin/config-forms'
+import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, PeriodicidadesOnboardingForm, CanalOficialForm } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -126,15 +126,23 @@ export default async function ConfiguracoesGeralPage({
 
   // R5 — só faz sentido restringir o canal de uma UNIDADE: a Sede raiz não tem
   // de quem se isolar, e fechá-la esconderia a torcida inteira.
-  const conviteRow: { conviteSlug: string | null; conviteAtivo: boolean } | null =
-    await db.tenant.findUnique({
-      where: { id: tenant.id },
-      select: { conviteSlug: true, conviteAtivo: true },
-    })
+  const conviteRow: {
+    conviteSlug: string | null
+    conviteAtivo: boolean
+    periodicidadesOnboarding: string[]
+  } | null = await db.tenant.findUnique({
+    where: { id: tenant.id },
+    select: {
+      conviteSlug: true,
+      conviteAtivo: true,
+      periodicidadesOnboarding: true,
+    },
+  })
   const convite = {
     slug: conviteRow?.conviteSlug ?? null,
     ativo: conviteRow?.conviteAtivo ?? false,
   }
+  const periodicidadesOnboarding = conviteRow?.periodicidadesOnboarding ?? []
 
   const ancestrais = await getAncestorTenantIds(tenant.id)
   const ehUnidadeDaTorcida = ancestrais.length > 0
@@ -176,15 +184,21 @@ export default async function ConfiguracoesGeralPage({
       <ConfigSectionCard
         icon={<IdCard className={ICONE} />}
         title="Cadastro de sócios"
-        description="Obrigatoriedade de documentos (RG e residência) no onboarding"
+        description="Documentos e planos (periodicidades) no onboarding"
         ownerOnly
         blocked={!isOwner}
         index={2}
       >
-        <DocumentosCadastroForm
-          key={String(tenant.exigirDocumentosCadastro)}
-          exigir={tenant.exigirDocumentosCadastro}
-        />
+        <div className="space-y-8">
+          <DocumentosCadastroForm
+            key={String(tenant.exigirDocumentosCadastro)}
+            exigir={tenant.exigirDocumentosCadastro}
+          />
+          <PeriodicidadesOnboardingForm
+            key={periodicidadesOnboarding.join(',') || 'padrao'}
+            periodicidades={periodicidadesOnboarding}
+          />
+        </div>
       </ConfigSectionCard>
 
       <ConfigSectionCard

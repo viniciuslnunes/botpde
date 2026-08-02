@@ -3,21 +3,37 @@
 Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos associados
 (distinto do plano SaaS em `Tenant.plano` e do livro-caixa em `FinanceiroLancamento`).
 
+## Pessoas no admin (2026-08-02): Torcedores × Sócios
+
+| Módulo | Rota | Conteúdo |
+|---|---|---|
+| **Torcedores** | `/admin/torcedores` | Só `SaasMembro.tipo = TORCEDOR` (quadro / desligados). `/admin/membros` redireciona. |
+| **Sócios** | `/admin/socios` | Solicitações (`SOCIO`+`PENDENTE`) · Aguardando emissão · Emitidas · Ativos · **Vencendo** (≤30d) · Vencidos |
+
+- Notificação `MEMBRO_SOLICITADO` aponta para `/admin/socios?status=solicitacoes`.
+- **Vigente / inadimplente (gate operacional neste ciclo)** = `SaasSocio.validade` (não cobranças Pix). `CobrancaAssociacao` / `adimplente` permanecem camada financeira opcional.
+- **Já sou sócio** no onboarding: nº + data de expedição + periodicidade + prova → na aprovação, auto-emite `SaasSocio` com `validade = expedição + período` (`lib/carteirinha-emissao.ts`). Não entra em Aguardando emissão.
+- **Quero me associar**: ficha LGE sem nº → após aprovação fica em Aguardando emissão (emissão manual).
+- Periodicidades do wizard: `Tenant.periodicidadesOnboarding` (config em Cadastro de sócios); enum inclui `QUADRIMENSAL` e `SEMESTRAL`; fallback vazio = quadrimensal + anual.
+- Campos: `SaasMembro.dataExpedicaoCarteirinha`, `periodicidadePretendida`; `SaasSocio.expedidoEm`.
+
 ## Entidades
 
 | Modelo | Uso |
 |---|---|
 | `PlanoAssociacao` | Contribuição periódica da torcida (nome, valor, periodicidade, ativo) |
-| `CobrancaAssociacao` | Cobrança por membro (mensalidade, adesão, avulsa) |
-| `SaasMembro.adimplente` | Espelho operacional — recalculado via cobranças abertas |
+| `CobrancaAssociacao` | Cobrança por membro (mensalidade, adesão, avulsa) — **não** é o gate de vigente neste ciclo |
+| `SaasMembro.adimplente` | Espelho operacional via cobranças (financeiro); tabs Sócios usam `validade` |
 | `SaasMembro` campos LGE | RG, CPF, filiação, escolaridade, profissão, nascimento |
 | `SaasSocio.qrToken` | Segredo opaco para QR verificável |
+| `SaasSocio.validade` / `expedidoEm` | Vigência da carteirinha digital |
 
 ## Cadastro completo no onboarding (2026-07)
 
 Antes, os campos LGE (`rg`, `cpf`, `filiacao`, `escolaridade`, `profissao`,
 `dataNascimento`) só eram preenchidos manualmente por um admin depois da
-aprovação, em `/admin/membros/[id]`. Agora o próprio sócio informa a maior
+aprovação, em `/admin/membros/[id]` (hoje detalhe em `/admin/torcedores/[id]` /
+card de sócio). Agora o próprio sócio informa a maior
 parte deles direto no onboarding (`/onboarding`, passo Vínculo → tipo
 `SOCIO`), seguindo o formato de ficha física de admissão do nicho (RG, CPF,
 filiação, endereço completo, menor de idade/responsável, termo).
@@ -30,15 +46,17 @@ para `tipo: SOCIO` via `.superRefine` em `solicitarVinculoSchema`,
 |---|---|
 | `sexo`, `estadoCivil`, `nacionalidade` | Identificação — nunca obrigatórios (evitar fricção) |
 | `logradouro`, `bairro`, `uf` | Endereço completo — obrigatórios para SOCIO (junto de `cep`, `numero`, `bloco`, `complemento` já existentes) |
-| `fotoDocumentoUrl`, `comprovanteResidenciaUrl` | Documentos — obrigatórios para SOCIO quando `Tenant.exigirDocumentosCadastro` (default `true`); desligável em `/admin/configuracoes?tab=cadastro` |
+| `fotoDocumentoUrl`, `comprovanteResidenciaUrl` | Documentos — obrigatórios para SOCIO quando `Tenant.exigirDocumentosCadastro` (default `true`); desligável em `/admin/configuracoes` → Cadastro de sócios |
 | `responsavelNome`, `responsavelDocumento`, `autorizacaoMenorAceitaEm` | Responsável legal — obrigatórios só quando o SOCIO tem menos de 18 anos (calculado a partir de `dataNascimento`) |
 | `termoResponsabilidadeAceitoEm` | Timestamp do aceite do termo de responsabilidade — obrigatório para SOCIO |
+| `dataExpedicaoCarteirinha`, `periodicidadePretendida` | Só caminho **Já sou sócio** — base do auto-emit |
 
 ### Fluxo guiado das 4 abas (2026-07-30)
 
 O formulário de sócio (`PassoVinculo` em `apps/web/src/app/onboarding/wizard.tsx`)
 avança aba por aba — Identificação → Endereço → **Associação** → Documentos:
 
+- No passo Vínculo o usuário escolhe **Torcedor** · **Já sou sócio** · **Quero me associar**.
 - `validarCamposSocio()` é **pura** (só lê estado) e roda no render *e* no submit,
   com as mesmas regras do `.superRefine` da action. `filtrarErrosDaAba()` recorta o
   resultado por aba via `CAMPO_TAB`.
@@ -50,11 +68,9 @@ avança aba por aba — Identificação → Endereço → **Associação** → D
 - O termo de responsabilidade fica na aba Documentos e o bloco de responsável
   legal na aba Identificação — nada de campo obrigatório fora das abas, senão a
   liberação do "Próximo" mentiria.
-- **Associação** (aba própria desde 2026-07-30): `numeroAssociado`, `anosSocio` e
-  o(s) departamento(s) pretendido(s). Antes moravam no rodapé da aba Endereço —
-  dado de vínculo com a torcida não é endereço, e a aba Endereço ficava com dois
-  assuntos. Com 4 abas a tab bar rola horizontalmente no mobile (`overflow-x-auto`)
-  em vez de espremer os rótulos.
+- **Associação** (aba própria desde 2026-07-30): no caminho existente —
+  `numeroAssociado`, `anosSocio`, expedição, periodicidade e departamentos;
+  no caminho novo — só departamentos (nº vem na emissão admin).
 
 ### Endereço pela localização (2026-07-30)
 

@@ -238,12 +238,14 @@ escopo registradas nas ondas 4–5:
 Cinco ondas, todas entregues. Menu de **24 → 14** entradas; seis módulos com
 tabs de rota. Decisões de escopo:
 
-- **Membros e Sócios ficaram separados**: são jornadas distintas (admissão vs.
-  carteirinha/mensalidade) e ambos já têm tabs internas por status — fundir
-  criaria duas barras empilhadas.
-- **`sedes/[id]` e `membros/[id]` não ganharam tabs**: o form de sede já tem
-  stepper próprio (`SEDE_STEPS`, com marcação de erro por etapa), e o detalhe de
-  membro tem só três blocos. Contagem de linhas engana — boa parte desses
+- **Torcedores e Sócios ficaram separados**: jornadas distintas (quadro de
+  torcedores vs admissão/carteirinha/vigência de sócios). Solicitações de sócio
+  vivem em `/admin/socios`; `/admin/membros` redireciona para `/admin/torcedores`.
+  Ambos já têm tabs internas por status — fundir criaria duas barras empilhadas.
+  Ver `docs/data/modulo-associacao.md` § Pessoas.
+- **`sedes/[id]` e detalhe de pessoa não ganharam tabs de módulo**: o form de sede já tem
+  stepper próprio (`SEDE_STEPS`, com marcação de erro por etapa), e o detalhe
+  tem só três blocos. Contagem de linhas engana — boa parte desses
   arquivos é query e tipo, não interface.
 - **Estúdio de Design sob o shell**: dependia de `h-[calc(100dvh-3.5rem)]`
   (viewport inteira). Passou a `xl:h-[70dvh]` com piso de `34rem`, para as duas

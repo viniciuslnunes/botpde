@@ -11,6 +11,7 @@ vi.mock('@/lib/hierarquia', async (importOriginal) => ({
 
 import {
   AtualizarMembroLgeSchema,
+  calcularValidadeCarteirinha,
   CriarCobrancaSchema,
   CriarPlanoAssociacaoSchema,
   DesligarMembroSchema,
@@ -20,11 +21,18 @@ import {
   normalizarCpf,
   normalizarRg,
   normalizarTelefone,
+  PERIODICIDADES_ONBOARDING_PADRAO,
+  resolverPeriodicidadesOnboarding,
+  SalvarPeriodicidadesOnboardingSchema,
   validarCpfDigitos,
   validarRg,
   validarTelefoneBr,
 } from '@torcida/types'
 import { montarPayloadQr, parsePayloadQr } from '@/lib/carteirinha-qr'
+import {
+  CARTEIRINHA_VENCENDO_DIAS,
+  statusValidadeCarteirinha,
+} from '@/lib/carteirinha-validade'
 import { encontrarConflitoNumeroAssociado } from '@/lib/membros-sede'
 
 describe('associacao — CPF', () => {
@@ -75,6 +83,66 @@ describe('associacao — RG', () => {
     expect(maskRg('12345678x')).toBe('12.345.678-X')
     expect(formatRg('123456789')).toBe('12.345.678-9')
     expect(formatRg(null)).toBeNull()
+  })
+})
+
+describe('associacao — validade da carteirinha', () => {
+  it('calcularValidadeCarteirinha soma meses por periodicidade', () => {
+    const exp = new Date(2026, 0, 15) // 15/01/2026
+    expect(calcularValidadeCarteirinha(exp, 'MENSAL').getTime()).toBe(
+      new Date(2026, 1, 15).getTime(),
+    )
+    expect(calcularValidadeCarteirinha(exp, 'QUADRIMENSAL').getTime()).toBe(
+      new Date(2026, 4, 15).getTime(),
+    )
+    expect(calcularValidadeCarteirinha(exp, 'SEMESTRAL').getTime()).toBe(
+      new Date(2026, 6, 15).getTime(),
+    )
+    expect(calcularValidadeCarteirinha(exp, 'ANUAL').getTime()).toBe(
+      new Date(2027, 0, 15).getTime(),
+    )
+  })
+
+  it('resolverPeriodicidadesOnboarding usa fallback Gaviões quando vazio', () => {
+    expect(resolverPeriodicidadesOnboarding([])).toEqual([
+      ...PERIODICIDADES_ONBOARDING_PADRAO,
+    ])
+    expect(resolverPeriodicidadesOnboarding(['MENSAL', 'ANUAL'])).toEqual([
+      'MENSAL',
+      'ANUAL',
+    ])
+  })
+
+  it('SalvarPeriodicidadesOnboardingSchema exige ao menos uma', () => {
+    expect(
+      SalvarPeriodicidadesOnboardingSchema.safeParse({ periodicidades: [] }).success,
+    ).toBe(false)
+    expect(
+      SalvarPeriodicidadesOnboardingSchema.safeParse({
+        periodicidades: ['QUADRIMENSAL', 'ANUAL'],
+      }).success,
+    ).toBe(true)
+  })
+
+  it('CriarPlanoAssociacaoSchema aceita QUADRIMENSAL', () => {
+    const parsed = CriarPlanoAssociacaoSchema.safeParse({
+      nome: 'Quadrimensal',
+      valor: 50,
+      periodicidade: 'QUADRIMENSAL',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('statusValidadeCarteirinha classifica ativo/vencendo/vencido', () => {
+    const agora = new Date(2026, 7, 2)
+    expect(statusValidadeCarteirinha(new Date(2026, 6, 1), agora)).toBe('vencido')
+    expect(
+      statusValidadeCarteirinha(
+        new Date(2026, 7, 2 + CARTEIRINHA_VENCENDO_DIAS - 1),
+        agora,
+      ),
+    ).toBe('vencendo')
+    expect(statusValidadeCarteirinha(new Date(2027, 0, 1), agora)).toBe('ativo')
   })
 })
 

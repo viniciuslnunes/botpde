@@ -1098,9 +1098,27 @@ async function assertMutacaoProprioPost(
   }
 }
 
-export async function editarPost(postId: string, conteudo: string): Promise<void> {
+/**
+ * Edita a publicação própria. `midias` é a lista final de anexos não sociais
+ * (imagem/vídeo/sticker) da edição inline — omitir mantém os anexos atuais.
+ * O embed social continua derivado do texto.
+ */
+export async function editarPost(
+  postId: string,
+  conteudo: string,
+  midias?: string[],
+): Promise<void> {
   const parsed = editarPostSchema.safeParse({ postId, conteudo })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Post inválido')
+
+  const parsedMidias = z
+    .array(midiaUrlSchema)
+    .max(MAX_MIDIAS, 'Máximo de 10 anexos')
+    .optional()
+    .safeParse(midias)
+  if (!parsedMidias.success) {
+    throw new ExpectedError(parsedMidias.error.issues[0]?.message ?? 'Anexo inválido')
+  }
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
@@ -1109,7 +1127,13 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
     exigirVisivel: true,
   })
 
-  const midiasFinais = midiasAposEditarConteudo(parsed.data.conteudo, post.midiaUrls)
+  const midiasFinais = parsedMidias.data
+    ? midiasComEmbedDoTexto(
+        parsed.data.conteudo,
+        parsedMidias.data.filter((url) => !isSocialUrl(url)),
+        MAX_MIDIAS,
+      )
+    : midiasAposEditarConteudo(parsed.data.conteudo, post.midiaUrls)
 
   await db.post.update({
     where: { id: post.id },

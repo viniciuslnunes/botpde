@@ -1,4 +1,4 @@
-import { db, Prisma } from '@torcida/db'
+import { db, Prisma, type PeriodicidadePlanoAssociacao } from '@torcida/db'
 import { ExpectedError } from '@/lib/expected-error'
 import { SYSTEM_ROLES } from '@torcida/types'
 import {
@@ -18,6 +18,8 @@ export type MembroParaEspelho = {
   cidade: string | null
   numeroAssociado: string | null
   anosSocio: number | null
+  dataExpedicaoCarteirinha?: Date | null
+  periodicidadePretendida?: PeriodicidadePlanoAssociacao | null
   cep: string | null
   numero: string | null
   bloco: string | null
@@ -92,6 +94,8 @@ function dadosCadastraisEspelho(membro: MembroParaEspelho) {
     cidade: membro.cidade,
     numeroAssociado: membro.numeroAssociado,
     anosSocio: membro.anosSocio,
+    dataExpedicaoCarteirinha: membro.dataExpedicaoCarteirinha ?? null,
+    periodicidadePretendida: membro.periodicidadePretendida ?? null,
     cep: membro.cep,
     numero: membro.numero,
     bloco: membro.bloco,

@@ -266,6 +266,8 @@ export type TorcidaOnboarding = {
    * de residência. Configurável em /admin/configuracoes.
    */
   exigirDocumentosCadastro: boolean
+  /** Periodicidades oferecidas em «Já sou sócio» (vazio = fallback Gaviões). */
+  periodicidadesOnboarding: string[]
 }
 
 export type DepartamentoOnboarding = {
@@ -510,6 +512,7 @@ export const getTorcidasPorAfiliacao = cache(
       logoUrl: string | null
       corPrimaria: string
       exigirDocumentosCadastro: boolean
+      periodicidadesOnboarding: string[]
       torcidaConhecidaId: string | null
       torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
@@ -523,6 +526,7 @@ export const getTorcidasPorAfiliacao = cache(
         logoUrl: true,
         corPrimaria: true,
         exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: true,
         torcidaConhecidaId: true,
         torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
@@ -576,6 +580,7 @@ export const getTorcidasPorAfiliacao = cache(
         stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
         exigirDocumentosCadastro: t.exigirDocumentosCadastro,
+        periodicidadesOnboarding: t.periodicidadesOnboarding ?? [],
       }))
       .sort(compararTorcidasOnboarding)
   },

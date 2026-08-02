@@ -26,6 +26,7 @@ import {
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
+import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'
 import { diffCamposMembro } from '@/lib/membro-audit-diff'
 import {
   executarPurgeMembro,
@@ -102,7 +103,10 @@ type MembroDecisaoSelect = {
   membroOrigemId: string | null
   aprovadoNaUnidadeTenantId: string | null
   numeroAssociado: string | null
+  dataExpedicaoCarteirinha: Date | null
+  periodicidadePretendida: string | null
   departamentoId: string | null
+  departamentoSedeId: string | null
   sedeId: string | null
   aprovadoPorNome: string | null
   aprovadoEm: Date | null
@@ -146,6 +150,8 @@ const membroDecisaoSelect = {
   membroOrigemId: true,
   aprovadoNaUnidadeTenantId: true,
   numeroAssociado: true,
+  dataExpedicaoCarteirinha: true,
+  periodicidadePretendida: true,
   departamentoId: true,
   sedeId: true,
   aprovadoPorNome: true,
@@ -372,6 +378,7 @@ export async function efetivarAreaPretendida(
     return { error: 'Não foi possível incluir na área. Tente novamente.' }
   }
 
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
   revalidatePath('/portal/departamentos')
@@ -685,11 +692,41 @@ export async function aprovarMembro(
   })
   await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
+  // Sócio «Já sou sócio»: auto-emite carteirinha com validade = expedição + plano.
+  // Best-effort — falha deixa o sócio em Aguardando emissão.
+  if (origem.tipo === 'SOCIO') {
+    const auto = await tentarAutoEmitirCarteirinhaAposAprovacao({
+      tenantId: origem.tenantId,
+      userId: origem.userId,
+      nome: origem.nome,
+      tipo: origem.tipo,
+      numeroAssociado: origem.numeroAssociado,
+      dataExpedicaoCarteirinha: origem.dataExpedicaoCarteirinha,
+      periodicidadePretendida: origem.periodicidadePretendida,
+      atorId: aprovadoPorId,
+    })
+    if (auto.emitida) {
+      await notificarSafe({
+        userId: origem.userId,
+        tenantId: origem.tenantId,
+        tipo: 'SOCIO_CARTEIRINHA_EMITIDA',
+        titulo: 'Carteirinha de sócio emitida',
+        corpo: origem.numeroAssociado
+          ? `Você é o sócio nº ${origem.numeroAssociado}.`
+          : 'Sua carteirinha digital foi ativada.',
+        link: '/portal/carteirinha',
+        atorId: aprovadoPorId,
+      })
+    }
+  }
+
   invalidarCachesComunidadeFeed(origem.tenantId)
   // Força recomputar contexto/caches compartilhados do portal (navbar + layout)
   // para refletir imediatamente `membro.status: APROVADO` no hard refresh.
   revalidatePath('/portal', 'layout')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/comunidade')
@@ -999,7 +1036,9 @@ export async function reprovarMembro(
 
   invalidarCachesComunidadeFeed(origem.tenantId)
   revalidatePath('/portal', 'layout')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/carteirinha')
@@ -1099,7 +1138,9 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cadastro')
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
+  revalidatePath('/admin/socios')
   revalidatePath('/portal/departamentos', 'layout')
   } catch (err) {
     const mapped = mapearErroDecisaoMembro(err)
@@ -1227,8 +1268,10 @@ export async function atualizarDadosLge(
     },
   })
 
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
-  revalidatePath(`/admin/membros/${existente.id}`)
+  revalidatePath('/admin/socios')
+  revalidatePath(`/admin/torcedores/${existente.id}`)
   return { ok: true }
 }
 
@@ -1335,9 +1378,10 @@ export async function desligarMembro(
     invalidarCachesComunidadeFeed(espelhoTenantId)
   }
   invalidarCachesComunidadeFeed(tenant.id)
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
-  revalidatePath(`/admin/membros/${membro.id}`)
   revalidatePath('/admin/socios')
+  revalidatePath(`/admin/torcedores/${membro.id}`)
   return { ok: true }
 }
 
@@ -1476,8 +1520,10 @@ export async function reatribuirSedeMembro(
     },
   })
 
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
-  revalidatePath(`/admin/membros/${membro.id}`)
+  revalidatePath('/admin/socios')
+  revalidatePath(`/admin/torcedores/${membro.id}`)
   revalidatePath('/admin/sedes')
   revalidatePath('/admin/torcida')
   return { ok: true }
@@ -1546,6 +1592,7 @@ export async function bloquearMembro(
     },
   })
 
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
 }
@@ -1578,6 +1625,7 @@ export async function desbloquearMembro(userId: string): Promise<{ error: string
     },
   })
 
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
 }
@@ -1609,6 +1657,7 @@ export async function apagarMembroDefinitivo(
 
   invalidarCachesComunidadeFeed(tenant.id)
   invalidatePermissionsCache(membro.userId, tenant.id)
+  revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
   revalidatePath('/admin')

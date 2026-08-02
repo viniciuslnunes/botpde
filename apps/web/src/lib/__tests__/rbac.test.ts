@@ -330,10 +330,10 @@ describe('filterMenuByPermissions com OR', () => {
     expect(filterMenuByPermissions(menu, [PERMISSIONS.MEMBERS_VIEW])).toHaveLength(0)
   })
 
-  it('ADMIN_MENU: members:approve vê Membros; messages:moderate vê Moderação', () => {
+  it('ADMIN_MENU: members:approve vê Torcedores e Sócios; messages:moderate vê Moderação', () => {
     const soAprovar = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MEMBERS_APPROVE])
-    expect(soAprovar.map((i) => i.id)).toContain('membros')
-    expect(soAprovar.map((i) => i.id)).not.toContain('socios')
+    expect(soAprovar.map((i) => i.id)).toContain('torcedores')
+    expect(soAprovar.map((i) => i.id)).toContain('socios')
 
     // Moderação virou tab de /admin/comunidade: o menu mostra o módulo, e o
     // módulo leva o moderador direto para a etapa dele.
@@ -347,7 +347,7 @@ describe('filterMenuByPermissions com OR', () => {
     const ids = filterMenuByPermissions(ADMIN_MENU, financeiro!.permissions).map((i) => i.id)
     expect(ids).toEqual(expect.arrayContaining(['dashboard', 'relatorios', 'bar', 'bar-pdv']))
     expect(ids).not.toContain('financeiro')
-    expect(ids).not.toContain('membros')
+    expect(ids).not.toContain('torcedores')
   })
 
   it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Eventos', () => {
@@ -367,7 +367,8 @@ describe('filterMenuByPermissions com OR', () => {
     const soMembers = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MEMBERS_VIEW]).map(
       (i) => i.id,
     )
-    expect(soMembers).toContain('membros')
+    expect(soMembers).toContain('torcedores')
+    expect(soMembers).toContain('socios')
     expect(soMembers).not.toContain('hierarquia')
   })
 
@@ -388,7 +389,7 @@ describe('filterMenuByPermissions com OR', () => {
         const esperado = new Set([
           'dashboard',
           'estrutura',
-          'membros',
+          'torcedores',
           'socios',
           'eventos',
           'loja',

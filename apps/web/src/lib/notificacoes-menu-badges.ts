@@ -12,7 +12,7 @@ import { resolverMenuIdDeRota } from '@torcida/types'
  * Resolvendo por rota, o badge sobe sozinho para a entrada do módulo.
  */
 export const ROTA_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
-  MEMBRO_SOLICITADO: '/admin/membros',
+  MEMBRO_SOLICITADO: '/admin/socios?status=solicitacoes',
   DENUNCIA_NOVA: '/admin/comunidade/moderacao',
   ALIANCA_PROPOSTA: '/admin/aliancas',
   ALIANCA_ACEITA: '/admin/aliancas',

@@ -80,7 +80,7 @@ export default async function TorcidasPage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                href="/admin/membros"
+                href="/admin/torcedores"
                 className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 <Users className="h-4 w-4" />

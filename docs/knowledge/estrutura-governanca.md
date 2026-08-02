@@ -70,6 +70,13 @@ torcida) — consulta 2026-07-10.
   acesso a sede, caravanas, desconto em materiais e ingressos de setor.
 - Receitas típicas: mensalidades, venda de materiais, eventos/festas,
   caravanas, (nas escolas de samba) carnaval.
+- **Periodicidades reais variam por torcida.** Exemplo âncora (Gaviões da
+  Fiel, site oficial 2026-08-02): planos **quadrimensal** e **anual** para
+  novos sócios, **mensal** em renovação, mais taxa de emissão de carteirinha
+  — ver `torcidas-brasil.md` § Gaviões. O SaaS hoje modela
+  `MENSAL | TRIMESTRAL | ANUAL | UNICA` (`PlanoAssociacao`); **quadrimensal
+  não cabe** sem estender o enum. Confiança média (site da torcida; valores
+  divergem entre páginas).
 - **Exceção importante**: o modelo **barra brava** (Geral do Grêmio, 2001) é
   de livre adesão — sem mensalidade, sem uniforme, sem cadastro. Nem todo
   tenant potencial tem a mesma operação. Fonte: Wikipédia/barrabrava.net.

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
-import { novoQrTokenSocio } from '@/lib/pix-gateway'
+import { emitirCarteirinhaInterna } from '@/lib/carteirinha-emissao'
 import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -63,77 +63,15 @@ export async function emitirCarteirinha(formData: FormData) {
     throw new Error('Apenas membros do tipo Sócio podem receber carteirinha')
 
   const numeroRaw = membro.numeroAssociado?.trim() ?? ''
-  if (!/^\d+$/.test(numeroRaw)) {
-    throw new ExpectedError(
-      'Sócio sem número de associado no cadastro. Atualize o nº informado no recrutamento antes de emitir.',
-    )
-  }
-  const numeroSocio = parseInt(numeroRaw, 10)
-  if (!Number.isFinite(numeroSocio) || numeroSocio < 1) {
-    throw new ExpectedError('Número de associado inválido.')
-  }
-
-  const jaTem: { id: string } | null = await db.saasSocio.findFirst({
-    where: { tenantId: tenant.id, userId },
-    select: { id: true },
+  const resultado = await emitirCarteirinhaInterna({
+    tenantId: tenant.id,
+    userId,
+    nome,
+    numeroAssociado: numeroRaw,
+    validade,
+    atorId: session.user.id,
   })
-  if (jaTem) throw new Error('Este membro já possui carteirinha')
-
-  const qrToken = novoQrTokenSocio()
-  let socio: { id: string; numeroSocio: number } | null = null
-
-  // Advisory lock por tenant + retry em unique — nº = o do recrutamento (não sequencial)
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      socio = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`socio-num:${tenant.id}`}))`
-        const conflito: { id: string } | null = await tx.saasSocio.findFirst({
-          where: { tenantId: tenant.id, numeroSocio },
-          select: { id: true },
-        })
-        if (conflito) {
-          throw new ExpectedError(
-            `Já existe carteirinha com o nº ${numeroRaw} nesta torcida.`,
-          )
-        }
-        return tx.saasSocio.create({
-          data: {
-            tenantId: tenant.id,
-            userId,
-            numeroSocio,
-            nome,
-            validade,
-            qrToken,
-            qrEmitidoEm: new Date(),
-          },
-          select: { id: true, numeroSocio: true },
-        })
-      })
-      break
-    } catch (err: unknown) {
-      if (err instanceof ExpectedError) throw err
-      if (isUniqueViolation(err) && attempt < 2) continue
-      if (isUniqueViolation(err)) {
-        throw new ExpectedError(
-          `Já existe carteirinha com o nº ${numeroRaw} nesta torcida.`,
-        )
-      }
-      throw err
-    }
-  }
-
-  if (!socio) throw new Error('Não foi possível emitir a carteirinha')
-
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'SOCIO_CARTEIRINHA_EMITIDA',
-      entidade: 'SaasSocio',
-      entidadeId: socio.id,
-      detalhes: { nome, numeroSocio: socio.numeroSocio, numeroAssociado: numeroRaw },
-    },
-  })
+  if (resultado.jaExistia) throw new Error('Este membro já possui carteirinha')
 
   await notificarSafe({
     userId,

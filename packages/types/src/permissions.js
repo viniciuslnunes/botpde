@@ -332,7 +332,7 @@ export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   bar: '/admin/bar',
   comunidade: '/admin/comunidade',
   sedes: '/admin/sedes',
-  membros: '/admin/membros',
+  membros: '/admin/torcedores',
   financeiro: '/admin/financeiro',
   patrimonio: '/admin/patrimonio',
   caravanas: '/admin/eventos?tipo=CARAVANA',

@@ -22,7 +22,7 @@ import {
   springGentle,
   springSnappy,
 } from '@/lib/motion-presets'
-import { isDepartamentoLegado, maskRg, maskTelefone, normalizarCpf, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
+import { isDepartamentoLegado, maskRg, maskTelefone, normalizarCpf, PERIODICIDADE_PLANO_LABEL, resolverPeriodicidadesOnboarding, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -144,6 +144,7 @@ export function OnboardingWizard({
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>('escolha')
+  const [caminhoSocio, setCaminhoSocio] = useState<'EXISTENTE' | 'NOVO' | null>(null)
 
   // Seleções acumuladas
   const [clube, setClube] = useState<AfiliacaoOnboarding | null>(convite?.clube ?? null)
@@ -410,7 +411,8 @@ export function OnboardingWizard({
     avancarPara('vinculo', 'socio')
   }
 
-  function abrirModoSocio() {
+  function abrirModoSocio(caminho: 'EXISTENTE' | 'NOVO') {
+    setCaminhoSocio(caminho)
     avancarPara('vinculo', 'socio')
   }
 
@@ -590,6 +592,7 @@ export function OnboardingWizard({
                 canalRestrito={convite?.canalRestrito ?? false}
                 torcidaMae={convite?.torcidaMae ?? null}
                 modo={vinculoModo}
+                caminhoSocio={caminhoSocio}
                 onAbrirSocio={abrirModoSocio}
                 onVoltar={voltarHistorico}
                 onErro={setErro}
@@ -1737,6 +1740,7 @@ function PassoVinculo({
   torcidaMae,
   userId,
   modo,
+  caminhoSocio,
   onAbrirSocio,
   onVoltar,
   onErro,
@@ -1758,7 +1762,8 @@ function PassoVinculo({
   torcidaMae: TorcidaMaeConvite | null
   userId: string
   modo: 'escolha' | 'socio'
-  onAbrirSocio: () => void
+  caminhoSocio: 'EXISTENTE' | 'NOVO' | null
+  onAbrirSocio: (caminho: 'EXISTENTE' | 'NOVO') => void
   onVoltar: () => void
   onErro: (m: string | null) => void
 }) {
@@ -1778,6 +1783,8 @@ function PassoVinculo({
   const [complemento, setComplemento] = useState('')
   const [numeroAssociado, setNumeroAssociado] = useState('')
   const [anosSocio, setAnosSocio] = useState('')
+  const [dataExpedicaoCarteirinha, setDataExpedicaoCarteirinha] = useState('')
+  const [periodicidadePretendida, setPeriodicidadePretendida] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [departamentoSedeId, setDepartamentoSedeId] = useState('')
   const [imagemProva, setImagemProva] = useState<string | undefined>()
@@ -2068,9 +2075,9 @@ function PassoVinculo({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ok: depende só da chave
   }, [vinculoDraftKey])
 
-  function abrirSocio() {
+  function abrirSocio(caminho: 'EXISTENTE' | 'NOVO') {
     onErro(null)
-    onAbrirSocio()
+    onAbrirSocio(caminho)
   }
 
   useEffect(() => {
@@ -2219,24 +2226,41 @@ function PassoVinculo({
     if (!cidadeEndereco) erros.cidade = ['Informe a cidade.']
     if (!bairro) erros.bairro = ['Informe o bairro.']
     if (!ufEndereco) erros.uf = ['Informe o estado (UF).']
-    if (!numeroAssociado) {
-      erros.numeroAssociado = ['Informe seu número de associado.']
-    }
-    if (!anosSocio) {
-      erros.anosSocio = ['Informe há quantos anos é sócio da torcida.']
-    } else {
-      const anos = Number(anosSocio)
-      if (!Number.isFinite(anos) || anos < 0 || anos > 100) {
-        erros.anosSocio = ['Informe um número de anos entre 0 e 100.']
+
+    const jaSocio = caminhoSocio === 'EXISTENTE'
+    if (jaSocio) {
+      if (!numeroAssociado) {
+        erros.numeroAssociado = ['Informe seu número de associado.']
       }
+      if (!anosSocio) {
+        erros.anosSocio = ['Informe há quantos anos é sócio da torcida.']
+      } else {
+        const anos = Number(anosSocio)
+        if (!Number.isFinite(anos) || anos < 0 || anos > 100) {
+          erros.anosSocio = ['Informe um número de anos entre 0 e 100.']
+        }
+      }
+      if (!dataExpedicaoCarteirinha) {
+        erros.dataExpedicaoCarteirinha = ['Informe a data de expedição da carteirinha.']
+      } else {
+        const exp = new Date(`${dataExpedicaoCarteirinha}T12:00:00`)
+        if (Number.isNaN(exp.getTime()) || exp > new Date()) {
+          erros.dataExpedicaoCarteirinha = ['Data de expedição inválida.']
+        }
+      }
+      if (!periodicidadePretendida) {
+        erros.periodicidadePretendida = ['Informe o plano (periodicidade) do associado.']
+      }
+      if (!imagemProva) {
+        erros.imagemProva = [
+          'Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.',
+        ]
+      }
+    } else if (!caminhoSocio) {
+      erros.caminhoSocio = ['Escolha se você já é sócio ou quer se associar.']
     }
 
     // Documentos + termo
-    if (!imagemProva) {
-      erros.imagemProva = [
-        'Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.',
-      ]
-    }
     if (documentosObrigatorios && !fotoDocumentoUrl) {
       erros.fotoDocumentoUrl = ['Envie a foto do RG.']
     }
@@ -2298,9 +2322,24 @@ function PassoVinculo({
           numero: numero || undefined,
           bloco: bloco || undefined,
           complemento: complemento || undefined,
-          numeroAssociado: numeroAssociado || undefined,
-          anosSocio: anosSocio || undefined,
-          imagemProva,
+          numeroAssociado:
+            caminhoSocio === 'EXISTENTE' ? numeroAssociado || undefined : undefined,
+          anosSocio: caminhoSocio === 'EXISTENTE' ? anosSocio || undefined : undefined,
+          dataExpedicaoCarteirinha:
+            caminhoSocio === 'EXISTENTE' ? dataExpedicaoCarteirinha || undefined : undefined,
+          periodicidadePretendida:
+            caminhoSocio === 'EXISTENTE'
+              ? (periodicidadePretendida as
+                  | 'MENSAL'
+                  | 'TRIMESTRAL'
+                  | 'QUADRIMENSAL'
+                  | 'SEMESTRAL'
+                  | 'ANUAL'
+                  | 'UNICA'
+                  | undefined) || undefined
+              : undefined,
+          caminhoSocio: caminhoSocio ?? undefined,
+          imagemProva: caminhoSocio === 'EXISTENTE' ? imagemProva : undefined,
           departamentoId: departamentoId || undefined,
           departamentoSedeId: vinculoEmUnidadePropria
             ? departamentoSedeId || undefined
@@ -2424,7 +2463,7 @@ function PassoVinculo({
           className="mt-4"
         />
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {/* Card 1: Torcedor da torcida */}
           <button
             type="button"
@@ -2515,10 +2554,10 @@ function PassoVinculo({
             </div>
           </button>
 
-          {/* Card 2: Sócio da organizada */}
+          {/* Card 2: Já sou sócio */}
           <button
             type="button"
-            onClick={abrirSocio}
+            onClick={() => abrirSocio('EXISTENTE')}
             disabled={pending}
             className="group flex h-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
@@ -2533,7 +2572,7 @@ function PassoVinculo({
                 className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
                 aria-hidden
               >
-                <Shield className="h-3.5 w-3.5" />
+                <BadgeCheck className="h-3.5 w-3.5" />
               </span>
             </div>
 
@@ -2542,10 +2581,10 @@ function PassoVinculo({
                 Requer aprovação
               </p>
               <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
-                Sócio da organizada
+                Já sou sócio
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                Acesso interno de sócios, com comprovante e análise da liderança.
+                Nº, expedição da carteirinha e plano — após aprovação a carteirinha digital já nasce vigente.
               </p>
 
               <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
@@ -2603,7 +2642,7 @@ function PassoVinculo({
 
               <div className="mt-auto flex items-end justify-between gap-4 pt-5">
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
-                  Solicitar vínculo
+                  Continuar
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </span>
 
@@ -2622,6 +2661,44 @@ function PassoVinculo({
               </div>
             </div>
           </button>
+
+          {/* Card 3: Quero me associar */}
+          <button
+            type="button"
+            onClick={() => abrirSocio('NOVO')}
+            disabled={pending}
+            className="group flex h-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+          >
+            <div className="relative flex w-[6.5rem] shrink-0 items-center justify-center self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
+              <EscudoClube
+                nome={nomeOrganizada}
+                escudoUrl={logoOrganizada}
+                size="xl"
+                priority
+              />
+              <span
+                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
+                aria-hidden
+              >
+                <Shield className="h-3.5 w-3.5" />
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Requer aprovação
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
+                Quero me associar
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                Primeira associação — ficha completa. A carteirinha é emitida pela diretoria após a aprovação.
+              </p>
+              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
+                Continuar
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </div>
+          </button>
         </div>
       </div>
     ) : (
@@ -2630,9 +2707,13 @@ function PassoVinculo({
       <BotaoVoltar onClick={onVoltar} disabled={pending} label="Voltar" />
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Solicitação de sócio</h1>
+          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+            {caminhoSocio === 'NOVO' ? 'Quero me associar' : 'Já sou sócio'}
+          </h1>
           <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-            Preencha seus dados. A liderança da {torcida.nome} vai analisar.
+            {caminhoSocio === 'NOVO'
+              ? `Preencha a ficha. Após a aprovação, a liderança da ${torcida.nome} emite a carteirinha.`
+              : `Informe nº, expedição e plano. A liderança da ${torcida.nome} confere e ativa sua carteirinha digital.`}
           </p>
         </div>
         <EscudoClube nome={nomeOrganizada} escudoUrl={logoOrganizada} size="xl" />
@@ -2995,46 +3076,87 @@ function PassoVinculo({
 
         {/* ─── Associação ────────────────────────────────────────────────── */}
         <SecaoFormulario titulo="Associação" oculta={tabAtiva !== 'associacao'}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Campo
-              name="numeroAssociado"
-              label="Nº de associado"
-              obrigatorio
-              erros={errosCampo.numeroAssociado}
-            >
-              <Input
-                inputMode="numeric"
-                maxLength={7}
-                value={numeroAssociado}
-                onChange={(e) => {
-                  setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))
-                  if (errosCampo.numeroAssociado) {
-                    setErrosCampo((prev) => {
-                      const next = { ...prev }
-                      delete next.numeroAssociado
-                      return next
-                    })
-                  }
-                }}
-                placeholder="Até 7 dígitos"
-              />
-            </Campo>
-            <Campo
-              name="anosSocio"
-              label="Há quantos anos é sócio"
-              obrigatorio
-              erros={errosCampo.anosSocio}
-            >
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                value={anosSocio}
-                onChange={(e) => setAnosSocio(e.target.value)}
-                placeholder="Ex: 3"
-              />
-            </Campo>
-          </div>
+          {caminhoSocio === 'NOVO' ? (
+            <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+              Na primeira associação a diretoria atribui o número e emite a
+              carteirinha depois da aprovação. Aqui você só declara a área
+              pretendida (opcional).
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo
+                name="numeroAssociado"
+                label="Nº de associado"
+                obrigatorio
+                erros={errosCampo.numeroAssociado}
+              >
+                <Input
+                  inputMode="numeric"
+                  maxLength={7}
+                  value={numeroAssociado}
+                  onChange={(e) => {
+                    setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))
+                    if (errosCampo.numeroAssociado) {
+                      setErrosCampo((prev) => {
+                        const next = { ...prev }
+                        delete next.numeroAssociado
+                        return next
+                      })
+                    }
+                  }}
+                  placeholder="Até 7 dígitos"
+                />
+              </Campo>
+              <Campo
+                name="anosSocio"
+                label="Há quantos anos é sócio"
+                obrigatorio
+                erros={errosCampo.anosSocio}
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={anosSocio}
+                  onChange={(e) => setAnosSocio(e.target.value)}
+                  placeholder="Ex: 3"
+                />
+              </Campo>
+              <Campo
+                name="dataExpedicaoCarteirinha"
+                label="Data de expedição da carteirinha"
+                obrigatorio
+                erros={errosCampo.dataExpedicaoCarteirinha}
+              >
+                <Input
+                  type="date"
+                  value={dataExpedicaoCarteirinha}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDataExpedicaoCarteirinha(e.target.value)}
+                />
+              </Campo>
+              <Campo
+                name="periodicidadePretendida"
+                label="Plano (periodicidade)"
+                obrigatorio
+                erros={errosCampo.periodicidadePretendida}
+              >
+                <Select
+                  value={periodicidadePretendida}
+                  onChange={(e) => setPeriodicidadePretendida(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {resolverPeriodicidadesOnboarding(torcida.periodicidadesOnboarding).map(
+                    (p) => (
+                      <option key={p} value={p}>
+                        {PERIODICIDADE_PLANO_LABEL[p] ?? p}
+                      </option>
+                    ),
+                  )}
+                </Select>
+              </Campo>
+            </div>
+          )}
 
           {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
             <Campo
@@ -3093,18 +3215,20 @@ function PassoVinculo({
 
         {/* ─── Documentos ────────────────────────────────────────────────── */}
         <SecaoFormulario titulo="Documentos" oculta={tabAtiva !== 'documentos'}>
-          <div>
-            <BlocoImagemProva
-              imagemProva={imagemProva}
-              uploadPend={cropComprovante.busy}
-              erros={errosCampo.imagemProva}
-              onArquivo={onArquivo}
-              onLimpar={() => setImagemProva(undefined)}
-            />
-            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-              Usado só para validar seu vínculo com a torcida; não fica visível a outros associados.
-            </p>
-          </div>
+          {caminhoSocio === 'EXISTENTE' ? (
+            <div>
+              <BlocoImagemProva
+                imagemProva={imagemProva}
+                uploadPend={cropComprovante.busy}
+                erros={errosCampo.imagemProva}
+                onArquivo={onArquivo}
+                onLimpar={() => setImagemProva(undefined)}
+              />
+              <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+                Usado só para validar seu vínculo com a torcida; não fica visível a outros associados.
+              </p>
+            </div>
+          ) : null}
 
           <div
             data-campo="fotoDocumentoUrl"
@@ -3383,6 +3507,9 @@ const CAMPO_TAB: Record<string, TabFormularioSocio> = {
   uf: 'endereco',
   numeroAssociado: 'associacao',
   anosSocio: 'associacao',
+  dataExpedicaoCarteirinha: 'associacao',
+  periodicidadePretendida: 'associacao',
+  caminhoSocio: 'associacao',
   departamentoId: 'associacao',
   departamentoSedeId: 'associacao',
   imagemProva: 'documentos',

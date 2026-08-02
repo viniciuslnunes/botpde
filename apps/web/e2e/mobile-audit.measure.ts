@@ -22,7 +22,7 @@ const ROTAS = [
   { nome: '08-perfil', path: '/portal/perfil' },
   { nome: '09-departamentos', path: '/portal/departamentos' },
   { nome: '10-admin', path: '/admin' },
-  { nome: '11-admin-membros', path: '/admin/membros' },
+  { nome: '11-admin-torcedores', path: '/admin/torcedores' },
   { nome: '12-admin-financeiro', path: '/admin/financeiro' },
   { nome: '13-admin-eventos', path: '/admin/eventos' },
   { nome: '14-admin-bar-pdv', path: '/admin/bar/pdv' },

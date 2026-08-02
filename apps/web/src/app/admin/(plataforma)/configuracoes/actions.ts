@@ -23,6 +23,7 @@ import {
   formatNomeTorcida,
   isDepartamentoLegado,
   PERMISSIONS,
+  SalvarPeriodicidadesOnboardingSchema,
   slugifyDepartamento,
 } from '@torcida/types'
 import { z } from 'zod'
@@ -282,6 +283,40 @@ export async function salvarExigirDocumentosCadastro(formData: FormData) {
       entidade: 'Tenant',
       entidadeId: tenant.id,
       detalhes: { exigir },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/onboarding')
+  invalidateTenantCache(tenant.slug)
+}
+
+/** Periodicidades oferecidas no onboarding «Já sou sócio». */
+export async function salvarPeriodicidadesOnboarding(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const raw = formData.getAll('periodicidades').map(String)
+  const parsed = SalvarPeriodicidadesOnboardingSchema.safeParse({ periodicidades: raw })
+  if (!parsed.success) {
+    throw new ExpectedError(
+      parsed.error.issues[0]?.message ?? 'Selecione ao menos uma periodicidade',
+    )
+  }
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { periodicidadesOnboarding: parsed.data.periodicidades },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_PERIODICIDADES_ONBOARDING_ATUALIZADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { periodicidades: parsed.data.periodicidades },
     },
   })
 

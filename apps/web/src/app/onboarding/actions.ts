@@ -54,6 +54,7 @@ import {
   parseDataCompetencia,
   PERMISSIONS,
   formatNomeTorcida,
+  resolverPeriodicidadesOnboarding,
 } from '@torcida/types'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
@@ -446,28 +447,82 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .transform((v) => v?.trim() || undefined),
   termoResponsabilidadeAceito: z.boolean().optional(),
+  // EXISTENTE = já tem nº/carteirinha; NOVO = primeira associação (sem nº).
+  caminhoSocio: z.enum(['EXISTENTE', 'NOVO']).optional(),
+  // Data de expedição da carteirinha física (só EXISTENTE).
+  dataExpedicaoCarteirinha: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  // Periodicidade do plano pretendido (só EXISTENTE).
+  periodicidadePretendida: z
+    .enum(['MENSAL', 'TRIMESTRAL', 'QUADRIMENSAL', 'SEMESTRAL', 'ANUAL', 'UNICA'])
+    .optional(),
 }).superRefine((data, ctx) => {
   if (data.tipo !== 'SOCIO') return
-  if (!data.imagemProva) {
+  const caminho = data.caminhoSocio ?? 'EXISTENTE'
+  if (!data.caminhoSocio) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['imagemProva'],
-      message: 'Envie uma foto da carteirinha ou comprovante de vínculo',
+      path: ['caminhoSocio'],
+      message: 'Escolha se você já é sócio ou quer se associar',
     })
   }
-  if (!data.numeroAssociado) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['numeroAssociado'],
-      message: 'Informe seu número de associado',
-    })
-  }
-  if (data.anosSocio === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['anosSocio'],
-      message: 'Informe há quantos anos é sócio',
-    })
+  if (caminho === 'EXISTENTE') {
+    if (!data.imagemProva) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['imagemProva'],
+        message: 'Envie uma foto da carteirinha ou comprovante de vínculo',
+      })
+    }
+    if (!data.numeroAssociado) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['numeroAssociado'],
+        message: 'Informe seu número de associado',
+      })
+    }
+    if (data.anosSocio === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['anosSocio'],
+        message: 'Informe há quantos anos é sócio',
+      })
+    }
+    if (!data.dataExpedicaoCarteirinha) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dataExpedicaoCarteirinha'],
+        message: 'Informe a data de expedição da carteirinha',
+      })
+    } else {
+      const exp = parseDataCompetencia(data.dataExpedicaoCarteirinha)
+      if (!exp || exp > new Date()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['dataExpedicaoCarteirinha'],
+          message: 'Data de expedição inválida',
+        })
+      }
+    }
+    if (!data.periodicidadePretendida) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['periodicidadePretendida'],
+        message: 'Informe o plano (periodicidade) do seu associado',
+      })
+    }
+  } else {
+    // NOVO: sem nº/expedição/prova de carteirinha — ficha LGE na fila de emissão.
+    if (data.numeroAssociado) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['numeroAssociado'],
+        message: 'Quem ainda vai se associar não informa número — use «Já sou sócio»',
+      })
+    }
   }
   if (!data.cep) {
     ctx.addIssue({
@@ -914,6 +969,7 @@ export async function solicitarVinculo(
         slug: true,
         nome: true,
         exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: true,
         afiliacaoId: true,
       },
     })
@@ -921,6 +977,23 @@ export async function solicitarVinculo(
       return { message: 'Torcida não encontrada.' }
     }
     const afiliacaoIdEfetiva = await resolverAfiliacaoIdEfetiva(tenant.id, tenant.afiliacaoId)
+
+    if (
+      data.tipo === 'SOCIO' &&
+      data.caminhoSocio === 'EXISTENTE' &&
+      data.periodicidadePretendida
+    ) {
+      const permitidas = resolverPeriodicidadesOnboarding(tenant.periodicidadesOnboarding)
+      if (!permitidas.includes(data.periodicidadePretendida)) {
+        return {
+          errors: {
+            periodicidadePretendida: [
+              'Esta periodicidade não está disponível nesta torcida',
+            ],
+          },
+        }
+      }
+    }
 
     if (data.tipo === 'SOCIO' && tenant.exigirDocumentosCadastro) {
       const docErrors: Record<string, string[]> = {}
@@ -964,9 +1037,15 @@ export async function solicitarVinculo(
       numero: data.numero,
       bloco: data.bloco,
       complemento: data.complemento,
-      numeroAssociado: data.numeroAssociado,
-      anosSocio: data.anosSocio,
-      imagemProva: data.imagemProva,
+      numeroAssociado: data.caminhoSocio === 'NOVO' ? undefined : data.numeroAssociado,
+      anosSocio: data.caminhoSocio === 'NOVO' ? undefined : data.anosSocio,
+      imagemProva: data.caminhoSocio === 'NOVO' ? undefined : data.imagemProva,
+      dataExpedicaoCarteirinha:
+        data.caminhoSocio === 'EXISTENTE' && data.dataExpedicaoCarteirinha
+          ? parseDataCompetencia(data.dataExpedicaoCarteirinha) ?? undefined
+          : undefined,
+      periodicidadePretendida:
+        data.caminhoSocio === 'EXISTENTE' ? data.periodicidadePretendida : undefined,
       // LGE / cadastro completo (2026-07)
       dataNascimento: dataNascimento ?? undefined,
       sexo: data.sexo,
@@ -1361,6 +1440,8 @@ export async function solicitarVinculo(
             cidade: true,
             numeroAssociado: true,
             anosSocio: true,
+            dataExpedicaoCarteirinha: true,
+            periodicidadePretendida: true,
             cep: true,
             numero: true,
             bloco: true,
@@ -1428,6 +1509,8 @@ export async function solicitarVinculo(
             cidade: true,
             numeroAssociado: true,
             anosSocio: true,
+            dataExpedicaoCarteirinha: true,
+            periodicidadePretendida: true,
             cep: true,
             numero: true,
             bloco: true,

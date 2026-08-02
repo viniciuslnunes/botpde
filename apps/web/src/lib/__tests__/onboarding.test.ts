@@ -365,12 +365,16 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     const r = await solicitarVinculo({
       ...vinculoBase,
       tipo: 'SOCIO',
+      caminhoSocio: 'EXISTENTE',
       numeroAssociado: '123456',
       anosSocio: 3,
+      dataExpedicaoCarteirinha: '2024-01-10',
+      periodicidadePretendida: 'ANUAL',
       cep: '01310-100',
       logradouro: 'Rua das Torcidas',
       bairro: 'Centro',
@@ -393,6 +397,7 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     sedeFindMany.mockResolvedValue([])
     membroFindUnique
@@ -462,6 +467,7 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     sedeFindMany.mockResolvedValue([])
     membroFindUnique.mockResolvedValue(null)
@@ -483,6 +489,7 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     sedeFindMany.mockResolvedValue([])
     departamentoFindFirst.mockResolvedValue({ id: UUID2, slug: 'caravanas', nome: 'Caravanas' })
@@ -531,8 +538,11 @@ describe('solicitarVinculo — validação', () => {
       nome: 'Fulano da Silva',
       departamentoId: UUID2,
       imagemProva: PROVA_URL,
+      caminhoSocio: 'EXISTENTE',
       numeroAssociado: '123456',
       anosSocio: 3,
+      dataExpedicaoCarteirinha: '2024-01-10',
+      periodicidadePretendida: 'ANUAL',
       cep: '01310-100',
       logradouro: 'Rua das Torcidas',
       bairro: 'Centro',
@@ -564,6 +574,7 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     sedeFindMany.mockResolvedValue([])
     membroFindUnique.mockResolvedValue({
@@ -592,6 +603,7 @@ describe('solicitarVinculo — validação', () => {
       slug: 'torcida-teste',
       nome: 'Torcida Teste',
       exigirDocumentosCadastro: true,
+        periodicidadesOnboarding: [],
     })
     sedeFindMany.mockResolvedValue([])
     membroFindUnique.mockResolvedValue(null)

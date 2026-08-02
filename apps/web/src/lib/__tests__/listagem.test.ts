@@ -148,13 +148,13 @@ describe('parse de params hostis', () => {
   })
 
   it('valor de enum fora das opções declaradas é descartado', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO,ESPIAO' }, spec)
-    expect(params.filtros.tipo).toEqual(['SOCIO'])
+    const params = parseListagemParams({ status: 'PENDENTE,ESPIAO' }, spec)
+    expect(params.filtros.status).toEqual(['PENDENTE'])
   })
 
   it('filtro desconhecido na URL não entra nos params', () => {
-    const params = parseListagemParams({ senhaHash: 'x', tipo: 'SOCIO' }, spec)
-    expect(Object.keys(params.filtros)).toEqual(['tipo'])
+    const params = parseListagemParams({ senhaHash: 'x', status: 'PENDENTE' }, spec)
+    expect(Object.keys(params.filtros)).toEqual(['status'])
   })
 
   it('filtro single-select ignora valores extras', () => {
@@ -176,8 +176,8 @@ describe('parse de params hostis', () => {
   })
 
   it('valores repetidos são deduplicados', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO,SOCIO,TORCEDOR' }, spec)
-    expect(params.filtros.tipo).toEqual(['SOCIO', 'TORCEDOR'])
+    const params = parseListagemParams({ sede: 'a,a,b' }, spec)
+    expect(params.filtros.sede).toEqual(['a', 'b'])
   })
 })
 
@@ -193,7 +193,7 @@ describe('montagem do where', () => {
   })
 
   it('filtros e busca convivem sem colidir na chave OR', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO', sede: 'nenhuma', q: 'ana' }, spec)
+    const params = parseListagemParams({ status: 'PENDENTE', sede: 'nenhuma', q: 'ana' }, spec)
     const where = montarWhereListagem<ListagemWhere>(spec, params, {
       escopo: { tenantId: TENANT },
     })
@@ -231,22 +231,22 @@ describe('montagem do where', () => {
   })
 
   it('ignorarFiltro tira só aquele filtro — base das facetas', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO', cidade: 'santos' }, spec)
+    const params = parseListagemParams({ status: 'PENDENTE', cidade: 'santos' }, spec)
     const where = montarWhereListagem<ListagemWhere>(spec, params, {
       escopo: { tenantId: TENANT },
-      ignorarFiltro: 'tipo',
+      ignorarFiltro: 'status',
     })
     const texto = comoTexto(where)
-    expect(texto).not.toContain('SOCIO')
+    expect(texto).not.toContain('PENDENTE')
     expect(texto).toContain('santos')
   })
 
-  // A tab Desligados de /admin/membros usa a chave `status` na URL, mas no banco
+  // A tab Desligados de /admin/torcedores usa a chave `status` na URL, mas no banco
   // o critério é `desligadoEm`. Como o filtro entra no `AND` (e não na raiz),
   // limpar o `where` pronto não adianta: quem traduz precisa tirar o filtro dos
   // params. Sem isso, `status: 'DESLIGADO'` chegava ao Prisma e derrubava a página.
   it('filtro traduzido some do where quando sai dos params', () => {
-    const params = parseListagemParams({ status: 'DESLIGADO', tipo: 'SOCIO' }, spec)
+    const params = parseListagemParams({ status: 'DESLIGADO', sede: 'sede-1' }, spec)
     const ingenuo = montarWhereListagem<ListagemWhere>(spec, params, {
       escopo: { tenantId: TENANT },
     })
@@ -262,7 +262,7 @@ describe('montagem do where', () => {
     const texto = comoTexto(where)
     expect(texto).not.toContain('DESLIGADO')
     expect(texto).toContain('"desligadoEm"')
-    expect(texto).toContain('SOCIO')
+    expect(texto).toContain('sede-1')
   })
 
   it('sentinela de tenant é resolvida nas cláusulas do spec', () => {
@@ -413,7 +413,7 @@ describe('hrefs', () => {
 
   it('omite tudo que está no default', () => {
     const params = parseListagemParams({}, spec)
-    expect(construirHrefListagem(spec, params)).toBe('/admin/membros')
+    expect(construirHrefListagem(spec, params)).toBe('/admin/torcedores')
   })
 
   it('ordenar por coluna nova volta para a página 1', () => {
@@ -425,17 +425,17 @@ describe('hrefs', () => {
 
   it('trocar filtro volta para a página 1 e preserva a busca', () => {
     const params = parseListagemParams({ pagina: '7', q: 'ana' }, spec)
-    const href = construirHrefFiltro(spec, params, 'tipo', ['SOCIO'])
+    const href = construirHrefFiltro(spec, params, 'status', ['PENDENTE'])
     expect(href).toContain('q=ana')
-    expect(href).toContain('tipo=SOCIO')
+    expect(href).toContain('status=PENDENTE')
     expect(href).not.toContain('pagina=')
   })
 
   it('limpar filtros zera busca e filtros, mantendo o tamanho de página', () => {
-    const params = parseListagemParams({ q: 'ana', tipo: 'SOCIO', porPagina: '50' }, spec)
+    const params = parseListagemParams({ q: 'ana', status: 'PENDENTE', porPagina: '50' }, spec)
     const href = construirHrefLimparFiltros(spec, params)
     expect(href).not.toContain('q=')
-    expect(href).not.toContain('tipo=')
+    expect(href).not.toContain('status=')
     expect(href).toContain('porPagina=50')
   })
 
@@ -455,7 +455,7 @@ describe('hrefs', () => {
 
   it('ida e volta pela URL preserva os params do contrato', () => {
     const original = parseListagemParams(
-      { q: 'ana', tipo: 'SOCIO,TORCEDOR', sede: 'nenhuma', sort: 'nome', dir: 'desc', porPagina: '50', pagina: '3' },
+      { q: 'ana', status: 'PENDENTE', sede: 'nenhuma', sort: 'nome', dir: 'desc', porPagina: '50', pagina: '3' },
       spec,
     )
     const href = construirHrefListagem(spec, original)
@@ -468,31 +468,31 @@ describe('props de UI derivadas do spec', () => {
   const spec = LISTAGEM_MEMBROS
 
   it('opção facetada carrega contagem e href de toggle', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO' }, spec)
-    const filtro = spec.colunas.find((c) => c.id === 'tipo')!.filtro!
+    const params = parseListagemParams({ sede: 'sede-1' }, spec)
+    const filtro = spec.colunas.find((c) => c.id === 'sede')!.filtro!
     const ui = montarFiltroUI(spec, params, filtro, {
-      tipo: [
-        { valor: 'SOCIO', label: 'Sócio', count: 400 },
-        { valor: 'TORCEDOR', label: 'Torcedor', count: 431 },
+      sede: [
+        { valor: 'sede-1', label: 'Unidade 1', count: 400 },
+        { valor: 'sede-2', label: 'Unidade 2', count: 431 },
       ],
     })
-    const socio = ui.opcoes!.find((o) => o.valor === 'SOCIO')!
-    expect(socio.ativo).toBe(true)
-    expect(socio.count).toBe(400)
+    const sede1 = ui.opcoes!.find((o) => o.valor === 'sede-1')!
+    expect(sede1.ativo).toBe(true)
+    expect(sede1.count).toBe(400)
     // Já ativo: o href precisa desligar, não reafirmar.
-    expect(socio.href).not.toContain('tipo=SOCIO')
-    expect(ui.opcoes!.find((o) => o.valor === 'TORCEDOR')!.href).toContain(
-      'tipo=SOCIO%2CTORCEDOR',
+    expect(sede1.href).not.toContain('sede=sede-1')
+    expect(ui.opcoes!.find((o) => o.valor === 'sede-2')!.href).toContain(
+      'sede=sede-1%2Csede-2',
     )
   })
 
   it('filtro de texto entrega form GET com os outros params preservados', () => {
-    const params = parseListagemParams({ q: 'ana', tipo: 'SOCIO', cidade: 'santos', pagina: '4' }, spec)
+    const params = parseListagemParams({ q: 'ana', status: 'PENDENTE', cidade: 'santos', pagina: '4' }, spec)
     const filtro = spec.colunas.find((c) => c.id === 'cidade')!.filtro!
     const ui = montarFiltroUI(spec, params, filtro)
     const nomes = ui.form!.ocultos.map((c) => c.nome)
     expect(nomes).toContain('q')
-    expect(nomes).toContain('tipo')
+    expect(nomes).toContain('status')
     // O próprio filtro vem do input; página nunca é preservada num filtro novo.
     expect(nomes).not.toContain('cidade')
     expect(nomes).not.toContain('pagina')
@@ -500,18 +500,23 @@ describe('props de UI derivadas do spec', () => {
   })
 
   it('chips descrevem cada valor ativo e removem só ele', () => {
-    const params = parseListagemParams({ tipo: 'SOCIO,TORCEDOR' }, spec)
-    const chips = montarChips(spec, params)
+    const params = parseListagemParams({ sede: 'a,b' }, spec)
+    const chips = montarChips(spec, params, {}, {
+      sede: [
+        { valor: 'a', label: 'Unidade A' },
+        { valor: 'b', label: 'Unidade B' },
+      ],
+    })
     expect(chips).toHaveLength(2)
-    expect(chips[0]!.valor).toBe('Sócio')
-    expect(chips[0]!.href).toContain('tipo=TORCEDOR')
+    expect(chips[0]!.valor).toBe('Unidade A')
+    expect(chips[0]!.href).toContain('sede=b')
   })
 
   it('params do contrato cobrem reservados e filtros, inclusive intervalo', () => {
     const nomes = paramsDoContrato(spec)
     expect(nomes).toContain('q')
     expect(nomes).toContain('porPagina')
-    expect(nomes).toContain('tipo')
+    expect(nomes).toContain('status')
     expect(nomes).toContain('criadoEmDe')
     expect(nomes).toContain('criadoEmAte')
     expect(nomes).not.toContain('criadoEm')
@@ -520,7 +525,7 @@ describe('props de UI derivadas do spec', () => {
   it('filtro ativo é distinguível de listagem vazia', () => {
     expect(temFiltroAtivo(parseListagemParams({}, spec))).toBe(false)
     expect(temFiltroAtivo(parseListagemParams({ q: 'ana' }, spec))).toBe(true)
-    expect(temFiltroAtivo(parseListagemParams({ tipo: 'SOCIO' }, spec))).toBe(true)
+    expect(temFiltroAtivo(parseListagemParams({ status: 'PENDENTE' }, spec))).toBe(true)
     expect(temFiltroAtivo(parseListagemParams({ pagina: '3' }, spec))).toBe(false)
   })
 })

@@ -28,6 +28,20 @@
   campeã entre escolas de torcida (títulos da elite paulista em 1995, 1999,
   2002, 2003; vice em 2026). Independente dos blocos nacionais.
   Fontes: CNN Brasil; Wikipédia; Goal.com (consulta 2026-07-10).
+- **Planos de mensalidade / carteirinha (site oficial, consulta 2026-08-02):**
+  o Departamento de Mensalidades publica períodos **quadrimensal**, **anual**
+  e (em renovação) **mensal**, mais taxa de **emissão da carteirinha**.
+  Valores publicados variam entre posts/páginas (ex.: anúncio de carteirinha
+  R$ 100 anual / R$ 40 quadrimestral / R$ 10 mensal + R$ 10 emissão; página
+  Associe-se com novos sócios a R$ 50 quadrimestral / R$ 110 anual). Confiança
+  **média** (fonte primária da própria torcida; tabela não está versionada
+  no site — confirmar no atendimento antes de seed/demo). Relevância de
+  produto: `PeriodicidadePlanoAssociacao` inclui
+  `MENSAL | TRIMESTRAL | QUADRIMENSAL | SEMESTRAL | ANUAL | UNICA`
+  (onboarding «Já sou sócio» + planos).
+  Fontes: [gavioes.com.br/associe-se](https://gavioes.com.br/associe-se);
+  posts “Solicite a nova carteirinha…” e “Restruturação do Departamento de
+  Mensalidades” em gavioes.com.br (consulta 2026-08-02).
 
 ### Mancha Verde / Mancha Alviverde (Palmeiras)
 - Fundada em 11/01/1983 da união de Império Verde, Inferno Verde e Grêmio

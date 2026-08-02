@@ -1,15 +1,80 @@
 import { z } from 'zod'
 import { parseDataCompetencia, validarJanelaCompetencia } from './financeiro.js'
 
-export const PeriodicidadePlanoSchema = z.enum(['MENSAL', 'TRIMESTRAL', 'ANUAL', 'UNICA'])
+export const PeriodicidadePlanoSchema = z.enum([
+  'MENSAL',
+  'TRIMESTRAL',
+  'QUADRIMENSAL',
+  'SEMESTRAL',
+  'ANUAL',
+  'UNICA',
+])
 export const TipoCobrancaSchema = z.enum(['MENSALIDADE', 'ADESAO', 'AVULSA'])
 export const StatusCobrancaSchema = z.enum(['PENDENTE', 'PAGA', 'CANCELADA', 'VENCIDA'])
+
+/** @typedef {z.infer<typeof PeriodicidadePlanoSchema>} PeriodicidadePlano */
 
 export const PERIODICIDADE_PLANO_LABEL = Object.freeze({
   MENSAL: 'Mensal',
   TRIMESTRAL: 'Trimestral',
+  QUADRIMENSAL: 'Quadrimensal',
+  SEMESTRAL: 'Semestral',
   ANUAL: 'Anual',
   UNICA: 'Única',
+})
+
+/** Meses a somar à data de expedição para obter a validade. UNICA = null (sem ciclo). */
+export const PERIODICIDADE_PLANO_MESES = Object.freeze({
+  MENSAL: 1,
+  TRIMESTRAL: 3,
+  QUADRIMENSAL: 4,
+  SEMESTRAL: 6,
+  ANUAL: 12,
+  UNICA: null,
+})
+
+/** Fallback quando Tenant.periodicidadesOnboarding está vazio (âncora Gaviões). */
+export const PERIODICIDADES_ONBOARDING_PADRAO = Object.freeze(
+  /** @type {readonly ['QUADRIMENSAL', 'ANUAL']} */ (['QUADRIMENSAL', 'ANUAL']),
+)
+
+/**
+ * Resolve as periodicidades oferecidas no wizard «Já sou sócio».
+ * @param {readonly string[] | null | undefined} configuradas
+ * @returns {PeriodicidadePlano[]}
+ */
+export function resolverPeriodicidadesOnboarding(configuradas) {
+  const validas = (configuradas ?? []).filter(
+    (p) => PeriodicidadePlanoSchema.safeParse(p).success,
+  )
+  if (validas.length === 0) return [...PERIODICIDADES_ONBOARDING_PADRAO]
+  return /** @type {PeriodicidadePlano[]} */ (validas)
+}
+
+/**
+ * Soma a periodicidade à data de expedição (calendário civil, dia preservado).
+ * UNICA: validade prática longe (100 anos) — sem ciclo de renovação.
+ * @param {Date} dataExpedicao
+ * @param {PeriodicidadePlano} periodicidade
+ * @returns {Date}
+ */
+export function calcularValidadeCarteirinha(dataExpedicao, periodicidade) {
+  const base = new Date(dataExpedicao.getTime())
+  if (Number.isNaN(base.getTime())) {
+    throw new Error('Data de expedição inválida')
+  }
+  const meses = PERIODICIDADE_PLANO_MESES[periodicidade]
+  const out = new Date(base.getFullYear(), base.getMonth(), base.getDate())
+  if (meses == null) {
+    out.setFullYear(out.getFullYear() + 100)
+    return out
+  }
+  out.setMonth(out.getMonth() + meses)
+  return out
+}
+
+export const SalvarPeriodicidadesOnboardingSchema = z.object({
+  periodicidades: z.array(PeriodicidadePlanoSchema).min(1).max(6),
 })
 
 export const TIPO_COBRANCA_LABEL = Object.freeze({

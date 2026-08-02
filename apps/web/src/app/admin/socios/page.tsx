@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { db, type Prisma } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
-import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { assertAnyPermission } from '@/lib/authz'
+import { getAncestorTenantIds, tenantsAreRivais } from '@/lib/hierarquia'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
@@ -31,6 +31,7 @@ import {
 import {
   LISTAGEM_SOCIOS_AGUARDANDO,
   LISTAGEM_SOCIOS_EMITIDAS,
+  LISTAGEM_SOCIOS_SOLICITACOES,
 } from '@/lib/listagem/specs'
 import {
   montarOrderByListagem,
@@ -41,23 +42,26 @@ import {
 } from '@/lib/listagem/query'
 import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { AdminSociosClient } from './admin-socios-client'
+import { AdminMembrosTable } from '@/app/admin/membros/admin-membros-client'
 import { SincronizarNumerosAviso } from './sincronizar-numeros-aviso'
 import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Sócios — Admin' }
 
-type StatusFiltro = 'aguardando' | 'todos' | 'ativos' | 'vencendo' | 'vencidos'
+type StatusFiltro = 'solicitacoes' | 'aguardando' | 'todos' | 'ativos' | 'vencendo' | 'vencidos'
 
 function parseStatus(raw: string): StatusFiltro | '' {
   if (
+    raw === 'solicitacoes' ||
+    raw === 'PENDENTE' ||
     raw === 'aguardando' ||
     raw === 'todos' ||
     raw === 'ativos' ||
     raw === 'vencendo' ||
     raw === 'vencidos'
   ) {
-    return raw
+    return raw === 'PENDENTE' ? 'solicitacoes' : raw
   }
   return ''
 }
@@ -124,10 +128,13 @@ export default async function SociosPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  let session: Awaited<ReturnType<typeof assertPermission>>['session']
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
+  let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   try {
-    ;({ session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_VIEW))
+    ;({ session, tenant } = await assertAnyPermission([
+      PERMISSIONS.MEMBERS_VIEW,
+      PERMISSIONS.MEMBERS_APPROVE,
+    ]))
   } catch {
     redirect('/admin')
   }
@@ -147,7 +154,7 @@ export default async function SociosPage({
   // acesso. Esconder a aba é só affordance — quem chamar a action sem ela
   // continua barrado no servidor.
   let podeGerirAcessos = superAdmin
-  // Bloquear/apagar no card do sócio: as mesmas permissões de /admin/membros.
+  // Bloquear/apagar no card do sócio: as mesmas permissões de /admin/torcedores.
   // O gate real está nas Server Actions; aqui é só affordance.
   let podeBloquear = superAdmin
   let podeApagar = superAdmin
@@ -171,35 +178,57 @@ export default async function SociosPage({
     user: { socios: { none: { tenantId: tenant.id } } },
   }
 
-  const [emitidas, ativos, vencendo, vencidos, aguardando] = await Promise.all([
-    db.saasSocio.count({ where: { tenantId: tenant.id } }),
-    db.saasSocio.count({
-      where: { tenantId: tenant.id, validade: { gte: now } },
-    }),
-    db.saasSocio.count({
-      where: {
-        tenantId: tenant.id,
-        validade: { gt: now, lt: em30dias },
-      },
-    }),
-    db.saasSocio.count({
-      where: { tenantId: tenant.id, validade: { lt: now } },
-    }),
-    db.saasMembro.count({ where: elegivelBase }),
-  ])
+  const solicitacoesBase: Prisma.SaasMembroWhereInput = {
+    tenantId: tenant.id,
+    tipo: 'SOCIO',
+    status: 'PENDENTE',
+  }
 
-  const contagens = { emitidas, ativos, vencendo, vencidos, aguardando }
+  const [emitidas, ativos, vencendo, vencidos, aguardando, solicitacoesCount] =
+    await Promise.all([
+      db.saasSocio.count({ where: { tenantId: tenant.id } }),
+      db.saasSocio.count({
+        where: { tenantId: tenant.id, validade: { gte: now } },
+      }),
+      db.saasSocio.count({
+        where: {
+          tenantId: tenant.id,
+          validade: { gt: now, lt: em30dias },
+        },
+      }),
+      db.saasSocio.count({
+        where: { tenantId: tenant.id, validade: { lt: now } },
+      }),
+      db.saasMembro.count({ where: elegivelBase }),
+      db.saasMembro.count({ where: solicitacoesBase }),
+    ])
+
+  const contagens = {
+    emitidas,
+    ativos,
+    vencendo,
+    vencidos,
+    aguardando,
+    solicitacoes: solicitacoesCount,
+  }
 
   const statusRaw = parseStatus(texto('status'))
   const statusFiltro: StatusFiltro =
-    statusRaw || (aguardando > 0 && emitidas === 0 ? 'aguardando' : 'todos')
+    statusRaw ||
+    (solicitacoesCount > 0
+      ? 'solicitacoes'
+      : aguardando > 0 && emitidas === 0
+        ? 'aguardando'
+        : 'todos')
   const isAguardando = statusFiltro === 'aguardando'
+  const isSolicitacoes = statusFiltro === 'solicitacoes'
 
-  // Dois modelos, dois contratos. A aba `status` decide qual; não entra no
-  // spec porque também troca o sort/busca/colunas (não é só um filtro).
-  const SPEC: ListagemSpec = isAguardando
-    ? LISTAGEM_SOCIOS_AGUARDANDO
-    : LISTAGEM_SOCIOS_EMITIDAS
+  // Três modelos/contratos. A aba status decide qual.
+  const SPEC: ListagemSpec = isSolicitacoes
+    ? LISTAGEM_SOCIOS_SOLICITACOES
+    : isAguardando
+      ? LISTAGEM_SOCIOS_AGUARDANDO
+      : LISTAGEM_SOCIOS_EMITIDAS
   const listagem = parseListagemParams(params, SPEC)
   const extrasDaRota: Record<string, string | undefined> = {
     status: statusFiltro === 'todos' ? undefined : statusFiltro,
@@ -230,12 +259,138 @@ export default async function SociosPage({
 
   let socios: SocioRow[] = []
   let elegiveisDetalhe: MembroDetalheRow[] = []
+  const solicitacoesItens: AdminMembroItem[] = []
   let totalLista = 0
   const numeroAssociadoPorUserId = new Map<string, string | null>()
   const detalhePorUserId = new Map<string, AdminMembroItem>()
   let numerosDessincronizados = 0
 
-  if (isAguardando) {
+  if (isSolicitacoes) {
+    const where: Prisma.SaasMembroWhereInput = montarWhereListagem(
+      SPEC,
+      listagem,
+      {
+        escopo: { tenantId: tenant.id },
+        extra: [solicitacoesBase],
+      },
+    )
+
+    const [rows, total]: [MembroDetalheRow[], number] = await Promise.all([
+      db.saasMembro.findMany({
+        where,
+        select: membroDetalheSelect,
+        orderBy: montarOrderByListagem(SPEC, listagem),
+        ...montarPaginacao(listagem),
+      }) as Promise<MembroDetalheRow[]>,
+      db.saasMembro.count({ where }),
+    ])
+    totalLista = total
+
+    const userIds = rows.map((m) => m.userId)
+    const membroIds = rows.map((m) => m.id)
+    type LogMembro = { entidadeId: string | null; acao: string; detalhes: unknown }
+    const [sociosOutros, reprovacoesOutros, logsMembros, nomesUnidade, areasEfetivadas]: [
+      { userId: string; tenantId: string }[],
+      { userId: string }[],
+      LogMembro[],
+      Map<string, string>,
+      Map<string, Set<string>>,
+    ] = await Promise.all([
+      userIds.length > 0
+        ? db.saasMembro.findMany({
+            where: {
+              userId: { in: userIds },
+              status: 'APROVADO',
+              tipo: 'SOCIO',
+              tenantId: { not: tenant.id },
+            },
+            select: { userId: true, tenantId: true },
+          })
+        : Promise.resolve([]),
+      userIds.length > 0
+        ? db.saasMembro.findMany({
+            where: {
+              userId: { in: userIds },
+              status: 'REPROVADO',
+              tipo: 'SOCIO',
+              tenantId: { not: tenant.id },
+            },
+            select: { userId: true },
+          })
+        : Promise.resolve([]),
+      membroIds.length > 0
+        ? db.auditLog.findMany({
+            where: {
+              tenantId: tenant.id,
+              entidade: 'SaasMembro',
+              entidadeId: { in: membroIds },
+              acao: {
+                in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'],
+              },
+            },
+            orderBy: { criadoEm: 'desc' },
+            select: { entidadeId: true, acao: true, detalhes: true },
+          })
+        : Promise.resolve([]),
+      resolverNomesUnidade(rows.map((m) => m.aprovadoNaUnidadeTenantId)),
+      getAreasEfetivadasPorUser(tenant.id, userIds),
+    ])
+
+    let userIdsComRivalSocio = new Set<string>()
+    if (sociosOutros.length > 0) {
+      const outrosTenantIds = [...new Set(sociosOutros.map((s) => s.tenantId))]
+      const checagens = await Promise.all(
+        outrosTenantIds.map(
+          async (id) => [id, await tenantsAreRivais(tenant.id, id)] as const,
+        ),
+      )
+      const tenantsRivais = new Set(checagens.filter(([, rival]) => rival).map(([id]) => id))
+      userIdsComRivalSocio = new Set(
+        sociosOutros.filter((s) => tenantsRivais.has(s.tenantId)).map((s) => s.userId),
+      )
+    }
+    const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
+    for (const r of reprovacoesOutros) {
+      reprovacoesOutraTorcidaPorUser.set(
+        r.userId,
+        (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
+      )
+    }
+    const tentativasPorMembro = new Map<string, number>()
+    const motivoReprovacaoPorMembro = new Map<string, string>()
+    for (const log of logsMembros) {
+      if (!log.entidadeId) continue
+      if (log.acao === 'CADASTRO_SOLICITADO' || log.acao === 'RECADASTRO_SOLICITADO') {
+        tentativasPorMembro.set(log.entidadeId, (tentativasPorMembro.get(log.entidadeId) ?? 0) + 1)
+      }
+      if (log.acao === 'MEMBRO_REPROVADO' && !motivoReprovacaoPorMembro.has(log.entidadeId)) {
+        const detalhes = log.detalhes
+        if (
+          detalhes &&
+          typeof detalhes === 'object' &&
+          'motivo' in detalhes &&
+          typeof (detalhes as { motivo: unknown }).motivo === 'string'
+        ) {
+          motivoReprovacaoPorMembro.set(log.entidadeId, (detalhes as { motivo: string }).motivo)
+        }
+      }
+    }
+
+    for (const m of rows) {
+      const item = mapToAdminMembroItem(m, {
+        aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
+          ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
+          : null,
+        alertaRivalSocio: userIdsComRivalSocio.has(m.userId),
+        reprovacoesOutraTorcida: reprovacoesOutraTorcidaPorUser.get(m.userId),
+        tentativas: tentativasPorMembro.get(m.id) ?? 1,
+        ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(m.id),
+        areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
+      })
+      solicitacoesItens.push(item)
+      detalhePorUserId.set(m.userId, item)
+    }
+  } else if (isAguardando) {
     const where: Prisma.SaasMembroWhereInput = montarWhereListagem(
       SPEC,
       listagem,
@@ -402,12 +557,15 @@ export default async function SociosPage({
   // Trocar de aba volta à página 1 e zera sort inválido entre os dois specs
   // (aprovadoEm não existe em emitidas e vice-versa).
   const tabHrefs: Record<string, string> = Object.fromEntries(
-    (['aguardando', 'todos', 'ativos', 'vencendo', 'vencidos'] as const).map(
-      (status) => {
+    (
+      ['solicitacoes', 'aguardando', 'todos', 'ativos', 'vencendo', 'vencidos'] as const
+    ).map((status) => {
         const specTab =
-          status === 'aguardando'
-            ? LISTAGEM_SOCIOS_AGUARDANDO
-            : LISTAGEM_SOCIOS_EMITIDAS
+          status === 'solicitacoes'
+            ? LISTAGEM_SOCIOS_SOLICITACOES
+            : status === 'aguardando'
+              ? LISTAGEM_SOCIOS_AGUARDANDO
+              : LISTAGEM_SOCIOS_EMITIDAS
         // Re-parse com o spec destino: sort/dir inválidos caem no padrão.
         const paramsTab = parseListagemParams(
           {
@@ -429,19 +587,24 @@ export default async function SociosPage({
             extras: { status: status === 'todos' ? undefined : status },
           }),
         ]
-      },
-    ),
+      }),
   )
 
-  const COLUNA_CLASSE: Record<string, string> = isAguardando
+  const COLUNA_CLASSE: Record<string, string> = isSolicitacoes
     ? {
         sede: 'hidden md:table-cell',
         cidade: 'hidden lg:table-cell',
-        aprovadoEm: 'hidden xl:table-cell',
+        criadoEm: 'hidden xl:table-cell',
       }
-    : {
-        email: 'hidden lg:table-cell',
-      }
+    : isAguardando
+      ? {
+          sede: 'hidden md:table-cell',
+          cidade: 'hidden lg:table-cell',
+          aprovadoEm: 'hidden xl:table-cell',
+        }
+      : {
+          email: 'hidden lg:table-cell',
+        }
 
   const cabecalho: ReactNode = SPEC.colunas.map((coluna) => (
     <ListagemTh
@@ -462,12 +625,10 @@ export default async function SociosPage({
       paginacao={paginacao}
       dinamicas={dinamicas}
       extras={extrasDaRota}
-      escopoChave={`${tenant.id}:${isAguardando ? 'aguardando' : 'emitidas'}`}
+      escopoChave={`${tenant.id}:${isSolicitacoes ? 'solicitacoes' : isAguardando ? 'aguardando' : 'emitidas'}`}
       filtrosCompactos={
-        isAguardando
-          ? [
-              { filtroId: 'sede', classe: 'md:hidden' },
-            ]
+        isSolicitacoes || isAguardando
+          ? [{ filtroId: 'sede', classe: 'md:hidden' }]
           : [{ filtroId: 'sede' }]
       }
     />
@@ -489,6 +650,21 @@ export default async function SociosPage({
       )}
 
       <AdminSociosClient
+        solicitacoes={solicitacoesItens}
+        solicitacoesTabela={
+          isSolicitacoes ? (
+            <AdminMembrosTable
+              cabecalho={cabecalho}
+              spec={SPEC}
+              params={listagem}
+              podeGerirAcessos={podeGerirAcessos}
+              podeBloquear={podeBloquear}
+              podeApagar={podeApagar}
+              bloqueadosUserIds={bloqueadosUserIds}
+              membros={solicitacoesItens}
+            />
+          ) : null
+        }
         socios={socios.map((s) => ({
           id: s.id,
           userId: s.userId,

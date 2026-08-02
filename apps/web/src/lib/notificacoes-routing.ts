@@ -57,7 +57,7 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   MEMBRO_SOLICITADO: {
     escopo: 'hibrido',
     permissoesAdminOr: [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
-    rota: '/admin/membros',
+    rota: '/admin/socios?status=solicitacoes',
   },
   COBRANCA_PENDENTE: { escopo: 'hibrido' },
   COBRANCA_VENCIDA: {
@@ -280,7 +280,10 @@ export async function notificarNovoMembroPendente(params: {
       corpo:
         corpoAdmin ??
         `${solicitanteNome} solicitou ingresso como ${label} em ${tenantNome}.`,
-      link: '/admin/membros?status=PENDENTE',
+      link:
+        tipoVinculo === 'SOCIO'
+          ? '/admin/socios?status=solicitacoes'
+          : '/admin/torcedores?status=PENDENTE',
       atorId: solicitanteUserId,
       excetoUserId: solicitanteUserId,
     }),

@@ -9,6 +9,11 @@ import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
 import { PostLegacyImage } from './post-legacy-image'
 import { FeedPostMenu } from './feed-post-menu'
+import {
+  PostEditProvider,
+  PostEditableMidia,
+  PostEditableTexto,
+} from './post-edit-provider'
 import { ExpandableText } from './expandable-text'
 import { PostPoll } from './post-poll'
 import { PostRepostEmbed } from './post-repost-embed'
@@ -63,6 +68,12 @@ export function FeedPostCard({
 
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <PostEditProvider
+        postId={post.id}
+        conteudo={post.conteudo}
+        midiaUrls={post.midiaUrls}
+        podeEditar={author && !isComunicadoOficial}
+      >
       <header className="flex items-center gap-3">
         <ComunidadePrefetchLink href={headerHref}>
           <Avatar nome={headerNome} avatarUrl={headerAvatar} size="md" />
@@ -125,7 +136,6 @@ export function FeedPostCard({
         {mostrarMenu && (
           <FeedPostMenu
             postId={post.id}
-            conteudoInicial={post.conteudo}
             fixado={post.fixado}
             modo={author ? 'autor' : 'moderar-grupo'}
           />
@@ -171,13 +181,15 @@ export function FeedPostCard({
         </>
       ) : (
         <>
-          {conteudoVisivel ? (
-            <ExpandableText
-              conteudo={conteudoVisivel}
-              lines={8}
-              className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
-            />
-          ) : null}
+          <PostEditableTexto>
+            {conteudoVisivel ? (
+              <ExpandableText
+                conteudo={conteudoVisivel}
+                lines={8}
+                className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+              />
+            ) : null}
+          </PostEditableTexto>
 
           {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
 
@@ -187,7 +199,17 @@ export function FeedPostCard({
 
           {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
 
-          {mediaBlock}
+          {midias.length > 0 ? (
+            <PostEditableMidia>
+              <PostMedia urls={midias} caption={mediaCaption} />
+            </PostEditableMidia>
+          ) : (
+            <>
+              {/* Anexo legado (Discord) não entra na edição — segue exibido. */}
+              {post.imagemUrl && <PostLegacyImage src={post.imagemUrl} caption={mediaCaption} />}
+              <PostEditableMidia>{null}</PostEditableMidia>
+            </>
+          )}
         </>
       )}
 
@@ -208,6 +230,7 @@ export function FeedPostCard({
           <ComunicadoShareButton comunicadoId={post.comunicadoOrigemId} />
         </div>
       )}
+      </PostEditProvider>
     </article>
   )
 }

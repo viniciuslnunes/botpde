@@ -19,7 +19,7 @@ const ROTAS: Array<{ fluxo: string; path: string }> = [
   { fluxo: 'portal-comunidade-seguindo', path: '/portal/comunidade/seguindo' },
 
   { fluxo: 'admin-home', path: '/admin' },
-  { fluxo: 'admin-membros', path: '/admin/membros' },
+  { fluxo: 'admin-torcedores', path: '/admin/torcedores' },
   { fluxo: 'admin-membros-importar', path: '/admin/membros/importar' },
   { fluxo: 'admin-socios', path: '/admin/socios' },
   { fluxo: 'admin-eventos', path: '/admin/eventos' },

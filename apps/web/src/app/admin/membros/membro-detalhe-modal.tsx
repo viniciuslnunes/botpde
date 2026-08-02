@@ -1135,7 +1135,7 @@ export function MembroDetalheModal({
             {/* Rodapé */}
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
               <Link
-                href={`/admin/membros/${membro.id}`}
+                href={`/admin/torcedores/${membro.id}`}
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Editar cadastro / unidade

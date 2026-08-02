@@ -18,9 +18,10 @@ const CAMPOS_SENSIVEIS_MEMBRO = [
   'filiacao',
 ] as const
 
-export const LISTAGEM_MEMBROS: ListagemSpec = {
-  id: 'admin-membros',
-  basePath: '/admin/membros',
+/** Base de torcedores (`SaasMembro.tipo = TORCEDOR`). A página força o tipo no where. */
+export const LISTAGEM_TORCEDORES: ListagemSpec = {
+  id: 'admin-torcedores',
+  basePath: '/admin/torcedores',
   sortPadrao: 'criadoEm',
   dirPadrao: 'desc',
   porPaginaPadrao: 25,
@@ -34,25 +35,7 @@ export const LISTAGEM_MEMBROS: ListagemSpec = {
   ],
   camposProibidos: CAMPOS_SENSIVEIS_MEMBRO,
   colunas: [
-    { id: 'nome', label: 'Membro', ordenarPor: 'nome', dirPadrao: 'asc' },
-    {
-      id: 'tipo',
-      label: 'Tipo',
-      ordenarPor: 'tipo',
-      dirPadrao: 'asc',
-      filtro: {
-        id: 'tipo',
-        label: 'Tipo',
-        tipo: 'enum',
-        campo: 'tipo',
-        multiplo: true,
-        faceta: true,
-        opcoes: [
-          { valor: 'SOCIO', label: 'Sócio' },
-          { valor: 'TORCEDOR', label: 'Torcedor' },
-        ],
-      },
-    },
+    { id: 'nome', label: 'Torcedor', ordenarPor: 'nome', dirPadrao: 'asc' },
     {
       id: 'departamento',
       label: 'Área',
@@ -90,9 +73,7 @@ export const LISTAGEM_MEMBROS: ListagemSpec = {
       dirPadrao: 'asc',
       filtro: { id: 'cidade', label: 'Cidade', tipo: 'texto', campo: 'cidade' },
     },
-    // Ordenável, mas sem popover: quem filtra situação são as tabs da página,
-    // que também trocam o bloco de insights. Dois controles para o mesmo param
-    // só criariam ambiguidade.
+    // Ordenável, mas sem popover: quem filtra situação são as tabs da página.
     { id: 'status', label: 'Status', ordenarPor: 'status', dirPadrao: 'asc' },
     {
       id: 'criadoEm',
@@ -102,8 +83,6 @@ export const LISTAGEM_MEMBROS: ListagemSpec = {
       filtro: { id: 'criadoEm', label: 'Data de cadastro', tipo: 'data', campo: 'criadoEm' },
     },
   ],
-  // `status` é o eixo das tabs da página (com insights próprios), não uma coluna:
-  // fica no contrato para o parse e a URL serem os mesmos, sem duplicar controle.
   filtrosAvulsos: [
     {
       id: 'status',
@@ -114,13 +93,15 @@ export const LISTAGEM_MEMBROS: ListagemSpec = {
         { valor: 'PENDENTE', label: 'Pendentes' },
         { valor: 'APROVADO', label: 'Aprovados' },
         { valor: 'REPROVADO', label: 'Reprovados' },
-        // Não é `status` no banco (é `desligadoEm`) — a página traduz. Fica no
-        // mesmo eixo porque para quem opera a base é a mesma pergunta.
+        // Não é `status` no banco (é `desligadoEm`) — a página traduz.
         { valor: 'DESLIGADO', label: 'Desligados' },
       ],
     },
   ],
 }
+
+/** @deprecated Alias — use LISTAGEM_TORCEDORES. */
+export const LISTAGEM_MEMBROS: ListagemSpec = LISTAGEM_TORCEDORES
 
 export const LISTAGEM_ACESSOS_PESSOAS: ListagemSpec = {
   id: 'admin-acessos-pessoas',
@@ -215,6 +196,52 @@ export const LISTAGEM_SOCIOS_EMITIDAS: ListagemSpec = {
           },
         },
       },
+    },
+  ],
+}
+
+/** Fila de admissão — sócios com status PENDENTE (`SaasMembro`). */
+export const LISTAGEM_SOCIOS_SOLICITACOES: ListagemSpec = {
+  id: 'admin-socios-solicitacoes',
+  basePath: '/admin/socios',
+  sortPadrao: 'criadoEm',
+  dirPadrao: 'desc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar solicitação por nome, cidade ou telefone…',
+  buscaEm: [
+    { campo: 'nome' },
+    { campo: 'cidade' },
+    { campo: 'telefone', modo: 'digitos' },
+    { campo: 'discordTag' },
+  ],
+  camposProibidos: CAMPOS_SENSIVEIS_MEMBRO,
+  colunas: [
+    { id: 'nome', label: 'Solicitante', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'sede',
+      label: 'Unidade',
+      ordenarPor: 'sede.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'sede',
+        label: 'Unidade',
+        tipo: 'enum',
+        campo: 'sedeId',
+        multiplo: true,
+        valorNulo: 'nenhuma',
+      },
+    },
+    {
+      id: 'cidade',
+      label: 'Cidade',
+      ordenarPor: 'cidade',
+      dirPadrao: 'asc',
+    },
+    {
+      id: 'criadoEm',
+      label: 'Solicitado em',
+      ordenarPor: 'criadoEm',
+      dirPadrao: 'desc',
     },
   ],
 }
@@ -397,7 +424,8 @@ export const LISTAGEM_SUPER_ADMIN_SETUP: ListagemSpec = {
 
 /** Todas as listagens registradas — base dos testes de invariante. */
 export const LISTAGENS: readonly ListagemSpec[] = [
-  LISTAGEM_MEMBROS,
+  LISTAGEM_TORCEDORES,
+  LISTAGEM_SOCIOS_SOLICITACOES,
   LISTAGEM_ACESSOS_PESSOAS,
   LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SOCIOS_AGUARDANDO,
