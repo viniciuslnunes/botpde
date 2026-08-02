@@ -1,7 +1,12 @@
-import { Network, Scale } from 'lucide-react'
-import { BalancoVisivelForm, HierarquiaVisivelForm } from '@/components/admin/config-forms'
+import { Network, Scale, Store } from 'lucide-react'
+import {
+  BalancoVisivelForm,
+  HierarquiaVisivelForm,
+  PortalNasUnidadesForm,
+} from '@/components/admin/config-forms'
 import { ConfigSectionCard } from '../_components/config-section-card'
 import { getConfigContexto } from '../_lib/contexto'
+import { resolverTenantRaizId } from '@/lib/membros-sede'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Transparência — Configurações' }
@@ -9,12 +14,13 @@ export const metadata: Metadata = { title: 'Transparência — Configurações' 
 const ICONE = 'h-4 w-4'
 
 /**
- * O que a torcida expõe no portal. Balanço e hierarquia visível estavam em
- * seções separadas de `?tab=`, mas respondem à mesma pergunta — quanto da
- * operação interna fica visível para associados e unidades filhas.
+ * O que a torcida expõe no portal. Balanço, hierarquia e (na Sede) o que
+ * cascateia para unidades — loja e agenda.
  */
 export default async function ConfiguracoesTransparenciaPage() {
   const { tenant, isOwner } = await getConfigContexto()
+  const raizId = await resolverTenantRaizId(tenant.id)
+  const isRaiz = raizId === tenant.id
 
   return (
     <div className="space-y-6">
@@ -44,6 +50,21 @@ export default async function ConfiguracoesTransparenciaPage() {
           visivel={tenant.hierarquiaVisivelParaFilhos}
         />
       </ConfigSectionCard>
+
+      {isRaiz ? (
+        <ConfigSectionCard
+          icon={<Store className={ICONE} />}
+          title="Loja e agenda nas unidades"
+          description="Presidente e vices controlam se a Sede aparece no portal de PDE/subsede"
+          index={2}
+        >
+          <PortalNasUnidadesForm
+            key={`${tenant.lojaVisivelNasUnidades}-${tenant.agendaVisivelNasUnidades}`}
+            lojaVisivel={tenant.lojaVisivelNasUnidades}
+            agendaVisivel={tenant.agendaVisivelNasUnidades}
+          />
+        </ConfigSectionCard>
+      ) : null}
     </div>
   )
 }

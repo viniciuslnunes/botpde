@@ -91,6 +91,7 @@ export default async function PortalLayout({
       tenant={navbarTenant}
       temDepartamentos={totalDepartamentos > 0}
       modoNacional={ctx?.modo === 'nacional'}
+      temVinculoTorcida={Boolean(ctx?.modo === 'nacional' && ctx.torcidaReal)}
       tenantSlugAtual={hostTenant?.slug ?? null}
     />
   )

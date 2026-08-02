@@ -23,10 +23,7 @@ import {
   getPerfilPrivadoEfetivoDoAlvo,
   getSeguimentoStatus,
 } from '@/lib/social'
-import {
-  getOrCreateComunidadeNacionalTenant,
-  resolveTenantIdPortalComunidade,
-} from '@/lib/comunidade-contexto'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import {
   criarNotificacao,
@@ -231,11 +228,11 @@ async function vinculoAprovadoNoTenant(userId: string, tenantId: string): Promis
 }
 
 /**
- * Contexto de engajamento (reação/comentário/salvar/compartilhar):
+ * Contexto de engajamento (reação/comentário/salvar):
  * - sócio APROVADO com tenant ativo + `COMMUNITY_POST`;
  * - torcedor APROVADO na unidade (convite) — `tenantId` do vínculo, sem abrir
- *   `getActiveTenant` (portal permanece em modo CN; publicar no mural segue
- *   bloqueado em `podePublicarNoCanal` / `podeVerFeedSocios`);
+ *   `getActiveTenant` (portal permanece em modo CN; publicar/compartilhar
+ *   continuam bloqueados — sócio via `assertPermission`);
  * - torcedor global da Comunidade Nacional (`tenantId` null).
  */
 async function resolverContextoEngajamento(): Promise<{
@@ -1678,43 +1675,27 @@ export async function removerPostSalvo(postId: string): Promise<void> {
 }
 
 export async function repostarPost(postId: string, comentario?: string): Promise<void> {
+  // Compartilhar = republicar: só sócio com community:post. Torcedor curte,
+  // comenta e salva — não abre o próprio feed com repost.
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
   const parsed = repostarSchema.safeParse({ postId, comentario })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
-  const [ctx, original] = await Promise.all([
-    resolverContextoEngajamento(),
-    db.post.findUnique({
-      where: { id: parsed.data.postId },
-      select: {
-        id: true,
-        autorId: true,
-        tenantId: true,
-        oculto: true,
-        visibilidade: true,
-        tipo: true,
-        comunicadoOrigemId: true,
-        tenant: { select: { afiliacaoId: true, sintetico: true } },
-      },
-    }) as Promise<PostEngajavelLite | null>,
-  ])
-
-  if (!original || !(await podeEngajarPostVisivel(ctx, original))) {
-    throw new Error('Post não encontrado')
-  }
-
-  // Destino: unidade/torcida do viewer; torcedor global puro → CN sintética.
-  let destTenantId = ctx.tenantId
-  if (!destTenantId) {
-    if (!ctx.afiliacaoId) throw new Error('Não autorizado')
-    const sintetico = await getOrCreateComunidadeNacionalTenant(ctx.afiliacaoId)
-    destTenantId = sintetico.id
-  }
+  const visibleIds = await resolveVisibleTenantIdsForFeed(tenant.id, session.user.id)
+  const original: { id: string; autorId: string; oculto: boolean; visibilidade: string } | null =
+    await db.post.findFirst({
+      where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
+      select: { id: true, autorId: true, oculto: true, visibilidade: true },
+    })
+  if (!original) throw new Error('Post não encontrado')
 
   const texto = parsed.data.comentario?.trim() || '🔁 Compartilhou uma publicação'
   const repost = await db.post.create({
     data: {
-      tenantId: destTenantId,
-      autorId: ctx.viewerId,
+      tenantId: tenant.id,
+      autorId: session.user.id,
       conteudo: texto,
       tipo: 'MEMBRO',
       visibilidade: 'PUBLICO',
@@ -1722,22 +1703,22 @@ export async function repostarPost(postId: string, comentario?: string): Promise
     },
   })
 
-  if (original.autorId !== ctx.viewerId) {
+  if (original.autorId !== session.user.id) {
     await criarNotificacao({
       userId: original.autorId,
-      tenantId: destTenantId,
+      tenantId: tenant.id,
       tipo: 'REPOST',
       titulo: 'Sua publicação foi compartilhada',
-      corpo: `${ctx.session.user.name ?? 'Um membro'} compartilhou seu post.`,
+      corpo: `${session.user.name ?? 'Um membro'} compartilhou seu post.`,
       link: linkPostComunidade(original.id),
-      atorId: ctx.viewerId,
+      atorId: session.user.id,
     })
   }
 
   await db.auditLog.create({
     data: {
-      tenantId: destTenantId,
-      atorId: ctx.viewerId,
+      tenantId: tenant.id,
+      atorId: session.user.id,
       acao: 'POST_REPOSTADO',
       entidade: 'Post',
       entidadeId: repost.id,
@@ -1747,13 +1728,13 @@ export async function repostarPost(postId: string, comentario?: string): Promise
 
   await publicarNaTimelineRede({
     postId: repost.id,
-    autorId: ctx.viewerId,
-    tenantId: destTenantId,
+    autorId: session.user.id,
+    tenantId: tenant.id,
     criadoEm: repost.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
-  invalidarLeituraComunidade(destTenantId, ctx.afiliacaoId)
+  invalidarLeituraComunidade(tenant.id)
 }
 
 export async function repostarComunicado(comunicadoId: string, comentario?: string): Promise<void> {

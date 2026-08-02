@@ -41,15 +41,16 @@ const navLinks = [
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
 
-/** Torcedor global (modo nacional) não tem torcida ativa — essas seções são
- * por tenant e ficariam vazias para ele. Escondidas até definirmos o que faz
- * sentido oferecer nesse modo. */
+/** Torcedor global (CN sem vínculo) — seções por tenant ficariam vazias. */
 const LINKS_SOMENTE_TORCIDA = new Set([
   '/portal/carteirinha',
   '/portal/eventos',
   '/portal/sedes',
   '/portal/loja',
 ])
+
+/** Torcedor vinculado à sede/unidade (convite): sem carteirinha. Loja/Sedes/Agenda ok. */
+const LINKS_OCULTOS_TORCEDOR_VINCULO = new Set(['/portal/carteirinha'])
 
 /** Único atalho de departamentos na navbar (não lista cada área). */
 const departamentosLink = {
@@ -65,8 +66,13 @@ interface PortalNavbarProps {
   /** Torcida ativa ou, no modo nacional, o clube (nome/escudo). */
   tenant: { nome: string; corPrimaria: string; logoUrl: string | null }
   temDepartamentos?: boolean
-  /** Comunidade do clube sem vínculo com torcida — sem carteirinha. */
+  /** Comunidade do clube sem torcida ativa no cookie (`getActiveTenant` null). */
   modoNacional?: boolean
+  /**
+   * Torcedor APROVADO na sede/unidade (convite). Com `modoNacional`, libera
+   * Loja/Sedes/Agenda e continua sem Carteirinha/Departamentos.
+   */
+  temVinculoTorcida?: boolean
   /** Slug da torcida ativa — só preenchido no modo torcida. */
   tenantSlugAtual?: string | null
 }
@@ -77,6 +83,7 @@ export function PortalNavbar({
   tenant,
   temDepartamentos = false,
   modoNacional = false,
+  temVinculoTorcida = false,
   tenantSlugAtual = null,
 }: PortalNavbarProps) {
   const pathname = usePathname()
@@ -106,10 +113,14 @@ export function PortalNavbar({
   }, [tenantSlugAtual])
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
+  const ocultosNacional = temVinculoTorcida
+    ? LINKS_OCULTOS_TORCEDOR_VINCULO
+    : LINKS_SOMENTE_TORCIDA
   const baseLinks = modoNacional
-    ? navLinks.filter((link) => !LINKS_SOMENTE_TORCIDA.has(link.href))
+    ? navLinks.filter((link) => !ocultosNacional.has(link.href))
     : [...navLinks]
-  // Departamentos no meio do fluxo operacional (após Comunidade), não no fim.
+  // Departamentos: só sócio com área (temDepartamentos). Torcedor do convite
+  // nunca entra — layout já passa 0 no modo nacional.
   const links = temDepartamentos
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]

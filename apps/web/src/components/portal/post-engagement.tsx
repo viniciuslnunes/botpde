@@ -53,6 +53,8 @@ interface PostEngagementProps {
   isAuthor?: boolean
   isRepost?: boolean
   salvoInicial?: boolean
+  /** Sócio com community:post. Torcedor só curte/comenta/salva. */
+  podeCompartilhar?: boolean
 }
 
 function EngajamentoBtn({
@@ -103,6 +105,7 @@ export function PostEngagement({
   isAuthor = false,
   isRepost = false,
   salvoInicial = false,
+  podeCompartilhar = true,
 }: PostEngagementProps) {
   const [reacao, setReacao] = useState<TipoReacaoSocial | null>(minhaReacao)
   const [salvo, setSalvo] = useState(salvoInicial)
@@ -416,7 +419,7 @@ export function PostEngagement({
           <MessageCircle className="h-4 w-4" />
           {comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
         </EngajamentoBtn>
-        {!isRepost && (
+        {!isRepost && podeCompartilhar && (
           <EngajamentoBtn
             active={repostando || compartilhado}
             onClick={() => setRepostando((v) => !v)}
@@ -478,7 +481,7 @@ export function PostEngagement({
       </div>
 
       <AnimatePresence initial={false}>
-        {repostando && (
+        {repostando && podeCompartilhar && (
           <m.form
             key="repost-form"
             onSubmit={enviarRepost}

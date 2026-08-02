@@ -159,6 +159,7 @@ export default async function ComunidadePage({
           podePublicar={podePublicar}
           viewerTenantId={unidade.tenantId}
           permissoes={permissoes}
+          podeCompartilhar={ehSocio}
         />
       )
     }
@@ -183,6 +184,7 @@ export default async function ComunidadePage({
           podePublicar={podePublicar}
           viewerTenantId={torcidaReal.id}
           permissoes={permissoes}
+          podeCompartilhar={ehSocio}
         />
       )
     }

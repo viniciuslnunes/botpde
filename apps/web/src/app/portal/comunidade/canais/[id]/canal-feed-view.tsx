@@ -44,6 +44,7 @@ export async function CanalFeedView({
   cursor,
   viewerTenantId,
   permissoes,
+  podeCompartilhar = true,
 }: {
   canal: CanalItem
   currentUser: CurrentUser
@@ -53,6 +54,8 @@ export async function CanalFeedView({
   viewerTenantId: string
   /** Permissões efetivas do viewer no tenant ativo — gate de "Pedidos pendentes". */
   permissoes: string[]
+  /** Sócio compartilha; torcedor só curte/comenta/salva. */
+  podeCompartilhar?: boolean
 }) {
   const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial
   const podeGerenciarMembros = await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes)
@@ -103,6 +106,7 @@ export async function CanalFeedView({
             filtro="canal"
             conversaId={canal.id}
             incluirFeedInterno={canal.canalOficial}
+            podeCompartilhar={podeCompartilhar}
           />
         </Suspense>
       ) : null}

@@ -25,6 +25,8 @@ interface FeedPostCardProps {
   isAuthor?: boolean
   salvo?: boolean
   podeModerarGrupo?: boolean
+  /** Sócio compartilha; torcedor só curte/comenta/salva. Default true. */
+  podeCompartilhar?: boolean
 }
 
 export function FeedPostCard({
@@ -34,6 +36,7 @@ export function FeedPostCard({
   isAuthor,
   salvo = false,
   podeModerarGrupo = false,
+  podeCompartilhar = true,
 }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
   const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
@@ -197,6 +200,7 @@ export function FeedPostCard({
         isAuthor={author}
         isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
         salvoInicial={salvo}
+        podeCompartilhar={podeCompartilhar}
       />
 
       {post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId && (

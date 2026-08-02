@@ -6,7 +6,7 @@ generator client {
 
 
 
-datasource db {
+datasource db { 
 
   provider = "postgresql"
 
@@ -213,6 +213,16 @@ model Tenant {
   /// worktree completa da torcida. Só a raiz SEDE consome este toggle.
 
   hierarquiaVisivelParaFilhos Boolean @default(false) @map("hierarquia_visivel_para_filhos")
+
+  /// Sede: loja desta torcida aparece no portal dos membros das unidades
+  /// (PDE/subsede). Default true — catálogo costuma ser público na web.
+  /// Só a raiz SEDE consome este toggle.
+  lojaVisivelNasUnidades Boolean @default(true) @map("loja_visivel_nas_unidades")
+
+  /// Sede: agenda (eventos globais) desta torcida aparece no portal dos
+  /// membros das unidades. Default false — unidade vê só a própria agenda
+  /// até a liderança liberar. Só a raiz SEDE consome este toggle.
+  agendaVisivelNasUnidades Boolean @default(false) @map("agenda_visivel_nas_unidades")
 
 
 

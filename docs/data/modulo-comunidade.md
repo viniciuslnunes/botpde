@@ -107,7 +107,8 @@ cobrir o mesmo conjunto.
 |-------|---------|
 | Contexto | `resolverContextoEngajamento()` — sócio `APROVADO` com `COMMUNITY_POST`; **ou** torcedor `APROVADO` na unidade do convite (`resolverTorcidaDoTorcedor`, sem abrir `getActiveTenant`); **ou** torcedor global / preview sem vínculo (escopo = `afiliacaoId` do clube). Não usar só `assertPermission` + `tenantId` do cookie. |
 | Gate do post | `podeEngajarPostVisivel` — fast-path: próprio tenant, vínculo APROVADO no tenant do post (inclusive canal `TENANT` / R5 self), ou mesmo clube (sintético / `PUBLICO`); fallback: `resolveVisibleTenantIdsForFeed`. |
-| Salvar / compartilhar | Mesmo contexto de engajamento (não `assertPermission`+`getActiveTenant` — isso barrava o torcedor do convite). |
+| Salvar | Mesmo contexto de engajamento (não `assertPermission`+`getActiveTenant` — isso barrava o torcedor do convite). |
+| Compartilhar / repost | Só sócio com `COMMUNITY_POST` (`assertPermission`). Torcedor na unidade curte, comenta e salva — **não** compartilha. |
 | Autor (editar/excluir/fixar) | `assertMutacaoProprioPost` — lookup por `autorId` (sem `tenantId` do cookie); se o post está no sintético, `assertComunidadeNacional` + mesma afiliação; senão `COMMUNITY_POST` no tenant do post. |
 | Leitura de comentários | `listarComentariosPost` aplica primeiro `resolveTenantIdPortalComunidade` + `resolveVisibleTenantIdsForFeed` (mesmo alcance do feed/permalink), depois `PUBLICO`/`TENANT`/`PRIVADO`. Rival/unrelated não lê nem comentário de post público; autor sempre lê; privacidade de perfil não entra. Torcedor global/CN continua suportado pelo tenant sintético. |
 | UI | `PostEngagement` é otimista; o servidor confirma / reverte no catch. |

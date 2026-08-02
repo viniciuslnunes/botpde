@@ -45,12 +45,14 @@ Portal: exige sessão logada; **não** usa permissão RBAC — qualquer associad
 
 O portal **não usa mais** `getVisibleTenantIds('loja')`/`resolveVisibility` — critério
 agora é membership real: `tenantsPermitidosLoja(userId)` em `apps/web/src/lib/loja-lojas.ts`
-une os tenants onde o usuário é `SaasMembro` `APROVADO`/`SOCIO`
-(`listarVinculosAprovadosDoUsuario`) com a torcida **raiz** de cada vínculo
+une os tenants onde o usuário é `SaasMembro` `APROVADO` (**sócio** ou **torcedor**
+canônico do convite) com a torcida **raiz** de cada vínculo
 (`getAncestorTenantIds`, último elemento da cadeia) — a loja da torcida principal está
-sempre disponível.
+sempre disponível (exceto canal restrito: só a própria unidade). A Sede controla
+a ponte com `Tenant.lojaVisivelNasUnidades` (default `true`) em
+`/admin/configuracoes/transparencia` — presidente/vice com `SETTINGS_MANAGE`.
 
-- `/portal/loja` lista as lojas do sócio (`listLojasDoSocio`), uma por tenant permitido;
+- `/portal/loja` lista as lojas (`listLojasDoSocio`), uma por tenant permitido;
   card marcado `principal: true` quando é a torcida raiz.
 - `/portal/loja/[tenantId]` é o catálogo de UM tenant — `tenantsPermitidosLoja` valida
   acesso, senão `notFound()`.

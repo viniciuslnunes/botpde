@@ -21,6 +21,8 @@ import {
   salvarBalancoFinanceiroVisivel,
   salvarBalancoDetalheNivel,
   salvarHierarquiaVisivel,
+  salvarLojaVisivelNasUnidades,
+  salvarAgendaVisivelNasUnidades,
   salvarExigirDocumentosCadastro,
   salvarCanalOficial,
   criarRole,
@@ -264,6 +266,99 @@ export function HierarquiaVisivelForm({ visivel }: HierarquiaVisivelFormProps) {
               : ativo
                 ? 'Hierarquia completa visível para as unidades'
                 : 'Cada unidade vê só a si mesma'}
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
+// ── Loja e agenda da Sede no portal das unidades ─────────────────────────────
+
+interface PortalNasUnidadesFormProps {
+  lojaVisivel: boolean
+  agendaVisivel: boolean
+}
+
+export function PortalNasUnidadesForm({ lojaVisivel, agendaVisivel }: PortalNasUnidadesFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [loja, setLoja] = useState(lojaVisivel)
+  const [agenda, setAgenda] = useState(agendaVisivel)
+
+  function salvarLoja(next: boolean) {
+    setLoja(next)
+    const fd = new FormData()
+    fd.set('lojaVisivelNasUnidades', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarLojaVisivelNasUnidades(fd), {
+        success: next
+          ? 'Loja da Sede visível no portal das unidades.'
+          : 'Loja da Sede oculta no portal das unidades.',
+      })
+      if (!ok) setLoja(!next)
+    })
+  }
+
+  function salvarAgenda(next: boolean) {
+    setAgenda(next)
+    const fd = new FormData()
+    fd.set('agendaVisivelNasUnidades', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarAgendaVisivelNasUnidades(fd), {
+        success: next
+          ? 'Agenda da Sede visível no portal das unidades.'
+          : 'Agenda da Sede oculta no portal das unidades — cada unidade vê só a própria.',
+      })
+      if (!ok) setAgenda(!next)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Controla o que membros de subsedes e PDEs (sócios e torcedores do convite)
+        enxergam da Sede no portal. A unidade sempre vê a própria loja e a própria
+        agenda.
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={loja}
+          disabled={pending}
+          onChange={(e) => salvarLoja(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Exibir a loja da Sede nas unidades
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : loja
+                ? 'Membros das unidades também veem o catálogo da torcida principal'
+                : 'Só a loja da própria unidade'}
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={agenda}
+          disabled={pending}
+          onChange={(e) => salvarAgenda(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Exibir a agenda da Sede nas unidades
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : agenda
+                ? 'Eventos globais da Sede aparecem na agenda das unidades'
+                : 'Cada unidade vê só os próprios eventos (padrão)'}
           </span>
         </span>
       </label>

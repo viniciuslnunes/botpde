@@ -1,21 +1,38 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
+import { isTenantRestrito } from './isolamento'
+
+/**
+ * Ancestrais cuja Sede liberou o recurso para as unidades (loja/agenda).
+ * Só aplica o filtro quando o ator NÃO está em canal restrito — R5 mantém
+ * cascata institucional de eventos mesmo com o toggle desligado.
+ */
+async function filtrarAncestraisComToggle(
+  ancestralIds: string[],
+  campo: 'agendaVisivelNasUnidades' | 'lojaVisivelNasUnidades',
+): Promise<string[]> {
+  if (ancestralIds.length === 0) return []
+  const rows: { id: string }[] = await db.tenant.findMany({
+    where: { id: { in: ancestralIds }, [campo]: true },
+    select: { id: true },
+  })
+  return rows.map((r) => r.id)
+}
 
 /**
  * Cláusula `where` do Prisma que decide quais eventos um associado enxerga:
  * eventos podem ser globais (sedeId nulo, valem pro tenant inteiro) ou
  * restritos a uma unidade específica dentro do próprio tenant (sedeId
  * preenchido, só quem tem vínculo com aquela unidade vê); eventos de
- * tenants ancestrais (sede-mãe) cascadeiam só quando globais dentro do
- * tenant de origem — um evento restrito a uma unidade da sede-mãe não diz
- * respeito a uma subsede/PDE diferente.
+ * tenants ancestrais (sede-mãe) cascadeiam só quando a Sede liberou
+ * `agendaVisivelNasUnidades` (ou a unidade está em canal restrito — R5).
  */
 export const getEscopoEventosVisiveis = cache(async function getEscopoEventosVisiveis(
   tenantId: string,
   userId: string | undefined,
 ) {
-  const [membro, tenantsVisiveis] = await Promise.all([
+  const [membro, tenantsVisiveis, atorRestrito] = await Promise.all([
     userId
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId, userId } },
@@ -24,8 +41,12 @@ export const getEscopoEventosVisiveis = cache(async function getEscopoEventosVis
       : null,
     // eventos é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
     getVisibleTenantIds(tenantId, 'eventos'),
+    isTenantRestrito(tenantId),
   ])
-  const ancestrais = tenantsVisiveis.filter((id) => id !== tenantId)
+  const ancestraisBrutos = tenantsVisiveis.filter((id) => id !== tenantId)
+  const ancestrais = atorRestrito
+    ? ancestraisBrutos
+    : await filtrarAncestraisComToggle(ancestraisBrutos, 'agendaVisivelNasUnidades')
 
   return {
     OR: [

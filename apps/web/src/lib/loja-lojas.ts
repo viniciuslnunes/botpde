@@ -1,38 +1,81 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
-import { listarVinculosAprovadosDoUsuario, type TorcidaOpcao } from '@/lib/tenant-context'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getTenantsRestritos } from '@/lib/isolamento'
 
 /**
- * IDs de tenant onde o usuário pode comprar: torcidas onde é `SaasMembro`
- * `APROVADO`/`SOCIO` (via `listarVinculosAprovadosDoUsuario`) mais a torcida
- * raiz de cada vínculo (a torcida principal sempre tem loja visível, mesmo
- * sem vínculo direto na Sede raiz — ex.: sócio de uma Subsede/PDE que também
- * é tenant próprio).
+ * Tenants com vínculo APROVADO que liberam a loja: sócio (qualquer registro,
+ * incl. espelho) **ou** torcedor canônico (`espelhado: false` — unidade/sede
+ * do convite). Não reusa `listarVinculosAprovadosDoUsuario` (só SOCIO / seletor
+ * de contexto).
+ */
+const listarTenantIdsComAcessoLoja = cache(async function listarTenantIdsComAcessoLoja(
+  userId: string,
+): Promise<string[]> {
+  const rows: { tenantId: string }[] = await db.saasMembro.findMany({
+    where: {
+      userId,
+      status: 'APROVADO',
+      OR: [{ tipo: 'SOCIO' }, { tipo: 'TORCEDOR', espelhado: false }],
+      tenant: { ativo: true, sintetico: false },
+    },
+    select: { tenantId: true },
+    orderBy: { criadoEm: 'desc' },
+  })
+  const vistos = new Set<string>()
+  const ids: string[] = []
+  for (const row of rows) {
+    if (vistos.has(row.tenantId)) continue
+    vistos.add(row.tenantId)
+    ids.push(row.tenantId)
+  }
+  return ids
+})
+
+/**
+ * IDs de tenant onde o usuário pode comprar: vínculos APROVADO (sócio ou
+ * torcedor do convite) mais a torcida raiz de cada vínculo — **só** quando a
+ * Sede liberou `lojaVisivelNasUnidades` (default true). Canal restrito: só a
+ * própria unidade.
  */
 export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
   userId: string,
 ): Promise<Set<string>> {
-  const [vinculos, restritos]: [TorcidaOpcao[], Set<string>] = await Promise.all([
-    listarVinculosAprovadosDoUsuario(userId),
+  const [vinculoIds, restritos]: [string[], Set<string>] = await Promise.all([
+    listarTenantIdsComAcessoLoja(userId),
     getTenantsRestritos(),
   ])
 
   const ids = new Set<string>()
-  for (const v of vinculos) {
+  const raizesPendentes = new Set<string>()
+
+  for (const tenantId of vinculoIds) {
     // R5 — a loja da unidade isolada continua para os membros dela; o que o
     // isolamento corta é a ponte com a loja da Sede (e a dela com o resto).
-    if (restritos.has(v.id)) {
-      ids.add(v.id)
+    if (restritos.has(tenantId)) {
+      ids.add(tenantId)
       continue
     }
-    ids.add(v.id)
-    const ancestrais = await getAncestorTenantIds(v.id)
-    const raiz = ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : v.id
-    if (!restritos.has(raiz)) ids.add(raiz)
+    ids.add(tenantId)
+    const ancestrais = await getAncestorTenantIds(tenantId)
+    const raiz = ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : tenantId
+    if (raiz !== tenantId && !restritos.has(raiz)) {
+      raizesPendentes.add(raiz)
+    }
   }
+
+  if (raizesPendentes.size > 0) {
+    const liberadas: { id: string }[] = await db.tenant.findMany({
+      where: {
+        id: { in: [...raizesPendentes] },
+        lojaVisivelNasUnidades: true,
+      },
+      select: { id: true },
+    })
+    for (const t of liberadas) ids.add(t.id)
+  }
+
   return ids
 })
 
@@ -48,23 +91,23 @@ export interface LojaResumo {
 }
 
 /**
- * Lojas visíveis ao sócio: uma por tenant onde `tenantsPermitidosLoja` libera
- * acesso. `principal: true` marca a torcida raiz de algum vínculo do usuário
- * (destacada na listagem). Sem `unstable_cache` — depende de membership em
- * tempo real; dedup só via `cache()` do React por request.
+ * Lojas visíveis ao membro (sócio ou torcedor do convite): uma por tenant onde
+ * `tenantsPermitidosLoja` libera acesso. `principal: true` marca a torcida raiz
+ * de algum vínculo. Sem `unstable_cache` — depende de membership em tempo real;
+ * dedup só via `cache()` do React por request.
  */
 export const listLojasDoSocio = cache(async function listLojasDoSocio(
   userId: string,
 ): Promise<LojaResumo[]> {
-  const [vinculos, permitidos] = await Promise.all([
-    listarVinculosAprovadosDoUsuario(userId),
+  const [vinculoIds, permitidos] = await Promise.all([
+    listarTenantIdsComAcessoLoja(userId),
     tenantsPermitidosLoja(userId),
   ])
 
   const raizes = new Set<string>()
-  for (const v of vinculos) {
-    const ancestrais = await getAncestorTenantIds(v.id)
-    raizes.add(ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : v.id)
+  for (const tenantId of vinculoIds) {
+    const ancestrais = await getAncestorTenantIds(tenantId)
+    raizes.add(ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : tenantId)
   }
 
   const tenantIds = [...permitidos]

@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
+import { podeVerFeedSocios } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadeAsideRail } from '../../_components/comunidade-aside-rail'
 import { calculateEffectivePermissions } from '@torcida/types'
@@ -36,12 +37,16 @@ export default async function CanalDetalhePage({
   const canal = await getCanalPorId(id, tenant.id, session.user.id)
   if (!canal) notFound()
 
-  const podePublicar = await podePublicarNoCanal(canal, tenant.id, permissoes)
+  const [podePublicar, ehSocio, avatarUrl] = await Promise.all([
+    podePublicarNoCanal(canal, tenant.id, permissoes),
+    podeVerFeedSocios(session.user.id, tenant.id),
+    getAvatarAtualDoUsuario(session.user.id),
+  ])
 
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
+    avatarUrl,
   }
 
   return (
@@ -64,6 +69,7 @@ export default async function CanalDetalhePage({
           cursor={cursor}
           viewerTenantId={tenant.id}
           permissoes={permissoes}
+          podeCompartilhar={ehSocio}
         />
       </div>
     </div>

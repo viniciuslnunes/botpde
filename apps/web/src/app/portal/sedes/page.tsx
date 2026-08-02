@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
-import { getActiveTenant } from '@/lib/tenant'
+import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { SedesExplorer } from '@/components/portal/sedes-explorer'
 import type {
   SedeExplorerItem,
@@ -17,7 +17,10 @@ type PageProps = {
 export default async function SedesPage({ searchParams }: PageProps) {
   const { sede: sedeParam } = await searchParams
   const session = await auth()
-  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
+  // Sócio (cookie/ativo) ou torcedor APROVADO na unidade/sede do convite.
+  const tenant = session?.user?.id
+    ? await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+    : null
   const agora = new Date()
 
   type SedeRow = {

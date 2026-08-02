@@ -190,6 +190,78 @@ export async function salvarHierarquiaVisivel(formData: FormData) {
   invalidateHierarchyCache(tenant.id)
 }
 
+/**
+ * Sede: liberar (ou não) a loja da torcida principal no portal dos membros das
+ * unidades. Presidente e vices (`SETTINGS_MANAGE`) — só na raiz.
+ */
+export async function salvarLojaVisivelNasUnidades(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { resolverTenantRaizId } = await import('@/lib/membros-sede')
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('Só a Sede principal controla a exibição da loja nas unidades.')
+  }
+
+  const visivel = formData.get('lojaVisivelNasUnidades') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { lojaVisivelNasUnidades: visivel },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_LOJA_UNIDADES_ATUALIZADA',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { visivel },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/configuracoes/transparencia')
+  revalidatePath('/portal/loja')
+  invalidateTenantCache(tenant.slug)
+}
+
+/**
+ * Sede: liberar (ou não) a agenda da torcida principal no portal dos membros
+ * das unidades. Default off — PDE/subsede vê só a própria agenda.
+ */
+export async function salvarAgendaVisivelNasUnidades(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { resolverTenantRaizId } = await import('@/lib/membros-sede')
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('Só a Sede principal controla a exibição da agenda nas unidades.')
+  }
+
+  const visivel = formData.get('agendaVisivelNasUnidades') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { agendaVisivelNasUnidades: visivel },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_AGENDA_UNIDADES_ATUALIZADA',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { visivel },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/configuracoes/transparencia')
+  revalidatePath('/portal/eventos')
+  invalidateTenantCache(tenant.slug)
+}
+
 /** Onboarding SOCIO: exige (ou não) foto do RG e comprovante de residência. */
 export async function salvarExigirDocumentosCadastro(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)

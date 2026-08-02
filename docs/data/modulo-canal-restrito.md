@@ -128,11 +128,12 @@ consultam o clube inteiro por `afiliacaoId` não passam por lá:
 | Salas nacionais | `lib/salas.ts` `listSalasNacionais` | filtra restritos + tag `ISOLAMENTO_CACHE_TAG` |
 | Onboarding — torcidas | `lib/onboarding.ts` `getTorcidasPorAfiliacao` | remove restritos das raízes |
 | Onboarding — unidades | `lib/onboarding.ts` `getSedesDaTorcidaOnboarding` | remove sedes de tenant restrito |
-| Loja | `lib/loja-lojas.ts` `tenantsPermitidosLoja` | unidade restrita mantém a própria loja, perde a ponte com a raiz |
+| Loja | `lib/loja-lojas.ts` `tenantsPermitidosLoja` | unidade restrita mantém a própria loja, perde a ponte com a raiz; fora do R5 a ponte depende de `lojaVisivelNasUnidades` na Sede |
+| Agenda (portal) | `lib/eventos.ts` `getEscopoEventosVisiveis` | R5 mantém cascata institucional de eventos; fora do R5 a Sede só entra se `agendaVisivelNasUnidades` |
 | Vitrine de canais da CN | `lib/canais.ts` `listCanaisPublicosPorAfiliacao` | não passa por `podeVerCanal` → corte explícito |
 | DM | `lib/mensageria.ts` `isParSeparadoPorCanalRestrito` | bloqueia quando um lado vive só em unidades restritas e não compartilham nenhuma |
 | Alianças | `app/admin/aliancas/actions.ts` `assertCanalNaoRestrito` | bloqueia propor/aceitar; as ATIVAS ficam gravadas e inertes |
-| Engajamento (reagir/comentar/denunciar/salvar/compartilhar) | `app/portal/comunidade/actions.ts` `podeEngajarPostVisivel` | trava de isolamento **antes** do fast-path "mesmo clube + PÚBLICO"; **exceção self**: vínculo `APROVADO` no tenant do post (torcedor do convite) engaja no mural interno |
+| Engajamento (reagir/comentar/denunciar/salvar) | `app/portal/comunidade/actions.ts` `podeEngajarPostVisivel` | trava de isolamento **antes** do fast-path "mesmo clube + PÚBLICO"; **exceção self**: vínculo `APROVADO` no tenant do post (torcedor do convite) engaja no mural interno. Compartilhar/repost continua só sócio |
 | Permalink de post | `lib/feed.ts` `getPostPorId` | mesma cláusula do feed — card e link precisam concordar |
 
 Busca de canais/unidades (`listUnidadesVisiveis`, `buscarCanaisEUnidades`) e

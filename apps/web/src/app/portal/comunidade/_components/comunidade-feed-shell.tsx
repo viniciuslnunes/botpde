@@ -264,6 +264,7 @@ export function ComunidadeFeedShell({
                 conversaId={conversaId}
                 escopo={escopo}
                 afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
+                podeCompartilhar={modoContexto === 'torcida'}
               />
             </Suspense>
           </>

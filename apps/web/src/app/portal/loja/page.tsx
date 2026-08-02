@@ -197,7 +197,7 @@ export default async function PortalLojaListagemPage() {
         <MotionEmptyState
           icon={<Store className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
           title="Nenhuma loja disponível"
-          description="Você ainda não tem um vínculo aprovado com uma torcida. Assim que seu cadastro for aprovado, a loja aparece aqui."
+          description="Você ainda não tem um vínculo aprovado com uma torcida. Assim que entrar por convite ou for aprovado, a loja aparece aqui."
           className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[rgb(var(--border))] py-16 text-center"
         />
       ) : lojaUnica ? null : (

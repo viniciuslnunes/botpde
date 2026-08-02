@@ -59,6 +59,7 @@ export function ComunidadeFeedInfinite({
   initialCursor,
   salvoIds,
   seedFromSsr = true,
+  podeCompartilhar = true,
 }: {
   tenantId: string
   currentUser: CurrentUser
@@ -71,6 +72,7 @@ export function ComunidadeFeedInfinite({
   initialCursor: string | null
   salvoIds: string[]
   seedFromSsr?: boolean
+  podeCompartilhar?: boolean
 }) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
   const isNacional = escopo === 'nacional'
@@ -261,6 +263,7 @@ export function ComunidadeFeedInfinite({
                           })}
                           currentUser={currentUser}
                           salvo={salvoSet.has(post.id)}
+                          podeCompartilhar={podeCompartilhar}
                         />
                       </div>
                     </OptimisticHighlight>

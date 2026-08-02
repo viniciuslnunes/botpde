@@ -11,7 +11,7 @@ import {
 /**
  * Vínculos APROVADO/SOCIO em que o usuário tem área admin (`hasAdminAreaAccess`).
  * Usado no switcher "Torcida ativa" do admin — não altera
- * `listarVinculosAprovadosDoUsuario` (loja e portal dependem do conjunto completo).
+ * `listarVinculosAprovadosDoUsuario` (seletor de contexto de sócio).
  */
 export async function listarVinculosAdminDoUsuario(userId: string): Promise<TorcidaOpcao[]> {
   const vinculos = await listarVinculosAprovadosDoUsuario(userId)
