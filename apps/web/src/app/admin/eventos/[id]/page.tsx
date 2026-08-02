@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS, TIPO_EVENTO_LABEL } from '@torcida/types'
+import { assertAnyPermission } from '@/lib/authz'
+import { hasPermission, PERMISSIONS, TIPO_EVENTO_LABEL } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
 import { Gauge, PencilLine, UserCheck } from 'lucide-react'
@@ -36,14 +36,27 @@ export default async function AdminEventoDetailPage({
   const aba = parseAba((await searchParams).tab)
 
   // Sessão e tenant vêm do próprio gate (tenant ativo), não do host.
-  let session: Awaited<ReturnType<typeof assertPermission>>['session']
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
+  let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
+  let podeGerir = false
   try {
-    ;({ session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE))
+    const authz = await assertAnyPermission([
+      PERMISSIONS.EVENTS_VIEW,
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.EVENTS_CREATE,
+    ])
+    session = authz.session
+    tenant = authz.tenant
+    podeGerir =
+      Boolean(authz.isSuperAdmin) ||
+      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE)
   } catch {
     redirect('/admin')
   }
   if (!session.user?.id) redirect('/portal')
+
+  // View-only: cockpit/presença sem abas de mutação.
+  const abaEfetiva = !podeGerir && aba === 'editar' ? 'cockpit' : aba
 
   type SedeLite = { id: string; nome: string; capacidade: number | null }
   type RsvpRow = {
@@ -160,7 +173,7 @@ export default async function AdminEventoDetailPage({
     checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
   }))
 
-  const { tabId, panelId } = adminTabIds('tab', aba)
+  const { tabId, panelId } = adminTabIds('tab', abaEfetiva)
 
   return (
     <div className="app-container space-y-6 py-8">
@@ -181,14 +194,16 @@ export default async function AdminEventoDetailPage({
             icon: <UserCheck className={ICONE_TAB} />,
             count: evento._count.rsvps,
           },
-          { id: 'editar', label: 'Editar', icon: <PencilLine className={ICONE_TAB} /> },
+          ...(podeGerir
+            ? [{ id: 'editar' as const, label: 'Editar', icon: <PencilLine className={ICONE_TAB} /> }]
+            : []),
         ]}
         basePath={`/admin/eventos/${evento.id}`}
-        activeId={aba}
+        activeId={abaEfetiva}
       />
 
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
-      {aba === 'cockpit' && (
+      {abaEfetiva === 'cockpit' && (
       <>
       <div className="space-y-3">
         <EventoAcoesRapidas
@@ -197,6 +212,7 @@ export default async function AdminEventoDetailPage({
           descricao={evento.descricao}
           local={evento.local}
           dataIso={evento.data.toISOString()}
+          podePublicarMural={podeGerir}
         />
         {(evento.lat != null && evento.lng != null) && (
           <EventoMapaLinks lat={evento.lat} lng={evento.lng} local={evento.local} />
@@ -238,17 +254,17 @@ export default async function AdminEventoDetailPage({
       </>
       )}
 
-      {aba === 'presenca' && (
+      {abaEfetiva === 'presenca' && (
         <ListaEmbarque
           eventoId={evento.id}
           itens={itens}
-          podeGerir
+          podeGerir={podeGerir}
           labelCheckin={labelCheckin}
           tituloEvento={evento.titulo}
         />
       )}
 
-      {aba === 'editar' && (
+      {abaEfetiva === 'editar' && podeGerir && (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
           <EditarEventoForm
             evento={eventoForm}

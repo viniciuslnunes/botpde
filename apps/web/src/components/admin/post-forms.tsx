@@ -154,7 +154,13 @@ function formatarData(data: Date | string) {
   )
 }
 
-export function PostsManager({ posts }: { posts: Post[] }) {
+export function PostsManager({
+  posts,
+  podeGerir = true,
+}: {
+  posts: Post[]
+  podeGerir?: boolean
+}) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const confirmAction = useConfirmAction()
@@ -216,6 +222,7 @@ export function PostsManager({ posts }: { posts: Post[] }) {
                 </p>
               </div>
 
+              {podeGerir ? (
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   onClick={() =>
@@ -256,6 +263,7 @@ export function PostsManager({ posts }: { posts: Post[] }) {
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+              ) : null}
             </div>
           </div>
         ),

@@ -132,7 +132,7 @@ consultam o clube inteiro por `afiliacaoId` não passam por lá:
 | Vitrine de canais da CN | `lib/canais.ts` `listCanaisPublicosPorAfiliacao` | não passa por `podeVerCanal` → corte explícito |
 | DM | `lib/mensageria.ts` `isParSeparadoPorCanalRestrito` | bloqueia quando um lado vive só em unidades restritas e não compartilham nenhuma |
 | Alianças | `app/admin/aliancas/actions.ts` `assertCanalNaoRestrito` | bloqueia propor/aceitar; as ATIVAS ficam gravadas e inertes |
-| Engajamento (reagir/comentar/denunciar) | `app/portal/comunidade/actions.ts` `podeEngajarPostVisivel` | trava de isolamento **antes** do fast-path "mesmo clube + PÚBLICO", que não consulta hierarquia e furava nos dois sentidos |
+| Engajamento (reagir/comentar/denunciar/salvar/compartilhar) | `app/portal/comunidade/actions.ts` `podeEngajarPostVisivel` | trava de isolamento **antes** do fast-path "mesmo clube + PÚBLICO"; **exceção self**: vínculo `APROVADO` no tenant do post (torcedor do convite) engaja no mural interno |
 | Permalink de post | `lib/feed.ts` `getPostPorId` | mesma cláusula do feed — card e link precisam concordar |
 
 Busca de canais/unidades (`listUnidadesVisiveis`, `buscarCanaisEUnidades`) e

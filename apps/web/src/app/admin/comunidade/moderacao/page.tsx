@@ -43,7 +43,8 @@ export default async function ModeracaoComunidadePage() {
   const { tenant, permissoes: effective } = await contextoAdmin()
   const podeModerarPosts = hasPermission(effective, PERMISSIONS.COMMUNITY_MODERATE)
   const podeModerarMensagens = hasPermission(effective, PERMISSIONS.MESSAGES_MODERATE)
-  if (!podeModerarPosts && !podeModerarMensagens) redirect('/admin')
+  const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
+  if (!podeModerarPosts && !podeModerarMensagens && !podeVer) redirect('/admin')
 
   // Denúncias de posts e de mensagens são independentes → um round-trip.
   // A tabela de mensagens pode não existir em bases antigas: catch → [].
@@ -51,7 +52,7 @@ export default async function ModeracaoComunidadePage() {
     DenunciaPendente[],
     DenunciaMensagemPendente[],
   ] = await Promise.all([
-    podeModerarPosts
+    podeModerarPosts || podeVer
       ? db.denuncia.findMany({
           where: { tenantId: tenant.id, status: 'PENDENTE' },
           orderBy: { criadoEm: 'asc' },
@@ -91,10 +92,12 @@ export default async function ModeracaoComunidadePage() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Revise denúncias pendentes de posts e mensagens e decida entre resolver ou descartar.
+        {podeModerarPosts || podeModerarMensagens
+          ? 'Revise denúncias pendentes de posts e mensagens e decida entre resolver ou descartar.'
+          : 'Somente leitura — denúncias pendentes (sem permissão para decidir).'}
       </p>
 
-      {podeModerarPosts && (
+      {(podeModerarPosts || podeVer) && (
         <ModeracaoDenunciasClient
           denunciasPosts={denuncias.map((d) => ({
             id: d.id,
@@ -106,7 +109,8 @@ export default async function ModeracaoComunidadePage() {
             denunciante: d.denunciante.nome ?? d.denunciante.email ?? 'Usuário',
           }))}
           denunciasMensagens={[]}
-          podeModerarPosts
+          podeModerarPosts={podeModerarPosts}
+          mostrarPosts
           podeModerarMensagens={false}
           onResolverPost={resolverDenuncia}
           onDescartarPost={descartarDenuncia}

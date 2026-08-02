@@ -23,7 +23,10 @@ import {
   getPerfilPrivadoEfetivoDoAlvo,
   getSeguimentoStatus,
 } from '@/lib/social'
-import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
+import {
+  getOrCreateComunidadeNacionalTenant,
+  resolveTenantIdPortalComunidade,
+} from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import {
   criarNotificacao,
@@ -38,13 +41,12 @@ import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/aut
 import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma, nomeExibicaoAfiliacao } from '@torcida/types'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import {
-  getPostPorId,
   podeVerFeedSocios,
   resolveTenantIdsSomenteComunicado,
   resolveVisibleTenantIdsForFeed,
 } from '@/lib/feed'
 import { getTenantsRestritos } from '@/lib/isolamento'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { isSuperAdminEmail, resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
@@ -219,17 +221,27 @@ async function previewDoPost(opts: {
   }
 }
 
+/** Vínculo APROVADO no tenant (sócio ou torcedor convidado) — engaja no mural. */
+async function vinculoAprovadoNoTenant(userId: string, tenantId: string): Promise<boolean> {
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true },
+  })
+  return membro?.status === 'APROVADO'
+}
+
 /**
- * Contexto de engajamento (reação/comentário): sócio APROVADO com tenant ativo
- * OU torcedor global da Comunidade Nacional. O feed lista posts do tenant
- * sintético do clube — o lookup de engajamento precisa cobrir o mesmo conjunto
- * (produção quebrava com 500: assertPermission sem tenant, ou post CN fora de
- * getVisibleTenantIds).
+ * Contexto de engajamento (reação/comentário/salvar/compartilhar):
+ * - sócio APROVADO com tenant ativo + `COMMUNITY_POST`;
+ * - torcedor APROVADO na unidade (convite) — `tenantId` do vínculo, sem abrir
+ *   `getActiveTenant` (portal permanece em modo CN; publicar no mural segue
+ *   bloqueado em `podePublicarNoCanal` / `podeVerFeedSocios`);
+ * - torcedor global da Comunidade Nacional (`tenantId` null).
  */
 async function resolverContextoEngajamento(): Promise<{
   session: Session
   viewerId: string
-  /** Tenant do viewer (sócio) ou null (torcedor global / CN). */
+  /** Tenant do viewer (sócio / torcedor da unidade) ou null (CN pura). */
   tenantId: string | null
   /** Clube do viewer — rate-limit e escopo de posts engajáveis na CN. */
   afiliacaoId: string | null
@@ -297,6 +309,18 @@ async function resolverContextoEngajamento(): Promise<{
     }
   }
 
+  // Torcedor APROVADO na unidade (getActiveTenant é null de propósito): engaja
+  // no tenant do convite — mural TENANT + R5 self — sem exigir community:post.
+  const unidadeTorcedor = await resolverTorcidaDoTorcedor(viewerId)
+  if (unidadeTorcedor) {
+    return {
+      session,
+      viewerId,
+      tenantId: unidadeTorcedor.id,
+      afiliacaoId: unidadeTorcedor.afiliacaoId,
+    }
+  }
+
   const perfil: {
     onboardingConcluidoEm: Date | null
     afiliacaoId: string | null
@@ -342,9 +366,13 @@ async function podeEngajarPostVisivel(
   // não consulta hierarquia; sem esta trava, qualquer torcedor do clube com o
   // id do post reagiria/comentaria em publicação de uma unidade isolada — e a
   // própria unidade isolada engajaria na praça de fora. Vale nos dois sentidos.
+  // Exceção: vínculo APROVADO na própria unidade (torcedor do convite) — self.
   if (post.tenantId !== ctx.tenantId) {
     const restritos = await getTenantsRestritos()
-    if (restritos.has(post.tenantId)) return false
+    if (restritos.has(post.tenantId)) {
+      if (!(await vinculoAprovadoNoTenant(ctx.viewerId, post.tenantId))) return false
+      return true
+    }
     if (ctx.tenantId && restritos.has(ctx.tenantId)) {
       // Única exceção: o comunicado oficial do ancestral, a só publicação
       // externa que a unidade isolada enxerga.
@@ -1160,19 +1188,28 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
   const ehAutor = viewerId === post.autorId
   let tenantNoAlcance = ehAutor
   if (!tenantNoAlcance) {
-    const viewerTenantId = await resolveTenantIdPortalComunidade(viewerId, session.user.email)
-    if (viewerTenantId === post.tenantId) {
+    // Torcedor/sócio APROVADO no tenant do post (mural da unidade via convite).
+    if (await vinculoAprovadoNoTenant(viewerId, post.tenantId)) {
       tenantNoAlcance = true
-    } else if (viewerTenantId) {
-      const tenantIdsVisiveis = await resolveVisibleTenantIdsForFeed(viewerTenantId, viewerId)
-      tenantNoAlcance = tenantIdsVisiveis.includes(post.tenantId)
+    } else {
+      const viewerTenantId = await resolveTenantIdPortalComunidade(viewerId, session.user.email)
+      if (viewerTenantId === post.tenantId) {
+        tenantNoAlcance = true
+      } else if (viewerTenantId) {
+        const tenantIdsVisiveis = await resolveVisibleTenantIdsForFeed(viewerTenantId, viewerId)
+        tenantNoAlcance = tenantIdsVisiveis.includes(post.tenantId)
+      }
     }
   }
   if (!tenantNoAlcance) throw new Error('Post não encontrado')
 
   let podeVer = ehAutor || post.visibilidade === 'PUBLICO'
   if (!podeVer && post.visibilidade === 'TENANT') {
-    podeVer = await podeVerFeedSocios(viewerId, post.tenantId)
+    // Sócio (feed sócios) OU qualquer vínculo APROVADO — o mural da unidade
+    // já mostra TENANT ao torcedor inscrito no canal; comentários seguem.
+    podeVer =
+      (await podeVerFeedSocios(viewerId, post.tenantId)) ||
+      (await vinculoAprovadoNoTenant(viewerId, post.tenantId))
   }
   if (!podeVer && post.visibilidade === 'PRIVADO') {
     podeVer = (await getSeguimentoStatus(viewerId, post.autorId)) === 'APROVADO'
@@ -1594,15 +1631,34 @@ export async function fixarPostPerfil(postId: string): Promise<void> {
 }
 
 export async function salvarPost(postId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  const parsed = z.string().uuid().safeParse(postId)
+  if (!parsed.success) throw new ExpectedError('Post não encontrado')
 
-  const post = await getPostPorId(postId, tenant.id, session.user.id)
-  if (!post) throw new Error('Post não encontrado')
+  const [ctx, post] = await Promise.all([
+    resolverContextoEngajamento(),
+    db.post.findUnique({
+      where: { id: parsed.data },
+      select: {
+        id: true,
+        autorId: true,
+        tenantId: true,
+        oculto: true,
+        visibilidade: true,
+        tipo: true,
+        comunicadoOrigemId: true,
+        tenant: { select: { afiliacaoId: true, sintetico: true } },
+      },
+    }) as Promise<PostEngajavelLite | null>,
+  ])
 
+  if (!post || !(await podeEngajarPostVisivel(ctx, post))) {
+    throw new Error('Post não encontrado')
+  }
+
+  const tenantIdSalvo = ctx.tenantId ?? post.tenantId
   await db.postSalvo.upsert({
-    where: { userId_postId: { userId: session.user.id, postId } },
-    create: { userId: session.user.id, postId, tenantId: tenant.id },
+    where: { userId_postId: { userId: ctx.viewerId, postId: post.id } },
+    create: { userId: ctx.viewerId, postId: post.id, tenantId: tenantIdSalvo },
     update: {},
   })
 
@@ -1610,36 +1666,55 @@ export async function salvarPost(postId: string): Promise<void> {
 }
 
 export async function removerPostSalvo(postId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  const ctx = await resolverContextoEngajamento()
+  const parsed = z.string().uuid().safeParse(postId)
+  if (!parsed.success) throw new ExpectedError('Post não encontrado')
 
   await db.postSalvo.deleteMany({
-    where: { userId: session.user.id, postId, tenantId: tenant.id },
+    where: { userId: ctx.viewerId, postId: parsed.data },
   })
 
   revalidatePath('/portal/comunidade/salvos')
 }
 
 export async function repostarPost(postId: string, comentario?: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
   const parsed = repostarSchema.safeParse({ postId, comentario })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
-  const visibleIds = await resolveVisibleTenantIdsForFeed(tenant.id, session.user.id)
-  const original: { id: string; autorId: string; oculto: boolean; visibilidade: string } | null =
-    await db.post.findFirst({
-      where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
-      select: { id: true, autorId: true, oculto: true, visibilidade: true },
-    })
-  if (!original) throw new Error('Post não encontrado')
+  const [ctx, original] = await Promise.all([
+    resolverContextoEngajamento(),
+    db.post.findUnique({
+      where: { id: parsed.data.postId },
+      select: {
+        id: true,
+        autorId: true,
+        tenantId: true,
+        oculto: true,
+        visibilidade: true,
+        tipo: true,
+        comunicadoOrigemId: true,
+        tenant: { select: { afiliacaoId: true, sintetico: true } },
+      },
+    }) as Promise<PostEngajavelLite | null>,
+  ])
+
+  if (!original || !(await podeEngajarPostVisivel(ctx, original))) {
+    throw new Error('Post não encontrado')
+  }
+
+  // Destino: unidade/torcida do viewer; torcedor global puro → CN sintética.
+  let destTenantId = ctx.tenantId
+  if (!destTenantId) {
+    if (!ctx.afiliacaoId) throw new Error('Não autorizado')
+    const sintetico = await getOrCreateComunidadeNacionalTenant(ctx.afiliacaoId)
+    destTenantId = sintetico.id
+  }
 
   const texto = parsed.data.comentario?.trim() || '🔁 Compartilhou uma publicação'
   const repost = await db.post.create({
     data: {
-      tenantId: tenant.id,
-      autorId: session.user.id,
+      tenantId: destTenantId,
+      autorId: ctx.viewerId,
       conteudo: texto,
       tipo: 'MEMBRO',
       visibilidade: 'PUBLICO',
@@ -1647,22 +1722,22 @@ export async function repostarPost(postId: string, comentario?: string): Promise
     },
   })
 
-  if (original.autorId !== session.user.id) {
+  if (original.autorId !== ctx.viewerId) {
     await criarNotificacao({
       userId: original.autorId,
-      tenantId: tenant.id,
+      tenantId: destTenantId,
       tipo: 'REPOST',
       titulo: 'Sua publicação foi compartilhada',
-      corpo: `${session.user.name ?? 'Um membro'} compartilhou seu post.`,
+      corpo: `${ctx.session.user.name ?? 'Um membro'} compartilhou seu post.`,
       link: linkPostComunidade(original.id),
-      atorId: session.user.id,
+      atorId: ctx.viewerId,
     })
   }
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
+      tenantId: destTenantId,
+      atorId: ctx.viewerId,
       acao: 'POST_REPOSTADO',
       entidade: 'Post',
       entidadeId: repost.id,
@@ -1672,13 +1747,13 @@ export async function repostarPost(postId: string, comentario?: string): Promise
 
   await publicarNaTimelineRede({
     postId: repost.id,
-    autorId: session.user.id,
-    tenantId: tenant.id,
+    autorId: ctx.viewerId,
+    tenantId: destTenantId,
     criadoEm: repost.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
-  invalidarLeituraComunidade(tenant.id)
+  invalidarLeituraComunidade(destTenantId, ctx.afiliacaoId)
 }
 
 export async function repostarComunicado(comunicadoId: string, comentario?: string): Promise<void> {

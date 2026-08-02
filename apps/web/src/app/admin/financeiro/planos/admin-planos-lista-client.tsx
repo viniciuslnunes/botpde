@@ -14,7 +14,13 @@ export type PlanoListaItem = {
   membrosCount: number
 }
 
-export function AdminPlanosListaClient({ planos }: { planos: PlanoListaItem[] }) {
+export function AdminPlanosListaClient({
+  planos,
+  podeGerir = true,
+}: {
+  planos: PlanoListaItem[]
+  podeGerir?: boolean
+}) {
   if (planos.length === 0) {
     return (
       <MotionEmptyState
@@ -76,12 +82,14 @@ export function AdminPlanosListaClient({ planos }: { planos: PlanoListaItem[] })
                 </span>
               </td>
               <td className="px-4 py-3 text-right">
-                <Link
-                  href={`/admin/financeiro/planos?edit=${plano.id}`}
-                  className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-                >
-                  Editar
-                </Link>
+                {podeGerir ? (
+                  <Link
+                    href={`/admin/financeiro/planos?edit=${plano.id}`}
+                    className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                  >
+                    Editar
+                  </Link>
+                ) : null}
               </td>
             </tr>
           ))}

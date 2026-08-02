@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
-import { assertPermission } from '@/lib/authz'
+import { assertAnyPermission } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   calculateEffectivePermissions,
@@ -29,9 +29,15 @@ export default async function EditarSedePage({
 }) {
   const { id } = await params
 
-  const authz = await assertPermission(PERMISSIONS.SEDES_MANAGE).catch(() => null)
+  const authz = await assertAnyPermission([
+    PERMISSIONS.SEDES_VIEW,
+    PERMISSIONS.SEDES_MANAGE,
+  ]).catch(() => null)
   if (!authz) redirect('/admin')
   const { session, tenant } = authz
+  const podeGerir =
+    Boolean(authz.isSuperAdmin) ||
+    hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.SEDES_MANAGE)
 
   type SedeEdit = {
     id: string
@@ -179,6 +185,7 @@ export default async function EditarSedePage({
 
   let podePromoverUi = false
   if (
+    podeGerir &&
     !portalProprio &&
     sede.ativa &&
     (sede.tipo === 'SUBSEDE' || sede.tipo === 'PONTO_ENCONTRO') &&
@@ -330,6 +337,7 @@ export default async function EditarSedePage({
 
         {podePromoverUi && <PromoverSedeButton sedeId={sede.id} sedeNome={sede.nome} />}
 
+        {podeGerir ? (
         <MotionReveal index={1}>
           <EditarSedeForm
             sede={{
@@ -360,6 +368,11 @@ export default async function EditarSedePage({
             paiHerdado={paiHerdado}
           />
         </MotionReveal>
+        ) : (
+          <p className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Somente leitura — sem permissão para editar esta unidade.
+          </p>
+        )}
       </div>
     </div>
   )

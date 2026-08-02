@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS, TIPO_EVENTO_LABEL, TipoEventoSchema } from '@torcida/types'
+import { assertAnyPermission } from '@/lib/authz'
+import { hasPermission, PERMISSIONS, TIPO_EVENTO_LABEL, TipoEventoSchema } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { AdminEventosList, type AdminEventoItem } from './admin-eventos-list'
@@ -123,10 +123,21 @@ async function EventosInsights({ tenantId }: { tenantId: string }) {
 export default async function AdminEventosPage({ searchParams }: Props) {
   // Sessão e tenant vêm do próprio gate (tenant ativo) — reabrir por host
   // traria a agenda de outra torcida.
-  let session: Awaited<ReturnType<typeof assertPermission>>['session']
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
+  let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
+  let podeGerir = false
   try {
-    ;({ session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE))
+    const authz = await assertAnyPermission([
+      PERMISSIONS.EVENTS_VIEW,
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.EVENTS_CREATE,
+    ])
+    session = authz.session
+    tenant = authz.tenant
+    podeGerir =
+      Boolean(authz.isSuperAdmin) ||
+      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
   } catch {
     redirect('/admin')
   }
@@ -304,16 +315,20 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             {tituloFiltro ? tituloFiltro : 'Agenda'}
           </h1>
           <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Eventos, caravanas e ensaios da torcida
+            {podeGerir
+              ? 'Eventos, caravanas e ensaios da torcida'
+              : 'Somente leitura — eventos, caravanas e ensaios'}
           </p>
         </div>
-        <NovoEventoButton
-          defaultTipo={tipoFiltro ?? 'GERAL'}
-          sedes={sedes}
-          partidas={partidas}
-          temAfiliacao={Boolean(afiliacaoId)}
-          redirectTo="/admin/eventos"
-        />
+        {podeGerir ? (
+          <NovoEventoButton
+            defaultTipo={tipoFiltro ?? 'GERAL'}
+            sedes={sedes}
+            partidas={partidas}
+            temAfiliacao={Boolean(afiliacaoId)}
+            redirectTo="/admin/eventos"
+          />
+        ) : null}
       </div>
 
       <AdminTabs

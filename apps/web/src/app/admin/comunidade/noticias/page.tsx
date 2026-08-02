@@ -26,7 +26,9 @@ function formatarData(data: Date) {
 
 export default async function AdminNoticiasPage() {
   const { tenant, permissoes: effective } = await contextoAdmin()
-  if (!hasPermission(effective, PERMISSIONS.NEWS_CURATE)) redirect('/admin')
+  const podeCurar = hasPermission(effective, PERMISSIONS.NEWS_CURATE)
+  const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
+  if (!podeCurar && !podeVer) redirect('/admin')
 
   if (!tenant.afiliacaoId) {
     return (
@@ -45,7 +47,9 @@ export default async function AdminNoticiasPage() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Aprove ou rejeite notícias em rascunho relacionadas ao seu time.
+        {podeCurar
+          ? 'Aprove ou rejeite notícias em rascunho relacionadas ao seu time.'
+          : 'Somente leitura — notícias em rascunho da afiliação.'}
       </p>
 
       {noticias.length === 0 ? (
@@ -84,6 +88,8 @@ export default async function AdminNoticiasPage() {
               </a>
 
               <div className="mt-4 flex flex-wrap gap-2">
+                {podeCurar ? (
+                  <>
                 <AdminActionForm
                   action={aprovarNoticia.bind(null, noticia.id)}
                   success="Notícia aprovada."
@@ -120,6 +126,8 @@ export default async function AdminNoticiasPage() {
                     Rejeitar
                   </button>
                 </AdminActionForm>
+                  </>
+                ) : null}
               </div>
             </div>
           ))}

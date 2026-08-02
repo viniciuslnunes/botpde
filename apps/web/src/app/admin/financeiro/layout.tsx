@@ -3,23 +3,26 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CreditCard, ListChecks, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { db } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS, hasPermission } from '@torcida/types'
+import { assertManageOrOversightView } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
 export default async function FinanceiroModuloLayout({ children }: { children: ReactNode }) {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE))
+    ;({ tenant } = await assertManageOrOversightView(
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.FINANCE_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }
 
   const permissoes = await permissoesEfetivasNoAdmin()
-
+  const somenteLeitura = !hasPermission(permissoes, PERMISSIONS.FINANCE_MANAGE)
   const cobrancasVencidas: number = await db.cobrancaAssociacao.count({
     where: { tenantId: tenant.id, status: 'VENCIDA' },
   })
@@ -39,7 +42,11 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
     <>
       <AdminPageHeader
         title="Financeiro"
-        description="Livro-caixa, evolução, cobranças de associação e planos de sócio."
+        description={
+          somenteLeitura
+            ? 'Somente leitura — livro-caixa, evolução, cobranças e planos.'
+            : 'Livro-caixa, evolução, cobranças de associação e planos de sócio.'
+        }
         icon={<Wallet className="h-5 w-5" />}
         actions={
           <Link

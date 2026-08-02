@@ -16,10 +16,13 @@ export function ComunidadeStickySearchChrome({
   children,
   escopo = 'torcida',
   modoContexto = 'torcida',
+  /** Mural de canal (Sede/unidade): mantém busca, esconde Descobrir/Seguindo/Grupos. */
+  ocultarFiltrosFeed = false,
 }: {
   children?: ReactNode
   escopo?: EscopoComunidade
   modoContexto?: 'nacional' | 'torcida'
+  ocultarFiltrosFeed?: boolean
 }) {
   const scrollVisible = useScrollChromeVisibilityShared()
   const reduceMotion = useReducedMotion()
@@ -56,9 +59,11 @@ export function ComunidadeStickySearchChrome({
         <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-[rgb(var(--border))]" />}>
           <ComunidadeSearchBar escopo={escopo} modoContexto={modoContexto} />
         </Suspense>
-        <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
-          <ComunidadeFeedTabs escopo={escopo} modoContexto={modoContexto} />
-        </Suspense>
+        {!ocultarFiltrosFeed ? (
+          <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
+            <ComunidadeFeedTabs escopo={escopo} modoContexto={modoContexto} />
+          </Suspense>
+        ) : null}
         {children}
       </div>
     </m.div>

@@ -17,9 +17,9 @@ import {
   isSuperAdminEmail,
   listarClubesParaSelecao,
   listarTorcidasParaSelecao,
-  listarVinculosAprovadosDoUsuario,
   usuarioPrecisaNickname,
 } from '@/lib/tenant-context'
+import { listarVinculosAdminDoUsuario } from '@/lib/admin-vinculos'
 import { listarUnidadesParaSelecao } from '@/lib/admin-context-unidades'
 import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
@@ -73,6 +73,7 @@ export default async function AdminLayout({
   // Solicitações). Só some do menu quem não alcança nenhuma delas.
   const exibirEstrutura =
     isSuperAdmin ||
+    hasPermission(effectivePermissions, PERMISSIONS.SEDES_VIEW) ||
     hasPermission(effectivePermissions, PERMISSIONS.SEDES_MANAGE) ||
     hasPermission(effectivePermissions, PERMISSIONS.ROLES_MANAGE) ||
     (tenantEhSedePrincipal &&
@@ -97,7 +98,8 @@ export default async function AdminLayout({
         listarUnidadesParaSelecao(tenant.id),
       ])
     : [[], [], []]
-  const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
+  // Só torcidas onde há área admin — espelho Caso B `member` na Sede some.
+  const vinculos = isSuperAdmin ? [] : await listarVinculosAdminDoUsuario(session.user.id)
   const notifications = await listarNotificacoesRecentes(
     tenant.id,
     session.user.id,

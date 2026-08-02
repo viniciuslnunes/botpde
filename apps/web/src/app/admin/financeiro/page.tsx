@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { formatDataCompetenciaInput, PERMISSIONS } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertManageOrOversightView } from '@/lib/authz'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
 import { AdminCreateDisclosure } from '@/components/admin/ui'
 import {
@@ -23,9 +23,13 @@ export const metadata: Metadata = { title: 'Financeiro — Admin' }
 type Props = { searchParams: Promise<FinanceiroSearchParams & { tab?: string }> }
 
 export default async function FinanceiroAdminPage({ searchParams }: Props) {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
+  let podeGerir = false
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE))
+    ;({ tenant, podeGerir } = await assertManageOrOversightView(
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.FINANCE_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }
@@ -59,7 +63,9 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
       <MotionReveal>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Operação do livro-caixa — criar, editar e excluir lançamentos.
+            {podeGerir
+              ? 'Operação do livro-caixa — criar, editar e excluir lançamentos.'
+              : 'Somente leitura — lançamentos do livro-caixa.'}
           </p>
           <ExportarFinanceiroButton />
         </div>
@@ -72,12 +78,14 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
       />
 
       <FinanceiroFiltros basePath="/admin/financeiro" values={values} />
-      <AdminCreateDisclosure label="Novo lançamento">
-        <FinanceiroLancamentoForm />
-      </AdminCreateDisclosure>
+      {podeGerir ? (
+        <AdminCreateDisclosure label="Novo lançamento">
+          <FinanceiroLancamentoForm />
+        </AdminCreateDisclosure>
+      ) : null}
       <FinanceiroLancamentosLista
         itens={itens}
-        podeGerir
+        podeGerir={podeGerir}
         total={lista.total}
         page={lista.page}
         pageSize={lista.pageSize}

@@ -111,24 +111,29 @@ export default async function AdminComunidadePage() {
 
   const podePublicarComunicado = hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
   const podeGerenciarPosts = hasPermission(effective, PERMISSIONS.COMMUNITY_MANAGE)
+  const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
 
   // Quem só modera ou só cura notícias não tem visão geral — entra pela própria
-  // etapa em vez de ser expulso da área.
-  if (!podePublicarComunicado && !podeGerenciarPosts) {
+  // etapa. COMMUNITY_VIEW (Diretoria oversight) abre a visão geral.
+  if (!podePublicarComunicado && !podeGerenciarPosts && !podeVer) {
     redirect(primeiraTabPermitida('comunidade', effective) ?? '/admin')
   }
 
   const [comunicadosCount, ultimoComunicado, postsCount, ultimoPost] = await Promise.all([
-    podePublicarComunicado ? db.announcement.count({ where: { tenantId: tenant.id } }) : Promise.resolve(0),
-    podePublicarComunicado
+    podePublicarComunicado || podeVer
+      ? db.announcement.count({ where: { tenantId: tenant.id } })
+      : Promise.resolve(0),
+    podePublicarComunicado || podeVer
       ? db.announcement.findFirst({
           where: { tenantId: tenant.id },
           orderBy: { publicadoEm: 'desc' },
           select: { titulo: true, publicadoEm: true },
         })
       : Promise.resolve(null),
-    podeGerenciarPosts ? db.post.count({ where: { tenantId: tenant.id } }) : Promise.resolve(0),
-    podeGerenciarPosts
+    podeGerenciarPosts || podeVer
+      ? db.post.count({ where: { tenantId: tenant.id } })
+      : Promise.resolve(0),
+    podeGerenciarPosts || podeVer
       ? db.post.findFirst({
           where: { tenantId: tenant.id },
           orderBy: { criadoEm: 'desc' },
@@ -139,9 +144,12 @@ export default async function AdminComunidadePage() {
 
   return (
     <div className="space-y-6">
+      {!podePublicarComunicado && !podeGerenciarPosts && podeVer ? (
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">Somente leitura.</p>
+      ) : null}
       {/* Navegação é das tabs: aqui só o pulso do módulo. */}
       <KpiGrid>
-        {podePublicarComunicado && (
+        {(podePublicarComunicado || podeVer) && (
           <StatCard
             label="Comunicados publicados"
             value={comunicadosCount}
@@ -154,7 +162,7 @@ export default async function AdminComunidadePage() {
             badgeTone="default"
           />
         )}
-        {podeGerenciarPosts && (
+        {(podeGerenciarPosts || podeVer) && (
           <StatCard
             label="Posts no mural"
             value={postsCount}
@@ -172,8 +180,8 @@ export default async function AdminComunidadePage() {
       <Suspense fallback={null}>
         <ComunidadeInsights
           tenantId={tenant.id}
-          mostrarEngajamento={podeGerenciarPosts}
-          mostrarLeituras={podePublicarComunicado}
+          mostrarEngajamento={podeGerenciarPosts || podeVer}
+          mostrarLeituras={podePublicarComunicado || podeVer}
         />
       </Suspense>
 

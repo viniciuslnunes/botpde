@@ -22,7 +22,9 @@ interface ComunicadoRaw {
 
 export default async function AdminComunicadosPage() {
   const { session, tenant, permissoes: effective } = await contextoAdmin()
-  if (!hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)) redirect('/admin/comunidade')
+  const podePublicar = hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+  const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
+  if (!podePublicar && !podeVer) redirect('/admin/comunidade')
 
   const comunicadosRaw: ComunicadoRaw[] = await db.announcement.findMany({
     where: { tenantId: tenant.id },
@@ -56,16 +58,20 @@ export default async function AdminComunicadosPage() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Avisos institucionais publicados para todos os associados.
+        {podePublicar
+          ? 'Avisos institucionais publicados para todos os associados.'
+          : 'Somente leitura — avisos institucionais publicados.'}
       </p>
 
-      <Suspense
-        fallback={
-          <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-        }
-      >
-        <ComunicadoComposerAdmin />
-      </Suspense>
+      {podePublicar ? (
+        <Suspense
+          fallback={
+            <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+          }
+        >
+          <ComunicadoComposerAdmin />
+        </Suspense>
+      ) : null}
       <MotionReveal index={1}>
         <ComunicadosManager
           comunicados={comunicados}
@@ -76,6 +82,7 @@ export default async function AdminComunicadosPage() {
           }}
           tenantId={tenant.id}
           tenantNome={tenant.nome}
+          podeGerir={podePublicar}
         />
       </MotionReveal>
     </div>

@@ -455,7 +455,7 @@ type NotificacaoWhere = {
     | { tenantId: string }
     | {
         tipo: { in: TipoNotificacao[] }
-        tenant: { afiliacaoId: string; sintetico: false; ativo: true }
+        tenantId: { in: string[] }
       }
   >
 }
@@ -464,6 +464,8 @@ type NotificacaoWhere = {
  * Where do sino do portal. Na CN (tenant sintético), inclui MEMBRO_APROVADO /
  * MEMBRO_REPROVADO do clube — a notificação canônica vive no tenant da torcida,
  * mas o solicitante assina SSE/inbox da CN até o redirect pós-aprovação.
+ *
+ * `Notificacao` não tem relação Prisma `tenant` — filtra por `tenantId in […]`.
  */
 export async function whereInboxPortal(
   tenantId: string,
@@ -485,17 +487,25 @@ export async function whereInboxPortal(
   if (tiposAdmissao.length === 0) {
     return { ...base, tenantId }
   }
+  const doClube: { id: string }[] = await db.tenant.findMany({
+    where: {
+      afiliacaoId: tenant.afiliacaoId,
+      sintetico: false,
+      ativo: true,
+    },
+    select: { id: true },
+  })
+  const idsClube = doClube.map((t) => t.id)
+  if (idsClube.length === 0) {
+    return { ...base, tenantId }
+  }
   return {
     ...base,
     OR: [
       { tenantId },
       {
         tipo: { in: tiposAdmissao },
-        tenant: {
-          afiliacaoId: tenant.afiliacaoId,
-          sintetico: false,
-          ativo: true,
-        },
+        tenantId: { in: idsClube },
       },
     ],
   }

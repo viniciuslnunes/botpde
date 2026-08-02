@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Landmark } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertManageOrOversightView } from '@/lib/authz'
 import {
   listarCandidatosResponsavelPatrimonio,
   listarPatrimonio,
@@ -27,9 +27,13 @@ export const metadata: Metadata = { title: 'Patrimônio — Admin' }
 type Props = { searchParams: Promise<PatrimonioSearchParams> }
 
 export default async function PatrimonioAdminPage({ searchParams }: Props) {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
+  let podeGerir = false
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE))
+    ;({ tenant, podeGerir } = await assertManageOrOversightView(
+      PERMISSIONS.PATRIMONY_MANAGE,
+      PERMISSIONS.PATRIMONY_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }
@@ -74,7 +78,9 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
             <div>
               <h1 className="text-xl font-semibold text-[rgb(var(--foreground))]">Patrimônio</h1>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                Operação do inventário — cadastro, baixa e responsáveis.
+                {podeGerir
+                  ? 'Operação do inventário — cadastro, baixa e responsáveis.'
+                  : 'Somente leitura — inventário da unidade.'}
               </p>
             </div>
           </div>
@@ -89,10 +95,10 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
 
       <PatrimonioResumoCards resumo={resumo} />
       <PatrimonioFiltros basePath="/admin/patrimonio" values={values} />
-      <PatrimonioItemForm candidatos={candidatos} />
+      {podeGerir ? <PatrimonioItemForm candidatos={candidatos} /> : null}
       <PatrimonioItensLista
         itens={itens}
-        podeGerir
+        podeGerir={podeGerir}
         candidatos={candidatos}
         total={lista.total}
         page={lista.page}

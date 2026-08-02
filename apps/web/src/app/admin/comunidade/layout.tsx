@@ -56,11 +56,23 @@ export default async function ComunidadeModuloLayout({ children }: { children: R
     },
   })
 
+  const somenteLeitura =
+    hasPermission(permissoes, PERMISSIONS.COMMUNITY_VIEW) &&
+    !hasPermission(permissoes, PERMISSIONS.COMMUNITY_MANAGE) &&
+    !hasPermission(permissoes, PERMISSIONS.ANNOUNCEMENTS_PUBLISH) &&
+    !hasPermission(permissoes, PERMISSIONS.COMMUNITY_MODERATE) &&
+    !hasPermission(permissoes, PERMISSIONS.MESSAGES_MODERATE) &&
+    !hasPermission(permissoes, PERMISSIONS.NEWS_CURATE)
+
   return (
     <>
       <AdminPageHeader
         title="Comunidade"
-        description="Comunicados oficiais, mural, moderação e curadoria de notícias."
+        description={
+          somenteLeitura
+            ? 'Somente leitura — comunicados, mural, moderação e notícias.'
+            : 'Comunicados oficiais, mural, moderação e curadoria de notícias.'
+        }
         icon={<MessagesSquare className="h-5 w-5" />}
       />
 

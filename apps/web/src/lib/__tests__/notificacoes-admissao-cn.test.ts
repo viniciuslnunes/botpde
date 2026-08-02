@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const findUnique = vi.fn()
+const findMany = vi.fn()
 const emitPing = vi.fn()
 const getOrCreateCn = vi.fn()
 
 vi.mock('@torcida/db', () => ({
   db: {
-    tenant: { findUnique: (...args: unknown[]) => findUnique(...args) },
+    tenant: {
+      findUnique: (...args: unknown[]) => findUnique(...args),
+      findMany: (...args: unknown[]) => findMany(...args),
+    },
   },
 }))
 
@@ -29,25 +33,31 @@ vi.mock('@/lib/env', () => ({
 describe('whereInboxPortal / emitNotificacaoPingCnDoSolicitante', () => {
   beforeEach(() => {
     findUnique.mockReset()
+    findMany.mockReset()
     emitPing.mockReset()
     getOrCreateCn.mockReset()
   })
 
   it('whereInboxPortal em tenant sintético inclui decisões de admissão do clube', async () => {
     findUnique.mockResolvedValue({ sintetico: true, afiliacaoId: 'af1' })
+    findMany.mockResolvedValue([{ id: 'torcida-a' }, { id: 'torcida-b' }])
     const { whereInboxPortal } = await import('@/lib/notificacoes')
     const where = await whereInboxPortal('cn-sintetico', 'u1', [
       'MENCAO',
       'MEMBRO_APROVADO',
       'MEMBRO_REPROVADO',
     ])
+    expect(findMany).toHaveBeenCalledWith({
+      where: { afiliacaoId: 'af1', sintetico: false, ativo: true },
+      select: { id: true },
+    })
     expect(where).toMatchObject({
       userId: 'u1',
       OR: [
         { tenantId: 'cn-sintetico' },
         {
           tipo: { in: ['MEMBRO_APROVADO', 'MEMBRO_REPROVADO'] },
-          tenant: { afiliacaoId: 'af1', sintetico: false, ativo: true },
+          tenantId: { in: ['torcida-a', 'torcida-b'] },
         },
       ],
     })
@@ -62,6 +72,7 @@ describe('whereInboxPortal / emitNotificacaoPingCnDoSolicitante', () => {
       tipo: { in: ['MEMBRO_APROVADO'] },
       tenantId: 'torcida-1',
     })
+    expect(findMany).not.toHaveBeenCalled()
   })
 
   it('emitNotificacaoPingCnDoSolicitante pinga o tenant sintético da CN', async () => {

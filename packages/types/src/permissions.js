@@ -30,10 +30,14 @@ export const PERMISSIONS = /** @type {const} */ ({
   BAR_MANAGE: 'bar:manage',
 
   // Eventos
+  /** Leitura da Agenda admin — sem criar/editar. */
+  EVENTS_VIEW: 'events:view',
   EVENTS_CREATE: 'events:create',
   EVENTS_MANAGE: 'events:manage',
 
   // Sedes
+  /** Leitura da Estrutura / unidades — sem editar ou promover. */
+  SEDES_VIEW: 'sedes:view',
   SEDES_MANAGE: 'sedes:manage',
 
   // Cargos (admin only)
@@ -57,6 +61,8 @@ export const PERMISSIONS = /** @type {const} */ ({
   PATRIMONY_MANAGE: 'patrimony:manage',
 
   // Comunidade (mural de posts locais/não-oficiais)
+  /** Leitura do módulo Comunidade admin — sem moderar/publicar. */
+  COMMUNITY_VIEW: 'community:view',
   COMMUNITY_MANAGE: 'community:manage',
 
   // Comunicados oficiais — separado de COMMUNITY_MANAGE: nem todo post
@@ -140,8 +146,9 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
   },
   {
     label: 'Eventos',
-    base: null,
+    base: PERMISSIONS.EVENTS_VIEW,
     items: [
+      { key: PERMISSIONS.EVENTS_VIEW, label: 'Ver agenda / eventos' },
       { key: PERMISSIONS.EVENTS_CREATE, label: 'Criar eventos' },
       { key: PERMISSIONS.EVENTS_MANAGE, label: 'Gerenciar eventos' },
     ],
@@ -164,8 +171,12 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
   },
   {
     label: 'Comunidade',
+    // Sem base: community:post é transversal (vários colaboradores) e não
+    // deve puxar community:view (que abre o módulo admin). View é oversight
+    // explícito (Diretoria) ou vem junto das perms de operação no pacote.
     base: null,
     items: [
+      { key: PERMISSIONS.COMMUNITY_VIEW, label: 'Ver comunidade (admin, leitura)' },
       { key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' },
       { key: PERMISSIONS.ANNOUNCEMENTS_PUBLISH, label: 'Publicar comunicados oficiais' },
       { key: PERMISSIONS.COMMUNITY_POST, label: 'Publicar no feed como membro' },
@@ -199,11 +210,19 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     ],
   },
   {
+    label: 'Sedes / Estrutura',
+    base: PERMISSIONS.SEDES_VIEW,
+    items: [
+      { key: PERMISSIONS.SEDES_VIEW, label: 'Ver estrutura / unidades' },
+      { key: PERMISSIONS.SEDES_MANAGE, label: 'Gerenciar sedes' },
+    ],
+  },
+  {
     label: 'Outros',
     base: null,
     items: [
-      { key: PERMISSIONS.SEDES_MANAGE, label: 'Gerenciar sedes' },
       { key: PERMISSIONS.ROLES_MANAGE, label: 'Gerenciar cargos' },
+      { key: PERMISSIONS.SETTINGS_MANAGE, label: 'Gerenciar configurações' },
       { key: PERMISSIONS.REPORTS_VIEW, label: 'Ver relatórios' },
       { key: PERMISSIONS.AUDIT_VIEW, label: 'Ver registro de auditoria' },
     ],
@@ -224,6 +243,14 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
  * @param {string[]} nextSelected - seleção depois da mudança do usuário
  * @returns {string[]} seleção com a cascata aplicada
  */
+/** Ops de comunidade admin que puxam `community:view` (sem afetar `community:post`). */
+const COMMUNITY_OPS_COM_VIEW = [
+  PERMISSIONS.COMMUNITY_MANAGE,
+  PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+  PERMISSIONS.COMMUNITY_MODERATE,
+  PERMISSIONS.NEWS_CURATE,
+]
+
 export function applyPermissionCascade(prevSelected, nextSelected) {
   const prev = new Set(prevSelected)
   const result = new Set(nextSelected)
@@ -243,6 +270,15 @@ export function applyPermissionCascade(prevSelected, nextSelected) {
       (key) => key !== group.base && result.has(key) && !prev.has(key),
     )
     if (addedNonBase) result.add(group.base)
+  }
+
+  // Comunidade: manage/publish/moderate/curate herdam view; post não.
+  // Remover view derruba as ops admin (mesmo padrão dos grupos com base).
+  if (prev.has(PERMISSIONS.COMMUNITY_VIEW) && !result.has(PERMISSIONS.COMMUNITY_VIEW)) {
+    for (const k of COMMUNITY_OPS_COM_VIEW) result.delete(k)
+  }
+  if (COMMUNITY_OPS_COM_VIEW.some((k) => result.has(k))) {
+    result.add(PERMISSIONS.COMMUNITY_VIEW)
   }
 
   return Array.from(result)

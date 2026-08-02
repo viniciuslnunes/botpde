@@ -6,7 +6,7 @@ import {
   formatDataCompetenciaInput,
   PERMISSIONS,
 } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertManageOrOversightView } from '@/lib/authz'
 import { listarCobrancasTenant } from '@/lib/cobrancas'
 import { resumirInadimplencia, type InadimplenciaResumo } from '@/lib/cobrancas-insights'
 import { getPixProvider } from '@/lib/pix-gateway'
@@ -95,9 +95,13 @@ const STATUS_FILTROS: Array<{ value: 'TODAS' | StatusCobrancaAssociacao; label: 
 ]
 
 export default async function CobrancasAdminPage({ searchParams }: Props) {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
+  let podeGerir = false
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE))
+    ;({ tenant, podeGerir } = await assertManageOrOversightView(
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.FINANCE_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }
@@ -153,23 +157,25 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
             Mensalidades e taxas — gateway Pix:{' '}
             <span className="font-medium">{provider === 'mock' ? 'Mock (dev)' : 'Mercado Pago'}</span>
           </p>
-          <DispararLembretesButton />
+          {podeGerir ? <DispararLembretesButton /> : null}
         </div>
       </MotionReveal>
 
-      <AdminCreateDisclosure label="Nova cobrança">
-        <AdminCriarCobrancaForm
-          membros={membrosRaw.map((m: (typeof membrosRaw)[number]) => ({
-            userId: m.userId,
-            label: m.nome,
-          }))}
-          planos={planosRaw.map((p: (typeof planosRaw)[number]) => ({
-            id: p.id,
-            nome: p.nome,
-            valor: Number(p.valor),
-          }))}
-        />
-      </AdminCreateDisclosure>
+      {podeGerir ? (
+        <AdminCreateDisclosure label="Nova cobrança">
+          <AdminCriarCobrancaForm
+            membros={membrosRaw.map((m: (typeof membrosRaw)[number]) => ({
+              userId: m.userId,
+              label: m.nome,
+            }))}
+            planos={planosRaw.map((p: (typeof planosRaw)[number]) => ({
+              id: p.id,
+              nome: p.nome,
+              valor: Number(p.valor),
+            }))}
+          />
+        </AdminCreateDisclosure>
+      ) : null}
 
       <AdminTabs
         tabs={STATUS_FILTROS.map((f) => ({
@@ -251,7 +257,9 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <AdminCobrancaAcoes cobrancaId={c.id} status={c.status} />
+                      {podeGerir ? (
+                        <AdminCobrancaAcoes cobrancaId={c.id} status={c.status} />
+                      ) : null}
                     </td>
                   </tr>
                 )

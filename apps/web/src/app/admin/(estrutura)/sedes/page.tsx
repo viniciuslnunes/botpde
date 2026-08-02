@@ -1,8 +1,8 @@
 import { db } from '@torcida/db'
-import { assertPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
+import { assertAnyPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
 import { getEstadoCanalRestritoEmLote } from '@/lib/canal-restrito'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida } from '@torcida/types'
+import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida, hasPermission } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
 import { atorPodeGerirPortalProprio } from '@/lib/sede-acesso-mae'
 import { redirect } from 'next/navigation'
@@ -94,9 +94,15 @@ async function carregarSedesCasoB(tenantId: string, sedesLocais: SedeRow[]): Pro
 }
 
 export default async function AdminSedesPage() {
-  const authz = await assertPermission(PERMISSIONS.SEDES_MANAGE).catch(() => null)
+  const authz = await assertAnyPermission([
+    PERMISSIONS.SEDES_VIEW,
+    PERMISSIONS.SEDES_MANAGE,
+  ]).catch(() => null)
   if (!authz) redirect('/admin')
   const { tenant } = authz
+  const podeGerir =
+    Boolean(authz.isSuperAdmin) ||
+    hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.SEDES_MANAGE)
 
   type MembroCountRow = { sedeId: string | null; _count: { _all: number } }
 
@@ -294,25 +300,38 @@ export default async function AdminSedesPage() {
   }))
 
   const torcidaPrincipal = [...paisExternos.values()][0] ?? null
-  const podeAdicionarLocal = podeCriarUnidadeTerritorial(
-    rowsLocal.some((s) => s.tipo === 'SEDE') ? 'SEDE' : 'PONTO_ENCONTRO',
-  )
+  const podeAdicionarLocal =
+    podeGerir &&
+    podeCriarUnidadeTerritorial(
+      rowsLocal.some((s) => s.tipo === 'SEDE') ? 'SEDE' : 'PONTO_ENCONTRO',
+    )
 
   return (
     <div className="min-w-0 space-y-6">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Hierarquia Sede → Subsede → PDE — mapa, eventos e cadastro. Unidades com portal próprio
-        continuam na árvore; a sede principal pode editá-las, desativá-las ou excluí-las com a
-        permissão de afiliação.
+        {podeGerir
+          ? 'Hierarquia Sede → Subsede → PDE — mapa, eventos e cadastro. Unidades com portal próprio continuam na árvore; a sede principal pode editá-las, desativá-las ou excluí-las com a permissão de afiliação.'
+          : 'Somente leitura — hierarquia Sede → Subsede → PDE da unidade.'}
       </p>
       <MotionReveal>
         <AdminSedesManager
-          sedes={sedes}
+          sedes={sedes.map((s) =>
+            podeGerir
+              ? s
+              : {
+                  ...s,
+                  podeExcluir: false,
+                  podeGerirPortalProprio: false,
+                  podeSolicitarReativacao: false,
+                  podeImporReativacao: false,
+                },
+          )}
           sedesOption={sedesOption}
           candidatos={candidatos}
           membrosSemUnidade={membrosSemUnidade}
           torcidaPrincipal={torcidaPrincipal}
           podeAdicionarLocal={podeAdicionarLocal}
+          somenteLeitura={!podeGerir}
         />
       </MotionReveal>
     </div>

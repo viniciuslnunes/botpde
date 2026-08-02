@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ADMIN_MENU,
+  applyPermissionCascade,
   calculateEffectivePermissions,
   canManageDepartamento,
   capabilityPorSlug,
@@ -380,11 +381,27 @@ describe('filterMenuByPermissions com OR', () => {
     expect(groups.find((g) => g.id === 'financas')?.label).toBe('Finanças')
   })
 
-  it('Fase 2: pacote colaborador de área canônica não abre operação admin (exceto Bar/PDV e Relatórios)', () => {
+  it('Fase 2: pacote colaborador de área canônica não abre operação admin (exceto Diretoria, Bar/PDV e Relatórios)', () => {
     for (const area of DEPARTAMENTOS_CANONICOS) {
       const ids = filterMenuByPermissions(ADMIN_MENU, area.permissions).map((i) => i.id)
-      // reports:view → leitura de indicadores; bar:operate → PDV (caixa do Financeiro).
-      // Nenhum item de operação transversal (membros, financeiro manage, loja...).
+      if (area.nome === 'Diretoria') {
+        const esperado = new Set([
+          'dashboard',
+          'estrutura',
+          'membros',
+          'socios',
+          'eventos',
+          'loja',
+          'comunidade',
+          'financeiro',
+          'patrimonio',
+          'relatorios',
+          'plataforma',
+        ])
+        expect(new Set(ids), area.nome).toEqual(esperado)
+        expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(true)
+        continue
+      }
       const esperado = new Set(['dashboard'])
       if (area.permissions.includes(PERMISSIONS.REPORTS_VIEW)) esperado.add('relatorios')
       if (area.permissions.includes(PERMISSIONS.BAR_OPERATE)) {
@@ -394,6 +411,40 @@ describe('filterMenuByPermissions com OR', () => {
       expect(new Set(ids), area.nome).toEqual(esperado)
       expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(esperado.size > 1)
     }
+  })
+
+  it('Membro · Diretoria: menu de visão sem perms de mutação', () => {
+    const diretoria = DEPARTAMENTOS_CANONICOS.find((a) => a.nome === 'Diretoria')!
+    expect(diretoria.permissions).toContain(PERMISSIONS.EVENTS_VIEW)
+    expect(diretoria.permissions).toContain(PERMISSIONS.COMMUNITY_VIEW)
+    expect(diretoria.permissions).toContain(PERMISSIONS.SEDES_VIEW)
+    expect(diretoria.permissions).toContain(PERMISSIONS.MEMBERS_VIEW)
+    expect(diretoria.permissions).not.toContain(PERMISSIONS.MEMBERS_APPROVE)
+    expect(diretoria.permissions).not.toContain(PERMISSIONS.EVENTS_MANAGE)
+    expect(diretoria.permissions).not.toContain(PERMISSIONS.FINANCE_MANAGE)
+    expect(diretoria.permissions).not.toContain(PERMISSIONS.SEDES_MANAGE)
+    expect(diretoria.permissions).not.toContain(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+    expect(diretoria.permissionsGestor).toContain(PERMISSIONS.MEMBERS_APPROVE)
+    expect(diretoria.permissionsGestor).toContain(PERMISSIONS.SEDES_MANAGE)
+  })
+
+  it('cascata: ops de comunidade puxam community:view; post não', () => {
+    const comManage = applyPermissionCascade([], [PERMISSIONS.COMMUNITY_MANAGE])
+    expect(comManage).toContain(PERMISSIONS.COMMUNITY_VIEW)
+    const soPost = applyPermissionCascade([], [PERMISSIONS.COMMUNITY_POST])
+    expect(soPost).not.toContain(PERMISSIONS.COMMUNITY_VIEW)
+  })
+
+  it('finance:view sozinho não abre admin; view+audit (Diretoria) abre', () => {
+    expect(
+      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.FINANCE_VIEW]).map((i) => i.id),
+    ).toEqual(['dashboard'])
+    expect(
+      filterMenuByPermissions(ADMIN_MENU, [
+        PERMISSIONS.FINANCE_VIEW,
+        PERMISSIONS.AUDIT_VIEW,
+      ]).map((i) => i.id),
+    ).toEqual(expect.arrayContaining(['financeiro', 'plataforma']))
   })
 
   it('Fase 2: gestor de cada área canônica ganha ao menos um item admin além do dashboard', () => {

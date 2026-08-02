@@ -41,6 +41,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     href: '/admin/torcida',
     permissao: [
       PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+      PERMISSIONS.SEDES_VIEW,
       PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.ROLES_MANAGE,
       PERMISSIONS.AFFILIATION_MANAGE,
@@ -60,8 +61,8 @@ export const ADMIN_MENU = /** @type {const} */ ([
     id: 'eventos',
     label: 'Agenda',
     href: '/admin/eventos',
-    // Criar eventos (EVENTS_CREATE) é operação de portal/área; admin = gerir.
-    permissao: PERMISSIONS.EVENTS_MANAGE,
+    // Leitura (Diretoria oversight) × gerir.
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
     secao: 'operacao',
   },
   // Catálogo, pedidos, categorias, cupons e desempenho são tabs de `/admin/loja`.
@@ -98,6 +99,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     label: 'Comunidade',
     href: '/admin/comunidade',
     permissao: [
+      PERMISSIONS.COMMUNITY_VIEW,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MODERATE,
@@ -113,15 +115,22 @@ export const ADMIN_MENU = /** @type {const} */ ([
     id: 'financeiro',
     label: 'Financeiro',
     href: '/admin/financeiro',
-    // finance:view = portal; admin = operação do gestor.
-    permissao: PERMISSIONS.FINANCE_MANAGE,
+    // finance:view sozinho = portal; admin exige manage OU (view + audit) —
+    // oversight da Diretoria sem abrir o livro-caixa para o colaborador Financeiro.
+    permissao: [
+      PERMISSIONS.FINANCE_MANAGE,
+      [PERMISSIONS.FINANCE_VIEW, PERMISSIONS.AUDIT_VIEW],
+    ],
     secao: 'financas',
   },
   {
     id: 'patrimonio',
     label: 'Patrimônio',
     href: '/admin/patrimonio',
-    permissao: PERMISSIONS.PATRIMONY_MANAGE,
+    permissao: [
+      PERMISSIONS.PATRIMONY_MANAGE,
+      [PERMISSIONS.PATRIMONY_VIEW, PERMISSIONS.AUDIT_VIEW],
+    ],
     secao: 'financas',
   },
   // Rede externa: domínio próprio, não vira etapa de Estrutura (que é a
@@ -156,6 +165,16 @@ export const ADMIN_MENU = /** @type {const} */ ([
 ])
 
 /**
+ * Permissão de item de menu/tab:
+ * - `null` → sempre permitido (gate é do módulo)
+ * - `string` → precisa daquela permissão
+ * - `string[]` → OR entre entradas
+ * - entrada aninhada `string[]` → AND (oversight: view + audit)
+ *
+ * @typedef {string | readonly (string | readonly string[])[] | null} MenuPermissao
+ */
+
+/**
  * Etapa de um módulo do admin, na forma consumida pelo layout.
  *
  * Existe porque `ADMIN_MODULOS` é `as const`: sem este contrato, o `.filter`
@@ -166,7 +185,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
  *   id: string,
  *   label: string,
  *   href: string,
- *   permissao: string | readonly string[] | null,
+ *   permissao: MenuPermissao,
  *   matchPaths?: readonly string[],
  * }} AdminModuloTab
  */
@@ -184,7 +203,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
  * sobre a mesma entidade-raiz, deep-linkável. Tela imersiva (PDV), detalhe de
  * item (`[id]`) e leitura cross-módulo (Relatórios) **não** viram tab.
  *
- * `permissao`: string (única), array (OR) ou `null` (herda o gate do módulo).
+ * `permissao`: ver `MenuPermissao` (string, OR, AND aninhado, ou `null`).
  * `matchPaths`: rotas irmãs que ativam a tab sem aparecer na barra.
  *
  * @typedef {{ id: string, menuId: string, href: string, tabs: readonly AdminModuloTab[] }} AdminModulo
@@ -270,31 +289,39 @@ export const ADMIN_MODULOS = ([
         id: 'visao-geral',
         label: 'Visão geral',
         href: '/admin/comunidade',
-        permissao: [PERMISSIONS.COMMUNITY_MANAGE, PERMISSIONS.ANNOUNCEMENTS_PUBLISH],
+        permissao: [
+          PERMISSIONS.COMMUNITY_VIEW,
+          PERMISSIONS.COMMUNITY_MANAGE,
+          PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+        ],
       },
       {
         id: 'comunicados',
         label: 'Comunicados',
         href: '/admin/comunidade/comunicados',
-        permissao: PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+        permissao: [PERMISSIONS.COMMUNITY_VIEW, PERMISSIONS.ANNOUNCEMENTS_PUBLISH],
       },
       {
         id: 'mural',
         label: 'Mural',
         href: '/admin/comunidade/mural',
-        permissao: PERMISSIONS.COMMUNITY_MANAGE,
+        permissao: [PERMISSIONS.COMMUNITY_VIEW, PERMISSIONS.COMMUNITY_MANAGE],
       },
       {
         id: 'moderacao',
         label: 'Moderação',
         href: '/admin/comunidade/moderacao',
-        permissao: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
+        permissao: [
+          PERMISSIONS.COMMUNITY_VIEW,
+          PERMISSIONS.COMMUNITY_MODERATE,
+          PERMISSIONS.MESSAGES_MODERATE,
+        ],
       },
       {
         id: 'noticias',
         label: 'Notícias',
         href: '/admin/comunidade/noticias',
-        permissao: PERMISSIONS.NEWS_CURATE,
+        permissao: [PERMISSIONS.COMMUNITY_VIEW, PERMISSIONS.NEWS_CURATE],
       },
     ],
   },
@@ -323,8 +350,12 @@ export const ADMIN_MODULOS = ([
         id: 'visao-geral',
         label: 'Visão geral',
         href: '/admin/torcida',
-        // Presidente vê o console consolidado; quem gere unidades vê a árvore.
-        permissao: [PERMISSIONS.TORCIDA_GLOBAL_VIEW, PERMISSIONS.SEDES_MANAGE],
+        // Presidente vê o console consolidado; quem gere ou só lê unidades vê a árvore.
+        permissao: [
+          PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+          PERMISSIONS.SEDES_VIEW,
+          PERMISSIONS.SEDES_MANAGE,
+        ],
         // Leitura de uma unidade pertence à visão consolidada.
         matchPaths: ['/admin/torcida/unidade'],
       },
@@ -332,7 +363,7 @@ export const ADMIN_MODULOS = ([
         id: 'unidades',
         label: 'Unidades',
         href: '/admin/sedes',
-        permissao: PERMISSIONS.SEDES_MANAGE,
+        permissao: [PERMISSIONS.SEDES_VIEW, PERMISSIONS.SEDES_MANAGE],
       },
       {
         id: 'hierarquia',
@@ -382,18 +413,30 @@ export function getAdminModulo(moduloId) {
 }
 
 /**
- * Testa `permissao` no formato do menu/tab: string, array (OR) ou `null`
- * (sempre permitido — o gate é do módulo).
+ * Testa `permissao` no formato do menu/tab:
+ * - `null` → sempre permitido (gate é do módulo)
+ * - `string` → precisa daquela permissão
+ * - `string[]` → OR entre entradas
+ * - entrada aninhada `string[]` → AND (oversight: view + audit, sem abrir
+ *   o módulo admin para quem só tem view no portal)
  *
- * @param {string | readonly string[] | null} permissao
+ * @param {string | readonly (string | readonly string[])[] | null} permissao
  * @param {string[]} effectivePermissions
  */
 function permite(permissao, effectivePermissions) {
   if (permissao === null || permissao === undefined) return true
-  if (Array.isArray(permissao)) {
-    return permissao.some((p) => hasPermission(effectivePermissions, p))
+  if (typeof permissao === 'string') {
+    return hasPermission(effectivePermissions, permissao)
   }
-  return hasPermission(effectivePermissions, /** @type {string} */ (permissao))
+  if (Array.isArray(permissao)) {
+    return permissao.some((entry) => {
+      if (Array.isArray(entry)) {
+        return entry.every((p) => hasPermission(effectivePermissions, p))
+      }
+      return hasPermission(effectivePermissions, entry)
+    })
+  }
+  return false
 }
 
 /**
@@ -510,19 +553,13 @@ export function resolverMenuIdDeRota(rota) {
  * Usar sempre no servidor — nunca confiar em filtragem feita só no cliente,
  * já que o menu não é controle de acesso, só affordance visual.
  *
- * `permissao` pode ser string ou array (OR — ex.: eventos aceita CREATE ou MANAGE).
+ * `permissao` segue `MenuPermissao` (string, OR, AND aninhado, ou `null`).
  *
- * @param {readonly {id: string, label: string, href: string, permissao: string | readonly string[] | null, secao?: string}[]} menu
+ * @param {readonly {id: string, label: string, href: string, permissao: MenuPermissao, secao?: string}[]} menu
  * @param {string[]} effectivePermissions
  */
 export function filterMenuByPermissions(menu, effectivePermissions) {
-  return menu.filter((item) => {
-    if (item.permissao === null) return true
-    if (Array.isArray(item.permissao)) {
-      return item.permissao.some((p) => hasPermission(effectivePermissions, p))
-    }
-    return hasPermission(effectivePermissions, item.permissao)
-  })
+  return menu.filter((item) => permite(item.permissao, effectivePermissions))
 }
 
 /**
@@ -569,9 +606,6 @@ export function groupAdminMenuBySecao(items) {
 export function hasAdminAreaAccess(effectivePermissions) {
   return ADMIN_MENU.some((item) => {
     if (item.permissao === null) return false
-    if (Array.isArray(item.permissao)) {
-      return item.permissao.some((p) => hasPermission(effectivePermissions, p))
-    }
-    return hasPermission(effectivePermissions, item.permissao)
+    return permite(item.permissao, effectivePermissions)
   })
 }

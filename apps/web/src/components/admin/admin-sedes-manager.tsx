@@ -320,10 +320,12 @@ function PaiExternoCard({
   node,
   nivel = 0,
   sedesOption,
+  somenteLeitura = false,
 }: {
   node: SedeExternoNode
   nivel?: number
   sedesOption: SedeOption[]
+  somenteLeitura?: boolean
 }) {
   const fotoOuStreet = resolveCoverUrl(node)
   // Torcida principal: foto da sede → Street View → logo do tenant (nunca "sem foto" se há logo).
@@ -374,9 +376,16 @@ function PaiExternoCard({
                 node={filho}
                 nivel={nivel + 1}
                 sedesOption={sedesOption}
+                somenteLeitura={somenteLeitura}
               />
             ) : (
-              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} sedesOption={sedesOption} />
+              <SedeCard
+                key={filho.id}
+                sede={filho}
+                nivel={nivel + 1}
+                sedesOption={sedesOption}
+                somenteLeitura={somenteLeitura}
+              />
             ),
           )}
         </div>
@@ -389,10 +398,12 @@ function SedeCard({
   sede,
   nivel = 0,
   sedesOption,
+  somenteLeitura = false,
 }: {
   sede: SedeLocalNode
   nivel?: number
   sedesOption: SedeOption[]
+  somenteLeitura?: boolean
 }) {
   const semCoords = sede.lat == null || sede.lng == null
   const coverUrl = resolveCoverUrl(sede)
@@ -512,7 +523,7 @@ function SedeCard({
                   podeImpor={Boolean(sede.podeImporReativacao)}
                 />
               ) : null}
-              {sede.portalProprio && sede.podeGerirPortalProprio ? (
+              {sede.portalProprio && sede.podeGerirPortalProprio && !somenteLeitura ? (
                 <>
                   <Link
                     href={`/admin/sedes/${sede.id}`}
@@ -558,16 +569,18 @@ function SedeCard({
                     href={`/admin/sedes/${sede.id}`}
                     className="inline-flex items-center justify-center gap-1 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.28)] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.18)]"
                   >
-                    Editar
+                    {somenteLeitura ? 'Ver' : 'Editar'}
                     <ChevronRight className="h-3.5 w-3.5" aria-hidden />
                   </Link>
-                  <SedeAcoesMenu
-                    sedeId={sede.id}
-                    sedeNome={sede.nome}
-                    ativa={sede.ativa}
-                    podeExcluir={sede.podeExcluir}
-                    destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
-                  />
+                  {!somenteLeitura ? (
+                    <SedeAcoesMenu
+                      sedeId={sede.id}
+                      sedeNome={sede.nome}
+                      ativa={sede.ativa}
+                      podeExcluir={sede.podeExcluir}
+                      destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
+                    />
+                  ) : null}
                 </>
               )}
             </div>
@@ -584,9 +597,16 @@ function SedeCard({
                 node={filho}
                 nivel={nivel + 1}
                 sedesOption={sedesOption}
+                somenteLeitura={somenteLeitura}
               />
             ) : (
-              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} sedesOption={sedesOption} />
+              <SedeCard
+                key={filho.id}
+                sede={filho}
+                nivel={nivel + 1}
+                sedesOption={sedesOption}
+                somenteLeitura={somenteLeitura}
+              />
             ),
           )}
         </div>
@@ -602,6 +622,7 @@ export function AdminSedesManager({
   membrosSemUnidade,
   torcidaPrincipal = null,
   podeAdicionarLocal = false,
+  somenteLeitura = false,
 }: {
   sedes: AdminSedeListItem[]
   sedesOption: SedeOption[]
@@ -610,6 +631,8 @@ export function AdminSedesManager({
   torcidaPrincipal?: PaiHerdadoListItem | null
   /** Só Sede principal — ver `podeCriarUnidadeTerritorial`. */
   podeAdicionarLocal?: boolean
+  /** Oversight: sem criar/editar/ações de mutação. */
+  somenteLeitura?: boolean
 }) {
   const [busca, setBusca] = useState('')
   const buscaDeferred = useDeferredValue(busca)
@@ -706,7 +729,7 @@ export function AdminSedesManager({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {semCoordsCount > 0 && isGoogleMapsConfigured() && (
+          {semCoordsCount > 0 && isGoogleMapsConfigured() && !somenteLeitura && (
             <button
               type="button"
               onClick={geocodeLote}
@@ -871,9 +894,19 @@ export function AdminSedesManager({
           <div className="space-y-4">
             {tree.map((node) =>
               node.kind === 'externo' ? (
-                <PaiExternoCard key={`ext-${node.id}`} node={node} sedesOption={sedesOption} />
+                <PaiExternoCard
+                  key={`ext-${node.id}`}
+                  node={node}
+                  sedesOption={sedesOption}
+                  somenteLeitura={somenteLeitura}
+                />
               ) : (
-                <SedeCard key={node.id} sede={node} sedesOption={sedesOption} />
+                <SedeCard
+                  key={node.id}
+                  sede={node}
+                  sedesOption={sedesOption}
+                  somenteLeitura={somenteLeitura}
+                />
               ),
             )}
           </div>

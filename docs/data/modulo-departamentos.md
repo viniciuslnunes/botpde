@@ -68,7 +68,8 @@ Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` 
 
 | Departamento | Colaborador (portal) | Gestor+ (portal + operação admin) |
 |---|---|---|
-| **Diretoria** | Relatórios; ver financeiro/patrimônio; salas; DMs/grupos; postar | Ver/aprovar/reprovar/advertir/bloquear/importar membros; LGE; auditoria; comunicados; eventos; mural/moderação/notícias; sedes; pedidos; gerir financeiro |
+| **Diretoria** | **Oversight admin (leitura)** + portal: relatórios, auditoria, membros/sócios, agenda, pedidos, comunidade, financeiro, patrimônio, estrutura/unidades; salas; DMs/grupos; postar | Aprovar/reprovar/advertir/bloquear/importar/desligar membros; LGE; comunicados; criar/gerir eventos; mural/moderação/notícias; canais; sedes; gerir financeiro |
+
 | **Financeiro** | Ver financeiro e relatórios; operar PDV do bar; DMs | Gerir financeiro e catálogo/estoque do bar; comunicados; salas/grupos |
 | **Social e eventos** | Postar; DMs/grupos/salas | Criar/gerir eventos; comunicados; mural/moderação/notícias; ver financeiro/relatórios/pedidos |
 | **Materiais / Loja** | DMs/grupos; postar; relatórios | Ver/gerir pedidos e catálogo; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
@@ -79,12 +80,19 @@ Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` 
 | **Feminino** | Postar; DMs/grupos/salas | Eventos; notícias; mural/moderação/canais; comunicados; relatórios; advertir |
 | **Carnaval** | Postar; salas/grupos; ver financeiro/patrimônio/relatórios | Eventos; mural/moderação/notícias; comunicados; canais; advertir |
 
-**Princípio Fase 2:** colaborador **não** recebe permissões que abrem o menu `/admin`
-(`members:view`, `events:manage`, `store:*`, `news:curate`, `finance:manage`, etc.),
-exceto o PDV do Bar (`bar:operate` no colaborador Financeiro — a tela vive em
-`/admin/bar`).
-`finance:view` / `patrimony:view` / `events:create` ficam no portal ou no pacote gestor;
-itens admin de Financeiro/Patrimônio/Eventos/Bar-catálogo exigem `*:manage`.
+**Princípio Fase 2:** colaborador **não** recebe permissões que abrem operação
+`/admin` (`members:view`, `events:manage`, `store:*`, `news:curate`,
+`finance:manage`, etc.), exceto:
+- PDV do Bar (`bar:operate` no colaborador Financeiro);
+- **`reports:view` → Dashboard + Relatórios** (demais áreas);
+- **exceção Diretoria:** Membro · Diretoria é **oversight read-only** no admin
+  (ver `docs/data/matriz-cargos-permissoes.md`) — vê módulos com `*:view` /
+  `store:view_orders` / `events:view` / `community:view` / `sedes:view`, sem
+  mutações (`*:manage`, approve, publish, moderate).
+
+`finance:view` / `patrimony:view` no colaborador de outras áreas continuam
+orientados ao **portal**; no admin só abrem com `*:manage` ou com oversight
+(`view` + `audit:view`, típico da Diretoria).
 
 **Presidência** (`settings:manage`, `roles:manage`, `torcida:global_view`,
 `alliances:manage`, e `community:post_nacional` via cargo de sistema) entra via
@@ -287,5 +295,11 @@ mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
    `/admin/relatorios`, colaborador de área canônica que tem `reports:view` no
    pacote passa a acessar a área admin com no máximo **Dashboard + Relatórios
    (leitura)** — nunca itens de operação (invariante testado em
-   `rbac.test.ts`). Para restringir a gestores, remover `reports:view` dos
-   pacotes colaborador no seed.
+   `rbac.test.ts`), **exceto Diretoria** (item 8).
+8. **Membro · Diretoria = visão admin read-only** (2026-08-02): pacote colaborador
+   da Diretoria inclui `members:view`, `finance:view`, `patrimony:view`,
+   `store:view_orders`, `events:view`, `community:view`, `sedes:view`,
+   `audit:view` (+ `reports:view`). Menu e GET dos módulos aceitam essas views;
+   mutações seguem `*:manage` / approve / publish. Matriz completa:
+   `docs/data/matriz-cargos-permissoes.md`. Demais áreas colaboradoras
+   permanecem na regra do item 7.

@@ -177,11 +177,13 @@ export function ComunicadosManager({
   currentUser,
   tenantId,
   tenantNome,
+  podeGerir = true,
 }: {
   comunicados: Comunicado[]
   currentUser: CurrentUser
   tenantId: string
   tenantNome: string
+  podeGerir?: boolean
 }) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -233,6 +235,7 @@ export function ComunicadosManager({
                 </Badge>
               </div>
 
+              {podeGerir ? (
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   onClick={() =>
@@ -275,6 +278,7 @@ export function ComunicadosManager({
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+              ) : null}
             </div>
 
             {comunicado.midiaUrls.length > 0 && (

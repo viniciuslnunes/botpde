@@ -33,6 +33,8 @@ interface ModeracaoDenunciasClientProps {
   denunciasMensagens: DenunciaMensagemItem[]
   podeModerarPosts: boolean
   podeModerarMensagens: boolean
+  /** Exibe a fila de posts mesmo sem poder moderar (oversight). */
+  mostrarPosts?: boolean
   onResolverPost: (id: string) => Promise<void>
   onDescartarPost: (id: string) => Promise<void>
   onResolverMensagem: (id: string) => Promise<void>
@@ -44,6 +46,7 @@ export function ModeracaoDenunciasClient({
   denunciasMensagens: mensagensIniciais,
   podeModerarPosts,
   podeModerarMensagens,
+  mostrarPosts = podeModerarPosts,
   onResolverPost,
   onDescartarPost,
   onResolverMensagem,
@@ -109,7 +112,7 @@ export function ModeracaoDenunciasClient({
 
   return (
     <div className="space-y-6">
-      {podeModerarPosts && (
+      {mostrarPosts && (
         <>
           {posts.length === 0 ? (
             <MotionEmptyState
@@ -154,6 +157,7 @@ export function ModeracaoDenunciasClient({
                         Denunciante: {denuncia.denunciante}
                       </p>
                     </div>
+                    {podeModerarPosts ? (
                     <div className="mt-4 flex flex-wrap gap-2">
                       <m.button
                         type="button"
@@ -174,6 +178,7 @@ export function ModeracaoDenunciasClient({
                         Descartar denúncia
                       </m.button>
                     </div>
+                    ) : null}
                   </m.div>
                 ))}
               </AnimatePresence>

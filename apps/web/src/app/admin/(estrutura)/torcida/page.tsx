@@ -4,7 +4,7 @@ import { Eye } from 'lucide-react'
 import type { Tenant } from '@torcida/db'
 import type { Metadata } from 'next'
 import { PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
-import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { assertAnyPermission, assertPresidenteGlobal } from '@/lib/authz'
 import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { TorcidaConsole } from './_components/torcida-console'
 import { TorcidaEstrutura } from './_components/torcida-estrutura'
@@ -27,14 +27,18 @@ function ConsoleSkeleton() {
 /**
  * Fallback para quem NÃO é Presidente de uma Sede raiz (subsede/PDE com tenant
  * próprio, ou admin sem TORCIDA_GLOBAL_VIEW): visão da estrutura da torcida,
- * que respeita o toggle R3 (`getWorktreeParaDescendente`). Sem `SEDES_MANAGE`,
- * entra pela primeira etapa permitida (Hierarquia / Solicitações) — o menu do
- * módulo aponta para esta raiz e não pode expulsar quem só tem etapa parcial.
+ * que respeita o toggle R3 (`getWorktreeParaDescendente`). Sem `SEDES_MANAGE`
+ * nem `SEDES_VIEW`, entra pela primeira etapa permitida (Hierarquia /
+ * Solicitações) — o menu do módulo aponta para esta raiz e não pode expulsar
+ * quem só tem etapa parcial.
  */
 async function TorcidaEstruturaFallback() {
   let tenant: Tenant
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE))
+    ;({ tenant } = await assertAnyPermission([
+      PERMISSIONS.SEDES_VIEW,
+      PERMISSIONS.SEDES_MANAGE,
+    ]))
   } catch {
     const permissoes = await permissoesEfetivasNoAdmin()
     redirect(primeiraTabPermitida('estrutura', permissoes) ?? '/admin')

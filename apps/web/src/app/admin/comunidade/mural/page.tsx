@@ -11,7 +11,9 @@ export const metadata: Metadata = { title: 'Mural — Comunidade' }
 
 export default async function AdminMuralPage() {
   const { tenant, permissoes: effective } = await contextoAdmin()
-  if (!hasPermission(effective, PERMISSIONS.COMMUNITY_MANAGE)) redirect('/admin/comunidade')
+  const podeGerir = hasPermission(effective, PERMISSIONS.COMMUNITY_MANAGE)
+  const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
+  if (!podeGerir && !podeVer) redirect('/admin/comunidade')
 
   const posts = await db.post.findMany({
     where: { tenantId: tenant.id },
@@ -22,16 +24,20 @@ export default async function AdminMuralPage() {
   return (
     <>
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Avisos internos publicados no mural, fora do fluxo de comunicados oficiais.
+        {podeGerir
+          ? 'Avisos internos publicados no mural, fora do fluxo de comunicados oficiais.'
+          : 'Somente leitura — avisos internos do mural.'}
       </p>
 
-      <MotionReveal>
-        <AdminCreateDisclosure label="Novo post" title="Novo post no mural">
-          <CriarPostForm />
-        </AdminCreateDisclosure>
-      </MotionReveal>
+      {podeGerir ? (
+        <MotionReveal>
+          <AdminCreateDisclosure label="Novo post" title="Novo post no mural">
+            <CriarPostForm />
+          </AdminCreateDisclosure>
+        </MotionReveal>
+      ) : null}
       <MotionReveal index={1}>
-        <PostsManager posts={posts} />
+        <PostsManager posts={posts} podeGerir={podeGerir} />
       </MotionReveal>
     </>
   )

@@ -6,7 +6,7 @@ import {
   PERIODICIDADE_PLANO_LABEL,
   PERMISSIONS,
 } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertManageOrOversightView } from '@/lib/authz'
 import { AdminCreateDisclosure } from '@/components/admin/ui'
 import { AdminPlanoForm } from './admin-plano-form'
 import { AdminPlanosListaClient } from './admin-planos-lista-client'
@@ -17,15 +17,19 @@ export const metadata: Metadata = { title: 'Planos de associação — Admin' }
 type Props = { searchParams: Promise<{ edit?: string }> }
 
 export default async function PlanosAssociacaoAdminPage({ searchParams }: Props) {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
+  let podeGerir = false
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE))
+    ;({ tenant, podeGerir } = await assertManageOrOversightView(
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.FINANCE_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }
 
   const sp = await searchParams
-  const editId = sp.edit?.trim()
+  const editId = podeGerir ? sp.edit?.trim() : undefined
 
   type PlanoRow = {
     id: string
@@ -61,7 +65,7 @@ export default async function PlanosAssociacaoAdminPage({ searchParams }: Props)
         Contribuições periódicas dos associados — distinto do plano SaaS da plataforma.
       </p>
 
-      {editando ? (
+      {podeGerir && editando ? (
         <>
           <AdminPlanoForm
             initial={{
@@ -81,13 +85,16 @@ export default async function PlanosAssociacaoAdminPage({ searchParams }: Props)
             Cancelar edição
           </Link>
         </>
-      ) : (
+      ) : podeGerir ? (
         <AdminCreateDisclosure label="Novo plano">
           <AdminPlanoForm />
         </AdminCreateDisclosure>
+      ) : (
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">Somente leitura.</p>
       )}
 
       <AdminPlanosListaClient
+        podeGerir={podeGerir}
         planos={planos.map((p) => ({
           id: p.id,
           nome: p.nome,

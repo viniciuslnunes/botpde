@@ -49,9 +49,6 @@ export default async function ComunidadePage({
   ])
   if (!ctx) redirect('/')
 
-  const escopoDesejado = resolverEscopoComunidade(ctx, params.escopo)
-  const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
-
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
@@ -62,6 +59,24 @@ export default async function ComunidadePage({
   const atualSlug = ctx.modo === 'torcida' ? ctx.tenant.slug : null
   const slugTorcida = torcidaReal?.slug ?? null
   const slugUnidade = ctx.unidade?.tenantSlug ?? null
+
+  // Caso B: cookie já na unidade → default do feed é o mural da unidade
+  // (não o da Sede). Caso A (mesmo slug) permanece em torcida.
+  const portalEhUnidadeCasoB =
+    !params.escopo &&
+    Boolean(
+      atualSlug &&
+        slugUnidade &&
+        slugTorcida &&
+        atualSlug === slugUnidade &&
+        slugUnidade !== slugTorcida &&
+        ctx.escopos.unidade,
+    )
+
+  const escopoDesejado = portalEhUnidadeCasoB
+    ? 'unidade'
+    : resolverEscopoComunidade(ctx, params.escopo)
+  const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao

@@ -6,7 +6,7 @@ import {
   formatDataCompetenciaInput,
   formatarMoedaBRL,
 } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertManageOrOversightView } from '@/lib/authz'
 import {
   compararFinanceiroPeriodo,
   resumirFinanceiroMensal,
@@ -116,9 +116,12 @@ async function FinanceiroInsights({ tenantId }: { tenantId: string }) {
 }
 
 export default async function FinanceiroEvolucaoPage() {
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertManageOrOversightView>>['tenant']
   try {
-    ;({ tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE))
+    ;({ tenant } = await assertManageOrOversightView(
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.FINANCE_VIEW,
+    ))
   } catch {
     redirect('/admin')
   }

@@ -156,6 +156,29 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
 }
 
 /**
+ * Gate de módulos admin onde `*:view` é portal, e oversight admin exige
+ * `view` + `audit:view` (Diretoria) — ou `*:manage` para operar.
+ */
+export async function assertManageOrOversightView(
+  managePerm: string,
+  viewPerm: string,
+): Promise<AuthzResult & { podeGerir: boolean }> {
+  try {
+    const authz = await assertPermission(managePerm)
+    return { ...authz, podeGerir: true }
+  } catch {
+    const authz = await assertAnyPermission([viewPerm])
+    if (
+      !authz.isSuperAdmin &&
+      !hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.AUDIT_VIEW)
+    ) {
+      throw new Error('Sem permissão')
+    }
+    return { ...authz, podeGerir: Boolean(authz.isSuperAdmin) }
+  }
+}
+
+/**
  * Tenant da administração central (Sede principal): possui registro `Sede` com
  * `tipo: 'SEDE'`. Subsedes e PDEs promovidos a portal próprio não passam —
  * alinhado a `assertPresidenteGlobal` e ao gate de `/admin/afiliacoes`.
