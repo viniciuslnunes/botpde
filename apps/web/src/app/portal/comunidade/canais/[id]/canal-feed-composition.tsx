@@ -40,6 +40,7 @@ import { ImageDropZone } from '@/components/media/image-drop-zone'
 import {
   labelTipoUnidade,
   labelVisibilidadeCanal,
+  linkTorcidaComunidadePublica,
   linkUnidadeComunidade,
   type CandidatoMembroCanalItem,
   type CanalItem,
@@ -257,10 +258,14 @@ export function CanalFeedComposition({
 
         {canal.canalOficial && (
           <Link
-            href={linkUnidadeComunidade(canal.tenantId)}
+            href={
+              canal.tipoUnidade === 'SEDE'
+                ? linkTorcidaComunidadePublica(canal.tenantId)
+                : linkUnidadeComunidade(canal.tenantId)
+            }
             className="hidden shrink-0 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline sm:block"
           >
-            Perfil da unidade
+            {canal.tipoUnidade === 'SEDE' ? 'Perfil da torcida' : 'Perfil da unidade'}
           </Link>
         )}
 

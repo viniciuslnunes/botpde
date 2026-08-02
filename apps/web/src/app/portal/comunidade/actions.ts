@@ -49,6 +49,7 @@ import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
   getCanalDaUnidadeDoVinculo,
+  getCanalSeMembroAtivo,
   assertElegibilidadeMembroCanal,
   inscreverCanal,
   podePublicarNoCanal,
@@ -990,21 +991,98 @@ export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Prom
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
 }
 
-export async function editarPost(postId: string, conteudo: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+/**
+ * Autor do próprio post — cobre torcida real e tenant sintético da CN
+ * (`publicarPostNacional`). Não filtrar por `tenantId` do cookie ativo: o post
+ * da CN vive no sintético e o sócio opera com a unidade real ativa.
+ */
+async function assertMutacaoProprioPost(
+  postId: string,
+  opts?: { exigirVisivel?: boolean },
+): Promise<{
+  session: Session
+  post: {
+    id: string
+    tenantId: string
+    midiaUrls: string[]
+    fixado: boolean
+    tipo: string
+  }
+  afiliacaoId: string | null
+}> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado')
 
+  const post: {
+    id: string
+    tenantId: string
+    midiaUrls: string[]
+    fixado: boolean
+    oculto: boolean
+    tipo: string
+    tenant: { sintetico: boolean; afiliacaoId: string | null }
+  } | null = await db.post.findFirst({
+    where: { id: postId, autorId: session.user.id },
+    select: {
+      id: true,
+      tenantId: true,
+      midiaUrls: true,
+      fixado: true,
+      oculto: true,
+      tipo: true,
+      tenant: { select: { sintetico: true, afiliacaoId: true } },
+    },
+  })
+  if (!post || (opts?.exigirVisivel && post.oculto)) {
+    throw new ExpectedError('Post não encontrado')
+  }
+
+  if (post.tenant.sintetico) {
+    const { afiliacaoId } = await assertComunidadeNacional()
+    if (post.tenant.afiliacaoId !== afiliacaoId) {
+      throw new ExpectedError('Post não encontrado')
+    }
+    return {
+      session,
+      post: {
+        id: post.id,
+        tenantId: post.tenantId,
+        midiaUrls: post.midiaUrls,
+        fixado: post.fixado,
+        tipo: post.tipo,
+      },
+      afiliacaoId,
+    }
+  }
+
+  const { tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+  if (post.tenantId !== tenant.id) {
+    throw new ExpectedError('Post não encontrado')
+  }
+  return {
+    session,
+    post: {
+      id: post.id,
+      tenantId: post.tenantId,
+      midiaUrls: post.midiaUrls,
+      fixado: post.fixado,
+      tipo: post.tipo,
+    },
+    afiliacaoId: tenant.afiliacaoId,
+  }
+}
+
+export async function editarPost(postId: string, conteudo: string): Promise<void> {
   const parsed = editarPostSchema.safeParse({ postId, conteudo })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Post inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
 
-  const post = await db.post.findFirst({
-    where: { id: parsed.data.postId, autorId: session.user.id, tenantId: tenant.id, oculto: false },
-    select: { id: true, midiaUrls: true },
+  const { session, post, afiliacaoId } = await assertMutacaoProprioPost(parsed.data.postId, {
+    exigirVisivel: true,
   })
-  if (!post) throw new Error('Post não encontrado')
 
   const midiasFinais = midiasAposEditarConteudo(parsed.data.conteudo, post.midiaUrls)
 
@@ -1015,7 +1093,7 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: post.tenantId,
       atorId: session.user.id,
       acao: 'POST_SOCIAL_EDITADO',
       entidade: 'Post',
@@ -1025,18 +1103,11 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
-  invalidarLeituraComunidade(tenant.id)
+  invalidarLeituraComunidade(post.tenantId, afiliacaoId)
 }
 
 export async function excluirPost(postId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
-  const post = await db.post.findFirst({
-    where: { id: postId, autorId: session.user.id, tenantId: tenant.id },
-    select: { id: true },
-  })
-  if (!post) throw new Error('Post não encontrado')
+  const { session, post, afiliacaoId } = await assertMutacaoProprioPost(postId)
 
   await db.post.update({
     where: { id: post.id },
@@ -1045,7 +1116,7 @@ export async function excluirPost(postId: string): Promise<void> {
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: post.tenantId,
       atorId: session.user.id,
       acao: 'POST_SOCIAL_EXCLUIDO',
       entidade: 'Post',
@@ -1055,7 +1126,7 @@ export async function excluirPost(postId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
-  invalidarLeituraComunidade(tenant.id)
+  invalidarLeituraComunidade(post.tenantId, afiliacaoId)
 }
 
 export interface ComentarioPostItem {
@@ -1482,26 +1553,16 @@ export async function encerrarEnquetePost(enqueteId: string): Promise<void> {
 }
 
 export async function fixarPostPerfil(postId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
-  const post: { id: string; fixado: boolean } | null = await db.post.findFirst({
-    where: {
-      id: postId,
-      autorId: session.user.id,
-      tenantId: tenant.id,
-      tipo: 'MEMBRO',
-      oculto: false,
-    },
-    select: { id: true, fixado: true },
+  const { session, post, afiliacaoId } = await assertMutacaoProprioPost(postId, {
+    exigirVisivel: true,
   })
-  if (!post) throw new Error('Post não encontrado')
+  if (post.tipo !== 'MEMBRO') throw new ExpectedError('Post não encontrado')
 
   if (!post.fixado) {
     const fixados = await db.post.count({
       where: {
         autorId: session.user.id,
-        tenantId: tenant.id,
+        tenantId: post.tenantId,
         tipo: 'MEMBRO',
         oculto: false,
         fixado: true,
@@ -1517,7 +1578,7 @@ export async function fixarPostPerfil(postId: string): Promise<void> {
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: post.tenantId,
       atorId: session.user.id,
       acao: post.fixado ? 'POST_DESAFIXADO_PERFIL' : 'POST_FIXADO_PERFIL',
       entidade: 'Post',
@@ -1529,6 +1590,7 @@ export async function fixarPostPerfil(postId: string): Promise<void> {
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath(linkPostComunidade(post.id))
+  invalidarLeituraComunidade(post.tenantId, afiliacaoId)
 }
 
 export async function salvarPost(postId: string): Promise<void> {
@@ -3554,7 +3616,8 @@ export async function publicarPostCanal(
     // tenant da unidade — mesmo fallback da aba "Minha unidade".
     const canal =
       (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
-      (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id))
+      (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id)) ??
+      (await getCanalSeMembroAtivo(parsed.data.conversaId, session.user.id))
     if (!canal) return { message: 'Canal não encontrado.' }
 
     if (!canal.souMembro) {

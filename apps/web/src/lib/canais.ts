@@ -1018,6 +1018,41 @@ export async function getCanalDaUnidadeDoVinculo(
   return row ? projetarCanalItem(row) : null
 }
 
+/**
+ * Canal oficial da Sede (tipo `SEDE`) — mural da aba "Minha torcida".
+ * Leitura pura (sem `getOrCreate`): sem ponteiro, a aba cai no feed legado.
+ */
+export async function getCanalOficialDaSede(
+  tenantId: string,
+  userId: string,
+): Promise<CanalItem | null> {
+  const sede: { canalConversaId: string | null } | null = await db.sede.findFirst({
+    where: { tenantId, tipo: 'SEDE', canalConversaId: { not: null } },
+    select: { canalConversaId: true },
+  })
+  const conversaId = sede?.canalConversaId
+  if (!conversaId) return null
+
+  const viaDiscovery = await getCanalPorId(conversaId, tenantId, userId)
+  if (viaDiscovery) return viaDiscovery
+
+  // Sócio Caso B no portal da PDE: descoberta cross-tenant pode falhar; se
+  // já é MembroConversa ATIVO, libera o mural (mesmo padrão do vínculo).
+  return getCanalSeMembroAtivo(conversaId, userId)
+}
+
+/** Canal em que a pessoa já é membro ATIVO — bypass do gate de descoberta. */
+export async function getCanalSeMembroAtivo(
+  conversaId: string,
+  userId: string,
+): Promise<CanalItem | null> {
+  const row = await carregarCanalRow(conversaId, userId)
+  if (!row) return null
+  const membro = row.membros[0]
+  if (membro?.status !== 'ATIVO') return null
+  return projetarCanalItem(row)
+}
+
 type CanalRow = NonNullable<Awaited<ReturnType<typeof carregarCanalRow>>>
 
 async function carregarCanalRow(conversaId: string, userId: string) {

@@ -107,9 +107,10 @@ cobrir o mesmo conjunto.
 |-------|---------|
 | Contexto | `resolverContextoEngajamento()` — sócio `APROVADO` com `COMMUNITY_POST`, **ou** torcedor global / preview sem vínculo (escopo = `afiliacaoId` do clube). Não usar só `assertPermission` + `tenantId` do viewer. |
 | Gate do post | `podeEngajarPostVisivel` — fast-path: próprio tenant, ou mesmo clube (sintético / `PUBLICO`); fallback: `resolveVisibleTenantIdsForFeed` (exportado de `feed.ts`). |
+| Autor (editar/excluir/fixar) | `assertMutacaoProprioPost` — lookup por `autorId` (sem `tenantId` do cookie); se o post está no sintético, `assertComunidadeNacional` + mesma afiliação; senão `COMMUNITY_POST` no tenant do post. |
 | Leitura de comentários | `listarComentariosPost` aplica primeiro `resolveTenantIdPortalComunidade` + `resolveVisibleTenantIdsForFeed` (mesmo alcance do feed/permalink), depois `PUBLICO`/`TENANT`/`PRIVADO`. Rival/unrelated não lê nem comentário de post público; autor sempre lê; privacidade de perfil não entra. Torcedor global/CN continua suportado pelo tenant sintético. |
 | UI | `PostEngagement` é otimista; o servidor confirma / reverte no catch. |
-| Sintoma clássico de regressão | POST em `/portal/comunidade` com *“An error occurred in the Server Components render”* ao curtir post da CN → lookup com `tenantId: tenant.id` ou authz sem tenant. |
+| Sintoma clássico de regressão | POST em `/portal/comunidade` com *“An error occurred in the Server Components render”* ao curtir **ou excluir** post da CN → lookup com `tenantId: tenant.id` ou authz sem tenant. |
 
 Helpers e actions: `apps/web/src/app/portal/comunidade/actions.ts`.
 Performance do hot path: `docs/data/modulo-comunidade-performance.md` § engajamento.
@@ -503,6 +504,12 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   `MembroConversa` e o pedido de entrada; o shell entrega só o cromo (abas,
   salas) e **não** monta composer genérico nem feed agregado, que é justamente
   o que a aba da unidade não é.
+
+  **Minha torcida = mural da Sede (2026-08-02)**: mesma `CanalFeedView` do
+  canal da unidade, com o canal oficial tipo `SEDE` (`getCanalOficialDaSede`).
+  Banner (escudo, OFICIAL, inscritos, local, Chat) dá o contexto que o feed
+  agregado não tinha. Feed Descobrir/Seguindo da organizada só aparece se a
+  Sede ainda não tiver `canalConversaId` (legado).
 
   **O gate da aba é o VÍNCULO, não `podeVerCanal`** (`getCanalDaUnidadeDoVinculo`
   em `lib/canais.ts`): `decidePodeVerCanal` barra todo não-sócio fora de canal

@@ -6,7 +6,7 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
-import { getCanalDaUnidadeDoVinculo, podePublicarNoCanal } from '@/lib/canais'
+import { getCanalDaUnidadeDoVinculo, getCanalOficialDaSede, podePublicarNoCanal } from '@/lib/canais'
 import { podeVerFeedSocios } from '@/lib/feed'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { calculateEffectivePermissions } from '@torcida/types'
@@ -95,13 +95,11 @@ export default async function ComunidadePage({
     )
   }
 
-  // Minha torcida / Minha unidade: sócio (modo torcida) ou TORCEDOR com
-  // vínculo (torcidaReal). Sem nenhum dos dois, só resta a Nacional.
+  // Minha torcida / Minha unidade: mural do canal oficial (Sede ou
+  // subsede/PDE) — mesma CanalFeedView. Feed agregado só sobra se o canal
+  // ainda não tiver ponteiro (legado).
   if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')
 
-  // Minha unidade é o CANAL da subsede/PDE, não um feed agregado: é lá que a
-  // liderança controla e segrega o que é da unidade. O filtro `canal` já
-  // existe e aplica o gate de membership do canal.
   const unidade = escopo === 'unidade' ? ctx.unidade : null
   const tenantDoEscopo = unidade
     ? { id: unidade.tenantId, nome: unidade.nome }
@@ -109,12 +107,9 @@ export default async function ComunidadePage({
 
   const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
-  // Mural da unidade: reusa a view do canal, que já resolve composer, gate de
-  // membership e pedido de entrada. Canal oficial nasce privado (pode não ter
-  // liderança vinculada ainda) — a liderança da subsede/PDE abre depois nas
-  // configurações do canal; até lá o não-membro vê o pedido de entrada, não
-  // um mural vazio sem explicação.
   let conteudoCanal: React.ReactNode = null
+  let conversaIdCanal: string | undefined
+
   if (unidade) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
       session.user.id,
@@ -128,6 +123,7 @@ export default async function ComunidadePage({
     const canal = await getCanalDaUnidadeDoVinculo(unidade.canalId, session.user.id)
 
     if (canal) {
+      conversaIdCanal = canal.id
       // Publicar no mural da unidade é de sócio: torcedor lê, participa de
       // grupos/salas/loja, mas não publica no canal oficial.
       const ehSocio = await podeVerFeedSocios(session.user.id, unidade.tenantId)
@@ -145,6 +141,31 @@ export default async function ComunidadePage({
         />
       )
     }
+  } else if (escopo === 'torcida') {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      torcidaReal.id,
+    )
+    const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
+    const canal = await getCanalOficialDaSede(torcidaReal.id, session.user.id)
+
+    if (canal) {
+      conversaIdCanal = canal.id
+      const ehSocio = await podeVerFeedSocios(session.user.id, torcidaReal.id)
+      const podePublicar =
+        ehSocio && (await podePublicarNoCanal(canal, torcidaReal.id, permissoes))
+
+      conteudoCanal = (
+        <CanalFeedView
+          canal={canal}
+          currentUser={currentUser}
+          podePublicar={podePublicar}
+          cursor={params.cursor}
+          viewerTenantId={torcidaReal.id}
+          permissoes={permissoes}
+        />
+      )
+    }
   }
 
   return (
@@ -158,8 +179,8 @@ export default async function ComunidadePage({
         }}
         currentUser={currentUser}
         cursor={params.cursor}
-        filtro={unidade ? 'canal' : filtro}
-        conversaId={unidade?.canalId}
+        filtro={conteudoCanal ? 'canal' : filtro}
+        conversaId={conversaIdCanal}
         conteudoCanal={conteudoCanal}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
