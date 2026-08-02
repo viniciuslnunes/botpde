@@ -2601,28 +2601,25 @@ function PassoVinculo({
                 )}
               </ul>
 
-              {fotoUnidade ? (
-                <div className="mt-4 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                  <div className="relative aspect-[16/9] w-full">
+              <div className="mt-auto flex items-end justify-between gap-4 pt-5">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
+                  Solicitar vínculo
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+
+                {fotoUnidade ? (
+                  <span className="relative block h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                     <Image
                       src={fotoUnidade}
                       alt={`Foto da unidade ${nomeUnidade}`}
                       fill
-                      sizes="(max-width: 1024px) 100vw, 320px"
-                      className="object-cover"
+                      sizes="80px"
+                      className="object-contain"
                       unoptimized={!canOptimizeImageUrl(fotoUnidade)}
                     />
-                  </div>
-                  <p className="px-3 py-2 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                    {nomeUnidade}
-                  </p>
-                </div>
-              ) : null}
-
-              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
-                Solicitar vínculo
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </span>
+                  </span>
+                ) : null}
+              </div>
             </div>
           </button>
         </div>
