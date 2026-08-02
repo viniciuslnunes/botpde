@@ -40,7 +40,7 @@ vi.mock('@/lib/social', () => ({ getSeguimentoStatus: vi.fn() }))
 vi.mock('@/lib/autor-badges', () => ({ enriquecerPostsComBadges: vi.fn() }))
 vi.mock('@/lib/noticias', () => ({ getNoticiasAprovadas: vi.fn() }))
 
-import { orFeedInternoDoTenant, resolveTenantIdsMinhaTorcida } from '@/lib/feed'
+import { orFeedInternoDoTenant, orFeedVisibilidadeSeguindo, resolveTenantIdsMinhaTorcida } from '@/lib/feed'
 
 const SEDE = 'sede-1'
 const SUBSEDE = 'subsede-1'
@@ -117,7 +117,29 @@ describe('orFeedInternoDoTenant', () => {
     })
   })
 
-  it('não admite PRIVADO — "Só seguidores" continua fora do feed da aba', () => {
+  it('não admite PRIVADO — "Só seguidores" continua fora do Descobrir via balde interno', () => {
     expect(orFeedInternoDoTenant(SEDE).visibilidade).toBe('TENANT')
+  })
+})
+
+/**
+ * Seguindo: PUBLICO + TENANT do tenant ativo + PRIVADO (gate = timeline /
+ * follow APROVADO). TENANT de outra unidade da hierarquia não entra pelo ramo
+ * interno — só com tenantId explícito do viewer.
+ */
+describe('orFeedVisibilidadeSeguindo', () => {
+  it('admite PUBLICO, TENANT do tenant ativo e PRIVADO', () => {
+    expect(orFeedVisibilidadeSeguindo(SUBSEDE)).toEqual([
+      { visibilidade: 'PUBLICO' },
+      { tenantId: SUBSEDE, visibilidade: 'TENANT' },
+      { visibilidade: 'PRIVADO' },
+    ])
+  })
+
+  it('TENANT de outro tenant da hierarquia não entra pelo ramo interno', () => {
+    const ramos = orFeedVisibilidadeSeguindo(SEDE)
+    const ramoTenant = ramos.find((r) => r.visibilidade === 'TENANT')
+    expect(ramoTenant).toEqual({ tenantId: SEDE, visibilidade: 'TENANT' })
+    expect(ramoTenant).not.toEqual({ tenantId: PDE, visibilidade: 'TENANT' })
   })
 })

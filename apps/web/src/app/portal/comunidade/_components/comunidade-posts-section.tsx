@@ -25,6 +25,11 @@ interface ComunidadePostsSectionProps {
   filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
   /** Obrigatório quando `filtro === 'canal'` — id da Conversa (canal). */
   conversaId?: string
+  /**
+   * Mural de canal oficial: mistura posts do canal + "Só torcida" do feed
+   * aberto deste `tenantId`. Temáticos ignoram.
+   */
+  incluirFeedInterno?: boolean
   /** Feed da Comunidade Nacional do clube — `tenantId` é o sintético. */
   escopo?: EscopoComunidade
   /** Obrigatório quando `escopo === 'nacional'`. */
@@ -37,6 +42,7 @@ export async function ComunidadePostsSection({
   cursor,
   filtro = 'descobrir',
   conversaId,
+  incluirFeedInterno = false,
   escopo = 'torcida',
   afiliacaoId,
 }: ComunidadePostsSectionProps) {
@@ -73,7 +79,12 @@ export async function ComunidadePostsSection({
 
   if (filtro === 'canal') {
     if (!conversaId) throw new Error('conversaId obrigatório para filtro="canal".')
-    const feed = await getPostsDoCanal(conversaId, tenantId, currentUser.id, { cursor, take: 20 })
+    const feed = await getPostsDoCanal(conversaId, tenantId, currentUser.id, {
+      cursor,
+      take: 20,
+      incluirFeedInterno,
+      viewerTenantId: tenantId,
+    })
     return (
       <ComunidadeFeedInfinite
         tenantId={tenantId}

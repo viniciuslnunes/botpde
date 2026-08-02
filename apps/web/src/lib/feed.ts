@@ -706,6 +706,22 @@ export function orFeedInternoDoTenant(tenantId: string): Prisma.PostWhereInput {
   return { tenantId, tipo: 'MEMBRO', visibilidade: 'TENANT' }
 }
 
+/**
+ * Visibilidade do feed Seguindo (timeline materializada).
+ *
+ * - PUBLICO: qualquer post da hierarquia já na timeline do viewer
+ * - TENANT: só do tenant ativo (nunca "Só torcida" de outra unidade da rede)
+ * - PRIVADO: "Só seguidores" — a timeline só tem autores com follow APROVADO
+ *   (fan-out/backfill); Descobrir NÃO usa este helper
+ */
+export function orFeedVisibilidadeSeguindo(tenantId: string): Prisma.PostWhereInput[] {
+  return [
+    { visibilidade: 'PUBLICO' },
+    { tenantId, visibilidade: 'TENANT' },
+    { visibilidade: 'PRIVADO' },
+  ]
+}
+
 /** Candidatos públicos do Descobrir — sem estado do viewer (reação/voto/RSVP). */
 async function getDescobrirPostsBaseCached(
   tenantId: string,
@@ -1412,9 +1428,8 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
         // A timeline materializada guarda o post, não a regra: o filtro de
-        // visibilidade é reaplicado na leitura. Interno entra só do tenant
-        // ativo — nunca "Só torcida" de outra torcida da hierarquia.
-        OR: [{ visibilidade: 'PUBLICO' }, { tenantId, visibilidade: 'TENANT' }],
+        // visibilidade é reaplicado na leitura (`orFeedVisibilidadeSeguindo`).
+        OR: orFeedVisibilidadeSeguindo(tenantId),
         oculto: false,
         ...escopoFeedSemConversa,
       },

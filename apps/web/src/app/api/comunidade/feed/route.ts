@@ -126,9 +126,11 @@ export async function GET(request: NextRequest) {
       if (!canal || !canal.souMembro) {
         return NextResponse.json({ error: 'Canal não encontrado.' }, { status: 404 })
       }
-      const { posts, pageInfo } = await getPostsDoCanal(canal.id, canal.tenantId, session.user.id, {
+      const { posts, pageInfo } = await getPostsDoCanal(canal.id, tenant.id, session.user.id, {
         cursor: parsed.data.cursor,
         take,
+        incluirFeedInterno: canal.canalOficial,
+        viewerTenantId: tenant.id,
       })
 
       return NextResponse.json({ posts, pageInfo })

@@ -511,6 +511,14 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   agregado não tinha. Feed Descobrir/Seguindo da organizada só aparece se a
   Sede ainda não tiver `canalConversaId` (legado).
 
+  **Só torcida no mural oficial (2026-08-02)**: posts `TENANT` do feed aberto
+  (`conversaId` null — seletor "Só torcida" do composer) entram no mural do
+  canal **oficial** junto com os posts do `conversaId`
+  (`orPostsDoMuralCanal` / `getPostsDoCanal` com `incluirFeedInterno`). Canais
+  temáticos não misturam. O ramo do canal não filtra `tenantId` do post — Caso B
+  / canal emprestado publica com o tenant do viewer. Invariante em
+  `lib/__tests__/canais.test.ts`.
+
   **O gate da aba é o VÍNCULO, não `podeVerCanal`** (`getCanalDaUnidadeDoVinculo`
   em `lib/canais.ts`): `decidePodeVerCanal` barra todo não-sócio fora de canal
   `PUBLICO`, e o canal da unidade nasce fechado — então o torcedor, dono da
@@ -572,27 +580,31 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
     torcedor no meio dos posts da torcida;
   - as **torcidas aliadas** — Minha torcida é a organização, não a praça.
 
-  E o feed é **só `PUBLICO`**: `TENANT` ("Só torcida") e `PRIVADO` ("Só
-  seguidores") não entram nem no Descobrir nem no Seguindo da aba — igual ao
-  que o feed Nacional já fazia. Os dois `where` (Descobrir e a timeline
-  materializada do Seguindo) declaram `visibilidade: 'PUBLICO'`
-  explicitamente: o conjunto de tenants sozinho não segura post interno que
-  chegue pela rede de quem o viewer segue. Invariante em
-  `lib/__tests__/feed-minha-torcida.test.ts`.
+  E o Descobrir da aba é **`PUBLICO` + `TENANT` do tenant ativo**: `PRIVADO`
+  ("Só seguidores") não entra na praça — igual ao Nacional. O `where` do
+  Descobrir declara isso explicitamente: o conjunto de tenants sozinho não
+  segura post interno que chegue pela rede de quem o viewer segue. Invariante
+  em `lib/__tests__/feed-minha-torcida.test.ts`.
 
   **Superfície do post interno (2026-08-02)**: a regra acima deixou "Só
   torcida" sem casa — o composer oferecia uma opção que fazia o post sumir de
   todo feed (só perfil/permalink/salvos). Resolvido admitindo `TENANT` na aba,
   **restrito ao tenant ativo** (`orFeedInternoDoTenant` em `lib/feed.ts`), nos
-  três pontos: base do Descobrir, query da rede e a timeline materializada do
-  Seguindo. O `visibilidade` continua não sendo redundante com o conjunto de
-  tenants — é exatamente ele que barra o "Só torcida" de **outra** torcida da
-  hierarquia chegando pela rede de quem o viewer segue. O balde interno é
-  seguro no cache compartilhado do Descobrir porque não depende do viewer:
-  quem abre a aba já é sócio aprovado do tenant (`podeVerFeedSocios`); o ramo
-  sem viewer (preview) filtra de volta para `PUBLICO`. `PRIVADO` ("Só
-  seguidores") segue fora dos feeds por desenho — é conteúdo de perfil.
-  Invariante em `lib/__tests__/feed-minha-torcida.test.ts`.
+  três pontos: base do Descobrir, query da rede do Descobrir e a timeline
+  materializada do Seguindo. O `visibilidade` continua não sendo redundante
+  com o conjunto de tenants — é exatamente ele que barra o "Só torcida" de
+  **outra** torcida da hierarquia chegando pela rede de quem o viewer segue.
+  O balde interno é seguro no cache compartilhado do Descobrir porque não
+  depende do viewer: quem abre a aba já é sócio aprovado do tenant
+  (`podeVerFeedSocios`); o ramo sem viewer (preview) filtra de volta para
+  `PUBLICO`.
+
+  **PRIVADO no Seguindo (2026-08-02)**: "Só seguidores" entra no feed
+  **Seguindo** da torcida (`orFeedVisibilidadeSeguindo` / `getPostsDaRede`) —
+  a timeline só materializa o viewer + autores com follow `APROVADO`. Continua
+  fora do Descobrir e do Nacional; perfil/permalink já usavam
+  `filtrarPostsVisiveis`. Invariante em
+  `lib/__tests__/feed-minha-torcida.test.ts`.
 - **Composer único Nacional (2026-07-23)**: a aba Nacional usa o mesmo
   `FeedComposer` da torcida com prop `nacional` (mídia/vídeo, emoji, stickers,
   menções; sempre `PUBLICO`; sem enquete/evento/alcance). Action

@@ -28,6 +28,7 @@ import {
 } from './feed'
 import {
   decidePodeVerCanal,
+  orPostsDoMuralCanal,
   type CanalItem,
   type CandidatoMembroCanalItem,
   type MembroCanalItem,
@@ -1125,11 +1126,22 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
   }
 }
 
+export type PostsDoCanalOpts = FeedOpts & {
+  /**
+   * Mural oficial (Minha torcida / Minha unidade): inclui também posts
+   * "Só torcida" do feed aberto do `viewerTenantId`. Temáticos ficam só no
+   * `conversaId`.
+   */
+  incluirFeedInterno?: boolean
+  /** Tenant da aba (Sede ou unidade). Default: `tenantId` posicional. */
+  viewerTenantId?: string
+}
+
 export async function getPostsDoCanal(
   conversaId: string,
   tenantId: string,
   userId: string,
-  opts: FeedOpts = {},
+  opts: PostsDoCanalOpts = {},
 ): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
   const membro: { id: string } | null = await db.membroConversa.findFirst({
     where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
@@ -1139,9 +1151,15 @@ export async function getPostsDoCanal(
 
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const cursorWhere = buildCursorWhere(decodeCursor(opts.cursor))
+  const viewerTenantId = opts.viewerTenantId ?? tenantId
+  const feedInternoTenantId = opts.incluirFeedInterno ? viewerTenantId : null
 
   const postsRaw = (await db.post.findMany({
-    where: { conversaId, tenantId, oculto: false, ...cursorWhere },
+    where: {
+      oculto: false,
+      ...cursorWhere,
+      OR: orPostsDoMuralCanal(conversaId, feedInternoTenantId),
+    },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,
     include: postInclude(userId),

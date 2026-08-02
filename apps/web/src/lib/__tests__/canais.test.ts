@@ -7,6 +7,7 @@ import {
   linkUnidadeComunidade,
   linkCanalComunidade,
   linkTorcidaComunidadePublica,
+  orPostsDoMuralCanal,
 } from '../canais-shared'
 
 describe('canais', () => {
@@ -84,5 +85,32 @@ describe('decidePodeVerCanal', () => {
     expect(
       decidePodeVerCanal({ relation: 'allied', visibilidade: 'ALIADOS', isSocio: false }),
     ).toBe(false)
+  })
+})
+
+describe('orPostsDoMuralCanal', () => {
+  const CANAL = 'canal-1'
+  const TENANT = 'tenant-1'
+
+  it('temático / sem feed interno: só posts do conversaId', () => {
+    expect(orPostsDoMuralCanal(CANAL, null)).toEqual([{ conversaId: CANAL }])
+  })
+
+  it('oficial: canal + TENANT sem conversa do tenant da aba', () => {
+    expect(orPostsDoMuralCanal(CANAL, TENANT)).toEqual([
+      { conversaId: CANAL },
+      {
+        conversaId: null,
+        tenantId: TENANT,
+        tipo: 'MEMBRO',
+        visibilidade: 'TENANT',
+      },
+    ])
+  })
+
+  it('ramo do canal não amarra tenantId do post (Caso B / emprestado)', () => {
+    const ramoCanal = orPostsDoMuralCanal(CANAL, TENANT).find((r) => r.conversaId === CANAL)
+    expect(ramoCanal).toEqual({ conversaId: CANAL })
+    expect(ramoCanal).not.toHaveProperty('tenantId')
   })
 })

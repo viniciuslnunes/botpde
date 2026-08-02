@@ -97,11 +97,12 @@ export async function CanalFeedView({
       {canal.souMembro ? (
         <Suspense fallback={<CanalFeedFallback />}>
           <ComunidadePostsSection
-            tenantId={canal.tenantId}
+            tenantId={viewerTenantId}
             currentUser={currentUser}
             cursor={cursor}
             filtro="canal"
             conversaId={canal.id}
+            incluirFeedInterno={canal.canalOficial}
           />
         </Suspense>
       ) : null}

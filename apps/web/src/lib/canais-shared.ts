@@ -156,3 +156,37 @@ export function labelVisibilidadeCanal(v: VisibilidadeCanal): string {
       return v
   }
 }
+
+/**
+ * `where.OR` do mural de um canal.
+ *
+ * - Sempre: posts com `conversaId` (sem filtrar `tenantId` do post — Caso B /
+ *   canal emprestado publica com o tenant do viewer).
+ * - Com `viewerTenantIdForFeedInterno` (só canal **oficial**): também posts
+ *   "Só torcida" do feed aberto (`TENANT` + sem conversa) daquele tenant.
+ */
+export function orPostsDoMuralCanal(
+  conversaId: string,
+  viewerTenantIdForFeedInterno: string | null,
+): Array<{
+  conversaId: string | null
+  tenantId?: string
+  tipo?: 'MEMBRO'
+  visibilidade?: 'TENANT'
+}> {
+  const ramos: Array<{
+    conversaId: string | null
+    tenantId?: string
+    tipo?: 'MEMBRO'
+    visibilidade?: 'TENANT'
+  }> = [{ conversaId }]
+  if (viewerTenantIdForFeedInterno) {
+    ramos.push({
+      conversaId: null,
+      tenantId: viewerTenantIdForFeedInterno,
+      tipo: 'MEMBRO',
+      visibilidade: 'TENANT',
+    })
+  }
+  return ramos
+}
