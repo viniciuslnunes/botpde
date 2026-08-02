@@ -1,5 +1,6 @@
 import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
 import { ComunidadeFeedNavClient } from './comunidade-feed-nav-client'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 export function ComunidadeFeedNavFallback() {
   return (
@@ -29,7 +30,7 @@ export async function ComunidadeFeedNav({
   userId: string
   currentUserId: string
   mostrarBalanco?: boolean
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
 }) {
   const badges = await getResumoBadgesComunidade(tenantId, userId)
 

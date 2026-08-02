@@ -9,6 +9,7 @@ import {
   type MencaoParsed,
 } from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springSnappy } from '@/lib/motion-presets'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface MembroMencao {
   id: string
@@ -27,7 +28,7 @@ interface MentionPickerProps {
   onSelect: (mencao: MencaoSelecionada) => void
   onClose: () => void
   /** Comunidade Nacional — typeahead no tenant sintético do clube. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
 }
 
 export function MentionPicker({ query, onSelect, onClose, escopo }: MentionPickerProps) {

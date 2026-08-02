@@ -7,12 +7,13 @@ import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ProximosEventosAside } from './proximos-eventos-aside'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface ComunidadeAsideWidgetsProps {
   tenantId: string
   afiliacaoId: string | null
   currentUserId?: string
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
 }
 
 export async function ComunidadeAsideWidgets({

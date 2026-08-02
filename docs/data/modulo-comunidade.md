@@ -452,6 +452,31 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   posts `TENANT`/`PRIVADO` para o escopo Nacional. Authz CN:
   `apps/web/src/lib/authz.ts` (`assertComunidadeNacional`,
   `assertPodeAcessarSalaNacional`).
+- **Três escopos: Nacional × Minha torcida × Minha unidade (2026-08-02)**:
+  `EscopoComunidade` = `nacional | torcida | unidade`, e a disponibilidade vem
+  de `EscoposDisponiveis` (`{ torcida, unidade }`) resolvida em
+  `resolverContextoComunidade`.
+
+  | Perfil | Abas |
+  |---|---|
+  | Torcedor global (sem unidade) | Nacional |
+  | Torcedor com vínculo | Nacional · **Minha unidade** |
+  | Sócio | Nacional · Minha torcida · Minha unidade (se vinculado a subsede/PDE) |
+
+  **Torcedor nunca tem a aba da torcida** — nem forçando `?escopo=torcida`:
+  ele pertence à unidade que o convidou, não à organizada, e não pode estar
+  inscrito no canal da Sede. Escopo pedido mas indisponível cai no default em
+  vez de erro (link colado não pode dar 403 na cara de quem abriu).
+
+  **A aba de unidade é ancorada num CANAL, não num tenant**
+  (`UnidadeComunidade` = `{ canalId, tenantId, nome }`). Unidade Caso A
+  (subsede no tenant da Sede) não tem tenant próprio, só
+  `Sede.canalConversaId`; Caso B tem os dois. Ancorar no canal cobre as duas
+  sem ramo especial — e o canal é o que a liderança de fato controla. A
+  resolução (`resolverUnidadeDoVinculo`) é **leitura pura**: nada de
+  `getOrCreateCanalOficial` num GET. Unidade sem canal provisionado
+  simplesmente não ganha a aba. Testes:
+  `lib/__tests__/comunidade-escopo.test.ts`.
 - **Composição do feed Nacional (2026-08-02)**: a CN é a praça do torcedor, e
   o feed precisa **garantir** isso — não basta ordenar por recência.
   `getPostsFeedNacional` roda **dois baldes**:

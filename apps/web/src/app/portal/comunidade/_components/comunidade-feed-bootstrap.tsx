@@ -1,6 +1,7 @@
 'use client'
 
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface CurrentUser {
   id: string
@@ -23,9 +24,9 @@ export function ComunidadeFeedBootstrap({
 }: {
   tenantId: string
   currentUser: CurrentUser
-  filtro?: 'descobrir' | 'seguindo' | 'grupos'
+  filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
   cursor?: string | null
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   afiliacaoId?: string
 }) {
   return (

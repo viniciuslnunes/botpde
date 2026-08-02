@@ -6,6 +6,7 @@ import { ComunidadeSearchBar } from './comunidade-search-bar'
 import { ComunidadeFeedTabs } from './comunidade-feed-tabs'
 import { useScrollChromeVisibilityShared } from '@/lib/scroll-chrome-context'
 import { springSnappy } from '@/lib/motion-presets'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 /**
  * Barra sticky (busca + tabs): some no scroll pra baixo / parado;
@@ -17,7 +18,7 @@ export function ComunidadeStickySearchChrome({
   modoContexto = 'torcida',
 }: {
   children?: ReactNode
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   modoContexto?: 'nacional' | 'torcida'
 }) {
   const scrollVisible = useScrollChromeVisibilityShared()

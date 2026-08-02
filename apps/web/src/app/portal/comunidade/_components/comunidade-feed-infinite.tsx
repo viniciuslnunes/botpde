@@ -25,6 +25,7 @@ import {
   type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
 } from '@/lib/feed-live-refresh'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface CurrentUser {
   id: string
@@ -63,7 +64,7 @@ export function ComunidadeFeedInfinite({
   currentUser: CurrentUser
   filtro: Filtro
   conversaId?: string
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   afiliacaoId?: string
   initialPosts: PostSocialItem[]
   initialPageInfo: PageInfo

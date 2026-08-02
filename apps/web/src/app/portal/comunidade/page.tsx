@@ -78,7 +78,8 @@ export default async function ComunidadePage({
           salasAtivas={salasAtivas}
           eventoIdInicial={eventoIdComposer}
           escopo="nacional"
-          podeEscopoTorcida={ctx.podeEscopoTorcida}
+          escopos={ctx.escopos}
+          nomeUnidade={ctx.unidade?.nome ?? null}
           modoContexto={ctx.modo}
           afiliacao={afiliacao}
           torcidaReal={torcidaReal}
@@ -88,28 +89,39 @@ export default async function ComunidadePage({
     )
   }
 
-  // Minha torcida: sócio (modo torcida) ou TORCEDOR com vínculo (torcidaReal).
+  // Minha torcida / Minha unidade: sócio (modo torcida) ou TORCEDOR com
+  // vínculo (torcidaReal). Sem nenhum dos dois, só resta a Nacional.
   if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')
 
-  const salasAtivas = await listSalasAtivas(torcidaReal.id)
+  // Minha unidade é o CANAL da subsede/PDE, não um feed agregado: é lá que a
+  // liderança controla e segrega o que é da unidade. O filtro `canal` já
+  // existe e aplica o gate de membership do canal.
+  const unidade = escopo === 'unidade' ? ctx.unidade : null
+  const tenantDoEscopo = unidade
+    ? { id: unidade.tenantId, nome: unidade.nome }
+    : { id: torcidaReal.id, nome: torcidaReal.nome }
+
+  const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <ComunidadeFeedShell
         tenant={{
-          id: torcidaReal.id,
-          nome: torcidaReal.nome,
+          id: tenantDoEscopo.id,
+          nome: tenantDoEscopo.nome,
           afiliacaoId: torcidaReal.afiliacaoId,
           balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
         }}
         currentUser={currentUser}
         cursor={params.cursor}
-        filtro={filtro}
+        filtro={unidade ? 'canal' : filtro}
+        conversaId={unidade?.canalId}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
         eventoIdInicial={eventoIdComposer}
-        escopo="torcida"
-        podeEscopoTorcida={ctx.podeEscopoTorcida}
+        escopo={unidade ? 'unidade' : 'torcida'}
+        escopos={ctx.escopos}
+        nomeUnidade={ctx.unidade?.nome ?? null}
         modoContexto={ctx.modo}
         afiliacao={ctx.afiliacao}
         torcidaReal={torcidaReal}

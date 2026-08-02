@@ -5,6 +5,7 @@ import {
   ComunidadeUserCardSection,
   ComunidadeUserCardFallback,
 } from './comunidade-user-card-section'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
 
 interface CurrentUser {
@@ -36,7 +37,7 @@ export function ComunidadeAsideRail({
   tenant: { id: string; nome: string; afiliacaoId: string | null; balancoFinanceiroVisivel?: boolean }
   currentUser: CurrentUser
   /** Feed dual (Nacional × Minha torcida) — ajusta card do sócio e links da nav. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   /** Torcida real do sócio — na aba Nacional exibe cargo em vez do rótulo da CN. */
   torcidaReal?: { id: string; nome: string } | null
 }) {

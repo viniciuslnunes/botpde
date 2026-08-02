@@ -43,6 +43,8 @@ const TENANT_SLUGS_REAIS = [
 ]
 const PESSOAS_POR_UNIDADE = 50
 const TORCEDORES_GLOBAIS_EXTRA = 150
+/** Marcador dos posts de torcedor na CN — permite reexecutar sem duplicar. */
+const MARCA_CN = '[TESTE-CORINTHIANS-CN]'
 
 // ── Utilitários ──────────────────────────────────────────────────────────
 let seq = 0
@@ -207,6 +209,129 @@ function templatesMembro(unidadeNome) {
     `Marcando presença no próximo evento da torcida.`,
     `Que emoção ver a arquibancada cheia de novo.`,
   ]
+}
+
+function diasAtras(dias) {
+  return new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+}
+
+function embaralhar(arr) {
+  const out = [...arr]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
+/**
+ * Get-or-create do tenant sintético da CN — mesmo slug reservado que
+ * `getOrCreateComunidadeNacionalTenant` usa no web.
+ */
+async function ensureTenantSinteticoCn(afiliacao) {
+  const slugReservado = `${afiliacao.slug ?? afiliacao.id}-nacional`
+  const existente = await db.tenant.findFirst({
+    where: { slug: slugReservado },
+    select: { id: true, slug: true },
+  })
+  if (existente) return existente
+
+  return db.tenant.create({
+    data: {
+      nome: `${afiliacao.nome} — Comunidade Nacional`,
+      slug: slugReservado,
+      afiliacaoId: afiliacao.id,
+      sintetico: true,
+      ativo: true,
+    },
+    select: { id: true, slug: true },
+  })
+}
+
+/**
+ * Fase 3b: posts de torcedor na Comunidade Nacional do Corinthians.
+ *
+ * A Fase 3 criava os 150 torcedores globais mas nenhum deles publicava, e o
+ * lote nacional (`seed-nacional-teste.js`) exclui o Corinthians de propósito
+ * — resultado: a CN do Timão só tinha post de sócio de organizada, e a cota
+ * de torcedor do feed nacional não tinha o que servir. Aqui os globais e os
+ * TORCEDOR APROVADO das unidades publicam no sintético, como
+ * `publicarPostNacional` faz em produção.
+ */
+async function seedPostsTorcedoresCn(afiliacao, contexto, resumo) {
+  const POSTS_MIN = 24
+  const sintetico = await ensureTenantSinteticoCn(afiliacao)
+
+  const jaTem = await db.post.count({
+    where: { tenantId: sintetico.id, tipo: 'MEMBRO', titulo: { startsWith: MARCA_CN } },
+  })
+  if (jaTem >= POSTS_MIN) {
+    console.log(`  ↔  Posts CN de torcedor já semeados (${jaTem}) — pulando`)
+    return
+  }
+
+  const filtroUserTeste = { email: { endsWith: `@${DOMINIO_TESTE}` } }
+  const [globais, torcedoresUnidade] = await Promise.all([
+    db.perfilTorcedor.findMany({
+      where: { afiliacaoId: afiliacao.id, user: filtroUserTeste },
+      select: { userId: true },
+    }),
+    db.saasMembro.findMany({
+      where: {
+        tenantId: { in: contexto.map((t) => t.id) },
+        tipo: 'TORCEDOR',
+        status: 'APROVADO',
+        user: filtroUserTeste,
+      },
+      select: { userId: true },
+    }),
+  ])
+
+  const autores = [
+    ...new Set([...globais.map((g) => g.userId), ...torcedoresUnidade.map((m) => m.userId)]),
+  ]
+  if (autores.length === 0) {
+    console.log('  ↔  Sem torcedores de teste para publicar na CN — pulando')
+    return
+  }
+
+  const textos = templatesMembro(afiliacao.nome)
+  const autoresPost = embaralhar(autores)
+  const postsRows = []
+  for (let i = 0; i < POSTS_MIN - jaTem; i++) {
+    postsRows.push({
+      id: crypto.randomUUID(),
+      tenantId: sintetico.id,
+      autorId: autoresPost[i % autoresPost.length],
+      titulo: `${MARCA_CN} Torcedor CN ${i + 1}`,
+      conteudo: pick(textos),
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      // No sintético o Descobrir nacional já inclui por `tenant.sintetico`;
+      // a flag reforça e cobre quem lê por `alcanceNacional`.
+      alcanceNacional: true,
+      // Espalhado no tempo: sem isso o balde de torcedor vira um bloco só.
+      criadoEm: diasAtras(Math.floor(Math.random() * 30)),
+    })
+  }
+
+  await createManyBatched('post', postsRows, 'Post CN torcedor')
+  resumo.totais.posts += postsRows.length
+
+  const reacoesRows = []
+  const tiposReacao = ['CURTIR', 'FORCA', 'VAMOS', 'PRESENTE']
+  for (const post of postsRows) {
+    for (const userId of embaralhar(autores).slice(0, 1 + Math.floor(Math.random() * 4))) {
+      reacoesRows.push({
+        id: crypto.randomUUID(),
+        postId: post.id,
+        userId,
+        tipo: pick(tiposReacao),
+      })
+    }
+  }
+  await createManyBatched('reacao', reacoesRows, 'Reação CN torcedor')
+  resumo.totais.reacoes += reacoesRows.length
 }
 
 // ── Fase 0: contexto (tenants, sedes, afiliação) ─────────────────────────
@@ -918,6 +1043,16 @@ async function main() {
     return
   }
 
+  // `--so-cn`: só os posts de torcedor na Comunidade Nacional. O lote inteiro
+  // é caro e as outras fases já são idempotentes — esta é a que faltava para
+  // a cota de torcedor do feed nacional ter o que servir.
+  if (process.argv.includes('--so-cn')) {
+    console.log('── Fase 3b (isolada): posts de torcedor na CN ──')
+    await seedPostsTorcedoresCn(afiliacao, contexto, resumo)
+    console.log(`\n🎉 CN concluída. Posts: ${resumo.totais.posts}, reações: ${resumo.totais.reacoes}\n`)
+    return
+  }
+
   console.log('── Fase 1+2: pessoas por unidade + cargos ──')
   await seedPessoas(contexto, resumo)
 
@@ -926,6 +1061,9 @@ async function main() {
 
   console.log('\n── Fase 3: torcedores globais (Comunidade Nacional) ──')
   await seedTorcedoresGlobais(afiliacao, resumo)
+
+  console.log('\n── Fase 3b: posts de torcedor na CN (tenant sintético) ──')
+  await seedPostsTorcedoresCn(afiliacao, contexto, resumo)
 
   console.log('\n── Fase 4: canais oficiais das unidades ──')
   await garantirCanaisOficiais()

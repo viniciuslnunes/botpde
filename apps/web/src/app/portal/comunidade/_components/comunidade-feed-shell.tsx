@@ -14,6 +14,7 @@ import { FeedComposerSkeleton, FeedStoriesSkeleton } from '@/components/portal/f
 import { ComunidadeNacionalComposerSection } from './comunidade-nacional-composer-section'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
+import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 
 interface CurrentUser {
@@ -31,7 +32,7 @@ interface ComunidadeFeedShellProps {
   }
   currentUser: CurrentUser
   cursor?: string
-  filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'grupos' | 'grupos' | 'grupos'
+  filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
   /** Clube do torcedor global (banner quando feed usa tenant proxy). */
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
   /** Banner CN — true enquanto o composer carrega o estado real. */
@@ -39,9 +40,13 @@ interface ComunidadeFeedShellProps {
   salasAtivas?: SalaAtivaListItem[]
   /** Deep-link `?eventoId=` — abre o composer no modo evento. */
   eventoIdInicial?: string
-  /** Escopo ativo do feed dual (Nacional × Minha torcida). */
-  escopo?: 'nacional' | 'torcida'
-  podeEscopoTorcida?: boolean
+  /** Canal do escopo `unidade` (mural oficial da subsede/PDE). */
+  conversaId?: string
+  /** Escopo ativo (Nacional × Minha torcida × Minha unidade). */
+  escopo?: EscopoComunidade
+  escopos?: EscoposDisponiveis
+  /** Rótulo da aba de unidade — nome da subsede/PDE de vínculo. */
+  nomeUnidade?: string | null
   /** Default do usuário (sócio=torcida, TORCEDOR=nacional) — abas de escopo. */
   modoContexto?: 'nacional' | 'torcida'
   afiliacao?: AfiliacaoComunidade | null
@@ -64,8 +69,10 @@ export function ComunidadeFeedShell({
   somentePublicoHint = false,
   salasAtivas = [],
   eventoIdInicial,
+  conversaId,
   escopo = 'torcida',
-  podeEscopoTorcida = false,
+  escopos = { torcida: false, unidade: false },
+  nomeUnidade = null,
   modoContexto = 'torcida',
   afiliacao = null,
   torcidaReal = null,
@@ -73,8 +80,7 @@ export function ComunidadeFeedShell({
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
   // TORCEDOR default nacional: sem `?escopo=` ainda precisa preservar CN nas subrotas.
-  const sufixoEscopo =
-    escopo === modoContexto ? '' : escopo === 'nacional' ? '?escopo=nacional' : '?escopo=torcida'
+  const sufixoEscopo = escopo === modoContexto ? '' : `?escopo=${escopo}`
 
   return (
     <>
@@ -88,8 +94,10 @@ export function ComunidadeFeedShell({
       <main className="min-w-0 space-y-4">
         <ComunidadeEscopoTabs
           afiliacao={afiliacao}
-          podeEscopoTorcida={podeEscopoTorcida}
+          escopos={escopos}
           escopoAtivo={escopo}
+          nomeUnidade={nomeUnidade}
+          nomeTorcida={torcidaReal?.nome ?? null}
           modoContexto={modoContexto}
         />
 
@@ -212,6 +220,7 @@ export function ComunidadeFeedShell({
             currentUser={currentUser}
             cursor={cursor}
             filtro={filtro}
+            conversaId={conversaId}
             escopo={escopo}
             afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
           />

@@ -6,6 +6,7 @@ import { m, AnimatePresence } from 'motion/react'
 import { springSnappy, fadeScale } from '@/lib/motion-presets'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { emitirFeedRefreshTopo, feedStreamEndpoint, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 /**
  * Banner "N novos posts" quando o usuário está longe do topo.
@@ -15,8 +16,8 @@ export function FeedLiveBanner({
   escopo,
   afiliacaoId,
 }: {
-  filtro?: 'descobrir' | 'seguindo' | 'grupos'
-  escopo?: 'nacional' | 'torcida'
+  filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
+  escopo?: EscopoComunidade
   afiliacaoId?: string
 }) {
   const [novos, setNovos] = useState(0)

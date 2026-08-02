@@ -19,7 +19,7 @@ export default async function MensagensPage({
   if (!ctx) redirect('/portal')
 
   const conversas = serializeConversasInbox(await listConversas(session.user.id))
-  const escopoNacional = ctx.modo === 'nacional' || !ctx.podeEscopoTorcida
+  const escopoNacional = ctx.modo === 'nacional' || !ctx.escopos.torcida
 
   return (
     <div className="space-y-4">

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 export interface PageInfo {
   hasMore: boolean
@@ -43,7 +44,7 @@ async function fetchFeedPage<TPost>(params: {
   take: number
   filtro?: string
   conversaId?: string
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   afiliacaoId?: string
   signal: AbortSignal
 }): Promise<ComunidadeFeedPage<TPost>> {
@@ -81,7 +82,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   /** Escopa a página a um canal específico (`filtro: 'canal'`). */
   conversaId?: string
   /** Feed da Comunidade Nacional — passa `afiliacaoId` junto. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   afiliacaoId?: string
   initialPosts: TPost[]
   initialPageInfo: PageInfo

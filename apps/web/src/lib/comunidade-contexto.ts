@@ -16,6 +16,7 @@ import {
 import {
   resolverEscopoComunidadePorModo,
   type EscopoComunidade,
+  type EscoposDisponiveis,
 } from '@/lib/comunidade-escopo'
 
 export type { EscopoComunidade }
@@ -46,6 +47,21 @@ function projetarAfiliacaoComunidade(a: AfiliacaoComunidade): AfiliacaoComunidad
   }
 }
 
+/**
+ * Aba "Minha unidade": a subsede/PDE de vínculo — a que emitiu o convite.
+ *
+ * É definida por um **canal**, não por um tenant. Unidade Caso A (subsede no
+ * tenant da Sede) não tem tenant próprio, só `Sede.canalConversaId`; Caso B
+ * (promovida) tem os dois. Ancorar no canal cobre as duas sem ramo especial —
+ * e é o que a liderança de fato controla.
+ */
+export type UnidadeComunidade = {
+  canalId: string
+  /** Tenant dono do canal — Caso A é o da Sede; Caso B, o da própria unidade. */
+  tenantId: string
+  nome: string
+}
+
 export type ContextoComunidadePortal =
   | {
       modo: 'torcida'
@@ -53,9 +69,10 @@ export type ContextoComunidadePortal =
       afiliacao: AfiliacaoComunidade | null
       /** Container operacional da Comunidade Nacional do clube (get-or-create). */
       tenantSintetico?: TenantSintetico | null
-      /** Sócio com tenant real — pode alternar para a aba "Minha torcida". */
-      podeEscopoTorcida: boolean
+      /** Sócio: tem a aba da organizada inteira (Sede + hierarquia). */
+      escopos: EscoposDisponiveis
       torcidaReal?: TorcidaRealComunidade | null
+      unidade?: UnidadeComunidade | null
     }
   | {
       modo: 'nacional'
@@ -63,19 +80,60 @@ export type ContextoComunidadePortal =
       afiliacao: AfiliacaoComunidade
       tenantSintetico?: TenantSintetico | null
       /**
-       * TORCEDOR com vínculo APROVADO: tem a aba "Minha torcida" (só posts
-       * públicos), mas o default continua Nacional do clube.
+       * TORCEDOR com vínculo APROVADO: tem a aba "Minha unidade" (o canal da
+       * unidade que o convidou) — **nunca** a aba da torcida, que é de sócio.
+       * O default continua Nacional do clube.
        */
-      podeEscopoTorcida: boolean
+      escopos: EscoposDisponiveis
       torcidaReal?: TorcidaRealComunidade | null
+      unidade?: UnidadeComunidade | null
     }
 
 export function resolverEscopoComunidade(
   ctx: ContextoComunidadePortal,
   escopoParam: string | undefined,
 ): EscopoComunidade {
-  return resolverEscopoComunidadePorModo(ctx.modo, ctx.podeEscopoTorcida, escopoParam)
+  return resolverEscopoComunidadePorModo(ctx.modo, ctx.escopos, escopoParam)
 }
+
+/**
+ * Canal oficial da unidade de vínculo da pessoa (`SaasMembro.sedeId`).
+ *
+ * Leitura pura — nada de `getOrCreateCanalOficial` aqui: esta função roda em
+ * GET, e write-on-GET já gerou órfãos neste repo. Unidade sem canal ainda
+ * provisionado simplesmente não ganha a aba.
+ *
+ * Só devolve unidade quando ela é SUBSEDE/PONTO_ENCONTRO: quem está vinculado
+ * à SEDE raiz não precisa de uma aba que repete a da torcida.
+ */
+const resolverUnidadeDoVinculo = cache(
+  async (userId: string, tenantIds: string[]): Promise<UnidadeComunidade | null> => {
+    if (tenantIds.length === 0) return null
+
+    const vinculo: {
+      tenantId: string
+      sede: { nome: string; tipo: string; canalConversaId: string | null } | null
+    } | null = await db.saasMembro.findFirst({
+      where: {
+        userId,
+        status: 'APROVADO',
+        espelhado: false,
+        tenantId: { in: tenantIds },
+        sede: { tipo: { in: ['SUBSEDE', 'PONTO_ENCONTRO'] }, canalConversaId: { not: null } },
+      },
+      orderBy: { criadoEm: 'desc' },
+      select: {
+        tenantId: true,
+        sede: { select: { nome: true, tipo: true, canalConversaId: true } },
+      },
+    })
+
+    const canalId = vinculo?.sede?.canalConversaId
+    if (!vinculo || !canalId) return null
+
+    return { canalId, tenantId: vinculo.tenantId, nome: vinculo.sede!.nome }
+  },
+)
 
 /**
  * Resolve tenant ativo ou modo comunidade nacional (torcedor global sem torcida
@@ -112,13 +170,18 @@ export const resolverContextoComunidade = cache(
         balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
       }
 
+      const unidade = await resolverUnidadeDoVinculo(userId, [tenant.id])
+
       return {
         modo: 'torcida',
         tenant: torcidaReal,
         afiliacao,
         tenantSintetico,
-        podeEscopoTorcida: true,
+        // Sócio vê a torcida inteira; a aba da unidade só quando ele está
+        // vinculado a uma subsede/PDE com canal.
+        escopos: { torcida: true, unidade: Boolean(unidade) },
         torcidaReal,
+        unidade,
       }
     }
 
@@ -153,13 +216,18 @@ export const resolverContextoComunidade = cache(
       }
     }
 
+    // Torcedor: a aba dele é a da UNIDADE que o convidou — nunca a da
+    // torcida, que é de sócio. Sem canal da unidade, sobra só a Nacional.
+    const unidade = torcidaReal ? await resolverUnidadeDoVinculo(userId, [torcidaReal.id]) : null
+
     return {
       modo: 'nacional',
       tenant: null,
       afiliacao,
       tenantSintetico,
-      podeEscopoTorcida: Boolean(torcidaReal),
+      escopos: { torcida: false, unidade: Boolean(unidade) },
       torcidaReal,
+      unidade,
     }
   },
 )

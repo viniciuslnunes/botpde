@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 type NavItem = {
   href: string
@@ -40,7 +41,7 @@ export function ComunidadeFeedNavClient({
   /** Prestação de contas pública — só quando o Presidente publicou o balanço. */
   mostrarBalanco?: boolean
   /** Feed dual (Nacional × Minha torcida) — preserva `?escopo=` nos links. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
 }) {
   const pathname = usePathname()
   const modoNacional = escopo === 'nacional'

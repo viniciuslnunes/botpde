@@ -10,6 +10,7 @@ import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import type { MembroBuscaItem, SugestaoMembroBusca } from '@/lib/comunidade-busca'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import { MembroSugestaoCard } from './membro-sugestao-card'
 import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais-shared'
 import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
@@ -30,7 +31,7 @@ export function BuscaMembrosClient({
 }: {
   sugestoesIniciais?: SugestaoMembroBusca[]
   /** Escopo ativo — preserva `?escopo=nacional` nas chamadas à API. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
 }) {
   const searchParams = useSearchParams()
   const inicial = searchParams.get('q') ?? ''

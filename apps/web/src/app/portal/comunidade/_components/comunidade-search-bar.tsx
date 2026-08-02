@@ -10,6 +10,7 @@ import { linkPostComunidade } from '@/lib/comunidade-social'
 import type { MembroBuscaItem } from '@/lib/comunidade-busca'
 import type { PostSocialItem } from '@/lib/feed'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface BuscaRapidaResponse {
   membros: MembroBuscaItem[]
@@ -21,7 +22,7 @@ export function ComunidadeSearchBar({
   escopo = 'torcida',
   modoContexto = 'torcida',
 }: {
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   modoContexto?: 'nacional' | 'torcida'
 }) {
   const router = useRouter()

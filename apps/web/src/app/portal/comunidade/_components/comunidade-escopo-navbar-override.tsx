@@ -3,7 +3,10 @@
 import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavbarBrandOverride, type NavbarBrand } from '@/lib/navbar-brand-override'
-import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
+import {
+  resolverEscopoComunidadePorModo,
+  type EscoposDisponiveis,
+} from '@/lib/comunidade-escopo'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 
 const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
@@ -31,13 +34,13 @@ type TorcidaBrand = {
 export function ComunidadeEscopoNavbarOverride({
   afiliacao,
   torcidaReal,
-  podeEscopoTorcida,
+  escopos,
   modoContexto = 'torcida',
   corPrimariaNacional,
 }: {
   afiliacao: AfiliacaoBrand | null
   torcidaReal: TorcidaBrand | null
-  podeEscopoTorcida: boolean
+  escopos: EscoposDisponiveis
   /** TORCEDOR = nacional (default CN); sócio = torcida. */
   modoContexto?: 'nacional' | 'torcida'
   /** Cor do tenant sintético da Comunidade Nacional (paleta do clube). */
@@ -49,7 +52,7 @@ export function ComunidadeEscopoNavbarOverride({
 
   const escopo = resolverEscopoComunidadePorModo(
     modoContexto,
-    podeEscopoTorcida,
+    escopos,
     searchParams.get('escopo'),
   )
 

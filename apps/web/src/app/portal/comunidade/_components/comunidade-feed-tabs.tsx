@@ -5,11 +5,12 @@ import { useSearchParams } from 'next/navigation'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 type FiltroTab = 'descobrir' | 'seguindo' | 'grupos'
 
 function hrefComFiltro(
-  escopo: 'nacional' | 'torcida',
+  escopo: EscopoComunidade,
   modoContexto: 'nacional' | 'torcida',
   filtro: FiltroTab,
 ): string {
@@ -29,7 +30,7 @@ export function ComunidadeFeedTabs({
   escopo = 'torcida',
   modoContexto = 'torcida',
 }: {
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   modoContexto?: 'nacional' | 'torcida'
 }) {
   const params = useSearchParams()

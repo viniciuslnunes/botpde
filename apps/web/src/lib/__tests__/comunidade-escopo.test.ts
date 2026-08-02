@@ -28,7 +28,17 @@ function ctxTorcida(): ContextoComunidadePortal {
     },
     afiliacao,
     tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
-    podeEscopoTorcida: true,
+    escopos: { torcida: true, unidade: false },
+  }
+}
+
+/** Sócio vinculado a uma subsede/PDE: tem as três abas. */
+function ctxSocioComUnidade(): ContextoComunidadePortal {
+  const base = ctxTorcida()
+  return {
+    ...base,
+    escopos: { torcida: true, unidade: true },
+    unidade: { canalId: 'canal-1', tenantId: 't-1', nome: 'Subsede Jundiaí' },
   }
 }
 
@@ -38,7 +48,7 @@ function ctxNacional(): ContextoComunidadePortal {
     tenant: null,
     afiliacao,
     tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
-    podeEscopoTorcida: false,
+    escopos: { torcida: false, unidade: false },
     torcidaReal: null,
   }
 }
@@ -49,7 +59,9 @@ function ctxTorcedorComUnidade(): ContextoComunidadePortal {
     tenant: null,
     afiliacao,
     tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
-    podeEscopoTorcida: true,
+    // Torcedor NÃO tem a aba da torcida — ele pertence à unidade que o
+    // convidou, e não pode estar no canal da Sede.
+    escopos: { torcida: false, unidade: true },
     torcidaReal: {
       id: 't-furia',
       nome: 'Fúria Jovem',
@@ -58,6 +70,7 @@ function ctxTorcedorComUnidade(): ContextoComunidadePortal {
       corPrimaria: '#000',
       balancoFinanceiroVisivel: false,
     },
+    unidade: { canalId: 'canal-2', tenantId: 't-furia', nome: 'PDE Baixada' },
   }
 }
 
@@ -76,18 +89,41 @@ describe('resolverEscopoComunidade', () => {
     expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('nacional')
   })
 
-  it('torcedor com unidade: default nacional; honra ?escopo=torcida', () => {
+  it('torcedor com unidade: default nacional; honra ?escopo=unidade', () => {
     const ctx = ctxTorcedorComUnidade()
     expect(resolverEscopoComunidade(ctx, undefined)).toBe('nacional')
     expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
-    expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('torcida')
+    expect(resolverEscopoComunidade(ctx, 'unidade')).toBe('unidade')
+  })
+
+  it('torcedor NUNCA entra no escopo da torcida, nem forçando a query', () => {
+    // A aba da organizada é de sócio. Torcedor pertence à unidade que o
+    // convidou e não pode estar inscrito no canal da Sede.
+    const ctx = ctxTorcedorComUnidade()
+    expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('nacional')
+  })
+
+  it('sócio com unidade: alterna entre os três escopos', () => {
+    const ctx = ctxSocioComUnidade()
+    expect(resolverEscopoComunidade(ctx, undefined)).toBe('torcida')
+    expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
+    expect(resolverEscopoComunidade(ctx, 'unidade')).toBe('unidade')
+  })
+
+  it('escopo indisponível cai no default em vez de quebrar', () => {
+    // Link colado de outra conta não pode dar erro na cara de quem abriu.
+    const semUnidade = ctxTorcida()
+    expect(resolverEscopoComunidade(semUnidade, 'unidade')).toBe('torcida')
+    expect(resolverEscopoComunidade(ctxNacional(), 'unidade')).toBe('nacional')
+    expect(resolverEscopoComunidade(semUnidade, 'lixo')).toBe('torcida')
   })
 
   it('por modo: TORCEDOR sem query fica nacional; sócio sem query fica torcida', () => {
-    expect(resolverEscopoComunidadePorModo('nacional', true, null)).toBe('nacional')
-    expect(resolverEscopoComunidadePorModo('nacional', true, 'torcida')).toBe('torcida')
-    expect(resolverEscopoComunidadePorModo('torcida', true, null)).toBe('torcida')
-    expect(resolverEscopoComunidadePorModo('torcida', true, 'nacional')).toBe('nacional')
+    const so = { torcida: true, unidade: false }
+    expect(resolverEscopoComunidadePorModo('nacional', so, null)).toBe('nacional')
+    expect(resolverEscopoComunidadePorModo('nacional', so, 'torcida')).toBe('torcida')
+    expect(resolverEscopoComunidadePorModo('torcida', so, null)).toBe('torcida')
+    expect(resolverEscopoComunidadePorModo('torcida', so, 'nacional')).toBe('nacional')
   })
 })
 

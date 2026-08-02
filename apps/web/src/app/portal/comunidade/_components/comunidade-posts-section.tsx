@@ -9,6 +9,7 @@ import {
 } from '@/lib/feed'
 import { getPostsDoCanal } from '@/lib/canais'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 interface CurrentUser {
   id: string
@@ -25,7 +26,7 @@ interface ComunidadePostsSectionProps {
   /** Obrigatório quando `filtro === 'canal'` — id da Conversa (canal). */
   conversaId?: string
   /** Feed da Comunidade Nacional do clube — `tenantId` é o sintético. */
-  escopo?: 'nacional' | 'torcida'
+  escopo?: EscopoComunidade
   /** Obrigatório quando `escopo === 'nacional'`. */
   afiliacaoId?: string | null
 }

@@ -67,7 +67,7 @@ export async function ComunidadeChromeRailSlot() {
       currentUserId={userId}
       tenantId={tenantId}
       tenantSinteticoId={ctx.tenantSintetico?.id ?? null}
-      podeEscopoTorcida={ctx.podeEscopoTorcida}
+      escopos={ctx.escopos}
       modoContexto={ctx.modo}
       salasTorcida={salasTorcida}
       canaisTorcida={canaisTorcida}

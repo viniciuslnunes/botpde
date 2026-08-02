@@ -18,7 +18,7 @@ const querySchema = z.object({
   take: z.coerce.number().int().min(5).max(50).optional(),
   filtro: z.enum(['descobrir', 'seguindo', 'grupos', 'canal']).optional(),
   conversaId: z.string().optional(),
-  escopo: z.enum(['nacional', 'torcida']).optional(),
+  escopo: z.enum(['nacional', 'torcida', 'unidade']).optional(),
   afiliacaoId: z.string().uuid().optional(),
 })
 
