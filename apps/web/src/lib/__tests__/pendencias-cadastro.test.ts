@@ -99,4 +99,31 @@ describe('resolverPendenciasCadastro via completude', () => {
     expect(pendenciasCadastroVisiveis(m)).toEqual([])
     expect(inadimplentePorPendenciaCadastro(m)).toBe(true)
   })
+
+  it('Vinícius-like: ficha incompleta dispara mesmo com carteirinha já emitida', () => {
+    const p = resolverPendenciasCadastro(
+      base({
+        numeroAssociado: '343221',
+        cep: '84035-620',
+        imagemProva: 'https://prova',
+        temCarteirinha: true,
+        exigirDocumentosCadastro: true,
+      }),
+    )
+    expect(p).toHaveLength(1)
+    expect(p[0]?.camposFaltantes).toEqual(
+      expect.arrayContaining([
+        'cpf',
+        'rg',
+        'nascimento',
+        'logradouro',
+        'bairro',
+        'uf',
+        'termo',
+        'documento',
+        'residencia',
+      ]),
+    )
+    expect(p[0]?.camposFaltantes).not.toContain('dataExpedicaoCarteirinha')
+  })
 })

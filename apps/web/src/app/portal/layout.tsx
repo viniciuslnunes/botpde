@@ -85,7 +85,10 @@ export default async function PortalLayout({
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
     ctx?.modo === 'torcida' && !isSuperAdmin
-      ? carregarPendenciasCadastro(ctx.tenant.id, session.user.id)
+      ? carregarPendenciasCadastro(ctx.tenant.id, session.user.id).catch((err: unknown) => {
+          console.error('[portal/layout] pendencias cadastro', err)
+          return null
+        })
       : Promise.resolve(null),
   ])
 
