@@ -12,6 +12,7 @@ import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeComposerSection } from './comunidade-composer-section'
 import { FeedComposerSkeleton, FeedStoriesSkeleton } from '@/components/portal/feed-skeletons'
 import { ComunidadeNacionalComposerSection } from './comunidade-nacional-composer-section'
+import { ComunidadeNacionalBanner } from './comunidade-nacional-banner'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
@@ -33,8 +34,15 @@ interface ComunidadeFeedShellProps {
   currentUser: CurrentUser
   cursor?: string
   filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
-  /** Clube do torcedor global (banner quando feed usa tenant proxy). */
-  clubeNacional?: { id: string; nome: string; apelido: string | null } | null
+  /** Clube do torcedor (banner da CN + hint). */
+  clubeNacional?: {
+    id: string
+    nome: string
+    apelido: string | null
+    escudoUrl?: string | null
+  } | null
+  /** Contagem de torcidas do clube — metadado do banner Nacional. */
+  torcidasNacionalCount?: number | null
   /** Banner CN — true enquanto o composer carrega o estado real. */
   somentePublicoHint?: boolean
   salasAtivas?: SalaAtivaListItem[]
@@ -75,6 +83,7 @@ export function ComunidadeFeedShell({
   cursor,
   filtro = 'descobrir',
   clubeNacional = null,
+  torcidasNacionalCount = null,
   somentePublicoHint = false,
   salasAtivas = [],
   eventoIdInicial,
@@ -114,14 +123,13 @@ export function ComunidadeFeedShell({
           modoContexto={modoContexto}
         />
 
-        {modoNacional && (
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Feed da comunidade nacional de{' '}
-            <strong className="text-[rgb(var(--foreground))]">
-              {clubeNacional?.apelido || clubeNacional?.nome}
-            </strong>
-            . Publicações públicas das torcidas do clube na plataforma.
-          </div>
+        {modoNacional && clubeNacional && (
+          <ComunidadeNacionalBanner
+            nome={clubeNacional.nome}
+            apelido={clubeNacional.apelido}
+            escudoUrl={clubeNacional.escudoUrl ?? afiliacao?.escudoUrl ?? null}
+            torcidasCount={torcidasNacionalCount}
+          />
         )}
 
         {modoNacional && solicitacaoPendente && (

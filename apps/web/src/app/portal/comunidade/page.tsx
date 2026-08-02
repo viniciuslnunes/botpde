@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comunidade-contexto'
+import { resolverContextoComunidade, resolverEscopoComunidade, getTenantIdsPorAfiliacao } from '@/lib/comunidade-contexto'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
@@ -62,9 +62,10 @@ export default async function ComunidadePage({
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
-    const [salasAtivas, solicitacaoPendente] = await Promise.all([
+    const [salasAtivas, solicitacaoPendente, tenantIdsClube] = await Promise.all([
       listSalasNacionais(afiliacao.id),
       getSolicitacaoSocioPendente(session.user.id),
+      getTenantIdsPorAfiliacao(afiliacao.id),
     ])
 
     return (
@@ -80,6 +81,7 @@ export default async function ComunidadePage({
           cursor={params.cursor}
           filtro={filtro}
           clubeNacional={afiliacao}
+          torcidasNacionalCount={tenantIdsClube.length}
           salasAtivas={salasAtivas}
           eventoIdInicial={eventoIdComposer}
           escopo="nacional"
