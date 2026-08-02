@@ -35,7 +35,8 @@ export async function sincronizarCobrancasVencidas(tenantId: string): Promise<nu
 }
 
 /**
- * Recalcula `SaasMembro.adimplente` a partir de cobranças abertas (PENDENTE/VENCIDA).
+ * Recalcula `SaasMembro.adimplente` a partir de cobranças abertas (PENDENTE/VENCIDA)
+ * e de pendência de cadastro dispensada sem completar (`lib/pendencias-cadastro`).
  */
 export async function recalcularAdimplencia(
   tenantId: string,
@@ -51,7 +52,12 @@ export async function recalcularAdimplencia(
     select: { id: true },
     take: 1,
   })
-  const adimplente = abertas.length === 0
+  // Import dinâmico evita ciclo cobrancas ↔ pendencias-cadastro-server.
+  const { membroInadimplentePorCadastroDispensado } = await import(
+    '@/lib/pendencias-cadastro-server'
+  )
+  const porCadastro = await membroInadimplentePorCadastroDispensado(tenantId, userId)
+  const adimplente = abertas.length === 0 && !porCadastro
   await db.saasMembro.updateMany({
     where: { tenantId, userId },
     data: { adimplente },

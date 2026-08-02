@@ -27,6 +27,12 @@ import {
 import { TabHistorico } from './membro-historico-tab'
 import { TabAcesso } from './membro-acesso-tab'
 import type { AdminMembroItem } from './admin-membro-item'
+import {
+  checklistCompletudeCadastro,
+  checklistCompletudeDocumentos,
+  preenchidoCompletude,
+  type CompletudeItem,
+} from '@/lib/completude-cadastro-socio'
 
 type TabId =
   | 'resumo'
@@ -168,16 +174,10 @@ function AnexoInline({
 }
 
 function preenchido(v: unknown): boolean {
-  if (v === null || v === undefined) return false
-  if (typeof v === 'string') return v.trim().length > 0
-  return true
+  return preenchidoCompletude(v)
 }
 
-type CheckItem = {
-  id: string
-  label: string
-  ok: boolean
-  obrigatorio: boolean
+type CheckItem = CompletudeItem & {
   /** Apontado como errado na reprovação — vence o `ok` na hora de renderizar. */
   reprovado?: boolean
 }
@@ -188,83 +188,37 @@ function marcarReprovados(itens: CheckItem[], reprovados: Set<string>): CheckIte
 }
 
 function checklistCadastro(m: AdminMembroItem): CheckItem[] {
-  if (!m.isSocio) return []
-  const menor =
-    (typeof m.idade === 'number' && m.idade < 18) ||
-    preenchido(m.responsavelNome) ||
-    preenchido(m.autorizacaoMenorAceitaLabel)
-  return [
-    {
-      id: 'numeroAssociado',
-      label: 'Nº de associado',
-      ok: preenchido(m.numeroAssociado),
-      obrigatorio: true,
-    },
-    { id: 'cpf', label: 'CPF', ok: preenchido(m.cpf), obrigatorio: true },
-    { id: 'rg', label: 'RG', ok: preenchido(m.rg), obrigatorio: true },
-    {
-      id: 'nascimento',
-      label: 'Data de nascimento',
-      ok: preenchido(m.dataNascimentoLabel),
-      obrigatorio: true,
-    },
-    { id: 'logradouro', label: 'Logradouro', ok: preenchido(m.logradouro), obrigatorio: true },
-    { id: 'bairro', label: 'Bairro', ok: preenchido(m.bairro), obrigatorio: true },
-    { id: 'cep', label: 'CEP', ok: preenchido(m.cep), obrigatorio: true },
-    { id: 'uf', label: 'UF', ok: preenchido(m.uf), obrigatorio: true },
-    {
-      id: 'termo',
-      label: 'Termo de responsabilidade',
-      ok: preenchido(m.termoResponsabilidadeAceitoLabel),
-      obrigatorio: true,
-    },
-    {
-      id: 'prova',
-      label: 'Comprovante de vínculo',
-      ok: preenchido(m.imagemProva),
-      obrigatorio: true,
-    },
-    ...(menor
-      ? [
-          {
-            id: 'resp-nome',
-            label: 'Nome do responsável',
-            ok: preenchido(m.responsavelNome),
-            obrigatorio: true,
-          },
-          {
-            id: 'resp-doc',
-            label: 'Documento do responsável',
-            ok: preenchido(m.responsavelDocumento),
-            obrigatorio: true,
-          },
-        ]
-      : []),
-  ]
+  return checklistCompletudeCadastro({
+    isSocio: m.isSocio,
+    idade: m.idade,
+    numeroAssociado: m.numeroAssociado,
+    cpf: m.cpf,
+    rg: m.rg,
+    dataNascimento: m.dataNascimentoLabel,
+    logradouro: m.logradouro,
+    bairro: m.bairro,
+    cep: m.cep,
+    uf: m.uf,
+    termoResponsabilidadeAceitoEm: m.termoResponsabilidadeAceitoLabel,
+    imagemProva: m.imagemProva,
+    responsavelNome: m.responsavelNome,
+    responsavelDocumento: m.responsavelDocumento,
+    autorizacaoMenorAceitaEm: m.autorizacaoMenorAceitaLabel,
+  })
 }
 
 function checklistDocumentos(m: AdminMembroItem): CheckItem[] {
-  if (!m.isSocio) return []
-  return [
+  // Admin sempre lista a aba Documentos para sócio (mesmo se a torcida
+  // desligou a exigência no onboarding — a ficha ainda mostra o estado).
+  return checklistCompletudeDocumentos(
     {
-      id: 'prova',
-      label: 'Comprovante de vínculo',
-      ok: preenchido(m.imagemProva),
-      obrigatorio: true,
+      isSocio: m.isSocio,
+      imagemProva: m.imagemProva,
+      fotoDocumentoUrl: m.fotoDocumentoUrl,
+      comprovanteResidenciaUrl: m.comprovanteResidenciaUrl,
     },
-    {
-      id: 'documento',
-      label: 'Foto do documento',
-      ok: preenchido(m.fotoDocumentoUrl),
-      obrigatorio: true,
-    },
-    {
-      id: 'residencia',
-      label: 'Comprovante de residência',
-      ok: preenchido(m.comprovanteResidenciaUrl),
-      obrigatorio: true,
-    },
-  ]
+    true,
+  )
 }
 
 function Checklist({ itens, titulo }: { itens: CheckItem[]; titulo?: string }) {

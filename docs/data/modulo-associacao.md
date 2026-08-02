@@ -16,6 +16,7 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
 - **Quero me associar**: ficha LGE sem nº → após aprovação fica em Aguardando emissão (emissão manual).
 - Periodicidades do wizard: `Tenant.periodicidadesOnboarding` (config em Cadastro de sócios); enum inclui `QUADRIMENSAL` e `SEMESTRAL`; fallback vazio = quadrimensal + anual.
 - Campos: `SaasMembro.dataExpedicaoCarteirinha`, `periodicidadePretendida`; `SaasSocio.expedidoEm`.
+- **Pendências de cadastro (2026-08-02):** usa a mesma **completude do cadastro** do card em `/admin/socios` (`lib/completude-cadastro-socio.ts` — nº, CPF, RG, nascimento, endereço, termo, prova, responsável se menor; + documentos se `exigirDocumentosCadastro`; + expedição/periodicidade se ainda não há `SaasSocio`). Modal no portal → `/portal/cadastro/associacao`. «Não mostrar de novo» → `adimplente = false` até completar (`pendenciasCadastroDispensadas`).
 
 ## Entidades
 
@@ -23,7 +24,8 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
 |---|---|
 | `PlanoAssociacao` | Contribuição periódica da torcida (nome, valor, periodicidade, ativo) |
 | `CobrancaAssociacao` | Cobrança por membro (mensalidade, adesão, avulsa) — **não** é o gate de vigente neste ciclo |
-| `SaasMembro.adimplente` | Espelho operacional via cobranças (financeiro); tabs Sócios usam `validade` |
+| `SaasMembro.adimplente` | Espelho: cobranças abertas **ou** pendência de cadastro dispensada sem completar |
+| `SaasMembro.pendenciasCadastroDispensadas` | Códigos em que o sócio marcou «não mostrar de novo» |
 | `SaasMembro` campos LGE | RG, CPF, filiação, escolaridade, profissão, nascimento |
 | `SaasSocio.qrToken` | Segredo opaco para QR verificável |
 | `SaasSocio.validade` / `expedidoEm` | Vigência da carteirinha digital |

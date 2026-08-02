@@ -20,11 +20,8 @@ export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
 export type SerieCampeonato = 'A' | 'B' | 'C' | 'D' | 'ESTADUAL' | 'OUTRA'
 
-/** Estados brasileiros (siglas) usados no onboarding e na validação de região. */
-export const UFS_BRASIL: string[] = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
-  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-]
+/** Re-export: fonte em `lib/ufs-brasil.ts` (seguro p/ Client Components). */
+export { UFS_BRASIL } from '@/lib/ufs-brasil'
 
 const STATS_VAZIAS: StatsClubeOnboarding = {
   sociosTotal: 0,

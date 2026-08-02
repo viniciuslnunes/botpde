@@ -972,9 +972,17 @@ model SaasMembro {
   /// Periodicidade pretendida no onboarding (quando ainda não há PlanoAssociacao).
   periodicidadePretendida PeriodicidadePlanoAssociacao? @map("periodicidade_pretendida")
 
-  /// Espelho operacional: false se há cobrança vencida/pendente relevante.
+  /// Espelho operacional: false se há cobrança vencida/pendente relevante
+  /// **ou** pendência de cadastro dispensada sem completar (ver
+  /// `pendenciasCadastroDispensadas` + `lib/pendencias-cadastro.ts`).
 
   adimplente Boolean @default(true)
+
+  /// Códigos de `PENDENCIAS_CADASTRO_CODIGOS` que o sócio marcou
+  /// «não mostrar de novo». Esconde o modal; a pendência em si só some
+  /// quando os dados faltantes forem preenchidos.
+
+  pendenciasCadastroDispensadas String[] @default([]) @map("pendencias_cadastro_dispensadas")
 
 
 

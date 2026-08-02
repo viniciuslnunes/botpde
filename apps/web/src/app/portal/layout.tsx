@@ -12,6 +12,8 @@ import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { getTenantFromHost } from '@/lib/tenant'
 import { NavbarBrandOverrideProvider } from '@/lib/navbar-brand-override'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
+import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
+import { PendenciasCadastroModal } from '@/components/portal/pendencias-cadastro-modal'
 
 export default async function PortalLayout({
   children,
@@ -79,9 +81,12 @@ export default async function PortalLayout({
         ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
         : null
 
-  const [avatarUrl, userName] = await Promise.all([
+  const [avatarUrl, userName, pendenciasSnap] = await Promise.all([
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
+    ctx?.modo === 'torcida' && !isSuperAdmin
+      ? carregarPendenciasCadastro(ctx.tenant.id, session.user.id)
+      : Promise.resolve(null),
   ])
 
   const navbar = (
@@ -113,6 +118,9 @@ export default async function PortalLayout({
         <main className="app-container relative py-4 sm:py-8">
           <PortalMotionShell>{children}</PortalMotionShell>
         </main>
+        {pendenciasSnap && pendenciasSnap.visiveis.length > 0 ? (
+          <PendenciasCadastroModal pendencias={pendenciasSnap.visiveis} />
+        ) : null}
       </NavbarBrandOverrideProvider>
     </div>
   )
