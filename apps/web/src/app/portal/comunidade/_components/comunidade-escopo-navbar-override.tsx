@@ -51,7 +51,7 @@ export function ComunidadeEscopoNavbarOverride({
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { setOverride } = useNavbarBrandOverride()
+  const { setOverride, setEscopoAtivo } = useNavbarBrandOverride()
 
   const escopo = resolverEscopoComunidadePorModo(
     modoContexto,
@@ -62,7 +62,13 @@ export function ComunidadeEscopoNavbarOverride({
   const onCanalDetalhe = CANAL_DETALHE_RE.test(pathname)
 
   useEffect(() => {
-    if (onCanalDetalhe) return
+    // Detalhe de canal tem override próprio — não forçar CN na topbar.
+    if (onCanalDetalhe) {
+      setEscopoAtivo(null)
+      return () => setEscopoAtivo(null)
+    }
+
+    setEscopoAtivo(escopo)
 
     let brand: NavbarBrand | null = null
     if (escopo === 'nacional' && afiliacao) {
@@ -89,11 +95,17 @@ export function ComunidadeEscopoNavbarOverride({
 
     if (!brand) {
       setOverride(null)
-      return
+      return () => {
+        setOverride(null)
+        setEscopoAtivo(null)
+      }
     }
 
     setOverride(brand)
-    return () => setOverride(null)
+    return () => {
+      setOverride(null)
+      setEscopoAtivo(null)
+    }
   }, [
     onCanalDetalhe,
     escopo,
@@ -110,6 +122,7 @@ export function ComunidadeEscopoNavbarOverride({
     unidade?.logoUrl,
     corPrimariaNacional,
     setOverride,
+    setEscopoAtivo,
   ])
 
   return null

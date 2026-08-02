@@ -91,8 +91,8 @@ export default async function PortalLayout({
       tenant={navbarTenant}
       temDepartamentos={totalDepartamentos > 0}
       modoNacional={ctx?.modo === 'nacional'}
-      // Convite TORCEDOR: torcidaReal (sede/unidade) ou aba unidade — ambos
-      // liberam Loja/Sedes/Agenda; Carteirinha/Departamentos continuam fora.
+      // Convite TORCEDOR: torcidaReal/unidade liberam Loja/Sedes/Agenda nas
+      // abas de canal (a navbar oculta esses links no escopo nacional).
       temVinculoTorcida={Boolean(
         ctx?.modo === 'nacional' && (ctx.torcidaReal || ctx.unidade),
       )}

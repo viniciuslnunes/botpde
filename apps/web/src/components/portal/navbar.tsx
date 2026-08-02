@@ -49,8 +49,18 @@ const LINKS_SOMENTE_TORCIDA = new Set([
   '/portal/loja',
 ])
 
-/** Torcedor vinculado à sede/unidade (convite): sem carteirinha. Loja/Sedes/Agenda ok. */
+/** Torcedor vinculado à sede/unidade (convite): sem carteirinha. */
 const LINKS_OCULTOS_TORCEDOR_VINCULO = new Set(['/portal/carteirinha'])
+
+/**
+ * Agenda/Sedes/Loja são do canal (torcida/unidade). Na CN somem da topbar —
+ * sócio e torcedor — e voltam ao abrir a aba do canal.
+ */
+const LINKS_REATIVOS_CANAL = new Set([
+  '/portal/eventos',
+  '/portal/sedes',
+  '/portal/loja',
+])
 
 /** Único atalho de departamentos na navbar (não lista cada área). */
 const departamentosLink = {
@@ -70,7 +80,8 @@ interface PortalNavbarProps {
   modoNacional?: boolean
   /**
    * Torcedor APROVADO na sede/unidade (convite). Com `modoNacional`, libera
-   * Loja/Sedes/Agenda e continua sem Carteirinha/Departamentos.
+   * Loja/Sedes/Agenda fora da CN (aba torcida/unidade) e continua sem
+   * Carteirinha/Departamentos.
    */
   temVinculoTorcida?: boolean
   /** Slug da torcida ativa — só preenchido no modo torcida. */
@@ -90,7 +101,7 @@ export function PortalNavbar({
   const searchParams = useSearchParams()
   const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
-  const { override: brandOverride } = useNavbarBrandOverride()
+  const { override: brandOverride, escopoAtivo } = useNavbarBrandOverride()
   // Override cosmético (visão de canal): substitui só o slot esquerdo, sem
   // afetar sessão/tenant ativo/permissões.
   const brandTenant = brandOverride ?? tenant
@@ -113,6 +124,19 @@ export function PortalNavbar({
   }, [tenantSlugAtual])
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
+
+  // CN: sem cadeado admin e sem Agenda/Sedes/Loja. Fonte de verdade = escopo
+  // do chrome da comunidade (mesmo resolver da marca); URL só como fallback.
+  const naComunidade = pathname.startsWith('/portal/comunidade')
+  const escopoParam = searchParams.get('escopo')
+  const emEscopoNacional =
+    escopoAtivo === 'nacional' ||
+    (escopoAtivo == null &&
+      naComunidade &&
+      (escopoParam === 'nacional' ||
+        (modoNacional && (escopoParam == null || escopoParam === ''))))
+  const mostrarCadeadoAdmin = hasAdminAreaAccess && !emEscopoNacional
+
   const ocultosNacional = temVinculoTorcida
     ? LINKS_OCULTOS_TORCEDOR_VINCULO
     : LINKS_SOMENTE_TORCIDA
@@ -121,26 +145,20 @@ export function PortalNavbar({
     : [...navLinks]
   // Departamentos: só sócio com área (temDepartamentos). Torcedor do convite
   // nunca entra — layout já passa 0 no modo nacional.
-  const links = temDepartamentos
+  const linksComDepto = temDepartamentos
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
+  const links = emEscopoNacional
+    ? linksComDepto.filter((link) => !LINKS_REATIVOS_CANAL.has(link.href))
+    : linksComDepto
 
-  // Abaixo de xl os labels somem da barra (só hamburger). Torcedor do convite
-  // precisa ver Loja/Sedes/Agenda sem abrir o menu — ícones na faixa de ações.
+  // Abaixo de xl: ícones de Loja/Sedes/Agenda na faixa de ações (só quando
+  // o canal está ativo — some junto com os labels na CN).
   const atalhosTopbarMobile = links.filter((link) =>
     link.href === '/portal/eventos' ||
     link.href === '/portal/sedes' ||
     link.href === '/portal/loja',
   )
-
-  // CN não tem área admin — esconde o cadeado no escopo nacional da comunidade.
-  const naComunidade = pathname.startsWith('/portal/comunidade')
-  const escopoParam = searchParams.get('escopo')
-  const emEscopoNacional =
-    naComunidade &&
-    (escopoParam === 'nacional' ||
-      (modoNacional && (escopoParam == null || escopoParam === '')))
-  const mostrarCadeadoAdmin = hasAdminAreaAccess && !emEscopoNacional
 
   function isActive(href: string) {
     return pathname.startsWith(href)

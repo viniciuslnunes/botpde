@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
 /** Marca exibida no slot esquerdo da navbar (nome/escudo/cor). */
 export interface NavbarBrand {
@@ -12,6 +13,12 @@ export interface NavbarBrand {
 interface NavbarBrandOverrideContextValue {
   override: NavbarBrand | null
   setOverride: (brand: NavbarBrand | null) => void
+  /**
+   * Escopo da Comunidade resolvido pelo chrome (`nacional`/`torcida`/`unidade`).
+   * `null` fora desse chrome — a navbar cai no fallback da URL.
+   */
+  escopoAtivo: EscopoComunidade | null
+  setEscopoAtivo: (escopo: EscopoComunidade | null) => void
 }
 
 const NavbarBrandOverrideContext = createContext<NavbarBrandOverrideContextValue | null>(null)
@@ -24,10 +31,17 @@ const NavbarBrandOverrideContext = createContext<NavbarBrandOverrideContextValue
  */
 export function NavbarBrandOverrideProvider({ children }: { children: ReactNode }) {
   const [override, setOverrideState] = useState<NavbarBrand | null>(null)
+  const [escopoAtivo, setEscopoAtivoState] = useState<EscopoComunidade | null>(null)
   const setOverride = useCallback((brand: NavbarBrand | null) => setOverrideState(brand), [])
+  const setEscopoAtivo = useCallback(
+    (escopo: EscopoComunidade | null) => setEscopoAtivoState(escopo),
+    [],
+  )
 
   return (
-    <NavbarBrandOverrideContext.Provider value={{ override, setOverride }}>
+    <NavbarBrandOverrideContext.Provider
+      value={{ override, setOverride, escopoAtivo, setEscopoAtivo }}
+    >
       {children}
     </NavbarBrandOverrideContext.Provider>
   )
