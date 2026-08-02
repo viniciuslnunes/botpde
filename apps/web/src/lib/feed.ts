@@ -540,6 +540,86 @@ export function encodeCursor(post: { id: string; criadoEm: Date | string }): str
   ).toString('base64url')
 }
 
+/**
+ * Cursor do feed Nacional: um por balde (torcedores da CN × organizadas).
+ * Os dois avançam em ritmos diferentes — um cursor único por recência
+ * arrastaria o balde lento junto e furaria a cota.
+ */
+export interface CursorNacional {
+  torcedor: FeedCursor | null
+  torcida: FeedCursor | null
+}
+
+function ehFeedCursor(valor: unknown): valor is FeedCursor {
+  if (!valor || typeof valor !== 'object') return false
+  const c = valor as Partial<FeedCursor>
+  return typeof c.id === 'string' && typeof c.criadoEmIso === 'string'
+}
+
+export function decodeCursorNacional(cursor?: string): CursorNacional {
+  if (!cursor) return { torcedor: null, torcida: null }
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
+    // Cursor legado (formato único, emitido antes dos dois baldes): vale para
+    // os dois lados — a página seguinte fica correta, sem repetir nem pular.
+    if (ehFeedCursor(parsed)) return { torcedor: parsed, torcida: parsed }
+    if (parsed && typeof parsed === 'object') {
+      const c = parsed as Partial<Record<keyof CursorNacional, unknown>>
+      return {
+        torcedor: ehFeedCursor(c.torcedor) ? c.torcedor : null,
+        torcida: ehFeedCursor(c.torcida) ? c.torcida : null,
+      }
+    }
+    return { torcedor: null, torcida: null }
+  } catch {
+    return { torcedor: null, torcida: null }
+  }
+}
+
+export function encodeCursorNacional(cursores: CursorNacional): string {
+  return Buffer.from(JSON.stringify(cursores), 'utf8').toString('base64url')
+}
+
+function chaveCursorNacional(cursores: CursorNacional): string {
+  const parte = (c: FeedCursor | null) => (c ? `${c.criadoEmIso}:${c.id}` : 'start')
+  return `${parte(cursores.torcedor)}|${parte(cursores.torcida)}`
+}
+
+/** Item mais antigo consumido de um balde — vira o cursor dele. */
+function ultimoCursor(posts: PostSocialItem[]): FeedCursor | null {
+  const ultimo = posts[posts.length - 1]
+  if (!ultimo) return null
+  const criadoEm = asDate(ultimo.criadoEm)
+  return { id: ultimo.id, criadoEmIso: criadoEm.toISOString() }
+}
+
+/**
+ * Distribui os dois baldes ao longo da página em vez de empilhar um depois do
+ * outro: cada passo emite do balde que está mais atrás da sua fatia. Com 10 e
+ * 2 itens, os 2 caem espaçados no meio — não colados no fim.
+ */
+export function intercalarProporcional<T>(a: T[], b: T[]): T[] {
+  const out: T[] = []
+  let i = 0
+  let j = 0
+
+  while (i < a.length || j < b.length) {
+    if (j >= b.length) {
+      out.push(a[i++]!)
+      continue
+    }
+    if (i >= a.length) {
+      out.push(b[j++]!)
+      continue
+    }
+    // Progresso relativo: quem consumiu proporcionalmente menos, emite.
+    if (i / a.length <= j / b.length) out.push(a[i++]!)
+    else out.push(b[j++]!)
+  }
+
+  return out
+}
+
 export function buildCursorWhere(cursor: FeedCursor | null) {
   if (!cursor) return undefined
   const data = new Date(cursor.criadoEmIso)
@@ -1464,9 +1544,10 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   opts: FeedOpts = {},
 ): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
-  const decodedCursor = decodeCursor(opts.cursor)
-  const cursorWhere = buildCursorWhere(decodedCursor)
-  const cursorKey = decodedCursor ? `${decodedCursor.criadoEmIso}:${decodedCursor.id}` : 'start'
+  const cursores = decodeCursorNacional(opts.cursor)
+  const cursorTorcedorWhere = buildCursorWhere(cursores.torcedor)
+  const cursorTorcidaWhere = buildCursorWhere(cursores.torcida)
+  const cursorKey = chaveCursorNacional(cursores)
 
   const [tenantIds, seguindoAprovados, sintetico] = await Promise.all([
     getTenantIdsPorAfiliacao(afiliacaoId),
@@ -1490,47 +1571,109 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
 
   const seguindoKey = [...seguindoAprovados].sort().join(',') || 'none'
   const tenantIdsKey = [...tenantIds].sort().join(',')
+  const idsTorcidas = sintetico ? tenantIds.filter((id) => id !== sintetico.id) : tenantIds
 
-  const postsRaw = (await unstable_cache(
-    async () =>
-      db.post.findMany({
-        where: {
-          tenantId: { in: tenantIds },
-          tipo: 'MEMBRO',
-          visibilidade: 'PUBLICO',
-          oculto: false,
-          ...escopoFeedSemConversa,
-          ...cursorWhere,
-          OR: orFeedNacionalDescobrir(seguindoAprovados),
-        },
-        orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-        take: take + 1,
-        include: postIncludeLista(userId),
-      }) as Promise<PostRaw[]>,
-    [
-      'feed-nacional',
-      afiliacaoId,
-      userId ?? 'anon',
-      seguindoKey,
-      tenantIdsKey,
-      cursorKey,
-      String(take),
-    ],
-    { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
-  )()) as PostRaw[]
+  // Dois baldes, uma consulta cada. Uma consulta só, ordenada por recência,
+  // devolvia a página inteira do balde mais prolífico (organizadas com
+  // `alcanceNacional`) e o torcedor sumia da CN.
+  const [postsTorcedorRaw, postsTorcidaRaw] = await Promise.all([
+    sintetico
+      ? (unstable_cache(
+          async () =>
+            db.post.findMany({
+              where: {
+                tenantId: sintetico.id,
+                tipo: 'MEMBRO',
+                visibilidade: 'PUBLICO',
+                oculto: false,
+                ...escopoFeedSemConversa,
+                ...cursorTorcedorWhere,
+              },
+              orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+              take: take + 1,
+              include: postIncludeLista(userId),
+            }) as Promise<PostRaw[]>,
+          [
+            'feed-nacional-torcedor',
+            afiliacaoId,
+            userId ?? 'anon',
+            sintetico.id,
+            cursorKey,
+            String(take),
+          ],
+          { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
+        )() as Promise<PostRaw[]>)
+      : Promise.resolve([] as PostRaw[]),
+    idsTorcidas.length > 0
+      ? (unstable_cache(
+          async () =>
+            db.post.findMany({
+              where: {
+                tenantId: { in: idsTorcidas },
+                tipo: 'MEMBRO',
+                visibilidade: 'PUBLICO',
+                oculto: false,
+                ...escopoFeedSemConversa,
+                ...cursorTorcidaWhere,
+                OR: orFeedNacionalDescobrir(seguindoAprovados),
+              },
+              orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+              take: take + 1,
+              include: postIncludeLista(userId),
+            }) as Promise<PostRaw[]>,
+          [
+            'feed-nacional-torcidas',
+            afiliacaoId,
+            userId ?? 'anon',
+            seguindoKey,
+            tenantIdsKey,
+            cursorKey,
+            String(take),
+          ],
+          { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
+        )() as Promise<PostRaw[]>)
+      : Promise.resolve([] as PostRaw[]),
+  ])
 
-  let posts = postsRaw.map(projetarPost)
-  if (!decodedCursor && sintetico) {
-    posts = rankDescobrirPosts(posts, sintetico.id)
+  const torcedorRecencia = postsTorcedorRaw.map(projetarPost)
+  const torcidaRecencia = postsTorcidaRaw.map(projetarPost)
+
+  // Quantos de cada balde entram nesta página. A CN é a praça do torcedor:
+  // metade é dele por direito, e o que ele não ocupar volta para as torcidas
+  // (e vice-versa) — cota nunca vira página curta.
+  const cota = Math.ceil(take / 2)
+  let nTorcedor = Math.min(cota, torcedorRecencia.length)
+  const nTorcida = Math.min(take - nTorcedor, torcidaRecencia.length)
+  if (nTorcedor + nTorcida < take) {
+    nTorcedor = Math.min(torcedorRecencia.length, take - nTorcida)
   }
-  const hasMore = posts.length > take
-  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  // O corte é sempre no PREFIXO por recência: o cursor de cada balde é o item
+  // mais antigo consumido dele. Reordenar antes de cortar (como o ranking
+  // fazia) pulava posts na página seguinte.
+  const consumidoTorcedor = torcedorRecencia.slice(0, nTorcedor)
+  const consumidoTorcida = torcidaRecencia.slice(0, nTorcida)
+
+  const escopoRanking = sintetico?.id ?? tenantIds[0] ?? afiliacaoId
+  const paginaBruta = intercalarProporcional(
+    rankDescobrirPosts(consumidoTorcedor, escopoRanking),
+    rankDescobrirPosts(consumidoTorcida, escopoRanking),
+  )
+
+  const hasMore =
+    torcedorRecencia.length > nTorcedor || torcidaRecencia.length > nTorcida
+  const pagina = await finalizarPosts(paginaBruta)
 
   return {
     posts: pagina,
     pageInfo: {
       hasMore,
-      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+      nextCursor: hasMore
+        ? encodeCursorNacional({
+            torcedor: ultimoCursor(consumidoTorcedor) ?? cursores.torcedor,
+            torcida: ultimoCursor(consumidoTorcida) ?? cursores.torcida,
+          })
+        : null,
     },
   }
 })

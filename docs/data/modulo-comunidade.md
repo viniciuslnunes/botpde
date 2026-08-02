@@ -452,6 +452,27 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   posts `TENANT`/`PRIVADO` para o escopo Nacional. Authz CN:
   `apps/web/src/lib/authz.ts` (`assertComunidadeNacional`,
   `assertPodeAcessarSalaNacional`).
+- **Composição do feed Nacional (2026-08-02)**: a CN é a praça do torcedor, e
+  o feed precisa **garantir** isso — não basta ordenar por recência.
+  `getPostsFeedNacional` roda **dois baldes**:
+  1. **torcedores** — posts do tenant sintético;
+  2. **organizadas** — posts das TOs do clube com `alcanceNacional` ou de quem
+     o viewer segue (`orFeedNacionalDescobrir`).
+
+  Cota de metade da página para o balde de torcedor; o que um balde não ocupa
+  volta para o outro, então cota nunca produz página curta. A página é montada
+  por `intercalarProporcional` (distribui o balde menor ao longo da página, em
+  vez de empilhar no fim) e cada balde é ranqueado por `rankDescobrirPosts`
+  antes da intercalação — inteligência dentro do balde, distribuição entre
+  eles.
+
+  **Cursor é composto** (`CursorNacional`: um `FeedCursor` por balde). Um
+  cursor único por recência arrastaria o balde lento junto e furaria a cota.
+  `decodeCursorNacional` aceita o formato legado (cursor único) aplicando-o aos
+  dois baldes, para não quebrar aba aberta durante o deploy. O corte de cada
+  balde é sempre no **prefixo por recência** — ranquear antes de cortar (o que
+  o código antigo fazia) pulava posts na página seguinte. Testes:
+  `lib/__tests__/feed-nacional-composicao.test.ts`.
 - **Escopo da aba "Minha torcida" (2026-08-01)**: o feed da torcida **não** usa
   `resolveVisibleTenantIdsForFeed` — usa `resolveTenantIdsMinhaTorcida`
   (`lib/feed.ts`), que devolve só a própria torcida + hierarquia
