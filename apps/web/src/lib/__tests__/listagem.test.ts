@@ -241,6 +241,30 @@ describe('montagem do where', () => {
     expect(texto).toContain('santos')
   })
 
+  // A tab Desligados de /admin/membros usa a chave `status` na URL, mas no banco
+  // o critério é `desligadoEm`. Como o filtro entra no `AND` (e não na raiz),
+  // limpar o `where` pronto não adianta: quem traduz precisa tirar o filtro dos
+  // params. Sem isso, `status: 'DESLIGADO'` chegava ao Prisma e derrubava a página.
+  it('filtro traduzido some do where quando sai dos params', () => {
+    const params = parseListagemParams({ status: 'DESLIGADO', tipo: 'SOCIO' }, spec)
+    const ingenuo = montarWhereListagem<ListagemWhere>(spec, params, {
+      escopo: { tenantId: TENANT },
+    })
+    // O valor não fica na raiz — deletar `where.status` seria no-op.
+    expect(ingenuo.status).toBeUndefined()
+    expect(comoTexto(ingenuo)).toContain('DESLIGADO')
+
+    const semStatus = { ...params, filtros: { ...params.filtros, status: [] } }
+    const where = montarWhereListagem<ListagemWhere>(spec, semStatus, {
+      escopo: { tenantId: TENANT },
+      extra: [{ desligadoEm: { not: null } }],
+    })
+    const texto = comoTexto(where)
+    expect(texto).not.toContain('DESLIGADO')
+    expect(texto).toContain('"desligadoEm"')
+    expect(texto).toContain('SOCIO')
+  })
+
   it('sentinela de tenant é resolvida nas cláusulas do spec', () => {
     const acessos = LISTAGEM_ACESSOS_PESSOAS
     const params = parseListagemParams({ cargo: 'sem' }, acessos)
