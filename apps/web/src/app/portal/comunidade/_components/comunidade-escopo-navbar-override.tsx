@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavbarBrandOverride } from '@/lib/navbar-brand-override'
-import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-contexto'
+import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 
 const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/

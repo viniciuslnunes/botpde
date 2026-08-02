@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
 import {
   resolverEscopoComunidade,
-  resolverEscopoComunidadePorModo,
   type ContextoComunidadePortal,
 } from '@/lib/comunidade-contexto'
 import { decidePodeVerCanal } from '@/lib/canais-shared'

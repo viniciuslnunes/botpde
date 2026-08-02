@@ -7,7 +7,7 @@ import { CanaisSugeridosAside } from './canais-sugeridos-aside'
 import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
 import { useShellDeFeed } from './comunidade-shell-rotas'
 import { Skeleton } from '@/components/portal/feed-skeletons'
-import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-contexto'
+import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
