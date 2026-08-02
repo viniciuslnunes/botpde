@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useNavbarBrandOverride } from '@/lib/navbar-brand-override'
+import { useNavbarBrandOverride, type NavbarBrand } from '@/lib/navbar-brand-override'
 import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 
@@ -14,23 +14,34 @@ type AfiliacaoBrand = {
   escudoUrl: string | null
 }
 
+type TorcidaBrand = {
+  nome: string
+  corPrimaria: string
+  logoUrl: string | null
+}
+
 /**
- * Enquanto o sócio está no escopo Nacional da Comunidade, troca nome/escudo
- * exibidos na navbar pelo clube (Timão, etc.) em vez da torcida organizada.
+ * Navbar reativa ao escopo Nacional × Minha torcida.
+ *
+ * - Sócio: layout base = torcida; Nacional sobrescreve com o clube.
+ * - TORCEDOR: layout base = clube (CN); Minha torcida sobrescreve com a
+ *   unidade/torcida do vínculo — senão o header fica no VERDÃO/FOGÃO.
  * Canal em detalhe mantém o override próprio (`CanalNavbarOverride`).
  */
 export function ComunidadeEscopoNavbarOverride({
   afiliacao,
+  torcidaReal,
   podeEscopoTorcida,
   modoContexto = 'torcida',
-  corPrimaria,
+  corPrimariaNacional,
 }: {
   afiliacao: AfiliacaoBrand | null
+  torcidaReal: TorcidaBrand | null
   podeEscopoTorcida: boolean
   /** TORCEDOR = nacional (default CN); sócio = torcida. */
   modoContexto?: 'nacional' | 'torcida'
   /** Cor do tenant sintético da Comunidade Nacional (paleta do clube). */
-  corPrimaria: string | null
+  corPrimariaNacional: string | null
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -43,25 +54,47 @@ export function ComunidadeEscopoNavbarOverride({
   )
 
   const onCanalDetalhe = CANAL_DETALHE_RE.test(pathname)
-  const modoNacional = escopo === 'nacional' && Boolean(afiliacao) && !onCanalDetalhe
 
   useEffect(() => {
-    if (!modoNacional || !afiliacao) return
+    if (onCanalDetalhe) return
 
-    setOverride({
-      nome: afiliacao.apelido ?? afiliacao.nome,
-      corPrimaria: corPrimaria ?? COR_PRIMARIA_PLATAFORMA,
-      logoUrl: afiliacao.escudoUrl,
-    })
+    let brand: NavbarBrand | null = null
+    if (escopo === 'nacional' && afiliacao) {
+      brand = {
+        nome: afiliacao.apelido ?? afiliacao.nome,
+        corPrimaria: corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
+        logoUrl: afiliacao.escudoUrl,
+      }
+    } else if (escopo === 'torcida' && torcidaReal) {
+      // TORCEDOR: layout do portal já é o clube — precisa override explícito.
+      // Sócio: reforça a marca da torcida (idempotente com o tenant do layout).
+      brand = {
+        nome: torcidaReal.nome,
+        corPrimaria: torcidaReal.corPrimaria,
+        logoUrl: torcidaReal.logoUrl,
+      }
+    }
+
+    if (!brand) {
+      setOverride(null)
+      return
+    }
+
+    setOverride(brand)
     return () => setOverride(null)
   }, [
-    modoNacional,
+    onCanalDetalhe,
+    escopo,
+    afiliacao,
     afiliacao?.nome,
     afiliacao?.apelido,
     afiliacao?.escudoUrl,
-    corPrimaria,
+    torcidaReal,
+    torcidaReal?.nome,
+    torcidaReal?.corPrimaria,
+    torcidaReal?.logoUrl,
+    corPrimariaNacional,
     setOverride,
-    afiliacao,
   ])
 
   return null

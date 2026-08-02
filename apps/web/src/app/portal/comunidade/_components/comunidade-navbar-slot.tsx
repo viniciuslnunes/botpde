@@ -17,14 +17,28 @@ export async function ComunidadeNavbarSlot() {
 
   const afiliacao = ctx.afiliacao
   const corPrimaria = ctx.tenantSintetico?.corPrimaria ?? null
+  const torcidaReal = ctx.torcidaReal
+    ? {
+        nome: ctx.torcidaReal.nome,
+        corPrimaria: ctx.torcidaReal.corPrimaria,
+        logoUrl: ctx.torcidaReal.logoUrl,
+      }
+    : ctx.modo === 'torcida'
+      ? {
+          nome: ctx.tenant.nome,
+          corPrimaria: ctx.tenant.corPrimaria,
+          logoUrl: ctx.tenant.logoUrl,
+        }
+      : null
 
   return (
     <>
       <ComunidadeEscopoNavbarOverride
         afiliacao={afiliacao}
+        torcidaReal={torcidaReal}
         podeEscopoTorcida={ctx.podeEscopoTorcida}
         modoContexto={ctx.modo}
-        corPrimaria={corPrimaria}
+        corPrimariaNacional={corPrimaria}
       />
       {afiliacao && corPrimaria ? (
         <ComunidadeNacionalPaletaSync
