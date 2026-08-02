@@ -442,6 +442,27 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   posts `TENANT`/`PRIVADO` para o escopo Nacional. Authz CN:
   `apps/web/src/lib/authz.ts` (`assertComunidadeNacional`,
   `assertPodeAcessarSalaNacional`).
+- **Escopo da aba "Minha torcida" (2026-08-01)**: o feed da torcida **não** usa
+  `resolveVisibleTenantIdsForFeed` — usa `resolveTenantIdsMinhaTorcida`
+  (`lib/feed.ts`), que devolve só a própria torcida + hierarquia
+  (Sede→Subsede→PDE). Ficam de fora, por decisão de produto:
+  - o **tenant sintético da CN**. Ele era injetado de propósito ("posts de
+    torcedor global entram como sugestão no feed de qualquer sócio") e o efeito
+    prático foi a aba virar uma segunda Comunidade Nacional, com post de
+    torcedor no meio dos posts da torcida;
+  - as **torcidas aliadas** — Minha torcida é a organização, não a praça.
+
+  E o feed é **só `PUBLICO`**: `TENANT` ("Só torcida") e `PRIVADO` ("Só
+  seguidores") não entram nem no Descobrir nem no Seguindo da aba — igual ao
+  que o feed Nacional já fazia. Os dois `where` (Descobrir e a timeline
+  materializada do Seguindo) declaram `visibilidade: 'PUBLICO'`
+  explicitamente: o conjunto de tenants sozinho não segura post interno que
+  chegue pela rede de quem o viewer segue. Invariante em
+  `lib/__tests__/feed-minha-torcida.test.ts`.
+
+  **Pendência**: o composer ainda oferece "Só torcida" e "Só seguidores", que
+  agora só aparecem em perfil/permalink/salvos. Decidir se as opções saem do
+  composer ou se ganham uma superfície própria.
 - **Composer único Nacional (2026-07-23)**: a aba Nacional usa o mesmo
   `FeedComposer` da torcida com prop `nacional` (mídia/vídeo, emoji, stickers,
   menções; sempre `PUBLICO`; sem enquete/evento/alcance). Action

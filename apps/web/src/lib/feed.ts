@@ -4,7 +4,11 @@ import { db, Prisma } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes, tagFeedNacional } from './comunidade-cache'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
-import { getAncestorTenantIds, getVisibleTenantIds } from './hierarquia'
+import {
+  getAncestorTenantIds,
+  getDescendantTenantIds,
+  getVisibleTenantIds,
+} from './hierarquia'
 import {
   ISOLAMENTO_CACHE_TAG,
   filtrarTenantsRestritos,
@@ -601,35 +605,6 @@ export function deveAplicarGatePrivacidadeAutorDescobrir(post: {
   return true
 }
 
-/**
- * Na rede/Seguindo, posts TENANT de autores seguidos só passam se o viewer
- * for sócio APROVADO no tenant do post (mesma regra do Descobrir TENANT).
- */
-async function filtrarPostsTenantDaRede<
-  T extends { autorId: string; tenantId: string; visibilidade: string },
->(viewerId: string, posts: T[]): Promise<T[]> {
-  const tenantIds = [
-    ...new Set(
-      posts
-        .filter((p) => p.visibilidade === 'TENANT' && p.autorId !== viewerId)
-        .map((p) => p.tenantId),
-    ),
-  ]
-  if (tenantIds.length === 0) return posts
-
-  const podePorTenant = new Map<string, boolean>()
-  await Promise.all(
-    tenantIds.map(async (id) => {
-      podePorTenant.set(id, await podeVerFeedSocios(viewerId, id))
-    }),
-  )
-
-  return posts.filter((p) => {
-    if (p.visibilidade !== 'TENANT' || p.autorId === viewerId) return true
-    return podePorTenant.get(p.tenantId) ?? false
-  })
-}
-
 function revivePostSocialItem(post: PostSocialItem): PostSocialItem {
   return {
     ...post,
@@ -690,36 +665,6 @@ async function getDescobrirPostsBaseCached(
   )()
 
   return cached.map(revivePostSocialItem)
-}
-
-/**
- * Candidatos "Só torcida" (TENANT) do Descobrir — só para sócios com vínculo
- * APROVADO no tenant (`podeVerFeedSocios`). Consulta por request, sem
- * `unstable_cache`: visibilidade TENANT depende do vínculo do viewer, então
- * cachear misturaria com o cache compartilhado PUBLICO do Descobrir e
- * vazaria para viewers sem permissão.
- */
-async function getDescobrirPostsTenantSocios(
-  visibleTenantIds: string[],
-  cursor: FeedCursor | null,
-  fetchLimit: number,
-): Promise<PostSocialItem[]> {
-  const cursorWhere = buildCursorWhere(cursor)
-  const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      tenant: { sintetico: false },
-      tipo: 'MEMBRO',
-      visibilidade: 'TENANT',
-      oculto: false,
-      ...escopoFeedSemConversa,
-      ...cursorWhere,
-    },
-    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-    take: fetchLimit,
-    include: postIncludeLista(),
-  })) as PostRaw[]
-  return postsRaw.map(projetarPost)
 }
 
 async function hidratarPostsDoUsuario(
@@ -823,6 +768,34 @@ export async function resolveVisibleTenantIdsForFeed(
   return [...new Set([...comSintetico, ...siblingsAbertas])]
 }
 
+/**
+ * Tenants do feed **"Minha torcida"**: a própria torcida e a sua hierarquia
+ * (Sede→Subsede→PDE). Fora, deliberadamente:
+ *
+ * - o **tenant sintético da Comunidade Nacional** — post de torcedor global
+ *   vive só na CN. Ele já vazou para cá uma vez como "sugestão" e a aba virou
+ *   uma segunda CN;
+ * - as **torcidas aliadas** — Minha torcida é a minha organização, não a praça.
+ *
+ * R5 — canal restrito: a unidade isolada não enxerga o ancestral (o comunicado
+ * oficial entra por fora, via `resolveTenantIdsSomenteComunicado`), e nenhuma
+ * unidade restrita entra no conjunto de outra.
+ *
+ * Invariante coberto por `lib/__tests__/feed-minha-torcida.test.ts`.
+ */
+export const resolveTenantIdsMinhaTorcida = cache(
+  async (tenantId: string): Promise<string[]> => {
+    const [ancestrais, descendentes, restrito] = await Promise.all([
+      getAncestorTenantIds(tenantId),
+      getDescendantTenantIds(tenantId),
+      isTenantRestrito(tenantId),
+    ])
+
+    const ids = new Set([tenantId, ...(restrito ? [] : ancestrais), ...descendentes])
+    return filtrarTenantsRestritos(Array.from(ids), tenantId)
+  },
+)
+
 export const getPostsParaFeed = cache(async function getPostsParaFeed(
   tenantId: string,
   userId: string | undefined,
@@ -838,7 +811,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const cursorWhere = buildCursorWhere(decodedCursor)
 
   const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
-    resolveVisibleTenantIdsForFeed(tenantId, userId),
+    resolveTenantIdsMinhaTorcida(tenantId),
     userId
       ? db.seguimento.findMany({
           where: { seguidorId: userId, status: 'APROVADO' },
@@ -879,11 +852,15 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
   const redeSet = new Set(redeIds)
 
-  const [postsRedeRaw, discoverBase, podeVerSocios] = await Promise.all([
+  const [postsRedeRaw, discoverBase] = await Promise.all([
     db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
+        // Minha torcida é um feed só de posts PÚBLICOS. O `visibilidade` aqui
+        // não é redundante com o conjunto de tenants: sem ele, um post
+        // "Só torcida" de alguém que o viewer segue entraria pela rede.
+        visibilidade: 'PUBLICO',
         oculto: false,
         ...escopoFeedSemConversa,
         ...cursorWhere,
@@ -894,13 +871,9 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       include: postInclude(userId),
     }) as Promise<PostRaw[]>,
     getDescobrirPostsBaseCached(tenantId, visibleTenantIds, decodedCursor, fetchLimit),
-    podeVerFeedSocios(userId, tenantId),
   ])
 
-  const seguindoOrdenados = await filtrarPostsTenantDaRede(
-    userId,
-    postsRedeRaw.map(projetarPost).sort(sortPostsDesc),
-  )
+  const seguindoOrdenados = postsRedeRaw.map(projetarPost).sort(sortPostsDesc)
 
   const discoverExternos = discoverBase.filter(
     (p) => !redeSet.has(p.autorId) || (p.tipo === 'INSTITUCIONAL' && p.comunicadoOrigemId),
@@ -912,35 +885,8 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
   )
 
-  // Posts "Só torcida" (TENANT) só entram no Descobrir para sócio com vínculo
-  // APROVADO no *tenant do post* — não basta poder ver a hierarquia. Sem
-  // gate de privacidade do autor (a visibilidade já é o escopo).
-  let discoverTenantExternos: PostSocialItem[] = []
-  if (podeVerSocios) {
-    const tenantCandidatos = await getDescobrirPostsTenantSocios(
-      visibleTenantIds,
-      decodedCursor,
-      fetchLimit,
-    )
-    const tenantIdsTenant = [
-      ...new Set(tenantCandidatos.map((p) => p.tenantId).filter((id) => id !== tenantId)),
-    ]
-    const podePorTenant = new Map<string, boolean>([[tenantId, true]])
-    await Promise.all(
-      tenantIdsTenant.map(async (id) => {
-        podePorTenant.set(id, await podeVerFeedSocios(userId, id))
-      }),
-    )
-    discoverTenantExternos = tenantCandidatos.filter(
-      (p) => !redeSet.has(p.autorId) && (podePorTenant.get(p.tenantId) ?? false),
-    )
-  }
-
   // Ranking único: rede (inclui o autor) + externos — post fresco do viewer sobe no Descobrir.
-  const candidatos = rankDescobrirPosts(
-    [...discoverVisiveis, ...discoverTenantExternos, ...seguindoOrdenados],
-    tenantId,
-  )
+  const candidatos = rankDescobrirPosts([...discoverVisiveis, ...seguindoOrdenados], tenantId)
   const hasMore = candidatos.length > take
   const paginaBruta = candidatos.slice(0, take)
   const pagina = await finalizarPosts(await hidratarPostsDoUsuario(paginaBruta, userId))
@@ -1334,7 +1280,10 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildTimelineCursorWhere(decodedCursor)
 
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  // Mesma regra do Descobrir da aba: hierarquia da torcida, sem CN e sem
+  // aliadas. "Seguindo" dentro de Minha torcida não pode ser uma porta lateral
+  // para o que o Descobrir da aba não mostra.
+  const visibleTenantIds = await resolveTenantIdsMinhaTorcida(tenantId)
   await garantirTimelineDaRedeDoViewer(userId)
 
   const batchSize = Math.max((take + 1) * 3, 24)
@@ -1365,6 +1314,8 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
         id: { in: timelineRows.map((row) => row.postId) },
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
+        // Só PÚBLICO — a timeline materializada guarda o post, não a regra.
+        visibilidade: 'PUBLICO',
         oculto: false,
         ...escopoFeedSemConversa,
       },
@@ -1378,8 +1329,7 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
       if (!post || seen.has(post.id)) continue
       lote.push(post)
     }
-    const loteVisivel = await filtrarPostsTenantDaRede(userId, lote)
-    for (const post of loteVisivel) {
+    for (const post of lote) {
       if (seen.has(post.id)) continue
       seen.add(post.id)
       ordenados.push(post)

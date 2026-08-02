@@ -55,14 +55,22 @@ describe('podeVerFeedSocios', () => {
     await expect(podeVerFeedSocios('u3', 't1')).resolves.toBe(false)
   })
 
-  it('retorna true para APROVADO', async () => {
-    findUnique.mockResolvedValue({ status: 'APROVADO' })
+  it('retorna true para SOCIO APROVADO', async () => {
+    findUnique.mockResolvedValue({ status: 'APROVADO', tipo: 'SOCIO' })
     await expect(podeVerFeedSocios('u4', 't1')).resolves.toBe(true)
     expect(findUnique).toHaveBeenCalledWith({
       where: { tenantId_userId: { tenantId: 't1', userId: 'u4' } },
-      select: { status: true },
+      select: { status: true, tipo: true },
     })
     expect(findUniqueUser).not.toHaveBeenCalled()
+  })
+
+  // Torcedor com vínculo APROVADO na unidade é membro, mas não é sócio: não
+  // enxerga o conteúdo interno da torcida.
+  it('retorna false para TORCEDOR APROVADO', async () => {
+    findUnique.mockResolvedValue({ status: 'APROVADO', tipo: 'TORCEDOR' })
+    findUniqueUser.mockResolvedValue({ email: 'torcedor@example.com' })
+    await expect(podeVerFeedSocios('u6', 't1')).resolves.toBe(false)
   })
 
   it('retorna true para super admin sem vínculo no tenant', async () => {
