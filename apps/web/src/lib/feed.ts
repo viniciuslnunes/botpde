@@ -693,6 +693,19 @@ function revivePostSocialItem(post: PostSocialItem): PostSocialItem {
   }
 }
 
+/**
+ * "Só torcida" (TENANT) tem casa **na aba Minha torcida** — e só do tenant
+ * ativo, nunca de outro tenant da hierarquia. Quem abre a aba já é sócio
+ * aprovado dele (`podeVerFeedSocios`), então o `where` não depende do viewer e
+ * o cache do Descobrir continua compartilhável.
+ *
+ * Sem isto o composer oferecia uma opção que fazia o post sumir de todo feed:
+ * `TENANT` só reaparecia em perfil, permalink e salvos.
+ */
+export function orFeedInternoDoTenant(tenantId: string): Prisma.PostWhereInput {
+  return { tenantId, tipo: 'MEMBRO', visibilidade: 'TENANT' }
+}
+
 /** Candidatos públicos do Descobrir — sem estado do viewer (reação/voto/RSVP). */
 async function getDescobrirPostsBaseCached(
   tenantId: string,
@@ -724,6 +737,7 @@ async function getDescobrirPostsBaseCached(
                 { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } },
               ],
             },
+            orFeedInternoDoTenant(tenantId),
             ...orSomenteComunicadoOficial(somenteComunicado),
           ]),
         },
@@ -909,10 +923,12 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       decodedCursor,
       fetchLimit,
     )
-    const candidatosGate = sugeridos.filter(deveAplicarGatePrivacidadeAutorDescobrir)
+    // Sem viewer não há sócio: o balde interno do cache não pode vazar aqui.
+    const publicos = sugeridos.filter((p) => p.visibilidade === 'PUBLICO')
+    const candidatosGate = publicos.filter(deveAplicarGatePrivacidadeAutorDescobrir)
     const autorIds = candidatosGate.map((p) => p.autorId)
     const semAcesso = await getAutoresSemAcesso(undefined, tenantId, autorIds)
-    const visiveis = sugeridos.filter(
+    const visiveis = publicos.filter(
       (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
     )
     const ranqueados = rankDescobrirPosts(visiveis, tenantId)
@@ -937,10 +953,11 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
-        // Minha torcida é um feed só de posts PÚBLICOS. O `visibilidade` aqui
-        // não é redundante com o conjunto de tenants: sem ele, um post
-        // "Só torcida" de alguém que o viewer segue entraria pela rede.
-        visibilidade: 'PUBLICO',
+        // O `visibilidade` aqui não é redundante com o conjunto de tenants:
+        // sem ele, um post "Só torcida" de OUTRO tenant, de alguém que o viewer
+        // segue, entraria pela rede. Interno só do tenant ativo, onde o viewer
+        // é sócio.
+        OR: [{ visibilidade: 'PUBLICO' }, { tenantId, visibilidade: 'TENANT' }],
         oculto: false,
         ...escopoFeedSemConversa,
         ...cursorWhere,
@@ -1394,8 +1411,10 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
         id: { in: timelineRows.map((row) => row.postId) },
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
-        // Só PÚBLICO — a timeline materializada guarda o post, não a regra.
-        visibilidade: 'PUBLICO',
+        // A timeline materializada guarda o post, não a regra: o filtro de
+        // visibilidade é reaplicado na leitura. Interno entra só do tenant
+        // ativo — nunca "Só torcida" de outra torcida da hierarquia.
+        OR: [{ visibilidade: 'PUBLICO' }, { tenantId, visibilidade: 'TENANT' }],
         oculto: false,
         ...escopoFeedSemConversa,
       },

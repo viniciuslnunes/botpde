@@ -40,7 +40,7 @@ vi.mock('@/lib/social', () => ({ getSeguimentoStatus: vi.fn() }))
 vi.mock('@/lib/autor-badges', () => ({ enriquecerPostsComBadges: vi.fn() }))
 vi.mock('@/lib/noticias', () => ({ getNoticiasAprovadas: vi.fn() }))
 
-import { resolveTenantIdsMinhaTorcida } from '@/lib/feed'
+import { orFeedInternoDoTenant, resolveTenantIdsMinhaTorcida } from '@/lib/feed'
 
 const SEDE = 'sede-1'
 const SUBSEDE = 'subsede-1'
@@ -100,5 +100,24 @@ describe('resolveTenantIdsMinhaTorcida', () => {
     // `manter = tenantId`: a comunidade interna da própria unidade segue viva
     // mesmo que ela apareça como restrita para terceiros.
     expect(filtrarTenantsRestritos).toHaveBeenCalledWith(expect.arrayContaining([SEDE, PDE]), SEDE)
+  })
+})
+
+/**
+ * "Só torcida" (TENANT) tem casa na aba, mas o balde interno é o ponto exato
+ * onde um post interno de OUTRA torcida da hierarquia vazaria: basta trocar
+ * `tenantId` por `{ in: visibleTenantIds }`. O teste trava esse contrato.
+ */
+describe('orFeedInternoDoTenant', () => {
+  it('admite TENANT só do tenant ativo, nunca da hierarquia inteira', () => {
+    expect(orFeedInternoDoTenant(SUBSEDE)).toEqual({
+      tenantId: SUBSEDE,
+      tipo: 'MEMBRO',
+      visibilidade: 'TENANT',
+    })
+  })
+
+  it('não admite PRIVADO — "Só seguidores" continua fora do feed da aba', () => {
+    expect(orFeedInternoDoTenant(SEDE).visibilidade).toBe('TENANT')
   })
 })

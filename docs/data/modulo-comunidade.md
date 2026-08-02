@@ -542,9 +542,19 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   chegue pela rede de quem o viewer segue. Invariante em
   `lib/__tests__/feed-minha-torcida.test.ts`.
 
-  **Pendência**: o composer ainda oferece "Só torcida" e "Só seguidores", que
-  agora só aparecem em perfil/permalink/salvos. Decidir se as opções saem do
-  composer ou se ganham uma superfície própria.
+  **Superfície do post interno (2026-08-02)**: a regra acima deixou "Só
+  torcida" sem casa — o composer oferecia uma opção que fazia o post sumir de
+  todo feed (só perfil/permalink/salvos). Resolvido admitindo `TENANT` na aba,
+  **restrito ao tenant ativo** (`orFeedInternoDoTenant` em `lib/feed.ts`), nos
+  três pontos: base do Descobrir, query da rede e a timeline materializada do
+  Seguindo. O `visibilidade` continua não sendo redundante com o conjunto de
+  tenants — é exatamente ele que barra o "Só torcida" de **outra** torcida da
+  hierarquia chegando pela rede de quem o viewer segue. O balde interno é
+  seguro no cache compartilhado do Descobrir porque não depende do viewer:
+  quem abre a aba já é sócio aprovado do tenant (`podeVerFeedSocios`); o ramo
+  sem viewer (preview) filtra de volta para `PUBLICO`. `PRIVADO` ("Só
+  seguidores") segue fora dos feeds por desenho — é conteúdo de perfil.
+  Invariante em `lib/__tests__/feed-minha-torcida.test.ts`.
 - **Composer único Nacional (2026-07-23)**: a aba Nacional usa o mesmo
   `FeedComposer` da torcida com prop `nacional` (mídia/vídeo, emoji, stickers,
   menções; sempre `PUBLICO`; sem enquete/evento/alcance). Action
