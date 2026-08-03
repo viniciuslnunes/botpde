@@ -84,19 +84,50 @@ export async function assertPodeEnviarMensagens() {
  * Participante ativo da conversa. Leitura/escrita na thread é por
  * `MembroConversa` (não por tenant) — torcedor na CN e sócio usam o mesmo
  * gate depois de já estarem na conversa.
+ *
+ * Exceção: conversa de ticket de loja — staff com `store:view_orders`/`store:manage`
+ * no tenant do ticket pode ler (e, se membro, escrever enquanto aberto).
  */
 export async function assertConversaAccess(conversaId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado.')
 
-  const membro = await assertMembroConversa(conversaId, session.user.id)
-  const tenant = { id: membro.conversa.tenantId }
-  return {
-    session,
-    tenant,
-    userId: session.user.id,
-    membro,
-    conversa: membro.conversa,
+  try {
+    const membro = await assertMembroConversa(conversaId, session.user.id)
+    const tenant = { id: membro.conversa.tenantId }
+    return {
+      session,
+      tenant,
+      userId: session.user.id,
+      membro,
+      conversa: membro.conversa,
+      via: 'membro' as const,
+    }
+  } catch {
+    const { staffPodeLerTicketConversa, getTicketPorConversaId } = await import('@/lib/loja-ticket')
+    const pode = await staffPodeLerTicketConversa(conversaId, session.user.id)
+    if (!pode) throw new Error('Você não participa desta conversa.')
+
+    const ticket = await getTicketPorConversaId(conversaId)
+    const conversa: {
+      id: string
+      tipo: 'DIRETA' | 'GRUPO' | 'CANAL'
+      tenantId: string
+      nome: string | null
+    } | null = await db.conversa.findUnique({
+      where: { id: conversaId },
+      select: { id: true, tipo: true, tenantId: true, nome: true },
+    })
+    if (!conversa || !ticket) throw new Error('Você não participa desta conversa.')
+
+    return {
+      session,
+      tenant: { id: conversa.tenantId },
+      userId: session.user.id,
+      membro: null,
+      conversa,
+      via: 'ticket_staff' as const,
+    }
   }
 }
 

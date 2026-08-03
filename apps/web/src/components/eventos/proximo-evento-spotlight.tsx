@@ -38,6 +38,8 @@ export function ProximoEventoSpotlight({
   lotacaoLabel,
   fotoUrl,
   diasLabel,
+  confirmados,
+  capacidade,
 }: {
   id: string
   titulo: string
@@ -48,8 +50,13 @@ export function ProximoEventoSpotlight({
   lotacaoLabel?: string | null
   fotoUrl?: string | null
   diasLabel?: string | null
+  confirmados?: number
+  capacidade?: number | null
 }) {
   const tone = tipoTone(tipo)
+  const temCap = capacidade != null && capacidade > 0 && confirmados != null
+  const pct = temCap ? Math.min(100, Math.round((confirmados / capacidade) * 100)) : null
+  const lotacaoCritica = pct != null && pct >= 85
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.85)] shadow-sm backdrop-blur-sm">
@@ -112,6 +119,35 @@ export function ProximoEventoSpotlight({
             </li>
           ) : null}
         </ul>
+
+        {temCap && pct != null ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-medium">
+              <span className="text-[rgb(var(--foreground-muted))]">Ocupação</span>
+              <span
+                className={
+                  lotacaoCritica
+                    ? 'tabular-nums text-amber-700 dark:text-amber-300'
+                    : 'tabular-nums text-[rgb(var(--foreground))]'
+                }
+              >
+                {pct}%
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border)_/_0.7)]">
+              <div
+                className={`h-full rounded-full ${
+                  pct >= 100
+                    ? 'bg-rose-500'
+                    : lotacaoCritica
+                      ? 'bg-amber-500'
+                      : 'bg-[rgb(var(--color-primary-fg))]'
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
 
         <Link
           href={href}

@@ -58,6 +58,7 @@ import { ensureSocialEmbedInMidias, midiasComEmbedDoTexto, stripEmbeddedSocialUr
 import { isConversaGrupoLike } from '@/lib/canais-shared'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { ComunidadePrefetchLink } from './comunidade-prefetch-link'
+import { PedidoTicketBanner } from './pedido-ticket-banner'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -164,6 +165,7 @@ export function MensagemThread({
   const textoRef = useRef(texto)
   textoRef.current = texto
 
+  const [ticketFechado, setTicketFechado] = useState(false)
   const conversaId = conversa.id
   const getScrollElement = useCallback(() => listRef.current, [])
   const listWindow = useMensagemListWindow(mensagens.length, getScrollElement)
@@ -171,7 +173,10 @@ export function MensagemThread({
   const podeEnviar =
     !enviando && !uploadPendente && (texto.trim().length > 0 || medias.some((m) => Boolean(m.url)))
   const conversaBloqueada =
-    conversa.solicitacaoRecebida || conversa.aguardandoAprovacao
+    conversa.solicitacaoRecebida || conversa.aguardandoAprovacao || ticketFechado
+  const onTicketStatus = useCallback((status: 'ABERTO' | 'ATENDENDO' | 'FECHADO' | null) => {
+    setTicketFechado(status === 'FECHADO')
+  }, [])
   const { confirmDiscard } = useUnsavedChangesContext()
 
   const draftChanges = useMemo(() => {
@@ -740,6 +745,8 @@ export function MensagemThread({
         )}
       </div>
 
+      <PedidoTicketBanner conversaId={conversaId} onStatus={onTicketStatus} />
+
       {painelMembros && isConversaGrupoLike(conversa.tipo) && (
         <AnimatePresence>
           <m.div
@@ -1130,6 +1137,11 @@ export function MensagemThread({
           </m.button>
         </div>
       </form>
+      )}
+      {ticketFechado && (
+        <div className="border-t border-[rgb(var(--border))] px-4 py-3 text-center text-xs text-[rgb(var(--foreground-muted))]">
+          Ticket fechado — histórico preservado, sem novas mensagens.
+        </div>
       )}
     </m.div>
   )

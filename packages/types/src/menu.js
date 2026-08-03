@@ -271,6 +271,12 @@ export const ADMIN_MODULOS = ([
         permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
       },
       {
+        id: 'tickets',
+        label: 'Arquivo',
+        href: '/admin/loja/tickets',
+        permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
+      },
+      {
         id: 'categorias',
         label: 'Categorias',
         href: '/admin/loja/categorias',

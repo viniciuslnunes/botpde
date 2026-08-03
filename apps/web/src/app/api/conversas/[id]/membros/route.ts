@@ -41,6 +41,13 @@ export async function POST(
     const { id: conversaId } = await context.params
     const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
 
+    if (!membro) {
+      return NextResponse.json(
+        { error: 'Assuma o ticket na fila da loja para gerenciar participantes.' },
+        { status: 403 },
+      )
+    }
+
     if (!isConversaGrupoLike(conversa.tipo)) {
       return NextResponse.json({ error: 'DMs não aceitam novos participantes.' }, { status: 400 })
     }
@@ -124,6 +131,13 @@ export async function PATCH(
     const { id: conversaId } = await context.params
     const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
 
+    if (!membro) {
+      return NextResponse.json(
+        { error: 'Assuma o ticket na fila da loja para gerenciar participantes.' },
+        { status: 403 },
+      )
+    }
+
     if (!isConversaGrupoLike(conversa.tipo)) {
       return NextResponse.json({ error: 'Somente grupos e canais aceitam transferência de admin.' }, { status: 400 })
     }
@@ -185,6 +199,13 @@ export async function DELETE(
   try {
     const { id: conversaId } = await context.params
     const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
+
+    if (!membro) {
+      return NextResponse.json(
+        { error: 'Assuma o ticket na fila da loja para gerenciar participantes.' },
+        { status: 403 },
+      )
+    }
 
     const body: unknown = await request.json().catch(() => ({}))
     const parsed = removerSchema.safeParse(body)

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { Package, ShoppingBag, Tags, Ticket, TrendingUp } from 'lucide-react'
+import { Archive, Package, ShoppingBag, Tags, Ticket, TrendingUp } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertStoreView } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
@@ -18,17 +18,26 @@ export default async function LojaModuloLayout({ children }: { children: ReactNo
 
   const permissoes = await permissoesEfetivasNoAdmin()
 
-  const pedidosPendentes: number = await db.saasPedido.count({
-    where: { tenantId: tenant.id, status: 'PENDENTE' },
-  })
+  const [pedidosPendentes, ticketsAbertos]: [number, number] = await Promise.all([
+    db.saasPedido.count({
+      where: { tenantId: tenant.id, status: 'PENDENTE' },
+    }),
+    db.saasPedidoTicket.count({
+      where: { tenantId: tenant.id, status: { in: ['ABERTO', 'ATENDENDO'] } },
+    }),
+  ])
 
-  // Estrutura vem de ADMIN_MODULOS; aqui só ícone e contagem.
   const tabs = montarTabsModulo('loja', permissoes, {
     catalogo: { icon: <ShoppingBag className={ICONE} /> },
     pedidos: {
       icon: <Package className={ICONE} />,
       count: pedidosPendentes,
       countClass: 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
+    },
+    tickets: {
+      icon: <Archive className={ICONE} />,
+      count: ticketsAbertos > 0 ? ticketsAbertos : undefined,
+      countClass: 'bg-[rgb(var(--color-info)_/_0.16)] text-[rgb(var(--color-info-fg))]',
     },
     categorias: { icon: <Tags className={ICONE} /> },
     cupons: { icon: <Ticket className={ICONE} /> },
@@ -39,7 +48,7 @@ export default async function LojaModuloLayout({ children }: { children: ReactNo
     <>
       <AdminPageHeader
         title="Loja"
-        description="Catálogo, pedidos, cupons e desempenho de vendas."
+        description="Catálogo, pedidos, arquivo de tickets e desempenho de vendas."
         icon={<ShoppingBag className="h-5 w-5" />}
       />
 

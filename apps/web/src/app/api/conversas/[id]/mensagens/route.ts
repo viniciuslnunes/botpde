@@ -70,8 +70,17 @@ export async function POST(
 ) {
   try {
     const { id: conversaId } = await context.params
-    const { userId, tenant, session, conversa } = await assertConversaAccess(conversaId)
+    const { userId, tenant, session, conversa, via } = await assertConversaAccess(conversaId)
+    if (via === 'ticket_staff') {
+      return NextResponse.json(
+        { error: 'Assuma o ticket na fila da loja para enviar mensagens.' },
+        { status: 403 },
+      )
+    }
     await assertPodeEnviarNaConversa(conversaId, userId)
+
+    const { assertTicketPermiteEnvio } = await import('@/lib/loja-ticket')
+    await assertTicketPermiteEnvio(conversaId)
 
     const body: unknown = await request.json()
     const parsed = enviarSchema.safeParse(body)

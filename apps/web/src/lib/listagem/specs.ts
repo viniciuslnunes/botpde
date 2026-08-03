@@ -543,6 +543,7 @@ export const LISTAGEM_LOJA_PEDIDOS: ListagemSpec = {
         ],
       },
     },
+    { id: 'ticket', label: 'Ticket' },
     {
       id: 'criadoEm',
       label: 'Data',

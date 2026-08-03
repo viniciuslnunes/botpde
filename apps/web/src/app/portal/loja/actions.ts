@@ -17,6 +17,7 @@ import {
   formatarMoedaBRL,
   PERMISSIONS,
 } from '@torcida/types'
+import { abrirTicketPedido } from '@/lib/loja-ticket'
 
 export type ActionState = {
   success?: boolean
@@ -338,14 +339,35 @@ export async function finalizarPedido(
             entidadeId: pedidoId,
           },
         })
+
+        let ticketConversaId: string | null = null
+        try {
+          const ticket = await abrirTicketPedido(pedidoId)
+          ticketConversaId = ticket.conversaId
+          await db.auditLog.create({
+            data: {
+              tenantId: p.tenantId,
+              atorId: session.user.id,
+              acao: 'PEDIDO_TICKET_ABERTO',
+              entidade: 'SaasPedidoTicket',
+              entidadeId: ticket.id,
+              detalhes: { pedidoId, conversaId: ticket.conversaId },
+            },
+          })
+        } catch {
+          // Pedido já gravado — falha no ticket não desfaz a compra.
+        }
+
         await notificarAdminsPorPermissao(
           [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
           {
             tenantId: p.tenantId,
             tipo: 'PEDIDO_RECEBIDO',
             titulo: 'Novo pedido na loja',
-            corpo: `Pedido de ${formatarMoedaBRL(Number(p.total))} recebido.`,
-            link: '/admin/loja/pedidos',
+            corpo: `Pedido de ${formatarMoedaBRL(Number(p.total))} recebido. Ticket na fila.`,
+            link: ticketConversaId
+              ? `/admin/loja/pedidos?ticket=fila`
+              : '/admin/loja/pedidos',
             atorId: session.user.id,
             excetoUserId: session.user.id,
           },

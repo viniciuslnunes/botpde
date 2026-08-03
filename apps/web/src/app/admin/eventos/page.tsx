@@ -7,9 +7,17 @@ import Link from 'next/link'
 import { AdminEventosList, type AdminEventoItem } from './admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
 import { AgendaCalendario, type AgendaCalItem } from '@/components/eventos/agenda-calendario'
+import { AgendaSemanaCompact } from '@/components/eventos/agenda-semana-compact'
 import { AgendaBusca } from '@/components/eventos/agenda-busca'
 import { ProximoEventoSpotlight } from '@/components/eventos/proximo-evento-spotlight'
-import { BarChart3, Calendar, CalendarDays, CalendarRange, History, List } from 'lucide-react'
+import {
+  BarChart3,
+  Calendar,
+  CalendarDays,
+  CalendarRange,
+  History,
+  List,
+} from 'lucide-react'
 import type { Metadata } from 'next'
 import type { TipoEvento } from '@torcida/db'
 import { diasParaEvento } from '@/lib/eventos'
@@ -23,7 +31,13 @@ import {
   type EventoPresencaItem,
   type EventosComparecimentoResumo,
 } from '@/lib/eventos-insights'
-import { AdminTabs, adminTabIds, InsightSection, StatCard } from '@/components/admin/ui'
+import {
+  AdminPageHeader,
+  AdminTabs,
+  adminTabIds,
+  InsightSection,
+  StatCard,
+} from '@/components/admin/ui'
 import type { AdminTabItem } from '@/components/admin/ui'
 import { MiniBarChart } from '@/components/admin/charts'
 
@@ -173,14 +187,24 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     sede: { capacidade: number | null } | null
     _count: { rsvps: number }
   }
-  type CalRow = { id: string; titulo: string; tipo: TipoEvento; data: Date }
+  type CalRow = {
+    id: string
+    titulo: string
+    tipo: TipoEvento
+    data: Date
+    fotoUrl: string | null
+    local: string | null
+  }
 
   const calJanela = vistaCal ? janelaCalendario(vistaCal, sp.data) : null
+  /** Semana corrente na Lista — strip compacta no aside operacional. */
+  const semanaListaJanela = vista === 'lista' ? janelaCalendario('semana') : null
 
-  const [proximos, passados, sedes, calEventos, partidas, afiliacaoId, projetos]: [
+  const [proximos, passados, sedes, calEventos, semanaListaEventos, partidas, afiliacaoId, projetos]: [
     EventoAdminRow[],
     EventoAdminRow[],
     Awaited<ReturnType<typeof listSedesAtivasParaEvento>>,
+    CalRow[],
     CalRow[],
     Awaited<ReturnType<typeof listPartidasParaEvento>>,
     string | null,
@@ -230,9 +254,34 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     isCal && calJanela
       ? (db.evento.findMany({
           where: { ...baseWhere, data: { gte: calJanela.gte, lt: calJanela.lt } },
-          select: { id: true, titulo: true, tipo: true, data: true },
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            data: true,
+            fotoUrl: true,
+            local: true,
+          },
           orderBy: { data: 'asc' },
           take: 120,
+        }) as Promise<CalRow[]>)
+      : Promise.resolve([] as CalRow[]),
+    semanaListaJanela
+      ? (db.evento.findMany({
+          where: {
+            ...baseWhere,
+            data: { gte: semanaListaJanela.gte, lt: semanaListaJanela.lt },
+          },
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            data: true,
+            fotoUrl: true,
+            local: true,
+          },
+          orderBy: { data: 'asc' },
+          take: 60,
         }) as Promise<CalRow[]>)
       : Promise.resolve([] as CalRow[]),
     listPartidasParaEvento(tenant.id),
@@ -252,7 +301,9 @@ export default async function AdminEventosPage({ searchParams }: Props) {
       descricao: evento.descricao,
       dataLabel: formatarData(evento.data),
       local: evento.local,
+      fotoUrl: evento.fotoUrl,
       confirmados,
+      capacidade: cap,
       passado,
       tipo: evento.tipo,
       serieId: evento.serieId,
@@ -261,6 +312,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           ? `${confirmados}/${cap} confirmados`
           : `${confirmados} confirmado${confirmados !== 1 ? 's' : ''}`,
       embarcados: null,
+      diasLabel: passado ? null : diasParaEvento(evento.data),
     }
   }
 
@@ -275,12 +327,23 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     tipo: e.tipo,
     dataIso: e.data.toISOString(),
     href: `/admin/eventos/${e.id}`,
+    fotoUrl: e.fotoUrl,
+    local: e.local,
+  }))
+
+  const semanaCompactItens = semanaListaEventos.map((e) => ({
+    id: e.id,
+    titulo: e.titulo,
+    tipo: e.tipo,
+    dataIso: e.data.toISOString(),
+    href: `/admin/eventos/${e.id}`,
+    local: e.local,
   }))
 
   const destaqueRow = !isCal && proximos[0] ? proximos[0] : null
   const destaque = destaqueRow ? serializar(destaqueRow, false) : null
-  const listaRestante = destaqueRow ? proximos.slice(1) : proximos
-  const listaProximos = listaRestante.length > 0 ? listaRestante : proximos
+  // Lista completa — o spotlight é destaque, não remove o item da fila operacional.
+  const listaProximos = proximos
 
   const iconeTab = 'h-4 w-4 shrink-0'
   const tabs: AdminTabItem[] = [
@@ -311,30 +374,30 @@ export default async function AdminEventosPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="app-container space-y-6 py-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
-            {tituloFiltro ? tituloFiltro : 'Agenda'}
-          </h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            {podeGerir
-              ? 'Eventos, caravanas e ensaios da torcida'
-              : 'Somente leitura — eventos, caravanas e ensaios'}
-          </p>
-        </div>
-        {podeGerir ? (
-          <NovoEventoButton
-            defaultTipo={tipoFiltro ?? 'GERAL'}
-            sedes={sedes}
-            partidas={partidas}
-            projetos={projetos}
-            temAfiliacao={Boolean(afiliacaoId)}
-            redirectTo="/admin/eventos"
-          />
-        ) : null}
-      </div>
+    <div className="flex min-h-full flex-col">
+      <AdminPageHeader
+        title={tituloFiltro ? tituloFiltro : 'Agenda'}
+        description={
+          podeGerir
+            ? 'Eventos, caravanas e ensaios da torcida'
+            : 'Somente leitura — eventos, caravanas e ensaios'
+        }
+        icon={<CalendarDays className="h-5 w-5" />}
+        actions={
+          podeGerir ? (
+            <NovoEventoButton
+              defaultTipo={tipoFiltro ?? 'GERAL'}
+              sedes={sedes}
+              partidas={partidas}
+              projetos={projetos}
+              temAfiliacao={Boolean(afiliacaoId)}
+              redirectTo="/admin/eventos"
+            />
+          ) : null
+        }
+      />
 
+      <div className="app-container min-w-0 flex-1 space-y-5 py-5 sm:py-8">
       <AdminTabs
         tabs={tabs}
         basePath="/admin/eventos"
@@ -349,10 +412,10 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             href={hrefFiltro({ tipo: '' })}
             prefetch
             className={[
-              'rounded-lg px-2.5 py-1.5 font-medium',
+              'rounded-lg px-2.5 py-1.5 font-medium transition-colors',
               !tipoFiltro
                 ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
+                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
             Todos
@@ -363,10 +426,10 @@ export default async function AdminEventosPage({ searchParams }: Props) {
               href={hrefFiltro({ tipo: t })}
               prefetch
               className={[
-                'rounded-lg px-2.5 py-1.5 font-medium',
+                'rounded-lg px-2.5 py-1.5 font-medium transition-colors',
                 tipoFiltro === t
                   ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                  : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
+                  : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
             >
               {TIPO_EVENTO_LABEL[t]}
@@ -419,8 +482,8 @@ export default async function AdminEventosPage({ searchParams }: Props) {
               />
             </div>
 
-            {destaque && destaqueRow && (
-              <aside className="order-first lg:sticky lg:top-24 lg:order-last lg:col-span-4 xl:col-span-3">
+            <aside className="order-first space-y-4 lg:sticky lg:top-24 lg:order-last lg:col-span-4 xl:col-span-3">
+              {destaque && destaqueRow ? (
                 <ProximoEventoSpotlight
                   id={destaque.id}
                   titulo={destaque.titulo}
@@ -431,11 +494,18 @@ export default async function AdminEventosPage({ searchParams }: Props) {
                   lotacaoLabel={destaque.lotacaoLabel}
                   fotoUrl={destaqueRow.fotoUrl}
                   diasLabel={diasParaEvento(destaqueRow.data)}
+                  confirmados={destaque.confirmados}
+                  capacidade={destaque.capacidade}
                 />
-              </aside>
-            )}
+              ) : null}
+              <AgendaSemanaCompact
+                itens={semanaCompactItens}
+                semanaHref={hrefFiltro({ vista: 'semana', data: '' })}
+              />
+            </aside>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

@@ -276,6 +276,8 @@ model Tenant {
 
   pedidos           SaasPedido[]
 
+  pedidoTickets     SaasPedidoTicket[]
+
   sedes             Sede[]
 
   eventos           Evento[]
@@ -605,6 +607,10 @@ model User {
   solicitacoesUnidadeFeitas    SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeSolicitante")
 
   solicitacoesUnidadeDecididas SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeDecisor")
+
+  pedidoTicketsAtendente       SaasPedidoTicket[]    @relation("PedidoTicketAtendente")
+
+  pedidoTicketsFechados        SaasPedidoTicket[]    @relation("PedidoTicketFechadoPor")
 
 
   // Controle de acesso lista pessoas por vínculo com a torcida ordenando por
@@ -2576,6 +2582,8 @@ model SaasPedido {
 
   itens SaasPedidoItem[]
 
+  ticket SaasPedidoTicket?
+
 
 
   @@index([tenantId])
@@ -2624,6 +2632,76 @@ model SaasPedidoItem {
   @@index([produtoId])
 
   @@map("saas_pedido_itens")
+
+}
+
+
+
+/// Ticket de atendimento pós-compra (conversa persistente comprador ↔ loja).
+/// 1:1 com SaasPedido. Status da fila é independente do StatusPedido.
+model SaasPedidoTicket {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  pedidoId String @unique @map("pedido_id")
+
+  pedido   SaasPedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  conversaId String   @unique @map("conversa_id")
+
+  conversa   Conversa @relation(fields: [conversaId], references: [id], onDelete: Restrict)
+
+  status PedidoTicketStatus @default(ABERTO)
+
+  atendenteId String? @map("atendente_id")
+
+  atendente   User?   @relation("PedidoTicketAtendente", fields: [atendenteId], references: [id], onDelete: SetNull)
+
+  abertoEm   DateTime  @default(now()) @map("aberto_em")
+
+  atendidoEm DateTime? @map("atendido_em")
+
+  fechadoEm  DateTime? @map("fechado_em")
+
+  fechadoPorId String? @map("fechado_por_id")
+
+  fechadoPor   User?   @relation("PedidoTicketFechadoPor", fields: [fechadoPorId], references: [id], onDelete: SetNull)
+
+  motivoFecho PedidoTicketMotivoFecho? @map("motivo_fecho")
+
+  @@index([tenantId, status, abertoEm])
+
+  @@index([tenantId, fechadoEm])
+
+  @@map("saas_pedido_tickets")
+
+}
+
+
+
+enum PedidoTicketStatus {
+
+  ABERTO
+
+  ATENDENDO
+
+  FECHADO
+
+}
+
+
+
+enum PedidoTicketMotivoFecho {
+
+  ENTREGUE
+
+  MANUAL
+
+  CANCELADO
 
 }
 
@@ -4026,6 +4104,8 @@ model Conversa {
   departamentoAreaCanal DepartamentoArea? @relation("DepartamentoAreaCanal")
 
   sedeCanal Sede? @relation("SedeCanal")
+
+  pedidoTicket SaasPedidoTicket?
 
 
 

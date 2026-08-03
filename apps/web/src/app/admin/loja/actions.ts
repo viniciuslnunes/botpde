@@ -4,8 +4,9 @@ import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, assertAnyPermission } from '@/lib/authz'
 import { garantirLancamentoFinanceiroPedido } from '@/lib/loja-financeiro'
+import { atenderTicket, fecharTicket, fecharTicketPorStatusPedido } from '@/lib/loja-ticket'
 import { notificarSafe } from '@/lib/notificacoes'
 import {
   PERMISSIONS,
@@ -398,6 +399,30 @@ export async function atualizarStatusPedido(
       },
     })
 
+    if (session.user.id) {
+      try {
+        const ticketFechado = await fecharTicketPorStatusPedido(id, statusNovo, session.user.id)
+        if (ticketFechado?.motivoFecho) {
+          await db.auditLog.create({
+            data: {
+              tenantId: tenant.id,
+              atorId: session.user.id,
+              acao: 'PEDIDO_TICKET_FECHADO',
+              entidade: 'SaasPedidoTicket',
+              entidadeId: ticketFechado.id,
+              detalhes: {
+                pedidoId: id,
+                motivo: ticketFechado.motivoFecho,
+                via: 'status_pedido',
+              },
+            },
+          })
+        }
+      } catch {
+        // Status do pedido já gravado — falha no fecho do ticket não reverte.
+      }
+    }
+
     if (statusNovo !== pedido.status) {
       const notificacaoPorStatus: Partial<
         Record<
@@ -423,12 +448,133 @@ export async function atualizarStatusPedido(
     }
 
     revalidatePath('/admin/loja/pedidos')
+    revalidatePath('/admin/loja/tickets')
     revalidatePath('/portal/loja/pedidos')
+    revalidatePath('/portal/mensagens')
     revalidatePath('/admin/financeiro')
     revalidatePath('/portal/financeiro')
     revalidatePath('/portal/balanco')
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao atualizar pedido' }
+  }
+}
+
+export type TicketActionState = {
+  success?: boolean
+  error?: string
+  conversaId?: string
+}
+
+/** Fila: primeiro staff com store:view_orders/manage que atender assume o ticket. */
+export async function atenderTicketPedido(ticketId: string): Promise<TicketActionState> {
+  try {
+    const { session, tenant } = await assertAnyPermission([
+      PERMISSIONS.STORE_VIEW_ORDERS,
+      PERMISSIONS.STORE_MANAGE,
+    ])
+    if (!session.user.id) return { error: 'Não autenticado' }
+
+    const previa = await db.saasPedidoTicket.findFirst({
+      where: { id: ticketId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!previa) return { error: 'Ticket não encontrado.' }
+
+    const ticket = await atenderTicket(ticketId, session.user.id)
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'PEDIDO_TICKET_ATENDIDO',
+        entidade: 'SaasPedidoTicket',
+        entidadeId: ticket.id,
+        detalhes: { pedidoId: ticket.pedidoId, conversaId: ticket.conversaId },
+      },
+    })
+
+    revalidatePath('/admin/loja/pedidos')
+    revalidatePath('/admin/loja/tickets')
+    revalidatePath('/portal/mensagens')
+    return { success: true, conversaId: ticket.conversaId }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao atender ticket' }
+  }
+}
+
+/** Gestor fecha o ticket sem necessariamente mudar o status do pedido. */
+export async function fecharTicketPedido(ticketId: string): Promise<TicketActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+    if (!session.user.id) return { error: 'Não autenticado' }
+
+    const previa = await db.saasPedidoTicket.findFirst({
+      where: { id: ticketId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!previa) return { error: 'Ticket não encontrado.' }
+
+    const ticket = await fecharTicket(ticketId, {
+      motivo: 'MANUAL',
+      atorId: session.user.id,
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'PEDIDO_TICKET_FECHADO',
+        entidade: 'SaasPedidoTicket',
+        entidadeId: ticket.id,
+        detalhes: { pedidoId: ticket.pedidoId, motivo: 'MANUAL', via: 'manual' },
+      },
+    })
+
+    revalidatePath('/admin/loja/pedidos')
+    revalidatePath('/admin/loja/tickets')
+    revalidatePath('/portal/loja/pedidos')
+    revalidatePath('/portal/mensagens')
+    return { success: true, conversaId: ticket.conversaId }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao fechar ticket' }
+  }
+}
+
+/**
+ * Auditoria ao abrir uma conversa no arquivo (sem carregar mensagens na listagem).
+ * Preferir `auditarVisualizacaoTicketArquivo` na página de detalhe (RSC);
+ * esta action existe para chamadas client explícitas.
+ */
+export async function registrarVisualizacaoTicketArquivo(
+  ticketId: string,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const { session, tenant } = await assertAnyPermission([
+      PERMISSIONS.STORE_VIEW_ORDERS,
+      PERMISSIONS.STORE_MANAGE,
+    ])
+    if (!session.user.id) return { error: 'Não autenticado' }
+
+    const ticket: { id: string; pedidoId: string; conversaId: string; status: string } | null =
+      await db.saasPedidoTicket.findFirst({
+        where: { id: ticketId, tenantId: tenant.id },
+        select: { id: true, pedidoId: true, conversaId: true, status: true },
+      })
+    if (!ticket) return { error: 'Ticket não encontrado.' }
+
+    const { auditarVisualizacaoTicketArquivo } = await import('@/lib/loja-ticket-arquivo')
+    await auditarVisualizacaoTicketArquivo({
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      ticketId: ticket.id,
+      pedidoId: ticket.pedidoId,
+      conversaId: ticket.conversaId,
+      status: ticket.status,
+    })
+
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao registrar visualização' }
   }
 }

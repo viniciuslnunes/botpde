@@ -27,19 +27,41 @@ Bot Discord legado (`BotProduto`/`BotPedido`) permanece separado — não compar
 | `SaasCarrinhoItem` | `saas_carrinho_itens` | sacola por usuário; `@@unique([userId, produtoId, tamanho])`; tamanho `UN` = sem grade |
 | `SaasPedido` | `saas_pedidos` | cabeçalho: `subtotal`, `desconto`, `cupomCodigo`, `modalidadeEntrega`, `grupoCheckoutId`, `financeiroLancamentoId?` |
 | `SaasPedidoItem` | `saas_pedido_itens` | linhas do pedido; `produtoNome` é snapshot |
+| `SaasPedidoTicket` | `saas_pedido_tickets` | ticket 1:1 com pedido; liga a `Conversa` GRUPO; fila ABERTO→ATENDENDO→FECHADO |
 
-Enums: `TipoCupom`, `ModalidadeEntrega` (RETIRADA/ENVIO), `StatusPedido`.
+Enums: `TipoCupom`, `ModalidadeEntrega` (RETIRADA/ENVIO), `StatusPedido`, `PedidoTicketStatus`, `PedidoTicketMotivoFecho`.
 
 ## RBAC
 
 | Permissão | Uso |
 |---|---|
-| `STORE_MANAGE` (`store:manage`) | CRUD produtos, categorias, cupons; alterar status de pedido |
-| `STORE_VIEW_ORDERS` (`store:view_orders`) | **Somente leitura** de `/admin/loja/pedidos` (via `assertStoreView()`) |
+| `STORE_MANAGE` (`store:manage`) | CRUD produtos, categorias, cupons; alterar status de pedido; **fechar ticket** manualmente |
+| `STORE_VIEW_ORDERS` (`store:view_orders`) | Leitura de `/admin/loja/pedidos`; **atender** ticket na fila (claim) |
 
 Menu admin: item "Loja" exige `STORE_MANAGE`; item "Pedidos (Loja)" exige `STORE_VIEW_ORDERS`.
 
 Portal: exige sessão logada; **não** usa permissão RBAC — qualquer associado autenticado compra.
+
+## Tickets pós-compra (2026-08-03)
+
+Cada `finalizarPedido` abre um `SaasPedidoTicket` + `Conversa` tipo `GRUPO` (só o comprador como membro). Staff da **unidade dona do pedido** (tenant sede/PDE) com `store:view_orders` ou `store:manage` vê a **fila**; o primeiro que **Atender** faz claim atômico (`ABERTO`→`ATENDENDO`) e entra na conversa.
+
+**Quem acessa:** gestores do depto Materiais/Loja (pacote com `STORE_*`), cargos de sistema owner/admin/vice (e quem tiver `store:view_orders` / `store:manage` por override). Colaborador do depto loja **sem** `store:view_orders` não vê o arquivo.
+
+Fechamento (mensagens **permanecem** no banco; só trava envio):
+- Automático ao marcar pedido `ENTREGUE` (`motivoFecho: ENTREGUE`) ou `CANCELADO`
+- Manual pelo gestor (`store:manage`) sem exigir mudança de status do pedido (`MANUAL`)
+
+**Arquivo de conversas** (`/admin/loja/tickets`):
+- Listagem só com metadados (cliente, status, datas) — **não** carrega mensagens
+- Mensagens sob demanda em `/admin/loja/tickets/[id]` (até 500)
+- Filtros: fechados (padrão) / na fila / todos + busca
+- Gestão no detalhe: atender, fechar ticket, abrir no portal de mensagens
+- Auditoria: `PEDIDO_TICKET_ABERTO`, `PEDIDO_TICKET_ATENDIDO`, `PEDIDO_TICKET_FECHADO`, `PEDIDO_TICKET_HISTORICO_VISUALIZADO`
+
+Diferença vs bot Discord: o bot apaga o canal e arquiva HTML em log; no SaaS o histórico é `MensagemDireta` + ticket. `canalTicketId`/`discordId` no pedido **não** são preenchidos (bridge fora de escopo).
+
+Regras puras: `packages/types/src/loja-ticket.js`. Lib: `apps/web/src/lib/loja-ticket.ts`. UI: coluna Ticket em `/admin/loja/pedidos`; arquivo em `/admin/loja/tickets`; link no portal `/portal/loja/pedidos` → `/portal/mensagens?c=…`.
 
 ## Visibilidade cross-tenant (portal): lojas por unidade (2026-07-27)
 
@@ -89,7 +111,9 @@ Server actions: `apps/web/src/app/portal/loja/actions.ts`
 /admin/loja → produtos
 /admin/loja/categorias → categorias
 /admin/loja/cupons → cupons
-/admin/loja/pedidos → pedidos (multi-item)
+/admin/loja/pedidos → pedidos (multi-item) + fila de tickets
+/admin/loja/tickets → arquivo de conversas (metadados; detalhe sob demanda)
+/admin/loja/tickets/[id] → conversa completa + gestão do ticket
 /admin/loja/[id] → editar produto
 ```
 
@@ -104,7 +128,7 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 - **Livro-caixa:** ao passar pedido para `CONFIRMADO` ou `ENTREGUE`, cria
   `FinanceiroLancamento` RECEITA categoria `LOJA` (idempotente via
   `SaasPedido.financeiroLancamentoId`) — ver `apps/web/src/lib/loja-financeiro.ts`
-- Auditoria: `PRODUTO_*`, `PEDIDO_*`, `CATEGORIA_*`, `CUPOM_*` em `AuditLog`
+- Auditoria: `PRODUTO_*`, `PEDIDO_*`, `PEDIDO_TICKET_ABERTO` / `_ATENDIDO` / `_FECHADO` / `_HISTORICO_VISUALIZADO`, `CATEGORIA_*`, `CUPOM_*` em `AuditLog`
 - **Cupom é tenant-scoped e reaplicado por tenant no checkout multi-tenant**:
   `finalizarPedido` busca e valida o mesmo código **em cada tenant dono** do
   grupo de checkout. Se o cupom existe no tenant A mas não no B, o checkout
@@ -139,12 +163,14 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 ## Testes
 
 `apps/web/src/lib/__tests__/loja.test.ts` — cupom, desconto, tamanhos, promo.
+`apps/web/src/lib/__tests__/loja-ticket.test.ts` — transições de ticket, claim, fecho, envio.
 
 ## Fora de escopo (fase posterior)
 
 - Gateway PIX/cartão
 - Cálculo de frete por CEP (Correios)
-- Preencher `discordId`/`canalTicketId` no fluxo web
+- Preencher `discordId`/`canalTicketId` no fluxo web (bridge Discord)
+- Reabrir ticket / transferir atendente
 - Bot SaaS unificado (tabelas `produtos`/`pedidos` legadas)
 
 ## Insights administrativos (2026-07-22)

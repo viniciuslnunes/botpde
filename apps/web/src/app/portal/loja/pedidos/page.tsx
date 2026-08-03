@@ -46,6 +46,7 @@ function serializarPedido(pedido: {
     quantidade: number
     produto: { imagensUrl: unknown }
   }[]
+  ticket: { conversaId: string; status: string } | null
 }): PedidoListItem {
   const primeiraImagem = pedido.itens[0]?.produto.imagensUrl
   const titulo =
@@ -67,6 +68,8 @@ function serializarPedido(pedido: {
     })),
     imagemUrl: firstProdutoImagemUrl(primeiraImagem as string[] | null | undefined),
     lojaNome: formatNomeTorcida(pedido.tenant.nome),
+    conversaId: pedido.ticket?.conversaId ?? null,
+    ticketStatus: pedido.ticket?.status ?? null,
   }
 }
 
@@ -80,6 +83,7 @@ export default async function MeusPedidosPage() {
     include: {
       tenant: { select: { nome: true } },
       itens: { include: { produto: { select: { imagensUrl: true } } } },
+      ticket: { select: { conversaId: true, status: true } },
     },
   })
 

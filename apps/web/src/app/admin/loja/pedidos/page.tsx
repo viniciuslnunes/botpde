@@ -1,7 +1,10 @@
 import { db, type Prisma } from '@torcida/db'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { assertStoreView } from '@/lib/authz'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   ListagemPaginacao,
   ListagemTh,
@@ -21,6 +24,11 @@ import {
   resumirPaginacao,
 } from '@/lib/listagem/query'
 import { Package } from 'lucide-react'
+import {
+  PERMISSIONS,
+  calculateEffectivePermissions,
+  hasPermission,
+} from '@torcida/types'
 import { AdminPedidosList } from './admin-pedidos-list'
 import type { Metadata } from 'next'
 
@@ -41,24 +49,57 @@ function formatarData(data: Date) {
   }).format(new Date(data))
 }
 
+function firstParam(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value
+}
+
 export default async function AdminPedidosPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   let tenant: Awaited<ReturnType<typeof assertStoreView>>['tenant']
+  let session: Awaited<ReturnType<typeof assertStoreView>>['session']
   try {
-    ;({ tenant } = await assertStoreView())
+    ;({ tenant, session } = await assertStoreView())
   } catch {
     redirect('/admin')
   }
 
   const params = await searchParams
   const listagem = parseListagemParams(params, SPEC)
+  const ticketView = firstParam(params.ticket) // fila | historico | undefined
 
-  const where: Prisma.SaasPedidoWhereInput = montarWhereListagem(SPEC, listagem, {
+  let podeGerir = false
+  if (isSuperAdminEmail(session.user?.email)) {
+    podeGerir = true
+  } else if (session.user?.id) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      tenant.id,
+    )
+    const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
+    podeGerir = hasPermission(efetivas, PERMISSIONS.STORE_MANAGE)
+  }
+
+  const whereBase: Prisma.SaasPedidoWhereInput = montarWhereListagem(SPEC, listagem, {
     escopo: { tenantId: tenant.id },
   })
+
+  const where: Prisma.SaasPedidoWhereInput =
+    ticketView === 'fila'
+      ? {
+          ...whereBase,
+          ticket: { status: { in: ['ABERTO', 'ATENDENDO'] } },
+        }
+      : ticketView === 'historico'
+        ? {
+            ...whereBase,
+            ticket: { status: 'FECHADO' },
+          }
+        : whereBase
 
   type PedidoRow = {
     id: string
@@ -78,9 +119,15 @@ export default async function AdminPedidosPage({
       total: unknown
       produto: { imagensUrl: string[] }
     }[]
+    ticket: {
+      id: string
+      status: 'ABERTO' | 'ATENDENDO' | 'FECHADO'
+      conversaId: string
+      atendente: { nome: string | null } | null
+    } | null
   }
 
-  const [pedidos, total]: [PedidoRow[], number] = await Promise.all([
+  const [pedidos, total, filaCount]: [PedidoRow[], number, number] = await Promise.all([
     db.saasPedido.findMany({
       where,
       orderBy: montarOrderByListagem(SPEC, listagem),
@@ -88,9 +135,20 @@ export default async function AdminPedidosPage({
       include: {
         user: { select: { nome: true, email: true } },
         itens: { include: { produto: { select: { imagensUrl: true } } } },
+        ticket: {
+          select: {
+            id: true,
+            status: true,
+            conversaId: true,
+            atendente: { select: { nome: true } },
+          },
+        },
       },
     }),
     db.saasPedido.count({ where }),
+    db.saasPedidoTicket.count({
+      where: { tenantId: tenant.id, status: { in: ['ABERTO', 'ATENDENDO'] } },
+    }),
   ])
 
   const paginacao = resumirPaginacao(total, listagem)
@@ -126,10 +184,38 @@ export default async function AdminPedidosPage({
       label: `${item.produtoNome}${item.tamanho ? ` (${item.tamanho})` : ''} × ${item.quantidade}`,
       totalLabel: formatarPreco(item.total),
     })),
+    ticket: pedido.ticket
+      ? {
+          id: pedido.ticket.id,
+          status: pedido.ticket.status,
+          conversaId: pedido.ticket.conversaId,
+          atendenteNome: pedido.ticket.atendente?.nome ?? null,
+        }
+      : null,
   }))
+
+  const tabClass = (ativa: boolean) =>
+    [
+      'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+      ativa
+        ? 'bg-[rgb(var(--primary))] text-white'
+        : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+    ].join(' ')
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Link href="/admin/loja/pedidos" className={tabClass(!ticketView)}>
+          Todos
+        </Link>
+        <Link href="/admin/loja/pedidos?ticket=fila" className={tabClass(ticketView === 'fila')}>
+          Fila{filaCount > 0 ? ` (${filaCount})` : ''}
+        </Link>
+        <Link href="/admin/loja/tickets" className={tabClass(false)}>
+          Arquivo de conversas
+        </Link>
+      </div>
+
       <ListagemToolbar
         spec={SPEC}
         params={listagem}
@@ -150,13 +236,22 @@ export default async function AdminPedidosPage({
                 aria-hidden
               />
             ),
-            title: 'Nenhum pedido ainda',
-            description: 'Quando a loja receber pedidos, eles aparecem aqui.',
+            title:
+              ticketView === 'fila'
+                ? 'Fila vazia'
+                : ticketView === 'historico'
+                  ? 'Nenhum ticket fechado'
+                  : 'Nenhum pedido ainda',
+            description:
+              ticketView === 'fila'
+                ? 'Quando houver pedidos aguardando atendimento, eles aparecem aqui.'
+                : 'Quando a loja receber pedidos, eles aparecem aqui.',
           }}
         />
       ) : (
         <AdminPedidosList
           pedidos={pedidosSerializados}
+          podeGerir={podeGerir}
           cabecalho={SPEC.colunas.map((coluna) => (
             <ListagemTh
               key={coluna.id}

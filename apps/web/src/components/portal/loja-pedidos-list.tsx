@@ -18,6 +18,8 @@ export interface PedidoListItem {
   itens: { id: string; label: string }[]
   imagemUrl: string | null
   lojaNome: string
+  conversaId: string | null
+  ticketStatus: string | null
 }
 
 interface LojaPedidosListProps {
@@ -51,6 +53,16 @@ function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
           </ul>
           <p className="mt-2 font-semibold text-[rgb(var(--foreground))]">{pedido.totalLabel}</p>
           <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">{pedido.meta}</p>
+          {pedido.conversaId && (
+            <Link
+              href={`/portal/mensagens?c=${pedido.conversaId}`}
+              className="mt-3 inline-flex text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            >
+              {pedido.ticketStatus === 'FECHADO'
+                ? 'Ver conversa do pedido'
+                : 'Conversar sobre o pedido'}
+            </Link>
+          )}
         </div>
       </div>
     </m.div>

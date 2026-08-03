@@ -4,6 +4,10 @@ import type { ReactNode } from 'react'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { StatusPedidoSelect } from '@/components/admin/produto-forms'
 import { StatusBadge, TableShell } from '@/components/admin/ui'
+import {
+  AdminPedidoTicketActions,
+  type PedidoTicketUi,
+} from './admin-pedido-ticket-actions'
 
 export interface AdminPedidoListItem {
   id: string
@@ -14,15 +18,17 @@ export interface AdminPedidoListItem {
   totalLabel: string
   subtotalRiscado: string | null
   itens: { id: string; imagemUrl: string | null; label: string; totalLabel: string }[]
+  ticket: PedidoTicketUi | null
 }
 
 interface AdminPedidosListProps {
   pedidos: AdminPedidoListItem[]
   /** `<th>` montados no servidor (`ListagemTh`). */
   cabecalho: ReactNode
+  podeGerir: boolean
 }
 
-export function AdminPedidosList({ pedidos, cabecalho }: AdminPedidosListProps) {
+export function AdminPedidosList({ pedidos, cabecalho, podeGerir }: AdminPedidosListProps) {
   return (
     <TableShell
       isEmpty={false}
@@ -71,6 +77,9 @@ export function AdminPedidosList({ pedidos, cabecalho }: AdminPedidosListProps) 
                 <StatusBadge dominio="pedido" status={pedido.status} />
                 <StatusPedidoSelect id={pedido.id} statusAtual={pedido.status} />
               </div>
+            </td>
+            <td className="px-4 py-3">
+              <AdminPedidoTicketActions ticket={pedido.ticket} podeGerir={podeGerir} />
             </td>
             <td className="hidden px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] lg:table-cell">
               {pedido.criadoEmLabel}
