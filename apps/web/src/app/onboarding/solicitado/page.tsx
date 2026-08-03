@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { buildPortalUrl, getActiveTenant } from '@/lib/tenant'
 import { SolicitacaoResumoCard } from '@/components/onboarding/solicitacao-resumo-card'
 
 export default async function SolicitacaoEnviadaPage({
@@ -13,8 +12,6 @@ export default async function SolicitacaoEnviadaPage({
 }) {
   const [params, session] = await Promise.all([searchParams, auth()])
   if (!session?.user?.id) redirect('/entrar')
-
-  const hostTenant = await getActiveTenant(session.user.id, session.user.email)
 
   const slug = params.torcida?.trim()
   const torcida = slug
@@ -28,6 +25,7 @@ export default async function SolicitacaoEnviadaPage({
     where: {
       userId: session.user.id,
       tipo: 'SOCIO',
+      espelhado: false,
       ...(torcida ? { tenantId: torcida.id } : {}),
     },
     orderBy: { atualizadoEm: 'desc' },
@@ -55,9 +53,6 @@ export default async function SolicitacaoEnviadaPage({
     },
   })
 
-  const portalUrl = torcida ? buildPortalUrl(torcida.slug) : '/portal/comunidade'
-  const portalExterno = portalUrl.startsWith('http')
-
   return (
     <div className="flex flex-1 flex-col justify-center py-12 text-center">
       <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" />
@@ -68,20 +63,13 @@ export default async function SolicitacaoEnviadaPage({
         {torcida ? (
           <>
             Sua solicitação foi registrada na <strong>{torcida.nome}</strong>. Enquanto a
-            liderança analisa, você já pode usar a comunidade dessa torcida — a aprovação
-            libera o mural e os benefícios de sócio.
+            liderança analisa, você já pode usar a Comunidade Nacional do clube e o canal
+            da unidade — a aprovação libera o mural da torcida e os benefícios de sócio.
           </>
         ) : (
           <>Sua solicitação foi registrada. A liderança da torcida vai analisar em breve.</>
         )}
       </p>
-
-      {hostTenant && torcida && hostTenant.slug !== torcida.slug && (
-        <p className="mx-auto mt-4 max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Seu contexto foi ajustado para a <strong>{torcida.nome}</strong>. A aprovação é feita
-          pela diretoria dessa torcida.
-        </p>
-      )}
 
       {solicitacao?.status === 'PENDENTE' ? (
         <div className="mx-auto mt-8 w-full max-w-4xl text-left">
@@ -116,21 +104,12 @@ export default async function SolicitacaoEnviadaPage({
       ) : null}
 
       <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-        {portalExterno ? (
-          <a
-            href={portalUrl}
-            className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Ir para a comunidade
-          </a>
-        ) : (
-          <Link
-            href={portalUrl}
-            className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Ir para a comunidade
-          </Link>
-        )}
+        <Link
+          href="/portal/comunidade?escopo=nacional"
+          className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Ir para a comunidade
+        </Link>
         <Link
           href="/onboarding"
           className="text-sm font-medium text-[rgb(var(--foreground-muted))] hover:underline"

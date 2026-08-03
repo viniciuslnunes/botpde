@@ -627,13 +627,13 @@ export type SolicitacaoSocioPendente = {
   criadoEm: Date
 }
 
-/** Sócio ainda em análise (mais recente) — banner de status na Comunidade Nacional. */
+/** Sócio ainda em análise (mais recente, canônico) — banner na Comunidade Nacional. */
 export const getSolicitacaoSocioPendente = cache(
   async (userId: string): Promise<SolicitacaoSocioPendente | null> => {
     // Leitura idempotente com retry (blips do proxy Railway na entrada da CN).
     const pendente: { criadoEm: Date; tenant: { nome: string } } | null = await withDbRetry(() =>
       db.saasMembro.findFirst({
-        where: { userId, tipo: 'SOCIO', status: 'PENDENTE' },
+        where: { userId, tipo: 'SOCIO', status: 'PENDENTE', espelhado: false },
         orderBy: { criadoEm: 'desc' },
         select: { criadoEm: true, tenant: { select: { nome: true } } },
       }),

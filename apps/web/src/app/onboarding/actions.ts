@@ -1157,8 +1157,8 @@ export async function solicitarVinculo(
     }
     dadosMembro.departamentoSedeId = departamentoSedeId
 
-    // TORCEDOR entra sem fila (CN do clube). SOCIO fica PENDENTE e abre a
-    // comunidade da própria torcida até a diretoria aprovar.
+    // TORCEDOR entra sem fila (CN do clube). SOCIO fica PENDENTE e usa a CN +
+    // unidade do convite como torcedor até a diretoria aprovar (sem aba da Sede).
     const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
     const existing:
@@ -1591,14 +1591,25 @@ export async function solicitarVinculo(
 
     if (data.tipo === 'TORCEDOR') {
       // Torcedor fica na Comunidade Nacional do clube (afiliacaoId), com aba
-      // Minha torcida só para posts públicos — não abre o portal de sócios.
+      // Minha unidade só para o canal do convite — não abre o portal de sócios.
       // Limpa cookie para não herdar TENANT_SLUG/contexto de outra torcida.
       await clearTenantContextSlug()
       return { ok: true, redirectTo: '/portal/comunidade?escopo=nacional' }
     }
 
-    // Sócio pendente: comunidade da própria torcida até a aprovação.
-    await setTenantContextSlug(tenantDestino.slug)
+    // Sócio pendente: mesma experiência de torcedor (CN + PDE) até a aprovação.
+    // Não grava torcida_ctx — senão o portal abria a Sede (Gaviões) sem vínculo.
+    await clearTenantContextSlug()
+    // Com unidade no convite: canal da PDE (regra TORCEDOR). Sem sedeId não
+    // chama — vincular sem unidade cairia no canal da Sede, que é de sócio.
+    if (dadosMembro.sedeId) {
+      await vincularCanaisBestEffort({
+        tenantId: tenantDestino.id,
+        userId,
+        sedeId: dadosMembro.sedeId,
+        tipo: 'TORCEDOR',
+      })
+    }
     return {
       ok: true,
       redirectTo: `/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`,

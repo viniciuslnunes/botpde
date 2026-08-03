@@ -557,6 +557,10 @@ describe('solicitarVinculo — validação', () => {
       email: 'fulano@example.com',
     })
     expect(r.redirectTo).toContain('/onboarding/solicitado')
+    expect(clearTenantContextSlugFn).toHaveBeenCalled()
+    expect(setTenantContextSlugFn).not.toHaveBeenCalled()
+    // Sem sedeId no wizard: não provisiona canal (evita cair no da Sede).
+    expect(vincularMembroCanaisFn).not.toHaveBeenCalled()
     expect(membroCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

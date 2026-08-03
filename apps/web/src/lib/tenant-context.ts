@@ -77,28 +77,21 @@ export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
  * Slug da torcida do usuário (vínculo real). Sem fallback TENANT_SLUG —
  * use em roteamento pós-login; TENANT_SLUG é só contexto do deploy.
  *
- * Só sócio APROVADO (ou PENDENTE aguardando análise) abre modo "Minha
- * torcida" como contexto ativo. TORCEDOR fica na Comunidade Nacional do
- * clube (`PerfilTorcedor.afiliacaoId`) — abrir tenant para TORCEDOR
- * jogava o portal de sócios no lugar errado.
+ * Só sócio **APROVADO** abre modo "Minha torcida". SOCIO PENDENTE fica na
+ * Comunidade Nacional + aba da unidade (como TORCEDOR) até a diretoria
+ * aprovar — abrir tenant com PENDENTE expunha a Sede (Gaviões) sem vínculo.
  */
 export async function resolveUserTenantSlugForUser(userId: string): Promise<string | null> {
   const socioAprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO', espelhado: false },
     orderBy: { criadoEm: 'desc' },
     select: { tenant: { select: { slug: true } } },
   })
-  if (socioAprovado) return socioAprovado.tenant.slug
-
-  const socioPendente: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'PENDENTE', tipo: 'SOCIO' },
-    orderBy: { criadoEm: 'desc' },
-    select: { tenant: { select: { slug: true } } },
-  })
-  return socioPendente?.tenant.slug ?? null
+  return socioAprovado?.tenant.slug ?? null
 }
 
-/** Vínculo que autoriza cookie/contexto de portal nesta torcida (só sócio). */
+/** Vínculo que autoriza cookie/subdomínio de portal nesta torcida.
+ * Só SOCIO **APROVADO** (canônico ou espelho Caso B na Sede). PENDENTE nunca. */
 export async function vinculoAutorizaContextoTenant(
   userId: string,
   tenantSlug: string,
@@ -107,7 +100,7 @@ export async function vinculoAutorizaContextoTenant(
     where: {
       userId,
       tipo: 'SOCIO',
-      status: { in: ['APROVADO', 'PENDENTE'] },
+      status: 'APROVADO',
       tenant: { slug: tenantSlug },
     },
     select: { id: true },
@@ -116,8 +109,9 @@ export async function vinculoAutorizaContextoTenant(
 }
 
 /**
- * Unidade/torcida do vínculo TORCEDOR APROVADO mais recente — alimenta a aba
- * "Minha torcida" sem abrir o modo sócio (`getActiveTenant` continua null).
+ * Tenant do vínculo que alimenta a aba "Minha unidade" sem abrir modo sócio
+ * (`getActiveTenant` continua null): TORCEDOR APROVADO ou SOCIO ainda PENDENTE
+ * (canônico). Espelho na Sede fica de fora — a unidade é a origem do convite.
  */
 export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
   id: string
@@ -141,12 +135,12 @@ export async function resolverTorcidaDoTorcedor(userId: string): Promise<{
   } | null = await db.saasMembro.findFirst({
     where: {
       userId,
-      status: 'APROVADO',
-      tipo: 'TORCEDOR',
-      // Espelho na Sede existe para a diretoria ver o quadro; "Minha torcida"
-      // é sempre a unidade/origem onde o torcedor entrou.
       espelhado: false,
       tenant: { ativo: true, sintetico: false },
+      OR: [
+        { status: 'APROVADO', tipo: 'TORCEDOR' },
+        { status: 'PENDENTE', tipo: 'SOCIO' },
+      ],
     },
     orderBy: { criadoEm: 'desc' },
     select: {

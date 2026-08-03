@@ -87,9 +87,9 @@ export type ContextoComunidadePortal =
       afiliacao: AfiliacaoComunidade
       tenantSintetico?: TenantSintetico | null
       /**
-       * TORCEDOR com vínculo APROVADO: tem a aba "Minha unidade" (o canal da
-       * unidade que o convidou) — **nunca** a aba da torcida, que é de sócio.
-       * O default continua Nacional do clube.
+       * TORCEDOR APROVADO ou SOCIO PENDENTE: tem a aba "Minha unidade" (o canal
+       * da unidade que o convidou) — **nunca** a aba da torcida, que é de sócio
+       * aprovado. O default continua Nacional do clube.
        */
       escopos: EscoposDisponiveis
       torcidaReal?: TorcidaRealComunidade | null
@@ -134,9 +134,14 @@ const resolverUnidadeDoVinculo = cache(
     } | null = await db.saasMembro.findFirst({
       where: {
         userId,
-        status: 'APROVADO',
         espelhado: false,
         tenantId: { in: tenantIds },
+        // TORCEDOR/SOCIO aprovados; SOCIO PENDENTE também — até a aprovação
+        // ele usa a unidade do convite como torcedor (sem aba da Sede).
+        OR: [
+          { status: 'APROVADO' },
+          { status: 'PENDENTE', tipo: 'SOCIO' },
+        ],
         sede: { tipo: { in: ['SUBSEDE', 'PONTO_ENCONTRO'] }, canalConversaId: { not: null } },
       },
       orderBy: { criadoEm: 'desc' },
@@ -254,51 +259,69 @@ export const resolverContextoComunidade = cache(
   async (userId: string, email?: string | null): Promise<ContextoComunidadePortal | null> => {
     const tenant = await getActiveTenant(userId, email)
     if (tenant) {
-      let afiliacao: AfiliacaoComunidade | null = null
-      if (tenant.afiliacaoId) {
-        const raw = await db.afiliacao.findUnique({
-          where: { id: tenant.afiliacaoId },
-          select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
-        })
-        afiliacao = raw ? projetarAfiliacaoComunidade(raw) : null
+      // Modo "Minha torcida" (aba da Sede) exige SOCIO APROVADO na worktree.
+      // getActiveTenant já barra subdomínio/cookie sem APROVADO; este probe é
+      // defesa em profundidade se o host ainda devolver um tenant.
+      const lineageProbe = await getTorcidaLineageTenantIds(tenant.id)
+      const socioAprovado: { id: string } | null = await db.saasMembro.findFirst({
+        where: {
+          userId,
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          espelhado: false,
+          tenantId: { in: lineageProbe },
+        },
+        select: { id: true },
+      })
+
+      if (socioAprovado) {
+        let afiliacao: AfiliacaoComunidade | null = null
+        if (tenant.afiliacaoId) {
+          const raw = await db.afiliacao.findUnique({
+            where: { id: tenant.afiliacaoId },
+            select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
+          })
+          afiliacao = raw ? projetarAfiliacaoComunidade(raw) : null
+        }
+
+        // Portal ativo (pode ser PDE Caso B) × organizada (sempre a Sede raiz).
+        // Sem essa distinção, as abas de escudo duplicavam o logo da unidade.
+        const [logoPortal, torcidaReal, tenantSintetico] = await Promise.all([
+          resolveTenantLogoUrl(tenant.id, tenant.logoUrl),
+          projetarTorcidaOrganizada(tenant),
+          tenant.afiliacaoId
+            ? getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
+            : Promise.resolve(null),
+        ])
+
+        const portalAtivo: TorcidaRealComunidade = {
+          id: tenant.id,
+          slug: tenant.slug,
+          nome: formatNomeTorcida(tenant.nome),
+          afiliacaoId: tenant.afiliacaoId,
+          logoUrl: logoPortal,
+          corPrimaria: tenant.corPrimaria,
+          balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+        }
+
+        // Worktree inteira: canônico Caso B está no tenant da PDE; no portal da
+        // Sede o sócio só tem espelho (sem sedeId) — sem a lineage a 3ª aba some.
+        const lineageIds = await getTorcidaLineageTenantIds(torcidaReal.id)
+        const unidade = await resolverUnidadeDoVinculo(userId, lineageIds)
+
+        return {
+          modo: 'torcida',
+          tenant: portalAtivo,
+          afiliacao,
+          tenantSintetico,
+          // Sócio vê a torcida inteira; a aba da unidade só quando ele está
+          // vinculado a uma subsede/PDE com canal.
+          escopos: { torcida: true, unidade: Boolean(unidade) },
+          torcidaReal,
+          unidade,
+        }
       }
-
-      // Portal ativo (pode ser PDE Caso B) × organizada (sempre a Sede raiz).
-      // Sem essa distinção, as abas de escudo duplicavam o logo da unidade.
-      const [logoPortal, torcidaReal, tenantSintetico] = await Promise.all([
-        resolveTenantLogoUrl(tenant.id, tenant.logoUrl),
-        projetarTorcidaOrganizada(tenant),
-        tenant.afiliacaoId
-          ? getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
-          : Promise.resolve(null),
-      ])
-
-      const portalAtivo: TorcidaRealComunidade = {
-        id: tenant.id,
-        slug: tenant.slug,
-        nome: formatNomeTorcida(tenant.nome),
-        afiliacaoId: tenant.afiliacaoId,
-        logoUrl: logoPortal,
-        corPrimaria: tenant.corPrimaria,
-        balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
-      }
-
-      // Worktree inteira: canônico Caso B está no tenant da PDE; no portal da
-      // Sede o sócio só tem espelho (sem sedeId) — sem a lineage a 3ª aba some.
-      const lineageIds = await getTorcidaLineageTenantIds(torcidaReal.id)
-      const unidade = await resolverUnidadeDoVinculo(userId, lineageIds)
-
-      return {
-        modo: 'torcida',
-        tenant: portalAtivo,
-        afiliacao,
-        tenantSintetico,
-        // Sócio vê a torcida inteira; a aba da unidade só quando ele está
-        // vinculado a uma subsede/PDE com canal.
-        escopos: { torcida: true, unidade: Boolean(unidade) },
-        torcidaReal,
-        unidade,
-      }
+      // Sem sócio aprovado: cai no ramo nacional (Timão + PDE) abaixo.
     }
 
     const perfil: {

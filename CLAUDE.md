@@ -58,6 +58,7 @@ pnpm --filter @torcida/web audit:notificacoes # fan-out, reconciliação de leit
 pnpm --filter @torcida/web audit:mensageria  # DM: segregação por rivalidade, bloqueio, solicitação
 pnpm --filter @torcida/web audit:loja        # cupom, estoque (inclui concorrência), pedido, seguir
 pnpm --filter @torcida/web audit:canal-restrito  # R5: semeia unidade Caso B (o seed não tem) e mede o isolamento
+pnpm --filter @torcida/web audit:onboarding  # TORCEDOR / SOCIO PENDENTE / APROVADO → comunidades e mural
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.

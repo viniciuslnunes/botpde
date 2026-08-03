@@ -205,7 +205,8 @@ export default async function AdminEventoDetailPage({
   const valorVagaNum = eventoForm.valorVaga
   const caravanaPaga = evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)
   const ocupacaoLotacao = caravanaPaga ? evento._count.cobrancas : evento._count.rsvps
-  const passado = evento.data.getTime() < Date.now()
+  const agora = new Date()
+  const passado = evento.data.getTime() < agora.getTime()
   const lotacaoPct =
     cap != null && cap > 0 ? Math.min(100, Math.round((ocupacaoLotacao / cap) * 100)) : null
   const lotacaoTone =

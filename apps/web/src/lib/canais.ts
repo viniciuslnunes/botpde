@@ -176,6 +176,22 @@ export async function assertElegibilidadeMembroCanal(
   }
   if (nivel === 'PENDENTE') return
   if (!estaAtivo(membro)) {
+    // SOCIO PENDENTE: libera só o canal da própria unidade (regra de torcedor
+    // até a aprovação). Canal da Sede / demais canais continuam barrados.
+    if (membro.status === 'PENDENTE' && membro.tipo === 'SOCIO' && !membro.desligadoEm) {
+      const pendenteNaUnidade: { id: string } | null = await db.saasMembro.findFirst({
+        where: {
+          userId,
+          tenantId: tenantVinculoId,
+          status: 'PENDENTE',
+          tipo: 'SOCIO',
+          espelhado: false,
+          sede: { canalConversaId: conversaId },
+        },
+        select: { id: true },
+      })
+      if (pendenteNaUnidade) return
+    }
     throw new ExpectedError('O vínculo com a torcida deste canal ainda não foi aprovado.')
   }
   if (membro.tipo === 'SOCIO') {

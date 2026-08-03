@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   conversaFindUnique: vi.fn(),
   membroFindUnique: vi.fn(),
+  membroFindFirst: vi.fn(),
   socioFindUnique: vi.fn(),
   sedeFindFirst: vi.fn(),
   membroConversaUpsert: vi.fn(),
@@ -13,7 +14,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@torcida/db', () => ({
   db: {
     conversa: { findUnique: mocks.conversaFindUnique },
-    saasMembro: { findUnique: mocks.membroFindUnique },
+    saasMembro: {
+      findUnique: mocks.membroFindUnique,
+      findFirst: mocks.membroFindFirst,
+    },
     saasSocio: { findUnique: mocks.socioFindUnique },
     sede: { findFirst: mocks.sedeFindFirst },
     membroConversa: { upsert: mocks.membroConversaUpsert },
@@ -56,12 +60,26 @@ describe('assertElegibilidadeMembroCanal', () => {
     ).rejects.toThrow('vínculo com a torcida deste canal')
   })
 
+  it('permite ATIVO no canal da unidade com SOCIO PENDENTE (acesso de torcedor)', async () => {
+    mocks.membroFindUnique.mockResolvedValue({
+      status: 'PENDENTE',
+      tipo: 'SOCIO',
+      desligadoEm: null,
+    })
+    mocks.membroFindFirst.mockResolvedValue({ id: 'm-pendente' })
+
+    await expect(
+      assertElegibilidadeMembroCanal('canal-unidade', 'pendente', 'ATIVO'),
+    ).resolves.toBeUndefined()
+  })
+
   it('recusa ATIVO quando o vínculo local ainda não foi aprovado', async () => {
     mocks.membroFindUnique.mockResolvedValue({
       status: 'PENDENTE',
       tipo: 'SOCIO',
       desligadoEm: null,
     })
+    mocks.membroFindFirst.mockResolvedValue(null)
 
     await expect(
       assertElegibilidadeMembroCanal('canal', 'membro', 'ATIVO'),
