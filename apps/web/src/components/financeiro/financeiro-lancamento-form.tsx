@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import {
   CATEGORIA_FINANCEIRO_LABEL,
   formatDataCompetenciaInput,
@@ -24,6 +24,14 @@ export type LancamentoFormInitial = {
   descricao: string
   data: string
   observacao: string | null
+  departamentoId?: string | null
+  projetoId?: string | null
+}
+
+/** Opções de rateio — carregadas na página, já escopadas por tenant. */
+export type RateioOpcoes = {
+  departamentos: Array<{ id: string; nome: string }>
+  projetos: Array<{ id: string; titulo: string; departamentoId: string }>
 }
 
 function hojeISODate() {
@@ -39,12 +47,16 @@ export function FinanceiroLancamentoForm({
   initial,
   onCancel,
   compact,
+  rateio,
 }: {
   initial?: LancamentoFormInitial
   onCancel?: () => void
   compact?: boolean
+  /** Ausente = torcida sem departamentos; o bloco de rateio nem aparece. */
+  rateio?: RateioOpcoes
 }) {
   const isEdit = Boolean(initial?.id)
+  const [departamentoId, setDepartamentoId] = useState(initial?.departamentoId ?? '')
   const formRef = useRef<HTMLFormElement>(null)
   const [state, action, pending] = useActionState(
     isEdit ? editarLancamentoFinanceiro : criarLancamentoFinanceiro,
@@ -151,6 +163,48 @@ export function FinanceiroLancamentoForm({
         />
         <FieldError messages={state.errors?.descricao} />
       </label>
+
+      {rateio && rateio.departamentos.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Departamento (opcional)
+            <select
+              name="departamentoId"
+              value={departamentoId}
+              onChange={(e) => setDepartamentoId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+            >
+              <option value="">Sem rateio por área</option>
+              {rateio.departamentos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nome}
+                </option>
+              ))}
+            </select>
+            <FieldError messages={state.errors?.departamentoId} />
+          </label>
+
+          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Projeto (opcional)
+            <select
+              name="projetoId"
+              defaultValue={initial?.projetoId ?? ''}
+              key={departamentoId}
+              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+            >
+              <option value="">Nenhum</option>
+              {rateio.projetos
+                .filter((p) => !departamentoId || p.departamentoId === departamentoId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.titulo}
+                  </option>
+                ))}
+            </select>
+            <FieldError messages={state.errors?.projetoId} />
+          </label>
+        </div>
+      )}
 
       <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
         Observação (opcional)

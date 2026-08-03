@@ -290,6 +290,10 @@ model Tenant {
 
   userDepartamentos UserDepartamento[]
 
+  departamentoAreas DepartamentoArea[]
+
+  projetos          Projeto[]
+
   auditLogs         AuditLog[]
 
   bloqueados        Bloqueado[]
@@ -393,9 +397,13 @@ model Tenant {
   /// Desligável em /admin/configuracoes → Cadastro de sócios.
   exigirDocumentosCadastro Boolean @default(true) @map("exigir_documentos_cadastro")
 
-  /// Portal: modal/fluxo de solicitar dados pendentes aos sócios desta unidade.
-  /// Escopo = este tenant (Sede ou afiliada). Default ligado.
+  /// Portal: modal de dados pendentes neste canal/unidade (default ligado).
   solicitarPendenciasCadastro Boolean @default(true) @map("solicitar_pendencias_cadastro")
+
+  /// Só na Sede (raiz): quando true, o valor de `solicitarPendenciasCadastro`
+  /// da Sede vale para toda a worktree (subsedes/PDEs ignoram o flag local).
+  /// Editável por owner/admin/vice/super-admin na Sede.
+  propagarPendenciasCadastroUnidades Boolean @default(false) @map("propagar_pendencias_cadastro_unidades")
 
   /// Periodicidades oferecidas no onboarding «Já sou sócio».
   /// Vazio = fallback de app (QUADRIMENSAL + ANUAL). Config em /admin/configuracoes.
@@ -470,6 +478,12 @@ model User {
   userDepartamentos    UserDepartamento[]
 
   departamentosGeridos DepartamentoGestor[]
+
+  departamentoAreas    DepartamentoAreaMembro[]
+
+  projetosResponsavel  Projeto[]               @relation("ProjetoResponsavel")
+
+  projetosParticipante ProjetoParticipante[]
 
   membros              SaasMembro[]
 
@@ -790,6 +804,12 @@ model Departamento {
 
   gestores DepartamentoGestor[]
 
+  areas    DepartamentoArea[]
+
+  projetos Projeto[]
+
+  lancamentos FinanceiroLancamento[] @relation("FinanceiroLancamentoDepartamento")
+
   roles    Role[]
 
   /// Preferência de área no cadastro (SaasMembro) — sem membership até APROVADO.
@@ -886,6 +906,268 @@ model DepartamentoGestor {
   @@index([userId])
 
   @@map("saas_departamento_gestores")
+
+}
+
+
+
+/// Área interna de um departamento (ex.: Campanha do Agasalho dentro do Social).
+/// Organiza gente e trabalho — NÃO concede permissão. RBAC continua no
+/// Departamento (permissions/permissionsGestor); área é só rótulo e filtro.
+model DepartamentoArea {
+
+  id             String @id @default(cuid())
+
+  tenantId       String @map("tenant_id")
+
+  departamentoId String @map("departamento_id")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+
+
+  nome      String
+
+  slug      String
+
+  /// O que a área faz na prática — a riqueza de conhecimento do produto.
+  descricao String?
+
+  /// Chave de ícone (string, nunca componente React).
+  icone     String?
+
+  ordem     Int     @default(0)
+
+  ativa     Boolean @default(true)
+
+  /// Agasalho/Natal: ativa em janela específica do ano.
+  sazonal   Boolean @default(false)
+
+  /// Checklist/config leve da área (mesmo padrão de Departamento.meta). Não é RBAC.
+  meta      Json?
+
+  /// Canal (Conversa tipo CANAL) da frente — vínculo manual, sem auto-criar.
+  /// Unique: uma conversa não serve a duas áreas nem a sede/depto ao mesmo tempo
+  /// (checagem na action + unique no ponteiro).
+  canalConversaId String? @unique @map("canal_conversa_id")
+
+  canalConversa   Conversa? @relation("DepartamentoAreaCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+
+
+  membros  DepartamentoAreaMembro[]
+
+  projetos Projeto[]
+
+  @@unique([departamentoId, slug])
+
+  @@index([tenantId, ativa])
+
+  @@map("saas_departamento_areas")
+
+}
+
+
+
+/// Associação usuário ↔ área de departamento. Exige `UserDepartamento` prévio
+/// no departamento pai (elegibilidade validada na Server Action, não aqui).
+/// `papel = RESPONSAVEL` é accountability, não gestão — quem gere é
+/// `DepartamentoGestor` / `canManageDepartamento`.
+model DepartamentoAreaMembro {
+
+  id     String @id @default(cuid())
+
+  areaId String @map("area_id")
+
+  userId String @map("user_id")
+
+  area DepartamentoArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+
+  /// MEMBRO | RESPONSAVEL — rótulo, nunca permissão.
+  papel PapelAreaDepartamento @default(MEMBRO)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  @@unique([areaId, userId])
+
+  @@index([userId])
+
+  @@map("saas_departamento_area_membros")
+
+}
+
+enum PapelAreaDepartamento {
+
+  MEMBRO
+
+  RESPONSAVEL
+
+}
+
+
+
+/// Trabalho de um departamento com começo, meta e prestação de contas
+/// (Campanha do Agasalho, Festa das Crianças, Escolinha da Bateria, Corrida de
+/// Rua). Transversal: serve Social, Bateria, Carnaval, Caravanas e Patrimônio.
+/// Como a área, NÃO concede permissão — quem gere é `canManageDepartamento`.
+model Projeto {
+
+  id             String @id @default(cuid())
+
+  tenantId       String @map("tenant_id")
+
+  departamentoId String @map("departamento_id")
+
+  /// Frente dentro do departamento. Nulo = projeto do departamento inteiro.
+  areaId         String? @map("area_id")
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  departamento Departamento      @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+  area         DepartamentoArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+
+
+  titulo    String
+
+  slug      String
+
+  descricao String?
+
+  tipo      TipoProjeto   @default(PROJETO)
+
+  status    StatusProjeto @default(PLANEJADO)
+
+
+
+  /// Janela de execução. `fim` nulo = contínuo (ex.: Inclusão Digital).
+  inicio DateTime
+
+  fim    DateTime?
+
+  /// Tradição que se repete todo ano (Agasalho, Natal) — usado no resumo.
+  recorrenteAnual Boolean @default(false)
+
+
+
+  /// Meta de alcance, com a unidade em texto ("pessoas atendidas", "peças").
+  metaQuantidade Int?     @map("meta_quantidade")
+
+  metaUnidade    String?  @map("meta_unidade")
+
+  /// Quanto já foi alcançado — atualizado à mão por quem gere.
+  realizadoQuantidade Int @default(0) @map("realizado_quantidade")
+
+  /// Orçamento previsto; o realizado vem da soma dos lançamentos vinculados.
+  orcamentoPrevisto Decimal? @map("orcamento_previsto") @db.Decimal(12, 2)
+
+
+
+  /// Quem responde pelo projeto — accountability, nunca permissão.
+  responsavelId String? @map("responsavel_id")
+
+  responsavel   User?   @relation("ProjetoResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  criadoPorId   String  @map("criado_por_id")
+
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  atualizadoEm  DateTime @updatedAt @map("atualizado_em")
+
+
+
+  participantes ProjetoParticipante[]
+
+  lancamentos   FinanceiroLancamento[]
+
+  eventos       Evento[]
+
+
+
+  @@unique([departamentoId, slug])
+
+  @@index([tenantId, status, inicio])
+
+  @@index([tenantId, departamentoId])
+
+  @@index([areaId])
+
+  @@map("saas_projetos")
+
+}
+
+
+
+/// Voluntário/equipe de um projeto. Subconjunto de quem já está no
+/// departamento — validado na Server Action, como na área.
+model ProjetoParticipante {
+
+  id        String @id @default(cuid())
+
+  projetoId String @map("projeto_id")
+
+  userId    String @map("user_id")
+
+  projeto Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  @@unique([projetoId, userId])
+
+  @@index([userId])
+
+  @@map("saas_projeto_participantes")
+
+}
+
+
+
+enum TipoProjeto {
+
+  /// Arrecadação sazonal com meta (Agasalho, Natal, Páscoa).
+  CAMPANHA
+
+  /// Trabalho contínuo (Inclusão Digital, Escolinha da Bateria).
+  PROJETO
+
+  /// Ação pontual (Doação de Sangue, Dia da Saúde).
+  ACAO
+
+  /// Convênio com universidade/instituição.
+  PARCERIA
+
+}
+
+
+
+enum StatusProjeto {
+
+  PLANEJADO
+
+  ATIVO
+
+  CONCLUIDO
+
+  CANCELADO
 
 }
 
@@ -1929,6 +2211,10 @@ model Evento {
 
   valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
 
+  /// Porta do ônibus: se true e há valorVaga, check-in sem pagamento PAGO
+  /// é bloqueado (gestor pode override). Default false = avisa e permite.
+  checkInExigePagamento Boolean @default(false) @map("check_in_exige_pagamento")
+
   /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
 
   capacidade Int?
@@ -1938,6 +2224,12 @@ model Evento {
   partidaId String? @map("partida_id")
 
   partida   Partida? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
+
+  /// Evento que faz parte de um projeto do departamento (ex.: a Festa das
+  /// Crianças de 2026 dentro do projeto homônimo). Opcional e sem cascata.
+  projetoId String?  @map("projeto_id")
+
+  projeto   Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
 
 
 
@@ -1970,6 +2262,8 @@ model Evento {
   @@index([tenantId, data])
 
   @@index([tenantId, tipo, data])
+
+  @@index([projetoId])
 
   @@map("saas_eventos")
 
@@ -3729,6 +4023,8 @@ model Conversa {
 
   departamentoCanal Departamento? @relation("DepartamentoCanal")
 
+  departamentoAreaCanal DepartamentoArea? @relation("DepartamentoAreaCanal")
+
   sedeCanal Sede? @relation("SedeCanal")
 
 
@@ -4483,6 +4779,20 @@ model FinanceiroLancamento {
 
 
 
+  /// Rateio por área: opcional e sem migração de dado legado. Responde
+  /// "quanto o Social gastou" sem depender de `categoria`.
+  departamentoId String?       @map("departamento_id")
+
+  departamento   Departamento? @relation("FinanceiroLancamentoDepartamento", fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  /// Custo/receita de um projeto (ex.: Festa das Crianças). Alimenta o
+  /// realizado × orçamento previsto do projeto.
+  projetoId      String?       @map("projeto_id")
+
+  projeto        Projeto?      @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+
+
+
   criadoPorId String   @map("criado_por_id")
 
   criadoPor   User     @relation("FinanceiroLancamentoCriadoPor", fields: [criadoPorId], references: [id])
@@ -4498,6 +4808,10 @@ model FinanceiroLancamento {
   @@index([tenantId, tipo, data])
 
   @@index([tenantId, categoria])
+
+  @@index([tenantId, departamentoId, data])
+
+  @@index([projetoId])
 
   @@map("saas_financeiro_lancamentos")
 

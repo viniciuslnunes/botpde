@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation'
-import { formatDataCompetenciaInput, PERMISSIONS } from '@torcida/types'
+import { db } from '@torcida/db'
+import {
+  formatDataCompetenciaInput,
+  isDepartamentoLegado,
+  PERMISSIONS,
+  STATUS_PROJETO_ABERTOS,
+} from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
 import { AdminCreateDisclosure } from '@/components/admin/ui'
@@ -7,7 +13,10 @@ import {
   parseFiltroFinanceiro,
   type FinanceiroSearchParams,
 } from '@/lib/financeiro-filtros'
-import { FinanceiroLancamentoForm } from '@/components/financeiro/financeiro-lancamento-form'
+import {
+  FinanceiroLancamentoForm,
+  type RateioOpcoes,
+} from '@/components/financeiro/financeiro-lancamento-form'
 import {
   FinanceiroLancamentosLista,
   type LancamentoRow,
@@ -47,6 +56,34 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
     listarLancamentosFinanceiro(tenant.id, { filtro }),
   ])
 
+  // Opções de rateio: só quando o operador pode gerir — leitura não precisa.
+  // Projetos abertos bastam; concluído/cancelado não recebe lançamento novo.
+  let rateio: RateioOpcoes | undefined
+  if (podeGerir) {
+    const [departamentos, projetos]: [
+      Array<{ id: string; nome: string; slug: string }>,
+      Array<{ id: string; titulo: string; departamentoId: string }>,
+    ] = await Promise.all([
+      db.departamento.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+        select: { id: true, nome: true, slug: true },
+      }),
+      db.projeto.findMany({
+        where: { tenantId: tenant.id, status: { in: [...STATUS_PROJETO_ABERTOS] } },
+        orderBy: { titulo: 'asc' },
+        take: 200,
+        select: { id: true, titulo: true, departamentoId: true },
+      }),
+    ])
+    rateio = {
+      departamentos: departamentos
+        .filter((d) => !isDepartamentoLegado(d))
+        .map((d) => ({ id: d.id, nome: d.nome })),
+      projetos,
+    }
+  }
+
   const itens: LancamentoRow[] = lista.itens.map((l) => ({
     id: l.id,
     tipo: l.tipo,
@@ -80,7 +117,7 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
       <FinanceiroFiltros basePath="/admin/financeiro" values={values} />
       {podeGerir ? (
         <AdminCreateDisclosure label="Novo lançamento">
-          <FinanceiroLancamentoForm />
+          <FinanceiroLancamentoForm rateio={rateio} />
         </AdminCreateDisclosure>
       ) : null}
       <FinanceiroLancamentosLista

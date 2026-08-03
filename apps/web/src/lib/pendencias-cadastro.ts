@@ -73,6 +73,22 @@ const LABELS: Record<CompletudeItemId, string> = {
 
 export const CAMPO_PENDENCIA_LABEL = LABELS
 
+/**
+ * Serviço ativo neste canal?
+ * - Sede: só o flag local.
+ * - Unidade: flag local, ou o da Sede se `sedePropagar`.
+ */
+export function resolverServicoPendenciasCanal(input: {
+  solicitarLocal: boolean
+  isRaiz: boolean
+  sedeSolicitar: boolean
+  sedePropagar: boolean
+}): boolean {
+  if (input.isRaiz) return input.solicitarLocal
+  if (input.sedePropagar) return input.sedeSolicitar
+  return input.solicitarLocal
+}
+
 /** Sócio aprovado — torcedores nunca entram, mesmo com cargo de liderança. */
 export function elegivelPendenciaCadastro(m: {
   tipo: string

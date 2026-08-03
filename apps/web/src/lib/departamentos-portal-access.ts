@@ -59,6 +59,62 @@ export function resolverDepartamentosHub(input: {
   })
 }
 
+export type AreaBase = {
+  id: string
+  nome: string
+  slug: string
+  descricao: string | null
+  icone: string | null
+  ordem: number
+  ativa: boolean
+  sazonal: boolean
+  /** Checklist leve (`meta.checklist`) — serializável JSON. */
+  meta?: unknown
+  /** Canal da frente (opcional). */
+  canalConversaId?: string | null
+  canalNome?: string | null
+}
+
+export type AreaAcesso = AreaBase & {
+  isMembro: boolean
+  isResponsavel: boolean
+  /** Gestão da área = gestão do departamento (ou SA) — NUNCA deriva de isResponsavel. */
+  podeGerir: boolean
+}
+
+/**
+ * Resolve as áreas de um departamento sob o ponto de vista de quem está
+ * olhando: minhas áreas primeiro, depois ativas, depois `ordem`/nome.
+ * `RESPONSAVEL` de área é rótulo de accountability — não concede gestão.
+ */
+export function resolverAreasDepartamento(input: {
+  areas: AreaBase[]
+  membroAreaIds: Set<string> | string[]
+  responsavelAreaIds: Set<string> | string[]
+  isGestorDepartamento: boolean
+  isSuperAdmin?: boolean
+}): AreaAcesso[] {
+  const membroAreaIds = asSet(input.membroAreaIds)
+  const responsavelAreaIds = asSet(input.responsavelAreaIds)
+  const podeGerir = Boolean(input.isGestorDepartamento || input.isSuperAdmin)
+
+  const resolved = input.areas.map((area) => ({
+    ...area,
+    isMembro: membroAreaIds.has(area.id),
+    isResponsavel: responsavelAreaIds.has(area.id),
+    podeGerir,
+  }))
+
+  resolved.sort((a, b) => {
+    if (a.isMembro !== b.isMembro) return a.isMembro ? -1 : 1
+    if (a.ativa !== b.ativa) return a.ativa ? -1 : 1
+    if (a.ordem !== b.ordem) return a.ordem - b.ordem
+    return a.nome.localeCompare(b.nome)
+  })
+
+  return resolved
+}
+
 /** Pode abrir `/portal/departamentos/[slug]`? Atuação, Diretoria ou SA. */
 export function podeAbrirDepartamentoPortal(input: {
   departamentoId: string

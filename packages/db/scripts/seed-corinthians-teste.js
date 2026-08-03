@@ -23,10 +23,17 @@
  * unidade e no da SEDE (`db:repair-aprovado-canal-membro`). Sem isso o
  * volume de teste mentiria sobre a regra de negócio.
  *
+ * Fase 2c (sócios / carteirinha / pendências): emite `SaasSocio` e completa
+ * ficha LGE em cenários ponderados — adimplente vigente, vencendo, vencido,
+ * pendente de atualização (modal), inadimplente por dispensa, aguardando
+ * emissão. Idempotente (pula quem já tem carteirinha). Rode isolado com
+ * `--so-socios` no lote já existente.
+ *
  * Uso:
  *   pnpm --filter @torcida/db seed:corinthians-teste
  *   pnpm --filter @torcida/db seed:corinthians-teste -- --so-canais
  *   pnpm --filter @torcida/db seed:corinthians-teste -- --so-historico
+ *   pnpm --filter @torcida/db seed:corinthians-teste -- --so-socios
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
@@ -105,6 +112,161 @@ function gerarCpf(n) {
 function gerarRg(n) {
   const base = String(800000000 + n).padStart(9, '0')
   return `${base.slice(0, 2)}.${base.slice(2, 5)}.${base.slice(5, 8)}-${base.slice(8, 9)}`
+}
+
+function addDays(base, days) {
+  const d = new Date(base)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d
+}
+
+function hashMod(str, mod) {
+  let h = 0
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0
+  return h % mod
+}
+
+/**
+ * Cenário determinístico por membro (reexecuções estáveis).
+ * Espelha as abas de `/admin/socios` + modal de pendências do portal.
+ *
+ *   adimplente_ativo      ~40% — ficha ok + validade longe + adimplente
+ *   vencendo              ~10% — ficha ok + validade ≤30d
+ *   vencido               ~15% — ficha ok + validade passada (inadimplente operacional)
+ *   pendente_cadastro     ~15% — ficha incompleta (modal); ~½ com carteirinha
+ *   inadimplente_dispensa ~12% — ficha incompleta + «não mostrar de novo» → adimplente=false
+ *   aguardando            ~8%  — aprovado sem SaasSocio (Quero me associar)
+ */
+function cenarioSocioAprovado(membroId) {
+  const r = hashMod(membroId, 100)
+  if (r < 40) return 'adimplente_ativo'
+  if (r < 50) return 'vencendo'
+  if (r < 65) return 'vencido'
+  if (r < 80) return 'pendente_cadastro'
+  if (r < 92) return 'inadimplente_dispensa'
+  return 'aguardando'
+}
+
+const PROVA_TESTE = 'https://placehold.co/640x400/png?text=prova-vinculo-teste'
+const DOC_TESTE = 'https://placehold.co/640x400/png?text=documento-teste'
+const RESIDENCIA_TESTE = 'https://placehold.co/640x400/png?text=residencia-teste'
+const UFS = ['SP', 'RJ', 'MG', 'PR', 'SC', 'RS', 'BA', 'PE']
+const LOGRADOUROS = [
+  'Rua da Independência',
+  'Av. Corinthians',
+  'Rua do Sol',
+  'Travessa da Fiel',
+  'Rua São Jorge',
+]
+
+function fichaSocioCompleta(n, solicitadoEm) {
+  const nasc = addDays(solicitadoEm, -(18 + (n % 40)) * 365)
+  return {
+    idade: 18 + (n % 40),
+    dataNascimento: nasc,
+    logradouro: pick(LOGRADOUROS),
+    bairro: pick(['Centro', 'Vila Prudente', 'Tatuapé', 'Itaquera', 'Mooca']),
+    cep: `${String(10000000 + (n % 89999999)).padStart(8, '0').slice(0, 8)}`.replace(
+      /(\d{5})(\d{3})/,
+      '$1-$2',
+    ),
+    uf: pick(UFS),
+    numero: String(10 + (n % 900)),
+    termoResponsabilidadeAceitoEm: solicitadoEm,
+    imagemProva: PROVA_TESTE,
+    fotoDocumentoUrl: DOC_TESTE,
+    comprovanteResidenciaUrl: RESIDENCIA_TESTE,
+    dataExpedicaoCarteirinha: addDays(solicitadoEm, -90 - (n % 200)),
+    periodicidadePretendida: pickPonderado([
+      ['ANUAL', 50],
+      ['QUADRIMENSAL', 25],
+      ['SEMESTRAL', 15],
+      ['MENSAL', 10],
+    ]),
+    adimplente: true,
+    pendenciasCadastroDispensadas: [],
+  }
+}
+
+/** Ficha de propósito incompleta — dispara `SOCIO_FICHA_INCOMPLETA` no portal. */
+function fichaSocioIncompleta(n) {
+  return {
+    idade: 20 + (n % 30),
+    dataNascimento: null,
+    logradouro: null,
+    bairro: null,
+    cep: null,
+    uf: null,
+    termoResponsabilidadeAceitoEm: null,
+    imagemProva: null,
+    fotoDocumentoUrl: null,
+    comprovanteResidenciaUrl: null,
+    dataExpedicaoCarteirinha: null,
+    periodicidadePretendida: null,
+  }
+}
+
+function validadeDoCenario(cenario, n, now = new Date()) {
+  switch (cenario) {
+    case 'adimplente_ativo':
+      return addDays(now, 60 + (n % 300))
+    case 'vencendo':
+      return addDays(now, 5 + (n % 20))
+    case 'vencido':
+      return addDays(now, -(10 + (n % 170)))
+    case 'pendente_cadastro':
+    case 'inadimplente_dispensa':
+      return addDays(now, 90 + (n % 120))
+    default:
+      return null
+  }
+}
+
+function camposMembroDoCenario(cenario, { n, solicitadoEm, numeroAssociado }) {
+  if (cenario === 'aguardando') {
+    // «Quero me associar»: aprovado sem nº → fica em Aguardando emissão.
+    return {
+      ...fichaSocioIncompleta(n),
+      numeroAssociado: null,
+      anosSocio: null,
+      adimplente: true,
+      pendenciasCadastroDispensadas: [],
+    }
+  }
+
+  if (cenario === 'pendente_cadastro') {
+    const comCard = hashMod(String(n), 2) === 0
+    return {
+      ...fichaSocioIncompleta(n),
+      // Nº preenchido (já sou / emissão) mas ficha LGE furada → modal.
+      numeroAssociado: String(numeroAssociado),
+      anosSocio: 1 + (n % 12),
+      adimplente: true,
+      pendenciasCadastroDispensadas: [],
+      // Metade recebe carteirinha na fase 2c; a outra fica em aguardando.
+      _emitirCarteirinha: comCard,
+    }
+  }
+
+  if (cenario === 'inadimplente_dispensa') {
+    return {
+      ...fichaSocioIncompleta(n),
+      numeroAssociado: String(numeroAssociado),
+      anosSocio: 1 + (n % 8),
+      adimplente: false,
+      pendenciasCadastroDispensadas: ['SOCIO_FICHA_INCOMPLETA'],
+      _emitirCarteirinha: true,
+    }
+  }
+
+  // adimplente_ativo | vencendo | vencido
+  return {
+    ...fichaSocioCompleta(n, solicitadoEm),
+    numeroAssociado: String(numeroAssociado),
+    anosSocio: 1 + (n % 20),
+    adimplente: cenario !== 'vencido',
+    _emitirCarteirinha: true,
+  }
 }
 
 /**
@@ -463,6 +625,20 @@ async function seedPessoas(contexto, resumo) {
           criadoEm: solicitadoEm,
         })
 
+        // Sócio aprovado: ficha/carteirinha por cenário (Fase 2c emite SaasSocio).
+        // Demais (torcedor / pendente / reprovado): só CPF/RG básicos.
+        const cenario =
+          tipo === 'SOCIO' && status === 'APROVADO' ? cenarioSocioAprovado(membroId) : null
+        const camposCenario = cenario
+          ? camposMembroDoCenario(cenario, {
+              n,
+              solicitadoEm,
+              numeroAssociado: n,
+            })
+          : null
+        const { _emitirCarteirinha: _ignorarFlag, ...camposMembro } = camposCenario ?? {}
+        void _ignorarFlag
+
         membrosRows.push({
           id: membroId,
           tenantId: tenant.id,
@@ -479,6 +655,7 @@ async function seedPessoas(contexto, resumo) {
           aprovadoPorId: analisado ? tenant.ownerUserId : null,
           aprovadoPorNome: analisado ? tenant.ownerUserNome : null,
           aprovadoEm: analisado ? decididoEm : null,
+          ...(camposMembro ?? {}),
           ...(laudo
             ? {
                 reprovadoEm: decididoEm,
@@ -643,6 +820,187 @@ async function backfillHistoricoMembrosTeste(contexto, resumo) {
   await createManyBatched('auditLog', auditRows, 'AuditLog (backfill de histórico)')
   resumo.totais.auditLog += auditRows.length
   if (laudosGravados === 0 && auditRows.length === 0) console.log('  ↔  Nada a completar — laudos e histórico já presentes')
+}
+
+/**
+ * Fase 2c — carteirinhas + cenários de adimplência / pendência de cadastro.
+ *
+ * O lote antigo criava SOCIO APROVADO sem `SaasSocio`, então quase todos
+ * caíam em «Aguardando emissão» mesmo depois da regra de vigência por
+ * `validade`. Esta fase:
+ *   1. Atualiza a ficha LGE conforme o cenário determinístico do membro.
+ *   2. Emite `SaasSocio` (com validade ativa / vencendo / vencida).
+ *   3. Deixa uma fatia proposital em aguardando + pendente de atualização.
+ *
+ * Idempotente: sócio de teste que já tem carteirinha no tenant é pulado.
+ */
+async function seedSociosAssociacao(contexto, resumo) {
+  resumo.totais.saasSocio ??= 0
+  const contagem = {
+    adimplente_ativo: 0,
+    vencendo: 0,
+    vencido: 0,
+    pendente_cadastro: 0,
+    inadimplente_dispensa: 0,
+    aguardando: 0,
+    emitidas: 0,
+    atualizados: 0,
+    pulados: 0,
+  }
+  const now = new Date()
+
+  for (const tenant of contexto) {
+    const membros = await db.saasMembro.findMany({
+      where: {
+        tenantId: tenant.id,
+        tipo: 'SOCIO',
+        status: 'APROVADO',
+        desligadoEm: null,
+        user: { email: { endsWith: `@${DOMINIO_TESTE}` } },
+      },
+      select: {
+        id: true,
+        userId: true,
+        nome: true,
+        criadoEm: true,
+        numeroAssociado: true,
+      },
+      orderBy: { criadoEm: 'asc' },
+    })
+    if (membros.length === 0) {
+      console.log(`  ↔  ${tenant.slug}: sem sócios de teste aprovados — pulando`)
+      continue
+    }
+
+    const existentes = await db.saasSocio.findMany({
+      where: { tenantId: tenant.id, userId: { in: membros.map((m) => m.userId) } },
+      select: { userId: true, numeroSocio: true },
+    })
+    const comCarteirinha = new Set(existentes.map((s) => s.userId))
+
+    const maxTenant = await db.saasSocio.aggregate({
+      where: { tenantId: tenant.id },
+      _max: { numeroSocio: true },
+    })
+    const maxExistente = maxTenant._max.numeroSocio ?? 0
+    const maxNoMembro = membros.reduce((m, s) => {
+      const n = parseInt(String(s.numeroAssociado ?? '').replace(/\D/g, ''), 10)
+      return Number.isFinite(n) ? Math.max(m, n) : m
+    }, 0)
+    let nextNumero = Math.max(maxExistente, maxNoMembro) + 1
+
+    // Números já ocupados no tenant (reais + teste) — evita P2002.
+    const ocupados = await db.saasSocio.findMany({
+      where: { tenantId: tenant.id },
+      select: { numeroSocio: true },
+    })
+    const vistos = new Set(ocupados.map((s) => s.numeroSocio))
+
+    const sociosRows = []
+    const auditRows = []
+
+    for (const membro of membros) {
+      if (comCarteirinha.has(membro.userId)) {
+        contagem.pulados += 1
+        continue
+      }
+
+      const cenario = cenarioSocioAprovado(membro.id)
+      contagem[cenario] += 1
+
+      const nSeed = hashMod(membro.id, 900000) + 1
+      const numeroAssociado =
+        /^\d+$/.test(String(membro.numeroAssociado ?? '').trim())
+          ? parseInt(String(membro.numeroAssociado).trim(), 10)
+          : nextNumero++
+
+      const campos = camposMembroDoCenario(cenario, {
+        n: nSeed,
+        solicitadoEm: membro.criadoEm ?? now,
+        numeroAssociado,
+      })
+      const emitir =
+        cenario === 'pendente_cadastro'
+          ? Boolean(campos._emitirCarteirinha)
+          : cenario !== 'aguardando'
+
+      const { _emitirCarteirinha, ...dataMembro } = campos
+      void _emitirCarteirinha
+
+      await db.saasMembro.update({
+        where: { id: membro.id },
+        data: dataMembro,
+      })
+      contagem.atualizados += 1
+
+      if (!emitir) continue
+
+      const validade = validadeDoCenario(cenario, nSeed, now)
+      if (!validade) continue
+
+      const expedidoEm =
+        dataMembro.dataExpedicaoCarteirinha ??
+        addDays(validade, cenario === 'vencido' ? -365 : -120)
+      const socioId = crypto.randomUUID()
+      const qrToken = crypto.randomBytes(24).toString('base64url')
+
+      sociosRows.push({
+        id: socioId,
+        tenantId: tenant.id,
+        userId: membro.userId,
+        numeroSocio: numeroAssociado,
+        nome: membro.nome,
+        validade,
+        expedidoEm,
+        qrToken,
+        qrEmitidoEm: now,
+        criadoEm: now,
+      })
+
+      auditRows.push({
+        id: crypto.randomUUID(),
+        tenantId: tenant.id,
+        atorId: tenant.ownerUserId,
+        acao: 'SOCIO_CARTEIRINHA_EMITIDA',
+        entidade: 'SaasSocio',
+        entidadeId: socioId,
+        criadoEm: now,
+        detalhes: {
+          nome: membro.nome,
+          numeroSocio: numeroAssociado,
+          seed: true,
+          cenario,
+          validade: validade.toISOString().slice(0, 10),
+        },
+      })
+    }
+
+    // Evita P2002 se o nº pretendido já existir (sócio real ou lote anterior).
+    for (const row of sociosRows) {
+      while (vistos.has(row.numeroSocio)) {
+        row.numeroSocio = nextNumero++
+      }
+      vistos.add(row.numeroSocio)
+      await db.saasMembro.updateMany({
+        where: { tenantId: tenant.id, userId: row.userId },
+        data: { numeroAssociado: String(row.numeroSocio) },
+      })
+    }
+
+    await createManyBatched('saasSocio', sociosRows, `SaasSocio (${tenant.slug})`)
+    await createManyBatched('auditLog', auditRows, `AuditLog carteirinha (${tenant.slug})`)
+    contagem.emitidas += sociosRows.length
+    resumo.totais.saasSocio += sociosRows.length
+    resumo.totais.auditLog += auditRows.length
+    console.log(
+      `  ✅ ${tenant.slug}: ${sociosRows.length} carteirinhas · ${membros.length - comCarteirinha.size} sócios processados · ${comCarteirinha.size} já tinham`,
+    )
+  }
+
+  console.log('\n  📊 Cenários (sócios processados nesta rodada):')
+  for (const [k, v] of Object.entries(contagem)) {
+    console.log(`     ${k.padEnd(24)}: ${v}`)
+  }
 }
 
 // ── Fase 3: torcedores 100% globais (Comunidade Nacional) ────────────────
@@ -1016,7 +1374,7 @@ async function main() {
 
   const resumo = {
     totais: {
-      users: 0, saasMembro: 0, userRole: 0, auditLog: 0, perfilTorcedor: 0,
+      users: 0, saasMembro: 0, saasSocio: 0, userRole: 0, auditLog: 0, perfilTorcedor: 0,
       conversas: 0, membroConversa: 0, posts: 0, reacoes: 0, comentarios: 0,
       eventos: 0, eventoRsvp: 0, salas: 0, participantesReuniao: 0, pedidos: 0,
     },
@@ -1030,6 +1388,15 @@ async function main() {
     console.log('── Fase 2b (isolada): laudo de reprovação + histórico ──')
     await backfillHistoricoMembrosTeste(contexto, resumo)
     console.log(`\n🎉 Backfill concluído. AuditLog inseridos: ${resumo.totais.auditLog}\n`)
+    return
+  }
+
+  // `--so-socios`: carteirinhas + ficha LGE + cenários de pendência/adimplência
+  // no lote já existente (quem estava todo em «Aguardando emissão»).
+  if (process.argv.includes('--so-socios')) {
+    console.log('── Fase 2c (isolada): sócios / carteirinhas / pendências ──')
+    await seedSociosAssociacao(contexto, resumo)
+    console.log(`\n🎉 Sócios concluídos. Carteirinhas: ${resumo.totais.saasSocio}\n`)
     return
   }
 
@@ -1058,6 +1425,9 @@ async function main() {
 
   console.log('\n── Fase 2b: laudo de reprovação + histórico (lotes antigos) ──')
   await backfillHistoricoMembrosTeste(contexto, resumo)
+
+  console.log('\n── Fase 2c: sócios / carteirinhas / pendências de cadastro ──')
+  await seedSociosAssociacao(contexto, resumo)
 
   console.log('\n── Fase 3: torcedores globais (Comunidade Nacional) ──')
   await seedTorcedoresGlobais(afiliacao, resumo)

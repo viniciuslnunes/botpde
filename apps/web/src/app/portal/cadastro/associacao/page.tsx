@@ -6,7 +6,10 @@ import { db } from '@torcida/db'
 import { formatNomeTorcida, resolverPeriodicidadesOnboarding } from '@torcida/types'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
-import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
+import {
+  carregarPendenciasCadastro,
+  servicoPendenciasCadastroAtivo,
+} from '@/lib/pendencias-cadastro-server'
 import { elegivelPendenciaCadastro } from '@/lib/pendencias-cadastro'
 import { preenchidoCompletude } from '@/lib/completude-cadastro-socio'
 import {
@@ -169,7 +172,7 @@ export default async function CadastroAssociacaoPage() {
   if (!membro || !elegivelPendenciaCadastro(membro)) {
     redirect('/portal/comunidade')
   }
-  if (tenant.solicitarPendenciasCadastro === false) {
+  if (!(await servicoPendenciasCadastroAtivo(tenant.id))) {
     redirect('/portal/comunidade')
   }
 

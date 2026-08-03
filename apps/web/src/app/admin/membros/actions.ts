@@ -284,7 +284,12 @@ async function limparMembershipDepartamentos(
   tenantId: string,
   userId: string,
   client: Prisma.TransactionClient | typeof db = db,
-): Promise<{ perfisAreaRemovidos: number; membrosRemovidos: number; gestoresRemovidos: number }> {
+): Promise<{
+  perfisAreaRemovidos: number
+  membrosRemovidos: number
+  gestoresRemovidos: number
+  areasRemovidas: number
+}> {
   const rolesDeArea: { id: string }[] = await client.role.findMany({
     where: { tenantId, departamentoId: { not: null } },
     select: { id: true },
@@ -308,10 +313,16 @@ async function limparMembershipDepartamentos(
   const gestoresRemovidos = await client.departamentoGestor.deleteMany({
     where: { userId, departamento: { tenantId } },
   })
+  // Quem sai do departamento perde as áreas dele — área não é RBAC, mas
+  // organiza gente do departamento; sem membership, não há o que organizar.
+  const areasRemovidas = await client.departamentoAreaMembro.deleteMany({
+    where: { userId, area: { tenantId } },
+  })
   return {
     perfisAreaRemovidos,
     membrosRemovidos: membrosRemovidos.count,
     gestoresRemovidos: gestoresRemovidos.count,
+    areasRemovidas: areasRemovidas.count,
   }
 }
 

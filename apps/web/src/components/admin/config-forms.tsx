@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition, useId } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
@@ -28,6 +29,7 @@ import {
   salvarAgendaVisivelNasUnidades,
   salvarExigirDocumentosCadastro,
   salvarSolicitarPendenciasCadastro,
+  salvarPropagarPendenciasCadastroUnidades,
   salvarPeriodicidadesOnboarding,
   salvarCanalOficial,
   criarRole,
@@ -429,15 +431,22 @@ export function DocumentosCadastroForm({ exigir }: DocumentosCadastroFormProps) 
 
 interface SolicitarPendenciasCadastroFormProps {
   ativo: boolean
-  /** Nome da unidade atual — reforça que o toggle é só deste tenant. */
+  /** Nome da unidade/canal atual. */
   unidadeNome: string
+  /**
+   * Unidade (não-Sede) sob propagação da Sede: o flag local fica sem efeito no
+   * modal até a Sede desligar a propagação.
+   */
+  sobPropagacaoSede?: boolean
 }
 
-/** Liga/desliga o modal/fluxo de dados pendentes para sócios desta unidade. */
+/** Liga/desliga o modal neste canal (tenant). Não altera Sede nem irmãs. */
 export function SolicitarPendenciasCadastroForm({
   ativo: inicial,
   unidadeNome,
+  sobPropagacaoSede = false,
 }: SolicitarPendenciasCadastroFormProps) {
+  const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [ativo, setAtivo] = useState(inicial)
 
@@ -451,18 +460,30 @@ export function SolicitarPendenciasCadastroForm({
           ? `Solicitação de dados pendentes ligada em ${unidadeNome}.`
           : `Solicitação de dados pendentes desligada em ${unidadeNome}.`,
       })
-      if (!ok) setAtivo(!next)
+      if (!ok) {
+        setAtivo(!next)
+        return
+      }
+      router.refresh()
     })
   }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Quando ligado, sócios aprovados desta unidade com ficha incompleta veem o
-        aviso no portal e podem completar o cadastro. Vale só para{' '}
+        Quando ligado, sócios aprovados deste canal com ficha incompleta veem o
+        aviso ao navegar em{' '}
         <strong className="font-semibold text-[rgb(var(--foreground))]">{unidadeNome}</strong>
-        — Sede e afiliadas têm o próprio controle. Torcedores não entram neste fluxo.
+        . Vale só para este canal — Sede e afiliadas têm controle próprio.
+        Torcedores não entram neste fluxo.
       </p>
+      {sobPropagacaoSede ? (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:text-amber-100">
+          A Sede está aplicando a solicitação a todas as unidades. O valor abaixo
+          fica guardado, mas o modal no portal segue o que a Sede definir até a
+          propagação ser desligada.
+        </p>
+      ) : null}
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
         <input
           type="checkbox"
@@ -479,8 +500,74 @@ export function SolicitarPendenciasCadastroForm({
             {pending
               ? 'Salvando…'
               : ativo
-                ? 'Serviço ativo nesta unidade — modal e página de completar cadastro'
-                : 'Serviço desligado nesta unidade — sócios não são cobrados por ficha incompleta'}
+                ? 'Serviço ativo neste canal — modal ao acessar esta unidade'
+                : 'Serviço desligado neste canal — navegação sem cobrança de ficha'}
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
+interface PropagarPendenciasCadastroFormProps {
+  ativo: boolean
+  unidadeNome: string
+}
+
+/** Só na Sede: faz o flag da Sede valer para toda a worktree. */
+export function PropagarPendenciasCadastroForm({
+  ativo: inicial,
+  unidadeNome,
+}: PropagarPendenciasCadastroFormProps) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(inicial)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('propagarPendenciasCadastroUnidades', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarPropagarPendenciasCadastroUnidades(fd), {
+        success: next
+          ? `Propagação ligada: solicitação da Sede vale em todas as unidades.`
+          : `Propagação desligada: cada unidade volta a controlar o próprio canal.`,
+      })
+      if (!ok) {
+        setAtivo(!next)
+        return
+      }
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="space-y-4 border-t border-[rgb(var(--border))] pt-6">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Opcional e só na Sede (
+        <strong className="font-semibold text-[rgb(var(--foreground))]">{unidadeNome}</strong>
+        ). Quando ligado, o valor de “Solicitar dados pendentes” da Sede passa a
+        valer em subsedes e PDEs — a Sede dita o ritmo. Sem isto, cada canal
+        decide sozinho.
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ativo}
+          disabled={pending}
+          onChange={(e) => salvar(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Aplicar solicitação a todas as unidades
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : ativo
+                ? 'Propagação ativa — modal nas unidades segue o flag da Sede'
+                : 'Propagação desligada — cada unidade usa o próprio controle'}
           </span>
         </span>
       </label>

@@ -86,6 +86,21 @@ const lancamentoCampos = {
     .max(500)
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  /**
+   * Rateio por área e por projeto. Opcionais: lançamento sem departamento
+   * segue válido (todo o histórico é assim) — a Server Action valida que os
+   * ids pertencem ao tenant e que o projeto é do departamento informado.
+   */
+  departamentoId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  projetoId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
 }
 
 export const CriarLancamentoSchema = z.object(lancamentoCampos)

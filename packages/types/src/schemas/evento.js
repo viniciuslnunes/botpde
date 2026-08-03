@@ -20,6 +20,16 @@ export const CriarEventoSchema = z.object({
   lng: z.preprocess((v) => (v === '' || v == null ? undefined : v), z.coerce.number().min(-180).max(180).optional()),
   capacidade: z.preprocess((v) => (v === '' || v == null ? undefined : v), z.coerce.number().int().positive().max(100_000).optional()),
   valorVaga: z.preprocess((v) => (v === '' || v == null ? undefined : v), z.coerce.number().positive().max(99_999.99).optional()),
+  /**
+   * Projeto do departamento ao qual o evento pertence (Festa das Crianças →
+   * projeto homônimo). Opcional; a Server Action valida tenant.
+   */
+  projetoId: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  /** Caravana paga: bloqueia check-in sem PAGO (override do gestor na porta). */
+  checkInExigePagamento: z.preprocess((v) => v === 'on' || v === true || v === 'true', z.boolean()).optional(),
   recorrenciasSemanas: z.preprocess((v) => (v === '' || v == null ? 0 : v), z.coerce.number().int().min(0).max(12).default(0)),
   partidaId: z.preprocess((v) => (v === '' || v == null || v === '__nova__' ? null : v), z.string().uuid().nullable().optional()),
 })

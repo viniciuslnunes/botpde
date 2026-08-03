@@ -9,6 +9,7 @@ import {
   hrefHomeDepartamento,
   hrefModuloPortal,
   isDepartamentoLegado,
+  missionDepartamento,
   PERMISSIONS,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
@@ -22,7 +23,7 @@ import {
 } from '@/lib/departamentos-portal-access'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { ArrowRight, Briefcase, Eye, LayoutGrid, Settings2 } from 'lucide-react'
+import { ArrowRight, Briefcase, Eye, Layers, LayoutGrid, Settings2 } from 'lucide-react'
 import { iconeDepartamento } from './departamento-icone'
 import { DepartamentoCorPicker } from './departamento-cor-picker'
 
@@ -34,7 +35,26 @@ interface GestorLite {
   departamentoId: string
 }
 
-type DeptoHubCardItem = DeptoHubItem & { podeEditarCor: boolean }
+/** KPI curto do card — só aparece quando a permissão do usuário cobre o dado. */
+export type DeptoKpi = { rotulo: string; valor: string; alerta: boolean }
+
+type DeptoHubCardItem = DeptoHubItem & {
+  podeEditarCor: boolean
+  /** Áreas do departamento em que ESTA pessoa atua (vazio para visão Diretoria). */
+  minhasAreas: string[]
+  kpi: DeptoKpi | null
+}
+
+/** O que cada papel pode fazer — o vocabulário do hub era implícito até aqui. */
+function explicacaoPapel(depto: DeptoHubItem): string {
+  if (depto.visaoDiretoria) {
+    return 'Você enxerga este departamento como Diretoria: leitura da home, sem gestão. Quem gere é o gestor da área.'
+  }
+  if (depto.isGestor) {
+    return 'Você gere este departamento: pode organizar áreas, incluir e remover pessoas da equipe e definir responsáveis.'
+  }
+  return 'Você atua neste departamento: vê a equipe, as áreas e o painel do domínio. A gestão é do gestor da área.'
+}
 
 /** Rótulo curto do atalho para o módulo portal (não a home do departamento). */
 function rotuloAtalhoModulo(slug: string): string {
@@ -70,6 +90,9 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
   // Demais departamentos (visão Diretoria): só leitura — não herdar Gestor/Gestão via SA.
   const mostraModulo = Boolean(moduloHref) && depto.isAtuacao
   const mostraGestao = depto.isGestor && !depto.visaoDiretoria
+  const mission = missionDepartamento(depto.slug)
+  const areasVisiveis = depto.minhasAreas.slice(0, 3)
+  const areasRestantes = depto.minhasAreas.length - areasVisiveis.length
   const papelBadge = depto.visaoDiretoria ? (
     <Badge variant="neutral" icon={<Eye className="h-3 w-3" aria-hidden />}>
       Só leitura
@@ -104,11 +127,57 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
               <h2 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
                 {depto.nome}
               </h2>
-              <div className="shrink-0">{papelBadge}</div>
+              <span className="shrink-0" title={explicacaoPapel(depto)}>
+                {papelBadge}
+              </span>
             </div>
             <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{areaLabel}</p>
           </div>
         </div>
+
+        <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+          {mission}
+        </p>
+
+        {areasVisiveis.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <Layers
+              className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+              aria-hidden
+            />
+            {areasVisiveis.map((nome) => (
+              <span
+                key={nome}
+                className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]"
+              >
+                {nome}
+              </span>
+            ))}
+            {areasRestantes > 0 && (
+              <span
+                className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]"
+                title={depto.minhasAreas.join(' · ')}
+              >
+                +{areasRestantes}
+              </span>
+            )}
+          </div>
+        )}
+
+        {depto.kpi && (
+          <div className="mt-3 flex items-baseline gap-1.5">
+            <span
+              className={
+                depto.kpi.alerta
+                  ? 'text-lg font-bold leading-none text-[rgb(var(--color-danger-fg))]'
+                  : 'text-lg font-bold leading-none text-[rgb(var(--foreground))]'
+              }
+            >
+              {depto.kpi.valor}
+            </span>
+            <span className="text-xs text-[rgb(var(--foreground-muted))]">{depto.kpi.rotulo}</span>
+          </div>
+        )}
 
         <div className="mt-auto flex flex-col gap-2 pt-4">
           <Link
@@ -158,6 +227,140 @@ function DeptoHubGrid({
       ))}
     </div>
   )
+}
+
+/**
+ * KPI contextual de cada card. Um único round-trip: cada consulta só sai se o
+ * departamento estiver visível E a permissão do usuário cobrir aquele dado —
+ * nunca vaza número de módulo que a pessoa não pode ver.
+ */
+async function carregarKpisHub(input: {
+  tenantId: string
+  slugsVisiveis: Set<string>
+  permissoes: string[]
+  isSuperAdmin: boolean
+}): Promise<Map<string, DeptoKpi>> {
+  const { tenantId, slugsVisiveis, permissoes, isSuperAdmin } = input
+  const pode = (p: string): boolean => isSuperAdmin || hasPermission(permissoes, p)
+  const quando = <T,>(cond: boolean, q: () => Promise<T>, vazio: T): Promise<T> =>
+    cond ? q() : Promise.resolve(vazio)
+
+  const agora = new Date()
+  type EventoData = { data: Date } | null
+
+  const [
+    admissaoPendente,
+    cobrancasVencidas,
+    itensManutencao,
+    pedidosAbertos,
+    denunciasAbertas,
+    proximoEnsaio,
+    proximaCaravana,
+  ]: [number, number, number, number, number, EventoData, EventoData] = await Promise.all([
+    quando(
+      slugsVisiveis.has('diretoria') && pode(PERMISSIONS.MEMBERS_VIEW),
+      () => db.saasMembro.count({ where: { tenantId, status: 'PENDENTE' } }),
+      0,
+    ),
+    quando(
+      slugsVisiveis.has('financeiro') && pode(PERMISSIONS.FINANCE_VIEW),
+      () => db.cobrancaAssociacao.count({ where: { tenantId, status: 'VENCIDA' } }),
+      0,
+    ),
+    quando(
+      slugsVisiveis.has('patrimonio') && pode(PERMISSIONS.PATRIMONY_VIEW),
+      () => db.patrimonioItem.count({ where: { tenantId, status: 'MANUTENCAO' } }),
+      0,
+    ),
+    quando(
+      slugsVisiveis.has('materiais-loja') && pode(PERMISSIONS.STORE_VIEW_ORDERS),
+      () => db.saasPedido.count({ where: { tenantId, status: 'PENDENTE' } }),
+      0,
+    ),
+    quando(
+      slugsVisiveis.has('comunicacao') && pode(PERMISSIONS.COMMUNITY_MODERATE),
+      () => db.denuncia.count({ where: { tenantId, status: 'PENDENTE' } }),
+      0,
+    ),
+    quando<EventoData>(
+      slugsVisiveis.has('bateria') && pode(PERMISSIONS.EVENTS_VIEW),
+      () =>
+        db.evento.findFirst({
+          where: { tenantId, tipo: 'ENSAIO', data: { gte: agora } },
+          orderBy: { data: 'asc' },
+          select: { data: true },
+        }),
+      null,
+    ),
+    quando<EventoData>(
+      slugsVisiveis.has('caravanas') && pode(PERMISSIONS.EVENTS_VIEW),
+      () =>
+        db.evento.findFirst({
+          where: { tenantId, tipo: 'CARAVANA', data: { gte: agora } },
+          orderBy: { data: 'asc' },
+          select: { data: true },
+        }),
+      null,
+    ),
+  ])
+
+  const fmtData = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'America/Sao_Paulo',
+  })
+  const kpis = new Map<string, DeptoKpi>()
+  const set = (slug: string, kpi: DeptoKpi): void => {
+    kpis.set(slug, kpi)
+  }
+
+  if (admissaoPendente > 0) {
+    set('diretoria', {
+      valor: String(admissaoPendente),
+      rotulo: 'na fila de admissão',
+      alerta: true,
+    })
+  }
+  if (cobrancasVencidas > 0) {
+    set('financeiro', {
+      valor: String(cobrancasVencidas),
+      rotulo: cobrancasVencidas === 1 ? 'cobrança vencida' : 'cobranças vencidas',
+      alerta: true,
+    })
+  }
+  if (itensManutencao > 0) {
+    set('patrimonio', {
+      valor: String(itensManutencao),
+      rotulo: itensManutencao === 1 ? 'item em manutenção' : 'itens em manutenção',
+      alerta: false,
+    })
+  }
+  if (pedidosAbertos > 0) {
+    set('materiais-loja', {
+      valor: String(pedidosAbertos),
+      rotulo: pedidosAbertos === 1 ? 'pedido em aberto' : 'pedidos em aberto',
+      alerta: true,
+    })
+  }
+  if (denunciasAbertas > 0) {
+    set('comunicacao', {
+      valor: String(denunciasAbertas),
+      rotulo: denunciasAbertas === 1 ? 'denúncia pendente' : 'denúncias pendentes',
+      alerta: true,
+    })
+  }
+  if (proximoEnsaio) {
+    set('bateria', { valor: fmtData.format(proximoEnsaio.data), rotulo: 'próximo ensaio', alerta: false })
+  }
+  if (proximaCaravana) {
+    set('caravanas', {
+      valor: fmtData.format(proximaCaravana.data),
+      rotulo: 'próxima caravana',
+      alerta: false,
+    })
+  }
+
+  return kpis
 }
 
 export function DepartamentosFallback() {
@@ -241,13 +444,44 @@ export async function DepartamentosSection() {
     gestorIds: gestorDe.map((g) => g.departamentoId),
     diretoriaId,
     isSuperAdmin,
-  }).map((d) => ({
+  })
+
+  const kpiPorSlug = await carregarKpisHub({
+    tenantId: tenant.id,
+    slugsVisiveis: new Set(departamentos.map((d) => d.slug)),
+    permissoes: effective,
+    isSuperAdmin,
+  })
+
+  // Áreas em que ESTA pessoa atua, agrupadas por departamento. Uma query só —
+  // o card mostra até 3 chips e o resto vira "+N".
+  type AreaVinculoRow = {
+    area: { nome: string; departamentoId: string; ativa: boolean }
+  }
+  const vinculosArea: AreaVinculoRow[] = await db.departamentoAreaMembro.findMany({
+    where: { userId: session.user.id, area: { tenantId: tenant.id } },
+    select: { area: { select: { nome: true, departamentoId: true, ativa: true } } },
+  })
+  const areasPorDepto = new Map<string, string[]>()
+  for (const v of [...vinculosArea].sort((a, b) => {
+    if (a.area.ativa !== b.area.ativa) return a.area.ativa ? -1 : 1
+    return a.area.nome.localeCompare(b.area.nome, 'pt-BR')
+  })) {
+    const lista = areasPorDepto.get(v.area.departamentoId) ?? []
+    lista.push(v.area.nome)
+    areasPorDepto.set(v.area.departamentoId, lista)
+  }
+
+  const cards: DeptoHubCardItem[] = departamentos.map((d) => ({
     ...d,
     // Gestor da área ou quem tem roles:manage (Presidência / SA).
     podeEditarCor: podeGerirCoresGlobal || d.isGestor,
+    // Visão Diretoria é leitura: não anuncia atuação que a pessoa não tem.
+    minhasAreas: d.isAtuacao ? (areasPorDepto.get(d.id) ?? []) : [],
+    kpi: kpiPorSlug.get(d.slug) ?? null,
   }))
 
-  if (departamentos.length === 0) {
+  if (cards.length === 0) {
     return (
       <MotionEmptyState
         icon={<Briefcase className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
@@ -257,8 +491,8 @@ export async function DepartamentosSection() {
     )
   }
 
-  const meusDepartamentos = departamentos.filter((d) => d.isAtuacao)
-  const demaisDepartamentos = departamentos.filter((d) => d.visaoDiretoria)
+  const meusDepartamentos = cards.filter((d) => d.isAtuacao)
+  const demaisDepartamentos = cards.filter((d) => d.visaoDiretoria)
   const temSecoes = meusDepartamentos.length > 0 && demaisDepartamentos.length > 0
 
   return (
@@ -295,7 +529,7 @@ export async function DepartamentosSection() {
           </section>
         </>
       ) : (
-        <DeptoHubGrid items={departamentos} />
+        <DeptoHubGrid items={cards} />
       )}
     </div>
   )

@@ -21,8 +21,15 @@
 
 - `tenantId`, `tipo`, `categoria`, `valor` (sempre > 0), `descricao`, `data`
 - `observacao` opcional
+- `departamentoId?`, `projetoId?` — rateio opcional por área/projeto
+  (nullable; histórico legado fica sem vínculo). A Server Action valida que
+  o departamento é do tenant e que o projeto pertence a ele
+  (`resolverRateio` em `admin/financeiro/actions.ts`). Gasto realizado de
+  um `Projeto` = soma das `DESPESA` com esse `projetoId` — ver
+  `docs/data/modulo-departamentos.md` § projetos.
 - `criadoPorId`, `criadoEm`, `atualizadoEm`
-- Índices: `(tenantId, data)`, `(tenantId, tipo, data)`, `(tenantId, categoria)`
+- Índices: `(tenantId, data)`, `(tenantId, tipo, data)`, `(tenantId, categoria)`,
+  `(tenantId, departamentoId, data)`, `(projetoId)`
 
 Enums:
 

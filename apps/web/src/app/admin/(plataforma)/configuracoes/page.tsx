@@ -11,12 +11,14 @@ import {
   CanalRestritoForm,
   type SolicitacaoReativacaoView,
 } from './_components/canal-restrito-form'
-import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, PeriodicidadesOnboardingForm, CanalOficialForm, SolicitarPendenciasCadastroForm } from '@/components/admin/config-forms'
+import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, PeriodicidadesOnboardingForm, CanalOficialForm, SolicitarPendenciasCadastroForm, PropagarPendenciasCadastroForm } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ConfigSectionCard } from './_components/config-section-card'
 import { getConfigContexto } from './_lib/contexto'
+import { resolverTenantRaizId } from '@/lib/membros-sede'
+import { sedePropagaPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Configurações — Admin' }
@@ -89,6 +91,13 @@ export default async function ConfiguracoesGeralPage({
 
   const { userId, tenant, isOwner, canManageSettings, canManagePendenciasCadastro } =
     await getConfigContexto()
+
+  const raizId = await resolverTenantRaizId(tenant.id)
+  const isRaiz = raizId === tenant.id
+  const sobPropagacaoSede =
+    !isRaiz && canManagePendenciasCadastro
+      ? await sedePropagaPendenciasCadastro(tenant.id)
+      : false
 
   const afiliacoes: AfiliacaoOption[] = await db.afiliacao
     .findMany({ orderBy: { nome: 'asc' }, select: { id: true, nome: true } })
@@ -200,11 +209,21 @@ export default async function ConfiguracoesGeralPage({
         >
           <div className="space-y-8">
             {canManagePendenciasCadastro ? (
-              <SolicitarPendenciasCadastroForm
-                key={String(tenant.solicitarPendenciasCadastro)}
-                ativo={tenant.solicitarPendenciasCadastro}
-                unidadeNome={formatNomeTorcida(tenant.nome)}
-              />
+              <>
+                <SolicitarPendenciasCadastroForm
+                  key={`local-${String(tenant.solicitarPendenciasCadastro)}`}
+                  ativo={tenant.solicitarPendenciasCadastro}
+                  unidadeNome={formatNomeTorcida(tenant.nome)}
+                  sobPropagacaoSede={sobPropagacaoSede}
+                />
+                {isRaiz ? (
+                  <PropagarPendenciasCadastroForm
+                    key={`propagar-${String(tenant.propagarPendenciasCadastroUnidades)}`}
+                    ativo={tenant.propagarPendenciasCadastroUnidades}
+                    unidadeNome={formatNomeTorcida(tenant.nome)}
+                  />
+                ) : null}
+              </>
             ) : null}
             {canManageSettings && isOwner ? (
               <>

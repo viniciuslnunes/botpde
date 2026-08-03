@@ -4,10 +4,17 @@ import { randomUUID } from 'crypto'
 import { db } from '@torcida/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { CriarEventoSchema, PERMISSIONS } from '@torcida/types'
+import {
+  CriarEventoSchema,
+  PERMISSIONS,
+  resolverStatusVaga,
+  temValorVaga,
+  deveBloquearCheckInSemPagamento,
+} from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { listarOcorrenciasFuturasSerie, parseEscopoSerie } from '@/lib/eventos-serie'
 import { resolvePartidaIdFromForm } from '@/app/admin/partidas/actions'
+import { carregarCobrancasVagaEvento } from '@/lib/eventos-tipo'
 
 export type EventoState = {
   ok?: boolean
@@ -46,7 +53,26 @@ function formToEvento(formData: FormData) {
     lng: formData.get('lng') || undefined,
     recorrenciasSemanas: formData.get('recorrenciasSemanas') || 0,
     partidaId: formData.get('partidaId') || null,
+    projetoId: formData.get('projetoId') || undefined,
+    checkInExigePagamento: formData.get('checkInExigePagamento'),
   }
+}
+
+/**
+ * Projeto do evento: pertence ao tenant. Sem id = sem vínculo (null).
+ * Espelha o cuidado de `resolverRateio` no financeiro.
+ */
+async function resolverProjetoEvento(
+  tenantId: string,
+  projetoId: string | undefined,
+): Promise<{ projetoId: string | null } | { erro: string }> {
+  if (!projetoId) return { projetoId: null }
+  const projeto: { id: string } | null = await db.projeto.findFirst({
+    where: { id: projetoId, tenantId },
+    select: { id: true },
+  })
+  if (!projeto) return { erro: 'Projeto não encontrado nesta torcida' }
+  return { projetoId: projeto.id }
 }
 
 export async function criarEvento(
@@ -76,6 +102,8 @@ export async function criarEvento(
     lat,
     lng,
     recorrenciasSemanas,
+    projetoId: projetoIdRaw,
+    checkInExigePagamento,
   } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
@@ -90,6 +118,10 @@ export async function criarEvento(
     if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
   }
 
+  const projetoRes = await resolverProjetoEvento(tenant.id, projetoIdRaw)
+  if ('erro' in projetoRes) return { errors: { projetoId: [projetoRes.erro] } }
+  const projetoId = projetoRes.projetoId
+
   const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
   if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
   const partidaId = partidaRes.partidaId
@@ -103,6 +135,7 @@ export async function criarEvento(
   }
   const serieId = semanasExtras > 0 ? randomUUID() : null
 
+  const valorVagaFinal = tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null
   const baseData = {
     tenantId: tenant.id,
     tipo,
@@ -116,7 +149,10 @@ export async function criarEvento(
     lng: lng ?? null,
     serieId,
     partidaId,
-    valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
+    projetoId,
+    valorVaga: valorVagaFinal,
+    checkInExigePagamento:
+      tipo === 'CARAVANA' && valorVagaFinal != null && Boolean(checkInExigePagamento),
     criadoPorId: session.user.id,
   }
 
@@ -139,6 +175,7 @@ export async function criarEvento(
           sedeId: sedeId ?? null,
           serieId,
           partidaId,
+          projetoId,
           serie: serieId ? { indice: criados.length, total: datas.length } : null,
         },
       },
@@ -166,7 +203,7 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade, lat, lng } =
+  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade, lat, lng, projetoId: projetoIdRaw, checkInExigePagamento } =
     parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
@@ -195,11 +232,16 @@ export async function editarEvento(
     if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
   }
 
+  const projetoRes = await resolverProjetoEvento(tenant.id, projetoIdRaw)
+  if ('erro' in projetoRes) return { errors: { projetoId: [projetoRes.erro] } }
+  const projetoId = projetoRes.projetoId
+
   const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
   if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
   const partidaId = partidaRes.partidaId
 
   const escopo = parseEscopoSerie(formData.get('escopoSerie'))
+  const valorVagaFinal = tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null
   const patchBase = {
     titulo,
     descricao: descricao ?? null,
@@ -211,7 +253,10 @@ export async function editarEvento(
     lat: lat ?? null,
     lng: lng ?? null,
     partidaId,
-    valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
+    projetoId,
+    valorVaga: valorVagaFinal,
+    checkInExigePagamento:
+      tipo === 'CARAVANA' && valorVagaFinal != null && Boolean(checkInExigePagamento),
   }
 
   let afetados = 1
@@ -252,6 +297,7 @@ export async function editarEvento(
         escopoSerie: escopo,
         serieId: existing.serieId,
         partidaId,
+        projetoId,
         afetados,
       },
     },
@@ -266,19 +312,69 @@ export async function editarEvento(
 }
 
 /**
- * Check-in real — independente do RSVP. Confirmar presença (EventoRsvp.status)
- * não equivale a check-in real: alguém pode confirmar e faltar, ou aparecer
- * sem ter confirmado antes e ser check-in manualmente. Faz upsert porque o
- * usuário pode não ter nenhum EventoRsvp prévio.
+ * Check-in real — independente do RSVP. Em caravana com `valorVaga`, cruza a
+ * cobrança AVULSA. Default: avisa e permite. Com `checkInExigePagamento`:
+ * bloqueia sem PAGO, salvo `override` do gestor.
  */
-export async function registrarCheckIn(eventoId: string, userId: string) {
+export async function registrarCheckIn(
+  eventoId: string,
+  userId: string,
+  opts?: { override?: boolean },
+): Promise<{ ok: true; aviso?: string } | { ok: false; error: string; bloqueado?: boolean }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
-  const evento: { tenantId: string; tipo: string } | null = await db.evento.findUnique({
+  const evento: {
+    tenantId: string
+    tipo: string
+    valorVaga: { toNumber(): number } | number | null
+    checkInExigePagamento: boolean
+  } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { tenantId: true, tipo: true },
+    select: {
+      tenantId: true,
+      tipo: true,
+      valorVaga: true,
+      checkInExigePagamento: true,
+    },
   })
   if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado.')
+
+  const valorVagaNum =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
+
+  let pagamentoStatus: string | null = null
+  let aviso: string | undefined
+  if (evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)) {
+    const cobrancas = await carregarCobrancasVagaEvento(tenant.id, eventoId)
+    pagamentoStatus = cobrancas[userId] ?? null
+    const status = resolverStatusVaga({
+      valorVaga: valorVagaNum,
+      cobrancaStatus: pagamentoStatus,
+    })
+    if (
+      deveBloquearCheckInSemPagamento({
+        checkInExigePagamento: evento.checkInExigePagamento,
+        valorVaga: valorVagaNum,
+        alerta: status.alerta,
+        override: opts?.override,
+      })
+    ) {
+      return {
+        ok: false,
+        bloqueado: true,
+        error: `Vaga ${status.labelPagamento.toLowerCase()}. Pague antes ou use “Embarcar mesmo assim”.`,
+      }
+    }
+    if (status.alerta) {
+      aviso = opts?.override
+        ? `Override — vaga ${status.labelPagamento.toLowerCase()}.`
+        : `Check-in ok — vaga ${status.labelPagamento.toLowerCase()}.`
+    }
+  }
 
   await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId } },
@@ -299,21 +395,28 @@ export async function registrarCheckIn(eventoId: string, userId: string) {
       acao: 'EVENTO_CHECKIN',
       entidade: 'EventoRsvp',
       entidadeId: eventoId,
-      detalhes: { userId },
+      detalhes: {
+        userId,
+        pagamentoStatus,
+        aviso: aviso ?? null,
+        override: Boolean(opts?.override),
+      },
     },
   })
 
   revalidateEventoPaths(eventoId, evento.tipo)
+  return aviso ? { ok: true, aviso } : { ok: true }
 }
 
 /**
  * Check-in via QR da carteirinha (mesmo token de `/carteirinha/validar`).
  * Exige carteirinha válida + adimplente; faz upsert de RSVP CONFIRMADO.
+ * Em caravana paga, anexa aviso se a vaga não estiver paga (não bloqueia).
  */
 export async function registrarCheckInPorQr(
   eventoId: string,
   payloadRaw: string,
-): Promise<{ ok: true; nome: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; nome: string; aviso?: string } | { ok: false; error: string }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
   const payload = payloadRaw.includes('t=')
@@ -337,12 +440,55 @@ export async function registrarCheckInPorQr(
   })
   if (!socio) return { ok: false, error: 'Carteirinha de outra torcida' }
 
-  const evento: { tenantId: string; tipo: string } | null = await db.evento.findUnique({
+  const evento: {
+    tenantId: string
+    tipo: string
+    valorVaga: { toNumber(): number } | number | null
+    checkInExigePagamento: boolean
+  } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { tenantId: true, tipo: true },
+    select: {
+      tenantId: true,
+      tipo: true,
+      valorVaga: true,
+      checkInExigePagamento: true,
+    },
   })
   if (!evento || evento.tenantId !== tenant.id) {
     return { ok: false, error: 'Evento não encontrado' }
+  }
+
+  const valorVagaNum =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
+
+  let pagamentoStatus: string | null = null
+  let aviso: string | undefined
+  if (evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)) {
+    const cobrancas = await carregarCobrancasVagaEvento(tenant.id, eventoId)
+    pagamentoStatus = cobrancas[socio.userId] ?? null
+    const status = resolverStatusVaga({
+      valorVaga: valorVagaNum,
+      cobrancaStatus: pagamentoStatus,
+    })
+    if (
+      deveBloquearCheckInSemPagamento({
+        checkInExigePagamento: evento.checkInExigePagamento,
+        valorVaga: valorVagaNum,
+        alerta: status.alerta,
+      })
+    ) {
+      return {
+        ok: false,
+        error: `Vaga ${status.labelPagamento.toLowerCase()}. Regularize o pagamento ou faça check-in manual com override.`,
+      }
+    }
+    if (status.alerta) {
+      aviso = `Vaga ${status.labelPagamento.toLowerCase()}.`
+    }
   }
 
   await db.eventoRsvp.upsert({
@@ -364,12 +510,17 @@ export async function registrarCheckInPorQr(
       acao: 'EVENTO_CHECKIN_QR',
       entidade: 'EventoRsvp',
       entidadeId: eventoId,
-      detalhes: { userId: socio.userId, nome: socio.nome },
+      detalhes: {
+        userId: socio.userId,
+        nome: socio.nome,
+        pagamentoStatus,
+        aviso: aviso ?? null,
+      },
     },
   })
 
   revalidateEventoPaths(eventoId, evento.tipo)
-  return { ok: true, nome: socio.nome }
+  return aviso ? { ok: true, nome: socio.nome, aviso } : { ok: true, nome: socio.nome }
 }
 
 export async function promoverDaListaEspera(
@@ -384,17 +535,31 @@ export async function promoverDaListaEspera(
       tenantId: true,
       tipo: true,
       capacidade: true,
+      valorVaga: true,
       sede: { select: { capacidade: true } },
-      _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
   if (!evento || evento.tenantId !== tenant.id) {
     return { ok: false, error: 'Evento não encontrado' }
   }
 
-  const { capacidadeEfetiva, lotacaoCheia } = await import('@/lib/eventos-capacidade')
+  const valorVagaNum =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
+
+  const { capacidadeEfetiva, lotacaoCheia, contarOcupacaoEvento } = await import(
+    '@/lib/eventos-capacidade'
+  )
   const cap = capacidadeEfetiva(evento)
-  if (lotacaoCheia(evento._count.rsvps, cap)) {
+  const ocupados = await contarOcupacaoEvento({
+    tenantId: tenant.id,
+    eventoId,
+    valorVaga: valorVagaNum,
+  })
+  if (lotacaoCheia(ocupados, cap)) {
     return { ok: false, error: 'Lotação esgotada' }
   }
 
@@ -411,6 +576,15 @@ export async function promoverDaListaEspera(
     data: { status: 'CONFIRMADO' },
   })
 
+  if (evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)) {
+    const { garantirCobrancaVagaCaravana } = await import('@/lib/caravana-vaga')
+    await garantirCobrancaVagaCaravana({
+      tenantId: tenant.id,
+      userId,
+      eventoId,
+      notificar: true,
+    })
+  }
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -428,7 +602,9 @@ export async function promoverDaListaEspera(
     tenantId: tenant.id,
     tipo: 'EVENTO_RSVP',
     titulo: 'Vaga liberada',
-    corpo: 'Você saiu da lista de espera e está confirmado no evento.',
+    corpo: temValorVaga(valorVagaNum)
+      ? 'Você saiu da lista de espera. Pague a cobrança da vaga para garantir o lugar.'
+      : 'Você saiu da lista de espera e está confirmado no evento.',
     link: `/portal/eventos/${eventoId}`,
     atorId: session.user.id,
   })

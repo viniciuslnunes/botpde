@@ -56,6 +56,14 @@ Cobertura da rodada 1: hierarquia territorial, fila de aprovação
 alcance nacional), canais/grupos públicos, Agenda genérica com RSVPs,
 Salas de vídeo e pedidos de loja (só Gaviões, a única com catálogo real).
 
+**Sócios / carteirinha / pendências (2026-08-03):** a Fase 2c de
+`seed-corinthians-teste.js` emite `SaasSocio` e completa (ou fura) a ficha
+LGE em cenários ponderados — adimplente vigente, vencendo (≤30d), vencido,
+pendente de atualização de cadastro (modal no portal), inadimplente por
+dispensa («não mostrar de novo» → `adimplente=false`) e uma fatia ainda em
+Aguardando emissão. No lote já existente: `pnpm --filter @torcida/db
+seed:corinthians-teste -- --so-socios`.
+
 ## Fase 1b (concluída) — módulos operacionais do mesmo lote
 
 Script: `packages/db/scripts/seed-corinthians-teste-modulos.js` — comando
@@ -79,8 +87,9 @@ Fases e o que cada uma passa a exercitar:
 | H | Moderação: fila de denúncias (pendentes, resolvidas e descartadas) |
 
 Ainda **não** coberto por seed (por decisão): notificações (só a aplicação
-em uso real gera), cobranças de associação/`PlanoAssociacao` e importação de
-membros.
+em uso real gera), cobranças Pix/`PlanoAssociacao`/`CobrancaAssociacao` e
+importação de membros. Vigência operacional e pendências de cadastro
+passam pela Fase 2c (`SaasSocio` + ficha LGE + `adimplente`).
 
 Limite estrutural deste lote: **um clube só**. Tudo fica sob uma única
 `Afiliacao`, então nada que dependa de vários clubes ao mesmo tempo é

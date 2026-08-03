@@ -281,6 +281,184 @@ mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 **Onda 4 (MVP):** canal da área (vínculo a `Conversa` CANAL), vaga paga em caravana
 (`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).
 
+## Áreas de atuação dentro do departamento (2026-08-03)
+
+Departamento era lista plana: quem estava no Social estava em "tudo do Social".
+Na prática não é assim — quem faz a Campanha do Agasalho normalmente não faz a
+Escolinha da Bateria nem a Inclusão Digital. As **áreas de atuação** modelam
+essas frentes.
+
+### Modelo
+
+- `DepartamentoArea` (`saas_departamento_areas`) — `tenantId`, `departamentoId`,
+  `nome`, `slug`, `descricao`, `icone` (chave string), `ordem`, `ativa`,
+  `sazonal`, `meta Json?`. Unique `(departamentoId, slug)`.
+- `DepartamentoAreaMembro` (`saas_departamento_area_membros`) — `areaId`,
+  `userId`, `papel: PapelAreaDepartamento (MEMBRO | RESPONSAVEL)`. Unique
+  `(areaId, userId)`.
+
+### Invariante central: **área não concede permissão**
+
+RBAC continua inteiramente em `Departamento.permissions` /
+`permissionsGestor`. Nenhum ponto de `permissionsOfRole` ou
+`fetchUserPermissionsImpl` (`apps/web/src/lib/tenant.ts`) lê área.
+`papel = RESPONSAVEL` é **accountability e filtro**, não delegação: quem gere
+área é `canManageDepartamento` (gestor do departamento, `roles:manage` ou
+super-admin), exatamente como `assertPodeGerirArea` em
+`portal/departamentos/actions.ts`. A regra pura vive em
+`apps/web/src/lib/departamentos-portal-access.ts`
+(`resolverAreasDepartamento` — `podeGerir` nunca deriva de `isResponsavel`),
+travada por teste.
+
+### Elegibilidade e cascata
+
+Só entra em área quem já tem membership em vigor no departamento pai e continua
+elegível como sócio (`isMembroElegivelDepartamento`). Sair do departamento
+derruba as áreas dele: `limparMembershipDepartamentos`
+(`admin/membros/actions.ts`) e `removerMembroDepartamento`
+(`admin/(plataforma)/acessos/actions.ts`) apagam
+`DepartamentoAreaMembro` no escopo correto. Arquivar área é `ativa: false`
+(soft) — nunca delete.
+
+### Conhecimento canônico e seed
+
+`packages/types/src/departamento-areas-canonicas.js` guarda as áreas-padrão de
+cada departamento canônico com descrição real do que a frente faz (Agasalho,
+Festa das Crianças, Inclusão Digital, Escolinha da Bateria, Corrida de Rua,
+Barracão, Escala de jogo…). Semeadas por
+`pnpm --filter @torcida/db seed:departamento-areas` — idempotente por
+`(departamentoId, slug)`; no update toca apenas `descricao`, `icone`, `ordem`
+e `sazonal`, **nunca** `ativa`, `nome` ou `meta` (a torcida pode ter
+renomeado/desativado). É semente, não trava: a torcida cria as próprias áreas.
+
+### Superfícies
+
+- **Portal** — `/portal/departamentos/[slug]`: o gate e as flags saem de um
+  loader único `getDepartamentoContexto` (`[slug]/_lib/contexto.ts`), no mesmo
+  padrão de `configuracoes/_lib/contexto.ts`. Blocos que a pessoa não pode
+  gerir aparecem **`blocked` com motivo** (`DepartamentoSectionCard`), não
+  somem — descoberta acima de invisibilidade. Bloco `#areas` e `#equipe`
+  segmentada por área.
+- **Hub** — o card mostra missão, chips das áreas em que a pessoa atua e um KPI
+  contextual, cada um gateado pela permissão correspondente.
+- **Admin** — módulo `/admin/departamentos` (tabs Visão / Áreas / Equipes),
+  gate `roles:manage`. O pacote de permissão segue em `/admin/acessos` e **não**
+  vira tab daqui — tab é etapa do próprio módulo (§5.12); o caminho para lá é um
+  link na Visão, travado por `admin-modulos.test.ts`. Gestor de departamento
+  **não** ganha rota
+  admin nova: ele opera pelo cockpit do portal (mantém o item 7 das decisões).
+  Listagens declaradas em `lib/listagem/specs.ts`
+  (`LISTAGEM_DEPARTAMENTO_AREAS`, `LISTAGEM_DEPARTAMENTO_EQUIPES`).
+
+### Checklist por frente (`area.meta`, 2026-08-03+)
+
+Mesmo espírito do barracão Carnaval (`Departamento.meta`), sem tabela nova e
+sem ERP: `DepartamentoArea.meta.checklist.items` é um array
+`{ id, label, done }` (máx. 30). O gestor adiciona/remove/marca no card da
+área; quem só participa vê o progresso. Modelos sugeridos por slug
+(`AREA_CHECKLIST_MODELOS` em `departamento-area-checklist.js`) só
+**acrescentam** itens faltantes (“Usar modelo”) — nunca apagam customizações.
+O seed de áreas continua sem tocar `meta`. Actions:
+`toggleChecklistItemArea` / `adicionarChecklistItemArea` /
+`removerChecklistItemArea` / `aplicarModeloChecklistArea`.
+
+### Canal por frente (2026-08-03+)
+
+Espelha o canal do departamento (`Departamento.canalConversaId`): ponteiro
+opcional `DepartamentoArea.canalConversaId` → `Conversa` tipo `CANAL`, deep-link
+`/portal/mensagens?c=`. **Só vínculo manual** — nunca auto-cria canal (anti-spam).
+Uma conversa não pode ser sede + departamento + área ao mesmo tempo
+(`validarVinculoCanalArea`). Action `vincularCanalDepartamentoArea`.
+
+### Anti-padrões (novos)
+
+- **Dar permissão ao responsável de área.** Se aparecer a necessidade, a
+  resposta é tornar a pessoa gestora do departamento — não vazar RBAC para a
+  área.
+- Confundir `subareas` do registry de capabilities (âncoras de navegação da
+  tela) com `DepartamentoArea` (organização de gente). São coisas diferentes e
+  não devem ser fundidas.
+- Sobrescrever `ativa`/`nome`/`meta` no seed de áreas.
+- Transformar a checklist em task-tracker/ERP (assignees, prazos, subtarefas).
+- Auto-criar canal por área (spam de conversas vazias).
+
+## Projetos e campanhas (2026-08-03)
+
+O que a área organiza (gente) ganhou o par: o que ela **executa**. `Projeto` é
+o objeto de trabalho transversal do departamento — Campanha do Agasalho, Festa
+das Crianças, Inclusão Digital, Escolinha da Bateria, Corrida de Rua,
+Barracão. Serve Social, Bateria, Carnaval, Caravanas e Patrimônio igualmente:
+não é feature do Social.
+
+### Modelo
+
+- `Projeto` (`saas_projetos`) — `tenantId`, `departamentoId`, `areaId?`,
+  `titulo`, `slug`, `descricao`, `tipo: TipoProjeto`, `status: StatusProjeto`,
+  `inicio`, `fim?`, `recorrenteAnual`, `metaQuantidade?`, `metaUnidade?`,
+  `realizadoQuantidade`, `orcamentoPrevisto?`, `responsavelId?`.
+  Unique `(departamentoId, slug)`.
+- `ProjetoParticipante` (`saas_projeto_participantes`) — voluntários do
+  projeto, unique `(projetoId, userId)`.
+- `TipoProjeto`: `CAMPANHA | PROJETO | ACAO | PARCERIA`.
+  `StatusProjeto`: `PLANEJADO | ATIVO | CONCLUIDO | CANCELADO`.
+- `Evento.projetoId?` — a Festa das Crianças de 2026 na Agenda aponta para o
+  projeto homônimo.
+- `FinanceiroLancamento.departamentoId?` e `.projetoId?` — ambos nullable, sem
+  migração de dado legado.
+
+### Decisões que sustentam o módulo
+
+- **Projeto não concede permissão**, como a área. `responsavelId` e
+  participantes são accountability; quem gere é `canManageDepartamento`
+  (`projetos-actions.ts` → `assertPodeGerirDepartamento`).
+- **Realizado financeiro não é digitado.** `orcamentoPrevisto` é declarado, mas
+  o gasto vem da soma das `DESPESA` vinculadas ao projeto (`groupBy` no
+  cockpit). Campo de "quanto gastei" digitado à mão vira número que ninguém
+  confia — o livro-caixa é a fonte.
+- **`metaQuantidade` sem meta devolve `null`, não 0%.** `progressoMeta` e
+  `saudeOrcamento` (`packages/types/src/projeto.js`) retornam `null` quando não
+  há meta/orçamento declarado: 0% leria como fracasso, e gastar sem orçamento
+  declarado é ausência de plano, não estouro. Travado em `projeto.test.ts`.
+- **Campanha recorrente compara dia/mês.** `estaNaJanela` trata
+  `recorrenteAnual` comparando só dia e mês — o registro do Agasalho de 2025
+  marca "na janela" em 2026 sem duplicar linha —, e cobre janela que vira o ano
+  (Natal 15/11 → 10/01).
+- **Rateio valida escopo no servidor.** `resolverRateio`
+  (`admin/financeiro/actions.ts`) confere que o departamento é do tenant e que
+  o projeto pertence àquele departamento; projeto sem departamento explícito
+  herda o do próprio projeto. Sem isso daria para pendurar gasto no
+  departamento de outra torcida via id forjado.
+
+### Superfícies
+
+Portal: bloco `#projetos` no cockpit, com filtro por área, barra de meta, barra
+de orçamento (vermelha no estouro), badge "Na janela" e **eventos da Agenda
+vinculados** (deep-link). **Abrir campanha do ano** (2026-08-03+): em área
+`sazonal` ativa, o gestor cria com um clique um `Projeto` `CAMPANHA` do ano
+corrente (`slug` = `{área}-{ano}`, janela 1º jan–31 dez, `recorrenteAnual`,
+status `ATIVO`/`PLANEJADO`) — sem auto-criar evento; idempotente. CTA no
+bloco `#areas` e atalho em `#projetos`. A **próxima ação** do cockpit prioriza,
+após filas: orçamento estourado → projeto na janela → área sazonal sem
+campanha do ano → hooks de plugin (ensaio/caravana/financeiro).
+
+Admin: tab **Projetos** em `/admin/departamentos`
+(`LISTAGEM_DEPARTAMENTO_PROJETOS`), leitura consolidada — cadastro é do gestor,
+no portal. Financeiro: seletores de departamento e projeto no formulário de
+lançamento, só para quem tem `finance:manage`. Agenda: seletor de projeto no
+criar/editar evento (`Evento.projetoId`).
+
+### Plugins do dia a dia (2026-08-03+)
+
+- **Bateria — escala de jogo:** aside `#escala` lista eventos futuros ligados ao
+  projeto da área `escala-de-jogo` ou a uma `partidaId` (RSVP/presença da
+  Agenda — sem lista paralela).
+- **Social — nudge de rateio:** com projetos abertos, o gestor vê lembrete de
+  vincular despesas no livro-caixa (`#rateio`); conta despesas do depto sem
+  `projetoId` (90 dias).
+- **Thin + agenda por projeto:** Social e Feminino priorizam eventos com
+  `Evento.projetoId` do departamento; fallback é a agenda GERAL. Loja aponta
+  pedidos para `/portal/loja/pedidos` (não admin).
+
 ## Decisões fechadas
 
 1. Perfil de área **vincula** departamento (membro/gestor); pacote é ao vivo.
@@ -303,3 +481,6 @@ mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
    mutações seguem `*:manage` / approve / publish. Matriz completa:
    `docs/data/matriz-cargos-permissoes.md`. Demais áreas colaboradoras
    permanecem na regra do item 7.
+9. **Área de atuação é organização, não RBAC** (2026-08-03): `DepartamentoArea`
+   segmenta gente e trabalho dentro do departamento; permissão continua no
+   departamento e `RESPONSAVEL` é accountability. Ver seção acima.

@@ -25,7 +25,7 @@
  *   → Conversa (+ MembroConversa em cascata)
  *   → PatrimonioItem → FinanceiroLancamento
  *   → UserPermission → DepartamentoGestor → UserDepartamento
- *   → UserRole → SaasMembro → PerfilTorcedor → User
+ *   → UserRole → SaasSocio → SaasMembro → PerfilTorcedor → User
  *
  * O que NÃO é revertido: o estoque dos produtos de bar reais do Gaviões, que
  * o seed decrementa ao registrar vendas. Para restaurar o catálogo demo:
@@ -129,6 +129,7 @@ async function main() {
   contagens.gestoresDepartamento = await db.departamentoGestor.count({ where: { userId: { in: userIds } } })
   contagens.userDepartamentos = await db.userDepartamento.count({ where: { userId: { in: userIds } } })
   contagens.userRoles = await db.userRole.count({ where: { userId: { in: userIds } } })
+  contagens.saasSocios = await db.saasSocio.count({ where: { userId: { in: userIds } } })
   contagens.saasMembros = await db.saasMembro.count({ where: { userId: { in: userIds } } })
   contagens.perfisTorcedor = await db.perfilTorcedor.count({ where: { userId: { in: userIds } } })
   contagens.users = userIds.length
@@ -140,7 +141,17 @@ async function main() {
     select: { id: true },
   })
   const membroIds = membrosTeste.map((m) => m.id)
-  const filtroAudit = { entidade: 'SaasMembro', entidadeId: { in: membroIds } }
+  const sociosTeste = await db.saasSocio.findMany({
+    where: { userId: { in: userIds } },
+    select: { id: true },
+  })
+  const socioIds = sociosTeste.map((s) => s.id)
+  const filtroAudit = {
+    OR: [
+      { entidade: 'SaasMembro', entidadeId: { in: membroIds } },
+      { entidade: 'SaasSocio', entidadeId: { in: socioIds } },
+    ],
+  }
   contagens.auditLogs = await db.auditLog.count({ where: filtroAudit })
 
   console.log('\n📊 Contagens (a apagar):')
@@ -184,6 +195,7 @@ async function main() {
   await db.departamentoGestor.deleteMany({ where: { userId: { in: userIds } } })
   await db.userDepartamento.deleteMany({ where: { userId: { in: userIds } } })
   await db.userRole.deleteMany({ where: { userId: { in: userIds } } })
+  await db.saasSocio.deleteMany({ where: { userId: { in: userIds } } })
   await db.saasMembro.deleteMany({ where: { userId: { in: userIds } } })
   await db.perfilTorcedor.deleteMany({ where: { userId: { in: userIds } } })
   const usersApagados = await db.user.deleteMany({ where: filtroUserTeste })

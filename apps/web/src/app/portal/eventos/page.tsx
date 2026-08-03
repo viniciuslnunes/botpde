@@ -26,6 +26,7 @@ import type { TipoEvento } from '@torcida/db'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
+import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 
 export const metadata: Metadata = { title: 'Agenda' }
 
@@ -156,6 +157,7 @@ export default async function EventosPage({ searchParams }: Props) {
   let podeCriar = false
   let sedes: Awaited<ReturnType<typeof listSedesAtivasParaEvento>> = []
   let partidas: Awaited<ReturnType<typeof listPartidasParaEvento>> = []
+  let projetos: Awaited<ReturnType<typeof listarProjetosParaEvento>> = []
   let temAfiliacao = false
   if (session?.user?.id && tenant) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
@@ -167,9 +169,10 @@ export default async function EventosPage({ searchParams }: Props) {
       hasPermission(effective, PERMISSIONS.EVENTS_CREATE) ||
       hasPermission(effective, PERMISSIONS.EVENTS_MANAGE)
     if (podeCriar) {
-      ;[sedes, partidas, temAfiliacao] = await Promise.all([
+      ;[sedes, partidas, projetos, temAfiliacao] = await Promise.all([
         listSedesAtivasParaEvento(tenant.id),
         listPartidasParaEvento(tenant.id),
+        listarProjetosParaEvento(tenant.id),
         getAfiliacaoIdDoTenant(tenant.id).then((id) => Boolean(id)),
       ])
     }
@@ -212,6 +215,7 @@ export default async function EventosPage({ searchParams }: Props) {
             defaultTipo={tipoFiltro ?? 'GERAL'}
             sedes={sedes}
             partidas={partidas}
+            projetos={projetos}
             temAfiliacao={temAfiliacao}
             redirectTo="/portal/eventos"
           />

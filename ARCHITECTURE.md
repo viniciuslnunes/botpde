@@ -1129,6 +1129,99 @@ tabelas: `docs/data/modulo-associacao.md`.
   super-admin tem gate diferente (allowlist de e-mail, cross-tenant), não regra
   de negócio diferente.
 
+### 5.15 Área de atuação do departamento — organização sem RBAC (2026-08-03)
+
+Departamento era uma lista plana por tenant: pertencer ao Social significava
+pertencer a tudo do Social. A realidade das torcidas é outra — Campanha do
+Agasalho, Inclusão Digital e Escolinha da Bateria são frentes com gente
+diferente. `DepartamentoArea` + `DepartamentoAreaMembro` modelam isso. Spec:
+`docs/data/modulo-departamentos.md` § áreas de atuação.
+
+- **Área organiza, departamento autoriza.** A alternativa era departamento
+  aninhado (`parentId`) com pacote próprio, que herdaria a máquina de RBAC de
+  graça — e multiplicaria perfis, linhas de `UserDepartamento` e caminhos de
+  `syncMembershipFromRoles` a cada frente de trabalho nova. Área ficou **fora**
+  do cálculo de permissão: nenhum ponto de `permissionsOfRole` /
+  `fetchUserPermissionsImpl` a consulta. O custo é real e aceito: responsável
+  de área não pode gerir a própria área — quem gere é o gestor do
+  departamento (`canManageDepartamento`). Se um dia a delegação for
+  necessária, o caminho é promover a pessoa a gestora, não vazar RBAC para a
+  área.
+- **`RESPONSAVEL` é accountability, não papel de acesso.** Existe para
+  responder "quem toca essa frente" e para a pendência "área ativa sem
+  responsável" no `/admin/departamentos`. `resolverAreasDepartamento` nunca
+  deriva `podeGerir` de `isResponsavel`, e isso é teste, não comentário.
+- **Conhecimento canônico é semente, não trava.** As áreas-padrão vivem em
+  `packages/types/src/departamento-areas-canonicas.js` com descrição do que
+  cada frente faz, e o seed atualiza só texto/ícone/ordem/sazonal — nunca
+  `ativa`, `nome` ou `meta`. Semear conhecimento sem sobrescrever a decisão da
+  torcida é o que permite rodar o seed de novo com segurança.
+- **Checklist por frente** em `DepartamentoArea.meta.checklist` (itens livres +
+  modelos sugeridos) — mesmo padrão leve do barracão; sem tabela nova. Spec:
+  `modulo-departamentos.md` § checklist por frente.
+- **Canal por frente** — `DepartamentoArea.canalConversaId` vínculo manual a
+  `Conversa` CANAL (nunca auto-cria); exclusive com sede/depto/outra área.
+- **Cockpit consome flags, não refaz RBAC.** `[slug]/_lib/contexto.ts` espelha
+  `configuracoes/_lib/contexto.ts`: um loader `cache()`-ado resolve gate,
+  permissões e áreas; os blocos só leem booleanos. Blocos sem permissão
+  aparecem `blocked` com motivo em vez de sumir — invisibilidade ensina menos
+  que uma porta fechada e rotulada.
+- **O admin do módulo é `roles:manage`.** Departamento como área operacional
+  ganhou módulo próprio (`/admin/departamentos`), mas gestor de departamento
+  continua sem rota admin nova: opera pelo portal. Mantém §5.12 e o item 7 de
+  `modulo-departamentos.md` — colaborador não recebe permissão que abre
+  operação admin.
+
+### 5.16 Projeto do departamento — execução com meta e orçamento (2026-08-03)
+
+Área organiza gente; `Projeto` é o que ela **executa** (Campanha do Agasalho,
+Festa das Crianças, Inclusão Digital). Spec:
+`docs/data/modulo-departamentos.md` § projetos e campanhas.
+
+- **Projeto não concede permissão**, como a área. `responsavelId` e
+  `ProjetoParticipante` são accountability; quem cria/edita é
+  `canManageDepartamento` (`projetos-actions.ts`).
+- **Gasto realizado vem do livro-caixa.** `orcamentoPrevisto` é declarado;
+  o realizado é a soma das `DESPESA` com `projetoId` — digitação manual de
+  "quanto gastei" seria número que ninguém confia. Meta de alcance
+  (`metaQuantidade`/`realizadoQuantidade`) continua manual porque não há
+  outra fonte.
+- **`progressoMeta`/`saudeOrcamento` devolvem `null` sem meta/orçamento** —
+  0% leria como fracasso; gastar sem previsto é ausência de plano, não
+  estouro. Travado em `projeto.test.ts`.
+- **Rateio no Financeiro valida escopo no servidor.**
+  `FinanceiroLancamento.departamentoId?`/`projetoId?` passam por
+  `resolverRateio`: departamento do tenant e projeto daquele departamento
+  (ou herda o do projeto se só o projeto veio). Sem isso, id forjado
+  penduraria gasto em outra torcida.
+- **Agenda aponta para o projeto.** `Evento.projetoId?` é opcional; criar/
+  editar evento validam o id no tenant (`resolverProjetoEvento`). O cockpit
+  do departamento lista os próximos eventos do projeto; o thin Social
+  prioriza essa agenda quando há vínculo.
+- **Campanha do ano (atalho sazonal).** Área `sazonal` ativa →
+  `abrirCampanhaDoAno` cria `Projeto` CAMPANHA `{área}-{ano}` com janela do
+  ano civil e `recorrenteAnual`, sem auto-criar evento. Próxima ação do
+  cockpit inclui orçamento estourado / na janela / área sem campanha.
+- **Plugins F8:** Bateria `#escala` compõe Agenda (RSVP/presença); Social
+  nudge de rateio; thin prioriza `Evento.projetoId` do departamento.
+
+### 5.17 Caravana paga — lotação por pagamento e hard-block opcional (2026-08-03)
+
+RSVP, cobrança AVULSA e check-in continuam trilhos separados. Com
+`Evento.valorVaga`:
+
+- **Ocupação da lotação** = cobranças `PAGA` (`contarOcupacaoEvento`), não
+  `CONFIRMADO`. Confirmar gera cobrança (`garantirCobrancaVagaCaravana`);
+  só o pagamento garante o assento.
+- **Check-in default** avisa e permite se a vaga não está paga.
+- **`Evento.checkInExigePagamento`** (opt-in no form de caravana) bloqueia
+  check-in/QR até PAGO; gestor usa override manual (“Embarcar mesmo assim”)
+  com AuditLog `override: true`. QR não tem override — redireciona para o
+  check-in manual.
+
+Regras puras em `packages/types/src/caravana-embarque.js`. Spec:
+`docs/data/modulo-caravanas.md`.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o

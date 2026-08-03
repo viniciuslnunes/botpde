@@ -16,6 +16,7 @@ import { diasParaEvento } from '@/lib/eventos'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
+import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import {
   listarPresencaPorEvento,
   resumirComparecimento,
@@ -176,13 +177,14 @@ export default async function AdminEventosPage({ searchParams }: Props) {
 
   const calJanela = vistaCal ? janelaCalendario(vistaCal, sp.data) : null
 
-  const [proximos, passados, sedes, calEventos, partidas, afiliacaoId]: [
+  const [proximos, passados, sedes, calEventos, partidas, afiliacaoId, projetos]: [
     EventoAdminRow[],
     EventoAdminRow[],
     Awaited<ReturnType<typeof listSedesAtivasParaEvento>>,
     CalRow[],
     Awaited<ReturnType<typeof listPartidasParaEvento>>,
     string | null,
+    Awaited<ReturnType<typeof listarProjetosParaEvento>>,
   ] = await Promise.all([
     vista !== 'lista'
       ? Promise.resolve([] as EventoAdminRow[])
@@ -235,6 +237,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
       : Promise.resolve([] as CalRow[]),
     listPartidasParaEvento(tenant.id),
     getAfiliacaoIdDoTenant(tenant.id),
+    podeGerir ? listarProjetosParaEvento(tenant.id) : Promise.resolve([]),
   ])
 
   function serializar(evento: EventoAdminRow, passado: boolean): AdminEventoItem {
@@ -325,6 +328,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             defaultTipo={tipoFiltro ?? 'GERAL'}
             sedes={sedes}
             partidas={partidas}
+            projetos={projetos}
             temAfiliacao={Boolean(afiliacaoId)}
             redirectTo="/admin/eventos"
           />

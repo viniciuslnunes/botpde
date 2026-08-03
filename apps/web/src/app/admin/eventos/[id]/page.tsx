@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import { assertAnyPermission } from '@/lib/authz'
-import { hasPermission, PERMISSIONS, TIPO_EVENTO_LABEL } from '@torcida/types'
+import { hasPermission, PERMISSIONS, TIPO_EVENTO_LABEL, resolverStatusVaga, temValorVaga } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
 import { Gauge, PencilLine, UserCheck } from 'lucide-react'
@@ -13,6 +13,7 @@ import { EventoMapaLinks } from '@/components/eventos/evento-mapa-links'
 import { EventoPartidaCard } from '@/components/eventos/evento-partida-card'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
+import { carregarCobrancasVagaEvento, listarProjetosParaEvento } from '@/lib/eventos-tipo'
 
 export const metadata: Metadata = { title: 'Agenda — Evento' }
 
@@ -80,7 +81,9 @@ export default async function AdminEventoDetailPage({
     lng: number | null
     serieId: string | null
     partidaId: string | null
+    projetoId: string | null
     valorVaga: { toNumber(): number } | number | null
+    checkInExigePagamento: boolean
     sede: { capacidade: number | null; nome: string } | null
     partida: {
       adversario: string
@@ -96,11 +99,12 @@ export default async function AdminEventoDetailPage({
     _count: { rsvps: number; cobrancas: number }
   }
 
-  const [evento, sedes, partidas, afiliacaoId]: [
+  const [evento, sedes, partidas, afiliacaoId, projetos]: [
     EventoDetail | null,
     SedeLite[],
     Awaited<ReturnType<typeof listPartidasParaEvento>>,
     string | null,
+    Awaited<ReturnType<typeof listarProjetosParaEvento>>,
   ] = await Promise.all([
     db.evento.findUnique({
       where: { id },
@@ -139,6 +143,7 @@ export default async function AdminEventoDetailPage({
     }) as Promise<SedeLite[]>,
     listPartidasParaEvento(tenant.id),
     getAfiliacaoIdDoTenant(tenant.id),
+    listarProjetosParaEvento(tenant.id),
   ])
 
   if (!evento || evento.tenantId !== tenant.id) notFound()
@@ -163,15 +168,32 @@ export default async function AdminEventoDetailPage({
           ? evento.valorVaga
           : evento.valorVaga.toNumber(),
   }
+  const valorVagaNum = eventoForm.valorVaga
+  const caravanaPaga = evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)
+  const ocupacaoLotacao = caravanaPaga ? evento._count.cobrancas : evento._count.rsvps
 
-  const itens: EmbarqueRow[] = evento.rsvps.map((r: RsvpRow) => ({
-    id: r.id,
-    userId: r.user.id,
-    nome: r.user.nome?.trim() || r.user.email || 'Membro',
-    email: r.user.email ?? '',
-    status: r.status,
-    checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
-  }))
+  const cobrancasPorUserId = caravanaPaga
+    ? await carregarCobrancasVagaEvento(tenant.id, evento.id)
+    : {}
+
+  const itens: EmbarqueRow[] = evento.rsvps.map((r: RsvpRow) => {
+    const statusVaga = resolverStatusVaga({
+      valorVaga: valorVagaNum,
+      cobrancaStatus: cobrancasPorUserId[r.user.id] ?? null,
+      checkedInAt: r.checkedInAt,
+    })
+    return {
+      id: r.id,
+      userId: r.user.id,
+      nome: r.user.nome?.trim() || r.user.email || 'Membro',
+      email: r.user.email ?? '',
+      status: r.status,
+      checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
+      pagamento: statusVaga.pagamento,
+      labelPagamento: statusVaga.labelPagamento,
+      alertaPagamento: statusVaga.alerta,
+    }
+  })
 
   const { tabId, panelId } = adminTabIds('tab', abaEfetiva)
 
@@ -224,10 +246,10 @@ export default async function AdminEventoDetailPage({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
           <p className="text-[11px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
-            Confirmados
+            {caravanaPaga ? 'Lotação (pagas)' : 'Confirmados'}
           </p>
           <p className="mt-1 text-lg font-semibold tabular-nums">
-            {cap != null ? `${evento._count.rsvps}/${cap}` : evento._count.rsvps}
+            {cap != null ? `${ocupacaoLotacao}/${cap}` : ocupacaoLotacao}
           </p>
         </div>
         <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
@@ -242,12 +264,12 @@ export default async function AdminEventoDetailPage({
           </p>
           <p className="mt-1 text-lg font-semibold tabular-nums">{espera}</p>
         </div>
-        {evento.tipo === 'CARAVANA' && (
+        {caravanaPaga && (
           <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
             <p className="text-[11px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
-              Vagas pagas
+              Confirmados (RSVP)
             </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">{evento._count.cobrancas}</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">{evento._count.rsvps}</p>
           </div>
         )}
       </div>
@@ -261,6 +283,7 @@ export default async function AdminEventoDetailPage({
           podeGerir={podeGerir}
           labelCheckin={labelCheckin}
           tituloEvento={evento.titulo}
+          mostrarPagamento={caravanaPaga}
         />
       )}
 
@@ -270,6 +293,7 @@ export default async function AdminEventoDetailPage({
             evento={eventoForm}
             sedes={sedes}
             partidas={partidas}
+            projetos={projetos}
             temAfiliacao={Boolean(afiliacaoId)}
             redirectTo={`/admin/eventos/${evento.id}?tab=editar`}
           />

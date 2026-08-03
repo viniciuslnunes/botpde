@@ -33,7 +33,47 @@ function formToLancamentoPayload(formData: FormData) {
     descricao: formData.get('descricao'),
     data: formData.get('data'),
     observacao: formData.get('observacao') ?? undefined,
+    departamentoId: formData.get('departamentoId') ?? undefined,
+    projetoId: formData.get('projetoId') ?? undefined,
   }
+}
+
+/**
+ * Rateio: o departamento é do tenant e, se houver projeto, ele é daquele
+ * departamento. Ids vindos do cliente nunca entram no banco sem essa checagem
+ * — senão daria para pendurar um gasto no departamento de outra torcida.
+ */
+async function resolverRateio(
+  tenantId: string,
+  departamentoId: string | undefined,
+  projetoId: string | undefined,
+): Promise<{ departamentoId: string | null; projetoId: string | null } | { erro: string }> {
+  if (!departamentoId && !projetoId) return { departamentoId: null, projetoId: null }
+
+  let deptoResolvido: string | null = null
+  if (departamentoId) {
+    const depto: { id: string } | null = await db.departamento.findFirst({
+      where: { id: departamentoId, tenantId },
+      select: { id: true },
+    })
+    if (!depto) return { erro: 'Departamento não encontrado nesta torcida' }
+    deptoResolvido = depto.id
+  }
+
+  if (!projetoId) return { departamentoId: deptoResolvido, projetoId: null }
+
+  const projeto: { id: string; departamentoId: string } | null = await db.projeto.findFirst({
+    where: { id: projetoId, tenantId },
+    select: { id: true, departamentoId: true },
+  })
+  if (!projeto) return { erro: 'Projeto não encontrado nesta torcida' }
+  if (deptoResolvido && projeto.departamentoId !== deptoResolvido) {
+    return { erro: 'O projeto escolhido não é deste departamento' }
+  }
+
+  // Projeto sem departamento explícito herda o do próprio projeto — o rateio
+  // por área continua correto sem o operador precisar preencher duas vezes.
+  return { departamentoId: deptoResolvido ?? projeto.departamentoId, projetoId: projeto.id }
 }
 
 export async function criarLancamentoFinanceiro(
@@ -47,9 +87,13 @@ export async function criarLancamentoFinanceiro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { tipo, categoria, valor, descricao, data, observacao } = parsed.data
+  const { tipo, categoria, valor, descricao, data, observacao, departamentoId, projetoId } =
+    parsed.data
   const dataComp = parseDataCompetencia(data)
   if (!dataComp) return { errors: { data: ['Data inválida'] } }
+
+  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId)
+  if ('erro' in rateio) return { error: rateio.erro }
 
   const created = await db.financeiroLancamento.create({
     data: {
@@ -60,6 +104,8 @@ export async function criarLancamentoFinanceiro(
       descricao,
       data: dataComp,
       observacao: observacao ?? null,
+      departamentoId: rateio.departamentoId,
+      projetoId: rateio.projetoId,
       criadoPorId: session.user.id!,
     },
     select: { id: true },
@@ -72,7 +118,14 @@ export async function criarLancamentoFinanceiro(
       acao: 'FINANCEIRO_LANCAMENTO_CRIADO',
       entidade: 'FinanceiroLancamento',
       entidadeId: created.id,
-      detalhes: { tipo, categoria, valor, data },
+      detalhes: {
+        tipo,
+        categoria,
+        valor,
+        data,
+        departamentoId: rateio.departamentoId,
+        projetoId: rateio.projetoId,
+      },
     },
   })
 
@@ -94,7 +147,8 @@ export async function editarLancamentoFinanceiro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { id, tipo, categoria, valor, descricao, data, observacao } = parsed.data
+  const { id, tipo, categoria, valor, descricao, data, observacao, departamentoId, projetoId } =
+    parsed.data
   const dataComp = parseDataCompetencia(data)
   if (!dataComp) return { errors: { data: ['Data inválida'] } }
 
@@ -103,6 +157,9 @@ export async function editarLancamentoFinanceiro(
     select: { id: true },
   })
   if (!existente) return { error: 'Lançamento não encontrado' }
+
+  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId)
+  if ('erro' in rateio) return { error: rateio.erro }
 
   await db.financeiroLancamento.update({
     where: { id: existente.id },
@@ -113,6 +170,8 @@ export async function editarLancamentoFinanceiro(
       descricao,
       data: dataComp,
       observacao: observacao ?? null,
+      departamentoId: rateio.departamentoId,
+      projetoId: rateio.projetoId,
     },
   })
 
@@ -123,7 +182,14 @@ export async function editarLancamentoFinanceiro(
       acao: 'FINANCEIRO_LANCAMENTO_EDITADO',
       entidade: 'FinanceiroLancamento',
       entidadeId: existente.id,
-      detalhes: { tipo, categoria, valor, data },
+      detalhes: {
+        tipo,
+        categoria,
+        valor,
+        data,
+        departamentoId: rateio.departamentoId,
+        projetoId: rateio.projetoId,
+      },
     },
   })
 

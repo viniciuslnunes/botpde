@@ -65,6 +65,16 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: [PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_APPROVE],
     secao: 'pessoas',
   },
+  // Departamento como área operacional (áreas de atuação, equipes). O pacote
+  // de PERMISSÃO de cada departamento continua em /admin/acessos — aqui é
+  // organização de gente, não RBAC.
+  {
+    id: 'departamentos',
+    label: 'Departamentos',
+    href: '/admin/departamentos',
+    permissao: PERMISSIONS.ROLES_MANAGE,
+    secao: 'pessoas',
+  },
   {
     id: 'eventos',
     label: 'Agenda',
@@ -219,6 +229,35 @@ export const ADMIN_MENU = /** @type {const} */ ([
  * @type {readonly AdminModulo[]}
  */
 export const ADMIN_MODULOS = ([
+  {
+    id: 'departamentos',
+    menuId: 'departamentos',
+    href: '/admin/departamentos',
+    tabs: [
+      { id: 'visao', label: 'Visão', href: '/admin/departamentos', permissao: PERMISSIONS.ROLES_MANAGE },
+      {
+        id: 'areas',
+        label: 'Áreas',
+        href: '/admin/departamentos/areas',
+        permissao: PERMISSIONS.ROLES_MANAGE,
+      },
+      {
+        id: 'equipes',
+        label: 'Equipes',
+        href: '/admin/departamentos/equipes',
+        permissao: PERMISSIONS.ROLES_MANAGE,
+      },
+      {
+        id: 'projetos',
+        label: 'Projetos',
+        href: '/admin/departamentos/projetos',
+        permissao: PERMISSIONS.ROLES_MANAGE,
+      },
+      // O pacote de PERMISSÃO do departamento continua em /admin/acessos e NÃO
+      // vira tab daqui: tab é etapa do próprio módulo (ARCHITECTURE §5.12). O
+      // caminho para lá é um link na Visão.
+    ],
+  },
   {
     id: 'loja',
     menuId: 'loja',

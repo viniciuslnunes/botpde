@@ -33,22 +33,24 @@ export function CaravanaVagaPagamento({
         <span className="font-semibold tabular-nums text-[rgb(var(--foreground))]">
           {formatarMoedaBRL(valorVaga)}
         </span>
+        . Confirmar presença gera a cobrança; a vaga no ônibus só fica garantida após o
+        pagamento.
       </p>
 
       {cobranca?.status === 'PAGA' ? (
         <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-          Vaga paga.
+          Vaga paga — lugar garantido.
         </p>
       ) : cobranca && cobranca.status !== 'CANCELADA' ? (
         <Link
           href={`/portal/cobrancas/${cobranca.id}`}
           className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
         >
-          Abrir cobrança ({cobranca.status.toLowerCase()})
+          Pagar agora ({cobranca.status.toLowerCase()})
         </Link>
       ) : !confirmado ? (
         <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-          Confirme presença para gerar a cobrança da vaga.
+          Confirme presença para gerar a cobrança automaticamente.
         </p>
       ) : (
         <button

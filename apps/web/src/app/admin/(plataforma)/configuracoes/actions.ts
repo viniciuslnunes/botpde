@@ -292,8 +292,8 @@ export async function salvarExigirDocumentosCadastro(formData: FormData) {
 }
 
 /**
- * Liga/desliga o serviço de solicitar dados pendentes aos sócios desta unidade.
- * Escopo = tenant atual (Sede ou afiliada). Owner/admin/vice/liderança/super-admin.
+ * Liga/desliga a solicitação de dados pendentes **neste canal** (tenant atual).
+ * Não altera Sede nem irmãs — o modal segue o canal do contexto do sócio.
  */
 export async function salvarSolicitarPendenciasCadastro(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE)
@@ -317,7 +317,45 @@ export async function salvarSolicitarPendenciasCadastro(formData: FormData) {
   })
 
   revalidatePath('/admin/configuracoes')
-  revalidatePath('/portal')
+  revalidatePath('/portal', 'layout')
+  revalidatePath('/portal/cadastro/associacao')
+  invalidateTenantCache(tenant.slug)
+}
+
+/**
+ * Só na Sede: liga/desliga a propagação do flag da Sede para toda a worktree.
+ * Com propagação ligada, o modal nas unidades segue o valor da Sede.
+ * Owner / admin / vice / super-admin.
+ */
+export async function salvarPropagarPendenciasCadastroUnidades(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE)
+
+  const { resolverTenantRaizId } = await import('@/lib/membros-sede')
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('Só a Sede pode definir a propagação para as unidades.')
+  }
+
+  const ativo = formData.get('propagarPendenciasCadastroUnidades') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { propagarPendenciasCadastroUnidades: ativo },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_PENDENCIAS_CADASTRO_PROPAGAR_ATUALIZADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { propagarPendenciasCadastroUnidades: ativo },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal', 'layout')
   revalidatePath('/portal/cadastro/associacao')
   invalidateTenantCache(tenant.slug)
 }

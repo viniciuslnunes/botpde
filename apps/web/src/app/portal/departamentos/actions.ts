@@ -7,11 +7,19 @@ import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
+  addAreaChecklistItem,
+  applyAreaChecklistModelo,
   calculateEffectivePermissions,
   canManageDepartamento,
   hasPermission,
   isDepartamentoLegado,
+  isMembroElegivelDepartamento,
   mergeBarracaoItem,
+  newAreaChecklistItemId,
+  removeAreaChecklistItem,
+  slugifyArea,
+  toggleAreaChecklistItem as mergeAreaChecklistToggle,
+  validarVinculoCanalArea,
   BARRACAO_CHECKLIST,
   PERMISSIONS,
 } from '@torcida/types'
@@ -19,6 +27,7 @@ import {
   adicionarMembroDepartamento,
   removerMembroDepartamento,
 } from '@/app/admin/(plataforma)/acessos/actions'
+import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
@@ -241,6 +250,19 @@ export async function vincularCanalArea(
         select: { id: true },
       })
       if (!canal) return { error: 'Canal inválido' }
+
+      const [areaDona, sedeDona]: [{ id: string } | null, { id: string } | null] = await Promise.all([
+        db.departamentoArea.findFirst({
+          where: { canalConversaId: canal.id },
+          select: { id: true },
+        }),
+        db.sede.findFirst({
+          where: { canalConversaId: canal.id },
+          select: { id: true },
+        }),
+      ])
+      if (sedeDona) return { error: 'Este canal já é o canal oficial de uma unidade.' }
+      if (areaDona) return { error: 'Este canal já está vinculado a uma área de atuação.' }
     }
 
     await db.departamento.update({
@@ -325,5 +347,792 @@ export async function toggleBarracaoItem(
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Áreas de atuação (`DepartamentoArea`) — organizam gente e trabalho dentro do
+// departamento; NÃO concedem permissão (RBAC continua no Departamento). Todas
+// usam `assertPodeGerirArea` e nunca confiam no id vindo do cliente: a área é
+// sempre revalidada contra `departamentoId` + `tenant.id`.
+// ---------------------------------------------------------------------------
+
+const BooleanFlagSchema = z.preprocess(
+  (v) => v === 'on' || v === 'true' || v === true,
+  z.boolean(),
+)
+
+const AreaCriarSchema = z.object({
+  departamentoId: IdSchema,
+  slug: IdSchema,
+  nome: z.string().trim().min(2, 'Nome muito curto').max(80, 'Nome muito longo'),
+  descricao: z.string().trim().max(500, 'Descrição muito longa').optional().or(z.literal('')),
+  sazonal: BooleanFlagSchema,
+})
+
+const AreaAtualizarSchema = AreaCriarSchema.extend({
+  areaId: IdSchema,
+})
+
+const AreaArquivarSchema = z.object({
+  areaId: IdSchema,
+  departamentoId: IdSchema,
+  slug: IdSchema,
+  ativa: z.enum(['true', 'false']).transform((v) => v === 'true'),
+})
+
+const AreaMembroSchema = z.object({
+  areaId: IdSchema,
+  departamentoId: IdSchema,
+  slug: IdSchema,
+  targetUserId: IdSchema,
+})
+
+const AreaResponsavelSchema = AreaMembroSchema.extend({
+  papel: z.enum(['MEMBRO', 'RESPONSAVEL']),
+})
+
+type AreaEscopo = {
+  id: string
+  nome: string
+  slug: string
+  ativa: boolean
+  meta: unknown
+}
+
+/** A área pertence ao departamento e ao tenant ativo — nunca confiar no cliente. */
+async function assertAreaNoDepartamento(
+  tenantId: string,
+  departamentoId: string,
+  areaId: string,
+): Promise<AreaEscopo> {
+  const area: AreaEscopo | null = await db.departamentoArea.findFirst({
+    where: { id: areaId, departamentoId, tenantId },
+    select: { id: true, nome: true, slug: true, ativa: true, meta: true },
+  })
+  if (!area) throw new Error('Área não encontrada')
+  return area
+}
+
+/**
+ * Só entra em `DepartamentoAreaMembro` quem já tem membership em vigor no
+ * departamento pai e continua elegível como sócio (SOCIO/APROVADO/ativo/não
+ * espelhado/sem origem). Sair do departamento — ou deixar de ser elegível —
+ * derruba a possibilidade de entrar em áreas dele.
+ */
+async function assertElegivelParaArea(
+  tenantId: string,
+  departamentoId: string,
+  targetUserId: string,
+): Promise<void> {
+  const efetivadas = await getAreasEfetivadasPorUser(tenantId, [targetUserId])
+  if (!efetivadas.get(targetUserId)?.has(departamentoId)) {
+    throw new Error('A pessoa precisa estar no departamento antes de entrar em uma área')
+  }
+
+  type SaasMembroLite = {
+    tenantId: string
+    tipo: string
+    status: string
+    desligadoEm: Date | null
+    espelhado: boolean
+    membroOrigemId: string | null
+  }
+  const membro: SaasMembroLite | null = await db.saasMembro.findFirst({
+    where: { tenantId, userId: targetUserId },
+    select: {
+      tenantId: true,
+      tipo: true,
+      status: true,
+      desligadoEm: true,
+      espelhado: true,
+      membroOrigemId: true,
+    },
+  })
+  if (!isMembroElegivelDepartamento(membro, tenantId)) {
+    throw new Error('Sócio não está mais elegível para áreas neste departamento')
+  }
+}
+
+export async function criarAreaDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaCriarSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    nome: formData.get('nome'),
+    descricao: formData.get('descricao'),
+    sazonal: formData.get('sazonal'),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+
+    const depto: { id: string } | null = await db.departamento.findFirst({
+      where: { id: parsed.data.departamentoId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!depto) return { error: 'Departamento não encontrado' }
+
+    const slugArea = slugifyArea(parsed.data.nome)
+    const existente: { id: string } | null = await db.departamentoArea.findFirst({
+      where: { departamentoId: depto.id, slug: slugArea },
+      select: { id: true },
+    })
+    if (existente) return { error: 'Já existe uma área com esse nome neste departamento.' }
+
+    const ultimaOrdem: { ordem: number } | null = await db.departamentoArea.findFirst({
+      where: { departamentoId: depto.id },
+      orderBy: { ordem: 'desc' },
+      select: { ordem: true },
+    })
+
+    const area = await db.departamentoArea.create({
+      data: {
+        tenantId: tenant.id,
+        departamentoId: depto.id,
+        nome: parsed.data.nome,
+        slug: slugArea,
+        descricao: parsed.data.descricao || null,
+        sazonal: parsed.data.sazonal,
+        ordem: (ultimaOrdem?.ordem ?? -1) + 1,
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_CRIADA',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { nome: area.nome, slug: area.slug, departamentoId: depto.id },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível criar a área' }
+  }
+}
+
+export async function atualizarAreaDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaAtualizarSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    nome: formData.get('nome'),
+    descricao: formData.get('descricao'),
+    sazonal: formData.get('sazonal'),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+
+    const novoSlug = slugifyArea(parsed.data.nome)
+    if (novoSlug !== area.slug) {
+      const colisao: { id: string } | null = await db.departamentoArea.findFirst({
+        where: {
+          departamentoId: parsed.data.departamentoId,
+          slug: novoSlug,
+          id: { not: area.id },
+        },
+        select: { id: true },
+      })
+      if (colisao) return { error: 'Já existe uma área com esse nome neste departamento.' }
+    }
+
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: {
+        nome: parsed.data.nome,
+        slug: novoSlug,
+        descricao: parsed.data.descricao || null,
+        sazonal: parsed.data.sazonal,
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_ATUALIZADA',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { nomeAntes: area.nome, nome: parsed.data.nome },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível atualizar a área' }
+  }
+}
+
+/** Arquiva (soft) ou reativa a área — nunca deleta. */
+export async function arquivarAreaDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaArquivarSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    ativa: formData.get('ativa'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { ativa: parsed.data.ativa },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_ARQUIVADA',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { nome: area.nome, ativa: parsed.data.ativa },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível atualizar a área' }
+  }
+}
+
+export async function adicionarMembroAreaDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaMembroSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    targetUserId: formData.get('targetUserId'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    await assertElegivelParaArea(tenant.id, parsed.data.departamentoId, parsed.data.targetUserId)
+
+    await db.departamentoAreaMembro.upsert({
+      where: {
+        areaId_userId: { areaId: area.id, userId: parsed.data.targetUserId },
+      },
+      create: { areaId: area.id, userId: parsed.data.targetUserId },
+      update: {},
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_MEMBRO_ADICIONADO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { userId: parsed.data.targetUserId },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível incluir na área' }
+  }
+}
+
+export async function removerMembroAreaDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaMembroSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    targetUserId: formData.get('targetUserId'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+
+    await db.departamentoAreaMembro.deleteMany({
+      where: { areaId: area.id, userId: parsed.data.targetUserId },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_MEMBRO_REMOVIDO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { userId: parsed.data.targetUserId },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível remover da área' }
+  }
+}
+
+export async function definirResponsavelArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaResponsavelSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    targetUserId: formData.get('targetUserId'),
+    papel: formData.get('papel'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+
+    const vinculo: { id: string } | null = await db.departamentoAreaMembro.findFirst({
+      where: { areaId: area.id, userId: parsed.data.targetUserId },
+      select: { id: true },
+    })
+    if (!vinculo) return { error: 'A pessoa precisa estar na área antes de virar responsável' }
+
+    await db.departamentoAreaMembro.update({
+      where: { id: vinculo.id },
+      data: { papel: parsed.data.papel },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_RESPONSAVEL_DEFINIDO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { userId: parsed.data.targetUserId, papel: parsed.data.papel },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
+  }
+}
+
+/** Candidatos do departamento (já elegíveis) ainda fora desta área específica. */
+export async function buscarCandidatosParaArea(
+  areaId: string,
+  departamentoId: string,
+  query: string,
+): Promise<Array<{ id: string; nome: string | null; email: string; nickname: string | null }>> {
+  const entrada = z
+    .object({ areaId: IdSchema, departamentoId: IdSchema, query: z.string().trim().min(2) })
+    .safeParse({ areaId, departamentoId, query })
+  if (!entrada.success) return []
+
+  let tenantId: string
+  try {
+    const { tenant } = await assertPodeGerirArea(entrada.data.departamentoId)
+    tenantId = tenant.id
+  } catch {
+    return []
+  }
+
+  const area: { id: string } | null = await db.departamentoArea.findFirst({
+    where: { id: entrada.data.areaId, departamentoId: entrada.data.departamentoId, tenantId },
+    select: { id: true },
+  })
+  if (!area) return []
+
+  const q = entrada.data.query
+  const jaNaArea: Array<{ userId: string }> = await db.departamentoAreaMembro.findMany({
+    where: { areaId: area.id },
+    select: { userId: true },
+  })
+  const excluir = new Set(jaNaArea.map((m) => m.userId))
+
+  const membrosDepto: Array<{
+    user: { id: string; nome: string | null; email: string; nickname: string | null }
+  }> = await db.userDepartamento.findMany({
+    where: {
+      departamentoId: entrada.data.departamentoId,
+      tenantId,
+      user: {
+        OR: [
+          { nome: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+          { nickname: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+    },
+    take: 12,
+    select: { user: { select: { id: true, nome: true, email: true, nickname: true } } },
+  })
+
+  return membrosDepto.map((m) => m.user).filter((u) => !excluir.has(u.id))
+}
+
+// ---------------------------------------------------------------------------
+// Checklist da área (`DepartamentoArea.meta.checklist`) — leve, sem ERP.
+// ---------------------------------------------------------------------------
+
+const AreaChecklistToggleSchema = z.object({
+  departamentoId: IdSchema,
+  areaId: IdSchema,
+  slug: z.string().min(1),
+  itemId: z.string().min(1).max(64),
+  done: z.enum(['true', 'false']),
+})
+
+export async function toggleChecklistItemArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaChecklistToggleSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    areaId: formData.get('areaId'),
+    slug: formData.get('slug'),
+    itemId: formData.get('itemId'),
+    done: formData.get('done'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    const nextMeta = mergeAreaChecklistToggle(
+      area.meta,
+      parsed.data.itemId,
+      parsed.data.done === 'true',
+    )
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { meta: nextMeta },
+    })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'AREA_CHECKLIST_ITEM',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: {
+          itemId: parsed.data.itemId,
+          done: parsed.data.done === 'true',
+          area: area.nome,
+        },
+      },
+    })
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
+  }
+}
+
+const AreaChecklistAddSchema = z.object({
+  departamentoId: IdSchema,
+  areaId: IdSchema,
+  slug: z.string().min(1),
+  label: z.string().trim().min(2).max(80),
+})
+
+export async function adicionarChecklistItemArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaChecklistAddSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    areaId: formData.get('areaId'),
+    slug: formData.get('slug'),
+    label: formData.get('label'),
+  })
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    const itemId = newAreaChecklistItemId(parsed.data.label)
+    const result = addAreaChecklistItem(area.meta, parsed.data.label, itemId)
+    if ('error' in result) return { error: result.error }
+
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { meta: result.meta },
+    })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'AREA_CHECKLIST_ADD',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { itemId: result.item.id, label: result.item.label, area: area.nome },
+      },
+    })
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível adicionar' }
+  }
+}
+
+const AreaChecklistRemoveSchema = z.object({
+  departamentoId: IdSchema,
+  areaId: IdSchema,
+  slug: z.string().min(1),
+  itemId: z.string().min(1).max(64),
+})
+
+export async function removerChecklistItemArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaChecklistRemoveSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    areaId: formData.get('areaId'),
+    slug: formData.get('slug'),
+    itemId: formData.get('itemId'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    const nextMeta = removeAreaChecklistItem(area.meta, parsed.data.itemId)
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { meta: nextMeta },
+    })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'AREA_CHECKLIST_REMOVE',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: { itemId: parsed.data.itemId, area: area.nome },
+      },
+    })
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível remover' }
+  }
+}
+
+const AreaChecklistModeloSchema = z.object({
+  departamentoId: IdSchema,
+  areaId: IdSchema,
+  slug: z.string().min(1),
+})
+
+/** Acrescenta itens do modelo sugerido pelo slug da área (não apaga os existentes). */
+export async function aplicarModeloChecklistArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaChecklistModeloSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    areaId: formData.get('areaId'),
+    slug: formData.get('slug'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    const result = applyAreaChecklistModelo(area.meta, area.slug)
+    if ('error' in result) return { error: result.error }
+
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { meta: result.meta },
+    })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'AREA_CHECKLIST_MODELO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: {
+          area: area.nome,
+          areaSlug: area.slug,
+          adicionados: result.adicionados,
+        },
+      },
+    })
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível aplicar o modelo' }
+  }
+}
+
+const CanalAreaLinkSchema = z.object({
+  departamentoId: IdSchema,
+  areaId: IdSchema,
+  slug: z.string().min(1),
+  conversaId: z.string().uuid().nullable(),
+})
+
+/**
+ * Vincula (ou remove) canal da frente. Manual — nunca cria Conversa.
+ * Recusa se o canal já for de sede, departamento ou outra área.
+ */
+export async function vincularCanalDepartamentoArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const rawConversa = formData.get('conversaId')
+  const parsed = CanalAreaLinkSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    areaId: formData.get('areaId'),
+    slug: formData.get('slug'),
+    conversaId:
+      rawConversa === null || rawConversa === '' || rawConversa === '__none__'
+        ? null
+        : rawConversa,
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+
+    if (parsed.data.conversaId) {
+      const canal: { id: string } | null = await db.conversa.findFirst({
+        where: {
+          id: parsed.data.conversaId,
+          tenantId: tenant.id,
+          tipo: 'CANAL',
+        },
+        select: { id: true },
+      })
+      if (!canal) return { error: 'Canal inválido' }
+
+      const [deptoDono, areaDona, sedeDona]: [
+        { id: string } | null,
+        { id: string } | null,
+        { id: string } | null,
+      ] = await Promise.all([
+        db.departamento.findFirst({
+          where: { canalConversaId: canal.id },
+          select: { id: true },
+        }),
+        db.departamentoArea.findFirst({
+          where: { canalConversaId: canal.id },
+          select: { id: true },
+        }),
+        db.sede.findFirst({
+          where: { canalConversaId: canal.id },
+          select: { id: true },
+        }),
+      ])
+
+      const erro = validarVinculoCanalArea({
+        conversaId: canal.id,
+        areaId: area.id,
+        usadoPorDepartamentoId: deptoDono?.id ?? null,
+        usadoPorAreaId: areaDona?.id ?? null,
+        usadoPorSedeId: sedeDona?.id ?? null,
+      })
+      if (erro) return { error: erro }
+    }
+
+    await db.departamentoArea.update({
+      where: { id: area.id },
+      data: { canalConversaId: parsed.data.conversaId },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'AREA_CANAL_VINCULADO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: {
+          area: area.nome,
+          conversaId: parsed.data.conversaId,
+        },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível vincular o canal' }
   }
 }

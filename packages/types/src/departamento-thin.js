@@ -9,7 +9,7 @@ export const DEPARTAMENTO_THIN_COPY = Object.freeze({
   'social-e-eventos': {
     titulo: 'Social e eventos',
     descricao:
-      'Festas, churrascos e ações na sede — a agenda vive em Eventos; este departamento reúne a equipe que organiza.',
+      'Festas e ações na sede — agenda em Eventos, projetos neste cockpit; despesas com rateio no Financeiro.',
     ctaModulo: 'Abrir eventos',
   },
   'materiais-loja': {

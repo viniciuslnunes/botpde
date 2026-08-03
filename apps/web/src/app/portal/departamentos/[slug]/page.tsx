@@ -1,28 +1,25 @@
 import { Suspense } from 'react'
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  calculateEffectivePermissions,
-  capabilityPorSlug,
-  hasPermission,
+  estaNaJanela,
+  formatDataCompetenciaInput,
   formatNomeTorcida,
+  hasPermission,
   hrefModuloPortal,
   hrefOperacaoAdmin,
-  isDepartamentoLegado,
   missionDepartamento,
   PERMISSIONS,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
+  slugCampanhaDoAno,
   subareasDepartamento,
 } from '@torcida/types'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import {
   DepartamentoEquipe,
   type MembroEquipe,
+  type AreaFiltro,
 } from '../_components/departamento-equipe'
 import {
   DepartamentoFilaMembros,
@@ -67,22 +64,20 @@ import {
 import { DepartamentoCanalBlock } from '../_components/departamento-canal-block'
 import { iconeDepartamento } from '../_components/departamento-icone'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
-import { podeAbrirDepartamentoPortal } from '@/lib/departamentos-portal-access'
-import { ArrowLeft, ArrowRight, Shield } from 'lucide-react'
+import { getDepartamentoContexto } from './_lib/contexto'
+import { DepartamentoSectionCard } from './_components/departamento-section-card'
+import {
+  DepartamentoAreasBlock,
+  type AreaMembroResumo,
+  type AreaResumo,
+} from './_components/departamento-areas-block'
+import {
+  DepartamentoProjetosBlock,
+  type AreaOpcao,
+  type ProjetoResumo,
+} from './_components/departamento-projetos-block'
+import { ArrowLeft, ArrowRight, Layers, Shield, Target, Users } from 'lucide-react'
 import type { Metadata } from 'next'
-
-type DeptoRow = {
-  id: string
-  nome: string
-  slug: string
-  cor: string
-  moduloPortal: string | null
-  permissions: string[]
-  permissionsGestor: string[]
-  meta: unknown
-  canalConversaId: string | null
-  canalConversa: { id: string; nome: string | null } | null
-}
 
 type Params = { slug: string }
 
@@ -100,104 +95,40 @@ export default async function DepartamentoHomePage({
 }: {
   params: Promise<Params>
 }) {
-  const [session, tenant, { slug }] = await Promise.all([
-    auth(),
-    getTenantFromHost(),
-    params,
-  ])
-  if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/')
+  const { slug } = await params
+  const ctx = await getDepartamentoContexto(slug)
+  if (!ctx) return null
 
-  const isSuperAdmin = isSuperAdminEmail(session.user.email)
-
-  // Torcedor/Sócio são TipoMembro — nunca home de departamento.
-  if (isDepartamentoLegado(slug)) notFound()
-
-  // Gate: depto + memberships + diretoria são independentes → um round-trip.
-  const [depto, memberships, diretoriaRow]: [
-    DeptoRow | null,
-    Array<{ departamentoId: string }>,
-    { id: string } | null,
-  ] = await Promise.all([
-    db.departamento.findFirst({
-      where: { tenantId: tenant.id, slug },
-      select: {
-        id: true,
-        nome: true,
-        slug: true,
-        cor: true,
-        moduloPortal: true,
-        permissions: true,
-        permissionsGestor: true,
-        meta: true,
-        canalConversaId: true,
-        canalConversa: { select: { id: true, nome: true } },
-      },
-    }),
-    db.userDepartamento.findMany({
-      where: { userId: session.user.id, tenantId: tenant.id },
-      select: { departamentoId: true },
-    }),
-    db.departamento.findFirst({
-      where: { tenantId: tenant.id, slug: 'diretoria' },
-      select: { id: true },
-    }),
-  ])
-  if (!depto || isDepartamentoLegado(depto)) notFound()
-
-  const membershipIds = memberships.map((m) => m.departamentoId)
-  const podeAbrir = podeAbrirDepartamentoPortal({
-    departamentoId: depto.id,
-    membershipIds,
-    diretoriaId: diretoriaRow?.id ?? null,
+  const {
+    userId,
+    tenant,
+    departamento: depto,
+    capability,
     isSuperAdmin,
-  })
-  if (!podeAbrir) redirect('/portal/departamentos')
+    isGestor,
+    isAtuacao,
+    permissoesEfetivas,
+    podeGerirEquipe,
+    podeAprovarArea,
+    podeVerFinanceiro,
+    podeVerPatrimonio,
+    podeModerar,
+    areas,
+  } = ctx
 
-  const isMembroDaArea = membershipIds.includes(depto.id)
-
-  // Gestão e permissões efetivas são independentes → paralelizar.
-  const [gestao, { rolePermissions, overrides }]: [
-    { id: string } | null,
-    Awaited<ReturnType<typeof getUserPermissionsInTenant>>,
-  ] = await Promise.all([
-    db.departamentoGestor.findFirst({
-      where: { userId: session.user.id, departamentoId: depto.id },
-      select: { id: true },
-    }),
-    getUserPermissionsInTenant(session.user.id, tenant.id),
-  ])
-  const isGestor = Boolean(gestao) || isSuperAdmin
-
-  const effectivePermissions = calculateEffectivePermissions(rolePermissions, overrides)
-  const podeAprovar =
-    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.MEMBERS_APPROVE)
-  const podeVerFinanceiro =
-    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.FINANCE_VIEW)
-  const podeVerPatrimonio =
-    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.PATRIMONY_VIEW)
   const podeVerPedidos =
-    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.STORE_VIEW_ORDERS)
-  const podeModerar =
-    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.COMMUNITY_MODERATE)
+    isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.STORE_VIEW_ORDERS)
 
   const [acessoCaravanas, acessoBateria] = await Promise.all([
     resolveAcessoPluginEvento(
-      session.user.id,
+      userId,
       tenant.id,
       'caravanas',
-      rolePermissions,
-      overrides,
+      permissoesEfetivas,
+      [],
       isSuperAdmin,
     ),
-    resolveAcessoPluginEvento(
-      session.user.id,
-      tenant.id,
-      'bateria',
-      rolePermissions,
-      overrides,
-      isSuperAdmin,
-    ),
+    resolveAcessoPluginEvento(userId, tenant.id, 'bateria', permissoesEfetivas, [], isSuperAdmin),
   ])
 
   type EquipeUserLite = {
@@ -256,6 +187,168 @@ export default async function DepartamentoHomePage({
     return userIdsElegiveis.has(userId)
   }
 
+  // Áreas: membros por área (mesma consulta alimenta o bloco #areas e os
+  // badges/filtro da equipe segmentada por área).
+  type AreaMembroRow = {
+    areaId: string
+    userId: string
+    papel: string
+    user: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
+  }
+  const areaMembrosRows: AreaMembroRow[] =
+    areas.length > 0
+      ? await db.departamentoAreaMembro.findMany({
+          where: { areaId: { in: areas.map((a) => a.id) } },
+          select: {
+            areaId: true,
+            userId: true,
+            papel: true,
+            user: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+          },
+        })
+      : []
+  const membrosPorArea = new Map<string, AreaMembroResumo[]>()
+  const areasPorUsuario = new Map<string, string[]>()
+  for (const row of areaMembrosRows) {
+    const lista = membrosPorArea.get(row.areaId) ?? []
+    lista.push({
+      userId: row.userId,
+      nome: row.user.nome,
+      nickname: row.user.nickname,
+      avatarUrl: row.user.avatarUrl,
+      papel: row.papel === 'RESPONSAVEL' ? 'RESPONSAVEL' : 'MEMBRO',
+    })
+    membrosPorArea.set(row.areaId, lista)
+    const ids = areasPorUsuario.get(row.userId) ?? []
+    ids.push(row.areaId)
+    areasPorUsuario.set(row.userId, ids)
+  }
+  for (const lista of membrosPorArea.values()) {
+    lista.sort((a, b) => {
+      if (a.papel !== b.papel) return a.papel === 'RESPONSAVEL' ? -1 : 1
+      return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR')
+    })
+  }
+  const areasResumo: AreaResumo[] = areas.map((a) => ({
+    ...a,
+    membros: membrosPorArea.get(a.id) ?? [],
+    campanhaAnoAberta: false,
+  }))
+  const areasFiltro: AreaFiltro[] = areas.map((a) => ({ id: a.id, nome: a.nome }))
+
+  // Projetos do departamento + gasto realizado (soma das DESPESAS vinculadas).
+  // O realizado nunca é digitado no projeto: vem do livro-caixa.
+  type ProjetoRow = {
+    id: string
+    titulo: string
+    slug: string
+    descricao: string | null
+    tipo: string
+    status: string
+    areaId: string | null
+    inicio: Date
+    fim: Date | null
+    recorrenteAnual: boolean
+    metaQuantidade: number | null
+    metaUnidade: string | null
+    realizadoQuantidade: number
+    orcamentoPrevisto: unknown
+    responsavel: { nome: string | null; nickname: string | null } | null
+    _count: { participantes: number }
+    eventos: Array<{ id: string; titulo: string; data: Date }>
+  }
+  const projetosRaw: ProjetoRow[] = await db.projeto.findMany({
+    where: { departamentoId: depto.id, tenantId: tenant.id },
+    orderBy: [{ status: 'asc' }, { inicio: 'desc' }],
+    take: 60,
+    select: {
+      id: true,
+      titulo: true,
+      slug: true,
+      descricao: true,
+      tipo: true,
+      status: true,
+      areaId: true,
+      inicio: true,
+      fim: true,
+      recorrenteAnual: true,
+      metaQuantidade: true,
+      metaUnidade: true,
+      realizadoQuantidade: true,
+      orcamentoPrevisto: true,
+      responsavel: { select: { nome: true, nickname: true } },
+      _count: { select: { participantes: true } },
+      eventos: {
+        where: { data: { gte: new Date() } },
+        orderBy: { data: 'asc' },
+        take: 3,
+        select: { id: true, titulo: true, data: true },
+      },
+    },
+  })
+
+  const gastoPorProjeto = new Map<string, number>()
+  if (projetosRaw.length > 0) {
+    const somas: Array<{ projetoId: string | null; _sum: { valor: unknown } }> =
+      await db.financeiroLancamento.groupBy({
+        by: ['projetoId'],
+        where: {
+          tenantId: tenant.id,
+          tipo: 'DESPESA',
+          projetoId: { in: projetosRaw.map((p) => p.id) },
+        },
+        _sum: { valor: true },
+      })
+    for (const s of somas) {
+      if (s.projetoId) gastoPorProjeto.set(s.projetoId, Number(s._sum.valor ?? 0))
+    }
+  }
+
+  const areaNomePorId = new Map(areas.map((a) => [a.id, a.nome]))
+  const anoAtual = new Date().getFullYear()
+  const slugsCampanhaAno = new Set(projetosRaw.map((p) => p.slug))
+  for (const a of areasResumo) {
+    a.campanhaAnoAberta = slugsCampanhaAno.has(slugCampanhaDoAno(a.slug, anoAtual))
+  }
+  const fmtDataCurta = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  })
+  const projetos: ProjetoResumo[] = projetosRaw.map((p) => ({
+    id: p.id,
+    titulo: p.titulo,
+    descricao: p.descricao,
+    tipo: p.tipo,
+    status: p.status,
+    areaId: p.areaId,
+    areaNome: p.areaId ? (areaNomePorId.get(p.areaId) ?? null) : null,
+    inicioIso: formatDataCompetenciaInput(p.inicio),
+    fimIso: p.fim ? formatDataCompetenciaInput(p.fim) : null,
+    inicioLabel: fmtDataCurta.format(p.inicio),
+    fimLabel: p.fim ? fmtDataCurta.format(p.fim) : null,
+    recorrenteAnual: p.recorrenteAnual,
+    naJanela: estaNaJanela({ inicio: p.inicio, fim: p.fim, recorrenteAnual: p.recorrenteAnual }),
+    metaQuantidade: p.metaQuantidade,
+    metaUnidade: p.metaUnidade,
+    realizadoQuantidade: p.realizadoQuantidade,
+    orcamentoPrevisto: p.orcamentoPrevisto == null ? null : Number(p.orcamentoPrevisto),
+    gastoRealizado: gastoPorProjeto.get(p.id) ?? 0,
+    responsavelNome:
+      p.responsavel?.nome?.trim() ||
+      (p.responsavel?.nickname ? `@${p.responsavel.nickname}` : null),
+    participantes: p._count.participantes,
+    eventos: p.eventos.map((e) => ({
+      id: e.id,
+      titulo: e.titulo,
+      dataLabel: fmtDataCurta.format(e.data),
+    })),
+  }))
+  const areasOpcoes: AreaOpcao[] = areas
+    .filter((a) => a.ativa)
+    .map((a) => ({ id: a.id, nome: a.nome }))
+
   const gestorSet = new Set(
     gestoresRaw.filter((g) => naEquipeVisivel(g.userId)).map((g) => g.userId),
   )
@@ -270,6 +363,7 @@ export default async function DepartamentoHomePage({
       nickname: g.user.nickname,
       avatarUrl: g.user.avatarUrl,
       isGestor: true,
+      areaIds: areasPorUsuario.get(g.userId) ?? [],
     })
   }
   for (const m of membrosRaw) {
@@ -282,6 +376,7 @@ export default async function DepartamentoHomePage({
       nickname: m.user.nickname,
       avatarUrl: m.user.avatarUrl,
       isGestor: gestorSet.has(m.userId),
+      areaIds: areasPorUsuario.get(m.userId) ?? [],
     })
   }
 
@@ -291,13 +386,18 @@ export default async function DepartamentoHomePage({
     return (a.nome ?? a.email).localeCompare(b.nome ?? b.email, 'pt-BR')
   })
 
-  const capability = capabilityPorSlug(depto.slug)
   const moduloKey = resolverModuloPortalDepartamento(depto.slug, depto.moduloPortal)
   const moduloHref = hrefModuloPortal(moduloKey)
   const operacaoHref = isGestor ? hrefOperacaoAdmin(moduloKey) : null
   const moduloLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
   const mission = missionDepartamento(depto.slug)
-  const subareas = subareasDepartamento(depto.slug)
+  // Registry cobre as capacidades do domínio; Áreas e Projetos são universais
+  // (todo departamento tem) e entram aqui em vez de repetir nos 10 slugs.
+  const subareas = [
+    ...subareasDepartamento(depto.slug),
+    { id: 'areas', label: 'Áreas', feature: 'equipe' as const },
+    { id: 'projetos', label: 'Projetos', feature: 'equipe' as const },
+  ]
   const panel = capability?.portalPanel ?? 'generico'
   const Icon = iconeDepartamento(depto.slug)
 
@@ -311,7 +411,7 @@ export default async function DepartamentoHomePage({
    * torcida, a área é decidida por cada nível no seu próprio portal.
    */
   let pedidosArea: PedidoAreaLite[] = []
-  if (isGestor && podeAprovar) {
+  if (isGestor) {
     type CandidatoRow = {
       id: string
       userId: string
@@ -406,7 +506,7 @@ export default async function DepartamentoHomePage({
     }
     totalPendentes = kpis.pendentes
 
-    if (podeAprovar) {
+    if (podeAprovarArea) {
       type PendenteRow = {
         id: string
         nome: string
@@ -451,11 +551,14 @@ export default async function DepartamentoHomePage({
   ] = await Promise.all([
     resolverProximaAcaoArea({
       tenantId: tenant.id,
+      departamentoId: depto.id,
       slug: depto.slug,
       panel,
       isGestor,
       totalPendentes,
       podeVerFinanceiro,
+      totalPedidosArea: pedidosArea.length,
+      nomeDepartamento: depto.nome,
     }),
     isGestor
       ? db.conversa.findMany({
@@ -500,7 +603,7 @@ export default async function DepartamentoHomePage({
               {moduloLabel}
               {isGestor
                 ? ' · você é gestor'
-                : isMembroDaArea
+                : isAtuacao
                   ? ' · você é membro'
                   : ' · visão Diretoria (sem gestão)'}
               {panel === 'diretoria' && isGestor && totalPendentes > 0
@@ -569,6 +672,7 @@ export default async function DepartamentoHomePage({
             <Suspense fallback={<BateriaEnsaiosSkeleton />}>
               <BateriaEnsaiosAside
                 tenantId={tenant.id}
+                departamentoId={depto.id}
                 nome={depto.nome}
                 isGestor={isGestor}
                 moduloHref={moduloHref}
@@ -599,32 +703,100 @@ export default async function DepartamentoHomePage({
                 tenantId={tenant.id}
                 slug={depto.slug}
                 nome={depto.nome}
+                departamentoId={depto.id}
                 isGestor={isGestor}
                 moduloHref={moduloHref}
                 operacaoHref={operacaoHref}
                 podeVerPedidos={podeVerPedidos}
                 podeModerar={podeModerar}
+                podeVerFinanceiro={podeVerFinanceiro}
+                podeGerirFinanceiro={
+                  isSuperAdmin ||
+                  hasPermission(permissoesEfetivas, PERMISSIONS.FINANCE_MANAGE)
+                }
               />
             </Suspense>
           )}
         </aside>
 
         <div className="order-2 space-y-6 lg:order-1">
-          {panel === 'diretoria' && isGestor && podeAprovar && (
-            <div id="fila" className="scroll-mt-20">
-              <DepartamentoFilaMembros
-                pendentes={pendentes}
-                totalPendentes={totalPendentes}
-              />
-            </div>
-          )}
+          {panel === 'diretoria' &&
+            (isGestor && podeAprovarArea ? (
+              <div id="fila" className="scroll-mt-20">
+                <DepartamentoFilaMembros pendentes={pendentes} totalPendentes={totalPendentes} />
+              </div>
+            ) : (
+              <DepartamentoSectionCard
+                icon={<Users className="h-4 w-4" />}
+                title="Fila de admissão"
+                description="Sócios e torcedores pendentes de aprovação nesta torcida."
+                id="fila"
+                index={0}
+                blocked
+                blockedReason="A aprovação da fila é de quem gere a Diretoria. Você vê o painel de resumo ao lado."
+              >
+                {null}
+              </DepartamentoSectionCard>
+            ))}
+
           {/* Vale para qualquer área (não só Diretoria): a decisão de entrada
               na área é do gestor dela, no portal do seu próprio nível. */}
-          {isGestor && podeAprovar && pedidosArea.length > 0 && (
-            <div id="pedidos-area" className="scroll-mt-20">
-              <DepartamentoFilaArea nomeArea={depto.nome} pedidos={pedidosArea} />
-            </div>
-          )}
+          {isGestor &&
+            (podeAprovarArea ? (
+              pedidosArea.length > 0 && (
+                <div id="pedidos-area" className="scroll-mt-20">
+                  <DepartamentoFilaArea nomeArea={depto.nome} pedidos={pedidosArea} />
+                </div>
+              )
+            ) : (
+              <DepartamentoSectionCard
+                icon={<Users className="h-4 w-4" />}
+                title="Pedidos de área"
+                description="Sócios aprovados aguardando entrada numa área deste departamento."
+                id="pedidos-area"
+                index={1}
+                blocked
+                blockedReason="Só quem aprova admissões decide esses pedidos. Fale com a Diretoria se algo estiver represado."
+              >
+                {null}
+              </DepartamentoSectionCard>
+            ))}
+
+          <DepartamentoSectionCard
+            icon={<Layers className="h-4 w-4" />}
+            title="Áreas de atuação"
+            description="Frentes de trabalho deste departamento — cada uma organiza sua própria gente."
+            id="areas"
+            index={2}
+          >
+            <DepartamentoAreasBlock
+              departamentoId={depto.id}
+              slug={depto.slug}
+              areas={areasResumo}
+              podeGerir={podeGerirEquipe}
+              canaisDisponiveis={canaisDisponiveis}
+            />
+          </DepartamentoSectionCard>
+
+          <DepartamentoSectionCard
+            icon={<Target className="h-4 w-4" />}
+            title="Projetos e campanhas"
+            description="O trabalho do departamento com período, meta e prestação de contas."
+            id="projetos"
+            index={3}
+          >
+            <DepartamentoProjetosBlock
+              departamentoId={depto.id}
+              slug={depto.slug}
+              projetos={projetos}
+              areas={areasOpcoes}
+              podeGerir={podeGerirEquipe}
+              areasSazonaisSemCampanha={areasResumo
+                .filter((a) => a.ativa && a.sazonal && !a.campanhaAnoAberta)
+                .map((a) => ({ id: a.id, nome: a.nome }))}
+            />
+          </DepartamentoSectionCard>
+
           <div id="equipe" className="scroll-mt-20">
             <DepartamentoEquipe
               departamentoId={depto.id}
@@ -632,8 +804,9 @@ export default async function DepartamentoHomePage({
               nome={depto.nome}
               cor={depto.cor}
               membros={membros}
-              isGestor={isGestor}
-              currentUserId={session.user.id}
+              isGestor={podeGerirEquipe}
+              currentUserId={userId}
+              areas={areasFiltro}
             />
           </div>
         </div>

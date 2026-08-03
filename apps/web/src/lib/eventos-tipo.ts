@@ -51,6 +51,11 @@ export type EventoEmbarqueLite = {
       avatarUrl: string | null
     }
   }>
+  /**
+   * Status da cobrança AVULSA da vaga por userId. Vazio quando ninguém gerou
+   * cobrança ainda. Só preenchido no loader — nunca passa a client cru.
+   */
+  cobrancasPorUserId: Record<string, string>
 }
 
 export const listarEventosPorTipo = cache(async function listarEventosPorTipo(
@@ -197,6 +202,17 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
     },
   })
   if (!row) return null
+
+  // Cobranças da vaga (C1) — join natural com RSVP por userId. Carrega sempre
+  // para o caller decidir; caravana sem valorVaga ignora no resolver.
+  const cobrancas: Array<{ userId: string; status: string }> =
+    await db.cobrancaAssociacao.findMany({
+      where: { tenantId, eventoId: row.id },
+      select: { userId: true, status: true },
+    })
+  const cobrancasPorUserId: Record<string, string> = {}
+  for (const c of cobrancas) cobrancasPorUserId[c.userId] = c.status
+
   return {
     id: row.id,
     tipo: row.tipo,
@@ -213,5 +229,55 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
     sede: row.sede ? { capacidade: row.sede.capacidade } : null,
     partida: row.partida,
     rsvps: row.rsvps,
+    cobrancasPorUserId,
   }
 })
+
+/**
+ * Mapa userId → status da cobrança AVULSA do evento. Usado pelo admin (query
+ * própria) e pelo check-in quando o loader completo não está em mãos.
+ */
+export async function carregarCobrancasVagaEvento(
+  tenantId: string,
+  eventoId: string,
+): Promise<Record<string, string>> {
+  const cobrancas: Array<{ userId: string; status: string }> =
+    await db.cobrancaAssociacao.findMany({
+      where: { tenantId, eventoId },
+      select: { userId: true, status: true },
+    })
+  const out: Record<string, string> = {}
+  for (const c of cobrancas) out[c.userId] = c.status
+  return out
+}
+
+/**
+ * Projetos abertos do tenant para o seletor Agenda ↔ Projeto.
+ * Só PLANEJADO/ATIVO — concluído/cancelado some da lista de vínculo novo.
+ */
+export async function listarProjetosParaEvento(
+  tenantId: string,
+): Promise<Array<{ id: string; titulo: string; departamentoNome: string }>> {
+  const rows: Array<{
+    id: string
+    titulo: string
+    departamento: { nome: string }
+  }> = await db.projeto.findMany({
+    where: {
+      tenantId,
+      status: { in: ['PLANEJADO', 'ATIVO'] },
+    },
+    orderBy: [{ titulo: 'asc' }],
+    take: 100,
+    select: {
+      id: true,
+      titulo: true,
+      departamento: { select: { nome: true } },
+    },
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    titulo: r.titulo,
+    departamentoNome: r.departamento.nome,
+  }))
+}

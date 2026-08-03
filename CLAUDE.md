@@ -46,6 +46,7 @@ pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
 pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comunidade
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
+pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 pnpm --filter @torcida/db audit:regras       # invariantes de negócio + matriz de relações
@@ -171,6 +172,26 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   lados, área não — quem não decidiu efetiva depois via
   `efetivarAreaPretendida`. Nunca aplicar `aplicarDepartamentoPreferido` num
   tenant a partir da decisão de outro.
+  **Áreas de atuação (2026-08-03):** `DepartamentoArea` +
+  `DepartamentoAreaMembro` segmentam frentes dentro do departamento (Agasalho,
+  Escolinha da Bateria, Barracão…). **Área NÃO concede permissão** — RBAC
+  continua no `Departamento`; `papel: RESPONSAVEL` é accountability, e quem
+  gere é `canManageDepartamento`. Regra pura em `resolverAreasDepartamento`
+  (`lib/departamentos-portal-access.ts`); conhecimento canônico em
+  `packages/types/src/departamento-areas-canonicas.js` (seed
+  `seed:departamento-areas`, que nunca sobrescreve `ativa`/`nome`). Cockpit do
+  portal usa o loader `[slug]/_lib/contexto.ts` e mostra bloco sem permissão
+  como `blocked` com motivo, não escondido. Admin: `/admin/departamentos`
+  (gate `roles:manage`); pacotes de permissão seguem em `/admin/acessos`.
+  Ver `ARCHITECTURE.md` §5.15.
+  **Projetos / campanhas (2026-08-03):** `Projeto` + `ProjetoParticipante`
+  são o trabalho executado pela área (Agasalho, Festa das Crianças…).
+  Projeto também **não** concede permissão; gasto realizado vem da soma
+  das `DESPESA` com `projetoId` (não digitado à mão). Portal: bloco
+  `#projetos` no cockpit; admin: tab em `/admin/departamentos/projetos`;
+  financeiro: rateio opcional `departamentoId`/`projetoId` no lançamento.
+  Contrato puro em `packages/types/src/projeto.js`. Ver `ARCHITECTURE.md`
+  §5.16.
 - **Membros / admissão** — fila `/admin/membros`, reprovação com laudo obrigatório
  (categoria + justificativa + etapas erradas, `CATEGORIAS_REPROVACAO`/
  `PONTOS_REPROVACAO` em `packages/types/src/schemas/membro.js`) e aba de
@@ -193,7 +214,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   portal `/portal/patrimonio`, admin `/admin/patrimonio`.
 - **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`);
   hubs legado redirecionam para Agenda: `docs/data/modulo-caravanas.md`,
-  `docs/data/modulo-bateria.md`.
+  `docs/data/modulo-bateria.md`. Caravana paga: lotação por `PAGA`, cobrança
+  auto ao confirmar, hard-block opcional (`checkInExigePagamento`); ver
+  `ARCHITECTURE.md` §5.17.
 - **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos` (lista/semana/mês);
   `Partida` global por `Afiliacao`; série/waitlist/mapa/QR offline; ver
   `docs/data/modulo-eventos.md` e `ARCHITECTURE.md` §5.11. Fontes de jogos:

@@ -7,23 +7,34 @@ export function ExportEmbarqueCsvButton({
   titulo,
   itens,
   filename,
+  incluirPagamento = false,
 }: {
   titulo: string
   itens: EmbarqueRow[]
   filename?: string
+  incluirPagamento?: boolean
 }) {
   function exportar() {
-    const header = ['nome', 'email', 'status', 'checkin']
-    const lines = itens.map((i) =>
-      [
-        i.nome,
-        i.email,
-        i.status,
-        i.checkedInAt ? new Date(i.checkedInAt).toISOString() : '',
-      ]
-        .map((c) => `"${String(c).replace(/"/g, '""')}"`)
-        .join(','),
-    )
+    const header = incluirPagamento
+      ? ['nome', 'email', 'status', 'pagamento', 'checkin']
+      : ['nome', 'email', 'status', 'checkin']
+    const lines = itens.map((i) => {
+      const cols = incluirPagamento
+        ? [
+            i.nome,
+            i.email,
+            i.status,
+            i.labelPagamento ?? '',
+            i.checkedInAt ? new Date(i.checkedInAt).toISOString() : '',
+          ]
+        : [
+            i.nome,
+            i.email,
+            i.status,
+            i.checkedInAt ? new Date(i.checkedInAt).toISOString() : '',
+          ]
+      return cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')
+    })
     const csv = [`# ${titulo}`, header.join(','), ...lines].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)

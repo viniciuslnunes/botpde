@@ -18,7 +18,8 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
 - Campos: `SaasMembro.dataExpedicaoCarteirinha`, `periodicidadePretendida`; `SaasSocio.expedidoEm`.
 - **Pendências de cadastro (2026-08-02):** usa a mesma **completude do cadastro** do card em `/admin/socios` (`lib/completude-cadastro-socio.ts` — nº, CPF, RG, nascimento, endereço, termo, prova, responsável se menor; + documentos se `exigirDocumentosCadastro`; + expedição/periodicidade se ainda não há `SaasSocio`). Modal no portal → `/portal/cadastro/associacao`. «Não mostrar de novo» → `adimplente = false` até completar (`pendenciasCadastroDispensadas`).
 - **Quem entra (2026-08-02):** todos os **sócios aprovados** da unidade (`tipo = SOCIO`) — membros, gestores de departamento, presidente/liderança/vice/admin desde que sócios. **Torcedores ficam de fora.**
-- **Toggle por unidade:** `Tenant.solicitarPendenciasCadastro` (default `true`) em `/admin/configuracoes` → Cadastro de sócios. Escopo = tenant atual (Sede ou afiliada). Quem gerencia: permissão `associacao:pendencias_manage` (owner, admin, vice + super-admin).
+- **Pendências por canal:** `Tenant.solicitarPendenciasCadastro` (default `true`) em `/admin/configuracoes` → Cadastro de sócios. Vale **só para o canal/unidade atual** — o modal dispara ao acessar aquele contexto. Quem gerencia: `associacao:pendencias_manage` (owner, admin, vice, liderança + super-admin).
+- **Propagação (só Sede):** `Tenant.propagarPendenciasCadastroUnidades` (default `false`). Quando ligado, o flag da Sede vale para toda a worktree (subsedes/PDEs ignoram o local). Só na Sede; mesmos cargos de gestão do toggle local (presidente/vice/admin/super-admin).
 
 ## Entidades
 
@@ -333,16 +334,24 @@ registro. Para sumir de vez:
 Gestores usam **Check-in pela carteirinha (QR)** na lista de embarque/presença
 (`ListaEmbarque` em caravanas/bateria/eventos): cole o payload ou a URL de
 `/carteirinha/validar?t=…`. A action `registrarCheckInPorQr` valida adimplência
-e registra `EVENTO_CHECKIN_QR`.
+e registra `EVENTO_CHECKIN_QR`. Em caravana com `valorVaga`, anexa aviso se a
+vaga não estiver paga. Default: **não bloqueia**. Com
+`Evento.checkInExigePagamento`, o QR **bloqueia** (use check-in manual com
+“Embarcar mesmo assim”). AuditLog grava `pagamentoStatus` / `override`.
 
 A carteirinha no portal **não** envia o token a APIs externas de QR (LGPD):
 mostra link de validação + cópia. Câmeras do celular abrem o link público.
 
 ## Caravana paga (paridade C1)
 
-- Admin define `Evento.valorVaga` em caravanas
+- Admin define `Evento.valorVaga` (e opcionalmente `checkInExigePagamento`)
 - Associado com RSVP `CONFIRMADO` gera cobrança `AVULSA` ligada a `eventoId`
-  (`solicitarCobrancaVagaCaravana` → `/portal/cobrancas/[id]`)
+  automaticamente (`garantirCobrancaVagaCaravana`); CTA manual permanece como
+  fallback
+- Lotação do ônibus conta só `PAGA` — confirmar sem pagar não garante lugar
+- Baixa da vaga gera lançamento com categoria `CARAVANA` (não `MENSALIDADE`)
+- Lista de embarque cruza RSVP × cobrança × check-in (`resolverStatusVaga`);
+  ver `docs/data/modulo-caravanas.md`
 - Home Caravanas mostra vagas pagas / confirmados quando há valor
 
 ## Notificações

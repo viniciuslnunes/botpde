@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   podeAbrirDepartamentoPortal,
+  resolverAreasDepartamento,
   resolverDepartamentosHub,
+  type AreaBase,
   type DeptoHubBase,
 } from '@/lib/departamentos-portal-access'
 import {
@@ -70,6 +72,83 @@ describe('departamentos portal access', () => {
         diretoriaId: 'd1',
       }),
     ).toBe(false)
+  })
+})
+
+describe('resolverAreasDepartamento', () => {
+  const areaBase = (
+    partial: Partial<AreaBase> & Pick<AreaBase, 'id' | 'slug' | 'nome'>,
+  ): AreaBase => ({
+    descricao: null,
+    icone: null,
+    ordem: 0,
+    ativa: true,
+    sazonal: false,
+    ...partial,
+  })
+
+  const agasalho = areaBase({ id: 'a1', slug: 'campanha-do-agasalho', nome: 'Campanha do Agasalho', ordem: 1 })
+  const inclusao = areaBase({ id: 'a2', slug: 'inclusao-digital', nome: 'Inclusão Digital', ordem: 2 })
+
+  it('responsável de área NÃO recebe podeGerir', () => {
+    const items = resolverAreasDepartamento({
+      areas: [agasalho, inclusao],
+      membroAreaIds: ['a1'],
+      responsavelAreaIds: ['a1'],
+      isGestorDepartamento: false,
+    })
+    const item = items.find((i) => i.id === 'a1')
+    expect(item?.isResponsavel).toBe(true)
+    expect(item?.podeGerir).toBe(false)
+  })
+
+  it('gestor do departamento recebe podeGerir em TODAS as áreas, mesmo onde não é membro', () => {
+    const items = resolverAreasDepartamento({
+      areas: [agasalho, inclusao],
+      membroAreaIds: [],
+      responsavelAreaIds: [],
+      isGestorDepartamento: true,
+    })
+    expect(items.every((i) => i.podeGerir)).toBe(true)
+    expect(items.every((i) => i.isMembro === false)).toBe(true)
+  })
+
+  it('super-admin recebe podeGerir em todas as áreas', () => {
+    const items = resolverAreasDepartamento({
+      areas: [agasalho, inclusao],
+      membroAreaIds: [],
+      responsavelAreaIds: [],
+      isGestorDepartamento: false,
+      isSuperAdmin: true,
+    })
+    expect(items.every((i) => i.podeGerir)).toBe(true)
+  })
+
+  it('ordenação: minha área inativa antes de área ativa que não é minha', () => {
+    const minhaInativa = areaBase({ id: 'a3', slug: 'ensaios', nome: 'Ensaios', ordem: 1, ativa: false })
+    const items = resolverAreasDepartamento({
+      areas: [inclusao, minhaInativa],
+      membroAreaIds: ['a3'],
+      responsavelAreaIds: [],
+      isGestorDepartamento: false,
+    })
+    expect(items.map((i) => i.id)).toEqual(['a3', 'a2'])
+  })
+
+  it('aceita arrays em vez de Set com o mesmo resultado', () => {
+    const viaSet = resolverAreasDepartamento({
+      areas: [agasalho, inclusao],
+      membroAreaIds: new Set(['a1']),
+      responsavelAreaIds: new Set(['a1']),
+      isGestorDepartamento: false,
+    })
+    const viaArray = resolverAreasDepartamento({
+      areas: [agasalho, inclusao],
+      membroAreaIds: ['a1'],
+      responsavelAreaIds: ['a1'],
+      isGestorDepartamento: false,
+    })
+    expect(viaArray).toEqual(viaSet)
   })
 })
 

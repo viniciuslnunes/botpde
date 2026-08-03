@@ -21,7 +21,7 @@ import {
   PENDENCIAS_CADASTRO_CODIGOS,
   type PendenciaCadastroCodigo,
 } from '@/lib/pendencias-cadastro'
-import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
+import { carregarPendenciasCadastro, servicoPendenciasCadastroAtivo } from '@/lib/pendencias-cadastro-server'
 import { resumirCompletudeCadastroSocio } from '@/lib/completude-cadastro-socio'
 import { notificarUsuario } from '@/lib/notificacoes-routing'
 import { UFS_BRASIL } from '@/lib/ufs-brasil'
@@ -87,7 +87,7 @@ export async function completarDadosAssociacao(
   if (!membro || !elegivelPendenciaCadastro(membro)) {
     return { message: 'Só sócios aprovados podem completar estes dados.' }
   }
-  if (tenant.solicitarPendenciasCadastro === false) {
+  if (!(await servicoPendenciasCadastroAtivo(tenant.id))) {
     return { message: 'A solicitação de dados pendentes está desligada nesta unidade.' }
   }
 

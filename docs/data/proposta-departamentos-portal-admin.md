@@ -233,5 +233,6 @@ sobre um shell portal único, com RBAC existente.
 **Admin** = configuração institucional + operação pesada de domínio.  
 **Portal Departamentos** = casa do membro e do gestor no dia a dia da área.
 
-**Próximo passo** após Fase 5 Onda 4 MVP: refinar C1 (gate adimplência na lotação,
-régua de vaga) e canal automático por área se ICP pedir.
+**Próximo passo** após Fase 5 Onda 4 MVP: refinamentos pontuais. Canal por
+área de atuação entregue como vínculo manual (`DepartamentoArea.canalConversaId`)
+— sem auto-criação.

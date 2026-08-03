@@ -10,6 +10,7 @@ import {
   PENDENCIA_SOCIO_FICHA,
   pendenciasCadastroVisiveis,
   resolverPendenciasCadastro,
+  resolverServicoPendenciasCanal,
   type MembroParaPendenciaCadastro,
 } from '../pendencias-cadastro'
 
@@ -156,6 +157,65 @@ describe('resolverPendenciasCadastro via completude', () => {
     ).toEqual([])
     expect(
       inadimplentePorPendenciaCadastro(base({ solicitarPendenciasCadastro: false })),
+    ).toBe(false)
+  })
+})
+
+describe('resolverServicoPendenciasCanal', () => {
+  it('Sede usa só o flag local', () => {
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: true,
+        isRaiz: true,
+        sedeSolicitar: true,
+        sedePropagar: false,
+      }),
+    ).toBe(true)
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: false,
+        isRaiz: true,
+        sedeSolicitar: false,
+        sedePropagar: true,
+      }),
+    ).toBe(false)
+  })
+
+  it('unidade sem propagação usa flag local', () => {
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: false,
+        isRaiz: false,
+        sedeSolicitar: true,
+        sedePropagar: false,
+      }),
+    ).toBe(false)
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: true,
+        isRaiz: false,
+        sedeSolicitar: false,
+        sedePropagar: false,
+      }),
+    ).toBe(true)
+  })
+
+  it('com propagação da Sede, unidade herda o flag da Sede', () => {
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: false,
+        isRaiz: false,
+        sedeSolicitar: true,
+        sedePropagar: true,
+      }),
+    ).toBe(true)
+    expect(
+      resolverServicoPendenciasCanal({
+        solicitarLocal: true,
+        isRaiz: false,
+        sedeSolicitar: false,
+        sedePropagar: true,
+      }),
     ).toBe(false)
   })
 })

@@ -586,6 +586,11 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
       },
     })
     await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })
+    // Quem sai do departamento perde as áreas deste departamento (só as dele —
+    // outros departamentos/tenants não são afetados).
+    await tx.departamentoAreaMembro.deleteMany({
+      where: { userId: targetUserId, area: { departamentoId } },
+    })
     await tx.auditLog.create({
       data: {
         tenantId: tenant.id,

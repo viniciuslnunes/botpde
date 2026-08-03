@@ -1,14 +1,78 @@
 import 'server-only'
 import { cache } from 'react'
 import { db } from '@torcida/db'
+import { resolverTenantRaizId } from '@/lib/membros-sede'
 import {
   elegivelPendenciaCadastro,
   inadimplentePorPendenciaCadastro,
   pendenciasCadastroVisiveis,
   resolverPendenciasCadastro,
+  resolverServicoPendenciasCanal,
   type MembroParaPendenciaCadastro,
   type PendenciaCadastro,
 } from '@/lib/pendencias-cadastro'
+
+/**
+ * Serviço ativo **neste canal** (tenant do contexto)?
+ *
+ * - Unidade: usa o flag local, salvo quando a Sede ligou “propagar às unidades”
+ *   — aí vale o flag da Sede (a Sede dita o ritmo).
+ * - Sede: só o próprio flag.
+ */
+export async function servicoPendenciasCadastroAtivo(tenantId: string): Promise<boolean> {
+  const raizId = await resolverTenantRaizId(tenantId)
+  const isRaiz = raizId === tenantId
+
+  if (isRaiz) {
+    const sede: { solicitarPendenciasCadastro: boolean } | null = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { solicitarPendenciasCadastro: true },
+    })
+    return resolverServicoPendenciasCanal({
+      solicitarLocal: sede?.solicitarPendenciasCadastro === true,
+      isRaiz: true,
+      sedeSolicitar: sede?.solicitarPendenciasCadastro === true,
+      sedePropagar: false,
+    })
+  }
+
+  const [unidade, sede]: [
+    { solicitarPendenciasCadastro: boolean } | null,
+    {
+      solicitarPendenciasCadastro: boolean
+      propagarPendenciasCadastroUnidades: boolean
+    } | null,
+  ] = await Promise.all([
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { solicitarPendenciasCadastro: true },
+    }),
+    db.tenant.findUnique({
+      where: { id: raizId },
+      select: {
+        solicitarPendenciasCadastro: true,
+        propagarPendenciasCadastroUnidades: true,
+      },
+    }),
+  ])
+
+  return resolverServicoPendenciasCanal({
+    solicitarLocal: unidade?.solicitarPendenciasCadastro === true,
+    isRaiz: false,
+    sedeSolicitar: sede?.solicitarPendenciasCadastro === true,
+    sedePropagar: sede?.propagarPendenciasCadastroUnidades === true,
+  })
+}
+
+/** Sede está forçando o valor nas unidades da worktree? */
+export async function sedePropagaPendenciasCadastro(tenantId: string): Promise<boolean> {
+  const raizId = await resolverTenantRaizId(tenantId)
+  const sede: { propagarPendenciasCadastroUnidades: boolean } | null = await db.tenant.findUnique({
+    where: { id: raizId },
+    select: { propagarPendenciasCadastroUnidades: true },
+  })
+  return sede?.propagarPendenciasCadastroUnidades === true
+}
 
 export type PendenciasCadastroSnapshot = {
   membroId: string
@@ -111,12 +175,10 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
   tenantId: string,
   userId: string,
 ): Promise<PendenciasCadastroSnapshot | null> {
-  const [membro, tenant]: [
+  const [membro, tenant, servicoAtivo]: [
     MembroPendenciaRow | null,
-    {
-      exigirDocumentosCadastro: boolean
-      solicitarPendenciasCadastro: boolean
-    } | null,
+    { exigirDocumentosCadastro: boolean } | null,
+    boolean,
   ] = await Promise.all([
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
@@ -124,16 +186,13 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
     }),
     db.tenant.findUnique({
       where: { id: tenantId },
-      select: {
-        exigirDocumentosCadastro: true,
-        solicitarPendenciasCadastro: true,
-      },
+      select: { exigirDocumentosCadastro: true },
     }),
+    servicoPendenciasCadastroAtivo(tenantId),
   ])
   if (!membro || !elegivelPendenciaCadastro(membro)) return null
 
-  // Serviço desligado nesta unidade — não monta modal nem marca inadimplência por cadastro.
-  if (tenant && tenant.solicitarPendenciasCadastro === false) {
+  if (!servicoAtivo) {
     return {
       membroId: membro.id,
       tenantId: membro.tenantId,
@@ -151,7 +210,7 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
     membro,
     Boolean(carteirinha),
     tenant?.exigirDocumentosCadastro ?? true,
-    tenant?.solicitarPendenciasCadastro ?? true,
+    true,
   )
   return {
     membroId: membro.id,

@@ -10,7 +10,7 @@ import {
   type CheckinOfflineItem,
 } from '@/lib/checkin-offline'
 
-type State = { ok?: boolean; error?: string; nome?: string }
+type State = { ok?: boolean; error?: string; nome?: string; aviso?: string }
 
 type BarcodeDetectorLike = {
   detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>
@@ -266,6 +266,11 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
       {state.ok && state.nome && (
         <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
           Check-in ok: {state.nome}
+          {state.aviso ? (
+            <span className="mt-0.5 block font-normal text-amber-700 dark:text-amber-400">
+              {state.aviso}
+            </span>
+          ) : null}
         </p>
       )}
     </div>

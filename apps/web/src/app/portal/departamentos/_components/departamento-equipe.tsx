@@ -1,11 +1,13 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useActionState, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { UserMinus, UserPlus } from 'lucide-react'
 import {
   adicionarMembroArea,
+  adicionarMembroAreaDepartamento,
   buscarCandidatosArea,
   removerMembroArea,
+  removerMembroAreaDepartamento,
   type ActionState,
 } from '@/app/portal/departamentos/actions'
 import { useActionStateToast } from '@/lib/toast-action'
@@ -18,7 +20,11 @@ export type MembroEquipe = {
   nickname: string | null
   avatarUrl: string | null
   isGestor: boolean
+  /** Áreas deste departamento em que a pessoa atua (vazio se o depto não tem áreas). */
+  areaIds?: string[]
 }
+
+export type AreaFiltro = { id: string; nome: string }
 
 function rotuloPessoa(m: Pick<MembroEquipe, 'nome' | 'nickname' | 'email'>) {
   return m.nome?.trim() || (m.nickname ? `@${m.nickname}` : null) || m.email
@@ -48,41 +54,176 @@ function PessoaCard({
   roleLabel,
   accent,
   action,
+  areas,
+  podeGerirAreas,
+  departamentoId,
+  slug,
 }: {
   membro: MembroEquipe
   roleLabel: string
   accent: string
   action?: ReactNode
+  areas?: AreaFiltro[]
+  podeGerirAreas?: boolean
+  departamentoId: string
+  slug: string
 }) {
   const nome = rotuloPessoa(membro)
+  const areasDaPessoa = (areas ?? []).filter((a) => membro.areaIds?.includes(a.id))
+  const areasDisponiveis = (areas ?? []).filter((a) => !membro.areaIds?.includes(a.id))
+
   return (
     <div
-      className="flex min-w-[12rem] max-w-[16rem] items-center gap-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm"
+      className="flex min-w-[12rem] max-w-[16rem] flex-col gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm"
       style={{ borderColor: `${accent}66` }}
     >
-      {membro.avatarUrl ? (
-        <img
-          src={membro.avatarUrl}
-          alt=""
-          className="h-9 w-9 shrink-0 rounded-full object-cover"
-        />
-      ) : (
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-          style={{ backgroundColor: accent }}
-        >
-          {initials(nome)}
+      <div className="flex items-center gap-2.5">
+        {membro.avatarUrl ? (
+          <img
+            src={membro.avatarUrl}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+            style={{ backgroundColor: accent }}
+          >
+            {initials(nome)}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{nome}</p>
+          <p className="truncate text-[11px] text-[rgb(var(--foreground-muted))]">
+            {roleLabel}
+            {membro.nickname ? ` · @${membro.nickname}` : ''}
+          </p>
+        </div>
+        {action}
+      </div>
+
+      {areas && areas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          {areasDaPessoa.map((a) => (
+            <span
+              key={a.id}
+              className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]"
+            >
+              {a.nome}
+              {podeGerirAreas && (
+                <RemoverDaAreaBotao
+                  departamentoId={departamentoId}
+                  slug={slug}
+                  areaId={a.id}
+                  areaNome={a.nome}
+                  targetUserId={membro.userId}
+                  personLabel={nome}
+                />
+              )}
+            </span>
+          ))}
+          {podeGerirAreas && areasDisponiveis.length > 0 && (
+            <AdicionarAreaSelect
+              departamentoId={departamentoId}
+              slug={slug}
+              targetUserId={membro.userId}
+              areasDisponiveis={areasDisponiveis}
+            />
+          )}
         </div>
       )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{nome}</p>
-        <p className="truncate text-[11px] text-[rgb(var(--foreground-muted))]">
-          {roleLabel}
-          {membro.nickname ? ` · @${membro.nickname}` : ''}
-        </p>
-      </div>
-      {action}
     </div>
+  )
+}
+
+function AdicionarAreaSelect({
+  departamentoId,
+  slug,
+  targetUserId,
+  areasDisponiveis,
+}: {
+  departamentoId: string
+  slug: string
+  targetUserId: string
+  areasDisponiveis: AreaFiltro[]
+}) {
+  const [areaId, setAreaId] = useState('')
+  const [state, action, pending] = useActionState(adicionarMembroAreaDepartamento, {} as ActionState)
+  useActionStateToast(state, pending, 'Incluído na área', { onSuccess: () => setAreaId('') })
+
+  return (
+    <form action={action} className="inline-flex items-center gap-1">
+      <input type="hidden" name="departamentoId" value={departamentoId} />
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="targetUserId" value={targetUserId} />
+      <input type="hidden" name="areaId" value={areaId} />
+      <select
+        value={areaId}
+        onChange={(e) => setAreaId(e.target.value)}
+        className="rounded-full border border-dashed border-[rgb(var(--border))] bg-transparent px-2 py-0.5 text-[10px] text-[rgb(var(--foreground-muted))] outline-none"
+      >
+        <option value="">+ área</option>
+        {areasDisponiveis.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.nome}
+          </option>
+        ))}
+      </select>
+      {areaId && (
+        <button
+          type="submit"
+          disabled={pending}
+          className="app-action rounded-full bg-[rgb(var(--primary))] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+        >
+          OK
+        </button>
+      )}
+    </form>
+  )
+}
+
+function RemoverDaAreaBotao({
+  departamentoId,
+  slug,
+  areaId,
+  areaNome,
+  targetUserId,
+  personLabel,
+}: {
+  departamentoId: string
+  slug: string
+  areaId: string
+  areaNome: string
+  targetUserId: string
+  personLabel: string
+}) {
+  const confirmAction = useConfirmAction()
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        void confirmAction({
+          titulo: `Remover ${personLabel} de ${areaNome}?`,
+          descricao: 'A pessoa continua no departamento; só sai desta área.',
+          labelConfirmar: 'Remover',
+          variante: 'destructive',
+          cancelled: false,
+          run: async () => {
+            const fd = new FormData()
+            fd.set('areaId', areaId)
+            fd.set('departamentoId', departamentoId)
+            fd.set('slug', slug)
+            fd.set('targetUserId', targetUserId)
+            return removerMembroAreaDepartamento({}, fd)
+          },
+          success: `Removido de ${areaNome}`,
+        })
+      }
+      className="app-action -mr-1 rounded-full p-0.5 hover:text-red-600"
+      title="Remover da área"
+    >
+      ×
+    </button>
   )
 }
 
@@ -93,6 +234,7 @@ export function DepartamentoEquipe({
   membros,
   isGestor,
   currentUserId,
+  areas = [],
 }: {
   departamentoId: string
   slug: string
@@ -102,10 +244,17 @@ export function DepartamentoEquipe({
   membros: MembroEquipe[]
   isGestor: boolean
   currentUserId: string
+  /** Áreas do departamento — habilita o filtro por chips e os badges por pessoa. */
+  areas?: AreaFiltro[]
 }) {
-  const gestores = membros.filter((m) => m.isGestor)
-  const colaboradores = membros.filter((m) => !m.isGestor)
-  const vazio = membros.length === 0
+  const [filtroAreaId, setFiltroAreaId] = useState<string | null>(null)
+  const membrosFiltrados = useMemo(
+    () => (filtroAreaId ? membros.filter((m) => m.areaIds?.includes(filtroAreaId)) : membros),
+    [membros, filtroAreaId],
+  )
+  const gestores = membrosFiltrados.filter((m) => m.isGestor)
+  const colaboradores = membrosFiltrados.filter((m) => !m.isGestor)
+  const vazio = membrosFiltrados.length === 0
 
   return (
     <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
@@ -120,6 +269,38 @@ export function DepartamentoEquipe({
         </div>
       </div>
 
+      {areas.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-[rgb(var(--border))] py-3">
+          <button
+            type="button"
+            onClick={() => setFiltroAreaId(null)}
+            className={[
+              'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+              filtroAreaId === null
+                ? 'bg-[rgb(var(--primary))] text-white'
+                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+            ].join(' ')}
+          >
+            Todas
+          </button>
+          {areas.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setFiltroAreaId(a.id)}
+              className={[
+                'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+                filtroAreaId === a.id
+                  ? 'bg-[rgb(var(--primary))] text-white'
+                  : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              {a.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isGestor && (
         <div id="gestao" className="scroll-mt-20 border-b border-[rgb(var(--border))] py-4">
           <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">Incluir membro</h3>
@@ -132,9 +313,11 @@ export function DepartamentoEquipe({
 
       {vazio ? (
         <p className="mt-4 text-center text-xs text-[rgb(var(--foreground-muted))]">
-          {isGestor
-            ? 'Ainda sem pessoas. Use a busca acima para incluir o primeiro membro.'
-            : 'Sem pessoas neste departamento'}
+          {filtroAreaId
+            ? 'Ninguém desta área ainda.'
+            : isGestor
+              ? 'Ainda sem pessoas. Use a busca acima para incluir o primeiro membro.'
+              : 'Sem pessoas neste departamento'}
         </p>
       ) : (
         <div className="mt-4 space-y-3">
@@ -145,7 +328,16 @@ export function DepartamentoEquipe({
               </p>
               <div className="flex flex-wrap items-start justify-center gap-3">
                 {gestores.map((m) => (
-                  <PessoaCard key={m.userId} membro={m} roleLabel="Gestor" accent={cor} />
+                  <PessoaCard
+                    key={m.userId}
+                    membro={m}
+                    roleLabel="Gestor"
+                    accent={cor}
+                    areas={areas}
+                    podeGerirAreas={isGestor}
+                    departamentoId={departamentoId}
+                    slug={slug}
+                  />
                 ))}
               </div>
             </div>
@@ -164,6 +356,10 @@ export function DepartamentoEquipe({
                     membro={m}
                     roleLabel="Colaborador"
                     accent={cor}
+                    areas={areas}
+                    podeGerirAreas={isGestor}
+                    departamentoId={departamentoId}
+                    slug={slug}
                     action={
                       isGestor && m.userId !== currentUserId ? (
                         <RemoverMembroButton

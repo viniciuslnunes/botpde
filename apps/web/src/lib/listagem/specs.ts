@@ -148,6 +148,204 @@ export const LISTAGEM_ACESSOS_PESSOAS: ListagemSpec = {
 }
 
 /**
+ * Áreas de atuação (`DepartamentoArea`) de todos os departamentos da torcida.
+ * Área organiza gente e trabalho — não concede permissão —, então não há campo
+ * sensível envolvido; o escopo por tenant é forçado pela página.
+ */
+export const LISTAGEM_DEPARTAMENTO_AREAS: ListagemSpec = {
+  id: 'admin-departamento-areas',
+  basePath: '/admin/departamentos/areas',
+  sortPadrao: 'nome',
+  dirPadrao: 'asc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar área por nome ou descrição…',
+  buscaEm: [{ campo: 'nome' }, { campo: 'descricao' }],
+  colunas: [
+    { id: 'nome', label: 'Área', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'departamento',
+      label: 'Departamento',
+      ordenarPor: 'departamento.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'departamento',
+        label: 'Departamento',
+        tipo: 'enum',
+        campo: 'departamentoId',
+        multiplo: true,
+        faceta: true,
+      },
+    },
+    {
+      id: 'ativa',
+      label: 'Situação',
+      ordenarPor: 'ativa',
+      dirPadrao: 'desc',
+      filtro: {
+        id: 'ativa',
+        label: 'Situação',
+        tipo: 'booleano',
+        campo: 'ativa',
+      },
+    },
+    {
+      id: 'sazonal',
+      label: 'Sazonal',
+      ordenarPor: 'sazonal',
+      dirPadrao: 'desc',
+      filtro: {
+        id: 'sazonal',
+        label: 'Sazonal',
+        tipo: 'booleano',
+        campo: 'sazonal',
+      },
+    },
+    { id: 'membros', label: 'Pessoas', align: 'right' },
+  ],
+}
+
+/**
+ * Equipes por área (`DepartamentoAreaMembro`): quem atua onde, com o papel
+ * (MEMBRO / RESPONSAVEL). Papel aqui é accountability, nunca RBAC.
+ */
+export const LISTAGEM_DEPARTAMENTO_EQUIPES: ListagemSpec = {
+  id: 'admin-departamento-equipes',
+  basePath: '/admin/departamentos/equipes',
+  sortPadrao: 'criadoEm',
+  dirPadrao: 'desc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar pessoa por nome ou @usuário…',
+  buscaEm: [{ campo: 'user.nome' }, { campo: 'user.nickname' }],
+  colunas: [
+    { id: 'pessoa', label: 'Pessoa', ordenarPor: 'user.nome', dirPadrao: 'asc' },
+    {
+      id: 'area',
+      label: 'Área',
+      ordenarPor: 'area.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'area',
+        label: 'Área',
+        tipo: 'enum',
+        campo: 'areaId',
+        multiplo: true,
+        faceta: true,
+      },
+    },
+    {
+      id: 'departamento',
+      label: 'Departamento',
+      ordenarPor: 'area.departamento.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'departamento',
+        label: 'Departamento',
+        tipo: 'enum',
+        campo: 'area.departamentoId',
+        multiplo: true,
+      },
+    },
+    {
+      id: 'papel',
+      label: 'Papel',
+      ordenarPor: 'papel',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'papel',
+        label: 'Papel',
+        tipo: 'enum',
+        campo: 'papel',
+        opcoes: [
+          { valor: 'RESPONSAVEL', label: 'Responsável' },
+          { valor: 'MEMBRO', label: 'Membro' },
+        ],
+      },
+    },
+    { id: 'criadoEm', label: 'Desde', ordenarPor: 'criadoEm', dirPadrao: 'desc', align: 'right' },
+  ],
+}
+
+/**
+ * Projetos, campanhas e ações (`Projeto`). Como área, projeto não é RBAC —
+ * a listagem é leitura consolidada; a gestão acontece no portal do gestor.
+ */
+export const LISTAGEM_DEPARTAMENTO_PROJETOS: ListagemSpec = {
+  id: 'admin-departamento-projetos',
+  basePath: '/admin/departamentos/projetos',
+  sortPadrao: 'inicio',
+  dirPadrao: 'desc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar projeto por nome ou descrição…',
+  buscaEm: [{ campo: 'titulo' }, { campo: 'descricao' }],
+  colunas: [
+    { id: 'titulo', label: 'Projeto', ordenarPor: 'titulo', dirPadrao: 'asc' },
+    {
+      id: 'departamento',
+      label: 'Departamento',
+      ordenarPor: 'departamento.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'departamento',
+        label: 'Departamento',
+        tipo: 'enum',
+        campo: 'departamentoId',
+        multiplo: true,
+        faceta: true,
+      },
+    },
+    {
+      id: 'tipo',
+      label: 'Tipo',
+      ordenarPor: 'tipo',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'tipo',
+        label: 'Tipo',
+        tipo: 'enum',
+        campo: 'tipo',
+        multiplo: true,
+        faceta: true,
+        opcoes: [
+          { valor: 'CAMPANHA', label: 'Campanha' },
+          { valor: 'PROJETO', label: 'Projeto' },
+          { valor: 'ACAO', label: 'Ação' },
+          { valor: 'PARCERIA', label: 'Parceria' },
+        ],
+      },
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      ordenarPor: 'status',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'status',
+        label: 'Status',
+        tipo: 'enum',
+        campo: 'status',
+        multiplo: true,
+        faceta: true,
+        opcoes: [
+          { valor: 'PLANEJADO', label: 'Planejado' },
+          { valor: 'ATIVO', label: 'Em andamento' },
+          { valor: 'CONCLUIDO', label: 'Concluído' },
+          { valor: 'CANCELADO', label: 'Cancelado' },
+        ],
+      },
+    },
+    { id: 'meta', label: 'Meta', align: 'right' },
+    {
+      id: 'inicio',
+      label: 'Início',
+      ordenarPor: 'inicio',
+      dirPadrao: 'desc',
+      align: 'right',
+      filtro: { id: 'inicio', label: 'Início', tipo: 'data', campo: 'inicio' },
+    },
+  ],
+}
+
+/**
  * Carteirinhas emitidas (`SaasSocio`). A aba `status` da página escolhe o
  * recorte de validade e NÃO entra no contrato — ela também decide se a listagem
  * é esta ou a de aguardando (modelo diferente).
@@ -427,6 +625,9 @@ export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_TORCEDORES,
   LISTAGEM_SOCIOS_SOLICITACOES,
   LISTAGEM_ACESSOS_PESSOAS,
+  LISTAGEM_DEPARTAMENTO_AREAS,
+  LISTAGEM_DEPARTAMENTO_EQUIPES,
+  LISTAGEM_DEPARTAMENTO_PROJETOS,
   LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SOCIOS_AGUARDANDO,
   LISTAGEM_LOJA_PEDIDOS,

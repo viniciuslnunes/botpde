@@ -1,9 +1,76 @@
 import Link from 'next/link'
-import { ArrowRight, Music2, Shield } from 'lucide-react'
+import { ArrowRight, ClipboardList, Music2, Shield } from 'lucide-react'
+import { db } from '@torcida/db'
 import { carregarPainelEventosTipo, getEventoEmbarque, listarEventosPorTipo } from '@/lib/eventos-tipo'
+
+type EscalaLite = {
+  id: string
+  titulo: string
+  data: Date
+  partidaId: string | null
+  confirmados: number
+  presentes: number
+}
+
+async function carregarEscalasJogo(
+  tenantId: string,
+  departamentoId: string,
+): Promise<EscalaLite[]> {
+  const area: { id: string } | null = await db.departamentoArea.findFirst({
+    where: { tenantId, departamentoId, slug: 'escala-de-jogo', ativa: true },
+    select: { id: true },
+  })
+
+  type Row = {
+    id: string
+    titulo: string
+    data: Date
+    partidaId: string | null
+    rsvps: Array<{ status: string; checkedInAt: Date | null }>
+  }
+
+  const agora = new Date()
+  const rows: Row[] = await db.evento.findMany({
+    where: {
+      tenantId,
+      data: { gte: agora },
+      OR: [
+        ...(area
+          ? [{ projeto: { areaId: area.id, departamentoId, tenantId } } as const]
+          : []),
+        { partidaId: { not: null } },
+      ],
+    },
+    orderBy: { data: 'asc' },
+    take: 5,
+    select: {
+      id: true,
+      titulo: true,
+      data: true,
+      partidaId: true,
+      rsvps: {
+        where: { status: { in: ['CONFIRMADO', 'LISTA_ESPERA'] } },
+        select: { status: true, checkedInAt: true },
+      },
+    },
+  })
+
+  return rows.map((e) => {
+    const confirmados = e.rsvps.filter((r) => r.status === 'CONFIRMADO')
+    return {
+      id: e.id,
+      titulo: e.titulo,
+      data: e.data,
+      partidaId: e.partidaId,
+      confirmados: confirmados.length,
+      presentes: confirmados.filter((r) => r.checkedInAt).length,
+    }
+  })
+}
 
 export async function BateriaEnsaiosAside({
   tenantId,
+  departamentoId,
   nome,
   isGestor,
   moduloHref,
@@ -11,6 +78,7 @@ export async function BateriaEnsaiosAside({
   podeVer,
 }: {
   tenantId: string
+  departamentoId: string
   nome: string
   isGestor: boolean
   moduloHref: string | null
@@ -32,9 +100,10 @@ export async function BateriaEnsaiosAside({
     )
   }
 
-  const [{ proximos, totalProximos, confirmadosProximos }, recentes] = await Promise.all([
+  const [{ proximos, totalProximos, confirmadosProximos }, recentes, escalas] = await Promise.all([
     carregarPainelEventosTipo(tenantId, 'ENSAIO', 5),
     listarEventosPorTipo(tenantId, 'ENSAIO', { futuros: false, limite: 1 }),
+    carregarEscalasJogo(tenantId, departamentoId),
   ])
 
   const ultimo = recentes[0] ?? null
@@ -48,6 +117,11 @@ export async function BateriaEnsaiosAside({
     ultimoConfirmados.length > 0
       ? Math.round((ultimoPresentes / ultimoConfirmados.length) * 100)
       : null
+
+  const fmt = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
 
   return (
     <div className="space-y-4">
@@ -88,10 +162,7 @@ export async function BateriaEnsaiosAside({
                     {e.titulo}
                   </Link>
                   <p className="text-[rgb(var(--foreground-muted))]">
-                    {new Intl.DateTimeFormat('pt-BR', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    }).format(e.data)}
+                    {fmt.format(e.data)}
                     {' · '}
                     {e._count.rsvps} confirmado{e._count.rsvps === 1 ? '' : 's'}
                   </p>
@@ -105,6 +176,54 @@ export async function BateriaEnsaiosAside({
           </p>
         )}
       </div>
+
+      <div
+        id="escala"
+        className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
+      >
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Escala de jogo</h2>
+        </div>
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+          RSVP e presença na Agenda — quem toca no jogo, sem lista paralela.
+        </p>
+        {escalas.length === 0 ? (
+          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhum jogo/escala futura. Vincule o evento ao projeto da área Escala ou a uma partida
+            na Agenda.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
+            {escalas.map((e) => (
+              <li key={e.id} className="text-xs">
+                <Link
+                  href={`/portal/eventos/${e.id}`}
+                  className="font-medium text-[rgb(var(--foreground))] hover:underline"
+                >
+                  {e.titulo}
+                </Link>
+                <p className="text-[rgb(var(--foreground-muted))]">
+                  {fmt.format(e.data)}
+                  {e.partidaId ? ' · jogo' : ''}
+                  {' · '}
+                  {e.confirmados} confirmado{e.confirmados === 1 ? '' : 's'}
+                  {e.confirmados > 0
+                    ? ` · ${e.presentes} presente${e.presentes === 1 ? '' : 's'}`
+                    : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link
+          href="/portal/eventos"
+          className="mt-3 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+        >
+          Abrir agenda →
+        </Link>
+      </div>
+
       {moduloHref && (
         <Link
           href={moduloHref}
@@ -138,6 +257,7 @@ export async function BateriaEnsaiosAside({
 export function BateriaEnsaiosSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
+      <div className="h-40 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
       <div className="h-40 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
       <div className="h-10 rounded-lg bg-[rgb(var(--border))]" />
     </div>

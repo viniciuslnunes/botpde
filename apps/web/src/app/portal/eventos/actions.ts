@@ -5,13 +5,15 @@ import { db } from '@torcida/db'
 import { getActiveTenant } from '@/lib/tenant'
 import { assertMembroAtivo } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
-import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
+import { capacidadeEfetiva, lotacaoCheia, contarOcupacaoEvento } from '@/lib/eventos-capacidade'
 import { notificarSafe } from '@/lib/notificacoes'
 import { promoverProximoDaEspera } from '@/lib/eventos-waitlist'
+import { garantirCobrancaVagaCaravana } from '@/lib/caravana-vaga'
+import { temValorVaga } from '@torcida/types'
 import type { RsvpStatus } from '@torcida/db'
 
 export type RsvpResult =
-  | { ok: true; status: RsvpStatus }
+  | { ok: true; status: RsvpStatus; cobrancaId?: string }
   | { ok: false; error: string; status?: RsvpStatus }
 
 export async function responderRsvp(
@@ -29,12 +31,13 @@ export async function responderRsvp(
     where: { id: eventoId },
     select: {
       tenantId: true,
+      tipo: true,
       data: true,
       titulo: true,
       criadoPorId: true,
       capacidade: true,
+      valorVaga: true,
       sede: { select: { capacidade: true } },
-      _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
 
@@ -44,6 +47,13 @@ export async function responderRsvp(
   if (new Date(evento.data) < new Date()) {
     return { ok: false, error: 'Evento já encerrado' }
   }
+
+  const valorVagaNum =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
 
   const atual = await db.eventoRsvp.findUnique({
     where: { eventoId_userId: { eventoId, userId: session.user.id } },
@@ -55,8 +65,17 @@ export async function responderRsvp(
   if (status === 'CONFIRMADO') {
     const cap = capacidadeEfetiva(evento)
     const jaConfirmado = atual?.status === 'CONFIRMADO'
-    if (!jaConfirmado && lotacaoCheia(evento._count.rsvps, cap)) {
-      statusFinal = 'LISTA_ESPERA'
+    // Caravana paga: lotação = vagas PAGAS. RSVP CONFIRMADO é intenção —
+    // se o ônibus já está cheio de pagantes, cai na espera.
+    if (!jaConfirmado) {
+      const ocupados = await contarOcupacaoEvento({
+        tenantId: tenant.id,
+        eventoId,
+        valorVaga: valorVagaNum,
+      })
+      if (lotacaoCheia(ocupados, cap)) {
+        statusFinal = 'LISTA_ESPERA'
+      }
     }
   }
 
@@ -65,6 +84,21 @@ export async function responderRsvp(
     update: { status: statusFinal },
     create: { eventoId, userId: session.user.id, status: statusFinal },
   })
+
+  let cobrancaId: string | undefined
+  if (
+    statusFinal === 'CONFIRMADO' &&
+    evento.tipo === 'CARAVANA' &&
+    temValorVaga(valorVagaNum)
+  ) {
+    const cob = await garantirCobrancaVagaCaravana({
+      tenantId: tenant.id,
+      userId: session.user.id,
+      eventoId,
+      notificar: true,
+    })
+    if (cob.ok) cobrancaId = cob.cobrancaId
+  }
 
   // Liberou vaga → promove o próximo da fila
   if (atual?.status === 'CONFIRMADO' && statusFinal !== 'CONFIRMADO') {
@@ -93,6 +127,9 @@ export async function responderRsvp(
   revalidatePath('/portal/bateria')
   revalidatePath(`/admin/eventos/${eventoId}`)
   revalidatePath('/portal')
+  revalidatePath('/portal/cobrancas')
 
-  return { ok: true, status: statusFinal }
+  return cobrancaId
+    ? { ok: true, status: statusFinal, cobrancaId }
+    : { ok: true, status: statusFinal }
 }

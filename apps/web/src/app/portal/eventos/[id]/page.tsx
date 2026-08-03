@@ -21,6 +21,8 @@ import {
   TIPO_EVENTO_LABEL,
   calculateEffectivePermissions,
   hasPermission,
+  resolverStatusVaga,
+  temValorVaga,
 } from '@torcida/types'
 import {
   EventoConfirmadosGrid,
@@ -124,7 +126,6 @@ export default async function EventoDetailPage({
     capacidade: evento.capacidade,
     sede: evento.sede,
   })
-  const esgotada = lotacaoCheia(confirmadosCount, cap)
 
   const valorVagaNum =
     evento.valorVaga == null
@@ -132,6 +133,12 @@ export default async function EventoDetailPage({
       : typeof evento.valorVaga === 'number'
         ? evento.valorVaga
         : evento.valorVaga.toNumber()
+  const caravanaPaga = evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)
+  const pagosCount = caravanaPaga
+    ? Object.values(evento.cobrancasPorUserId).filter((s) => s === 'PAGA').length
+    : 0
+  const ocupacaoLotacao = caravanaPaga ? pagosCount : confirmadosCount
+  const esgotada = lotacaoCheia(ocupacaoLotacao, cap)
 
   const confirmadosAvatar = evento.rsvps
     .filter((r) => r.status === 'CONFIRMADO')
@@ -142,14 +149,24 @@ export default async function EventoDetailPage({
       avatarUrl: r.user.avatarUrl,
     }))
 
-  const itens: EmbarqueRow[] = evento.rsvps.map((r) => ({
-    id: r.id,
-    userId: r.user.id,
-    nome: r.user.nome?.trim() || r.user.email,
-    email: r.user.email,
-    status: r.status,
-    checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
-  }))
+  const itens: EmbarqueRow[] = evento.rsvps.map((r) => {
+    const statusVaga = resolverStatusVaga({
+      valorVaga: valorVagaNum,
+      cobrancaStatus: evento.cobrancasPorUserId[r.user.id] ?? null,
+      checkedInAt: r.checkedInAt,
+    })
+    return {
+      id: r.id,
+      userId: r.user.id,
+      nome: r.user.nome?.trim() || r.user.email,
+      email: r.user.email,
+      status: r.status,
+      checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
+      pagamento: statusVaga.pagamento,
+      labelPagamento: statusVaga.labelPagamento,
+      alertaPagamento: statusVaga.alerta,
+    }
+  })
 
   const labelCheckin = evento.tipo === 'ENSAIO' ? 'Presença' : 'Embarque'
   const backHref =
@@ -222,8 +239,14 @@ export default async function EventoDetailPage({
               {/* Stats inline — sem cards vazios */}
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1 text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
-                  {cap != null ? `${confirmadosCount}/${cap}` : confirmadosCount} confirmados
+                  {cap != null ? `${ocupacaoLotacao}/${cap}` : ocupacaoLotacao}{' '}
+                  {caravanaPaga ? 'vagas pagas' : 'confirmados'}
                 </span>
+                {caravanaPaga && (
+                  <span className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1 text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
+                    {confirmadosCount} confirmaram
+                  </span>
+                )}
                 <span className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1 text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
                   {embarcadosCount} {labelCheckin.toLowerCase()}
                 </span>
@@ -343,6 +366,7 @@ export default async function EventoDetailPage({
             podeGerir={podeGerir}
             labelCheckin={labelCheckin}
             tituloEvento={evento.titulo}
+            mostrarPagamento={evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)}
           />
         </EventoDetailReveal>
       )}

@@ -23,16 +23,19 @@ Filtros: `?tipo=CARAVANA\|ENSAIO\|GERAL`, `?vista=lista\|semana\|mes`, `?q=`, `?
 ## Modelo
 
 - `Evento` — `tipo` GERAL \| CARAVANA \| ENSAIO; `sedeId`; `capacidade`; `valorVaga`;
-  `lat`/`lng`; `serieId`; `partidaId` (jogo do clube); `fotoUrl`.
+  `checkInExigePagamento` (caravana paga); `lat`/`lng`; `serieId`; `partidaId`
+  (jogo do clube); `fotoUrl`; `projetoId?`.
 - `Partida` — **global por `Afiliacao`** (sem `tenantId`): adversário, mando
   (`CASA`\|`FORA`), competição, data/hora, placar opcional, `status`
   (`AGENDADA`\|`AO_VIVO`\|`ENCERRADA`\|`CANCELADA`), `fonteExternalId?`.
 - `EventoRsvp` — `CONFIRMADO` \| `RECUSADO` \| `LISTA_ESPERA`; `criadoEm` (fila FIFO);
   `checkedInAt` / `checkedInPorId` = presença real (**RSVP ≠ check-in**).
 
-**Capacidade efetiva** = `Evento.capacidade` senão `Sede.capacidade`. Lotação cheia
-→ `LISTA_ESPERA`. Saída de `CONFIRMADO` → `promoverProximoDaEspera` (ordem
-`criadoEm`). Lib: `apps/web/src/lib/eventos-waitlist.ts`.
+**Capacidade efetiva** = `Evento.capacidade` senão `Sede.capacidade`. Em caravana
+com `valorVaga`, ocupação = cobranças `PAGA` (`contarOcupacaoEvento`); demais
+eventos = RSVP `CONFIRMADO`. Lotação cheia → `LISTA_ESPERA`. Saída de
+`CONFIRMADO` → `promoverProximoDaEspera` (ordem `criadoEm`). Lib:
+`apps/web/src/lib/eventos-waitlist.ts`.
 
 **Recorrência:** `recorrenciasSemanas` cria N+1 com o mesmo `serieId`. Edit/delete:
 escopo **esta** ou **futuras**. Lib: `eventos-serie.ts`.
@@ -57,6 +60,10 @@ Libs: `partidas.ts`, `admin/partidas/actions.ts`.
 - Card da partida vinculada (`evento-partida-card.tsx`)
 - Badge **Série** + escopo esta/futuras
 - Cockpit: KPIs, embarque/presença, export CSV
+- **Caravana paga × embarque (2026-08-03+):** lista com badge de pagamento,
+  lotação por `PAGA`, cobrança auto ao confirmar, check-in warn+allow ou
+  hard-block opcional (`checkInExigePagamento` + override); ver
+  `modulo-caravanas.md`
 
 ## Inteligência de dados externos (jogos)
 

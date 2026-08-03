@@ -112,6 +112,7 @@ export async function baixarCobrancaComoPaga(input: {
     valor: Prisma.Decimal
     descricao: string
     financeiroLancamentoId: string | null
+    eventoId: string | null
   }
   const cob: Row | null = await db.cobrancaAssociacao.findFirst({
     where: { id: input.cobrancaId, tenantId: input.tenantId },
@@ -123,11 +124,59 @@ export async function baixarCobrancaComoPaga(input: {
       valor: true,
       descricao: true,
       financeiroLancamentoId: true,
+      eventoId: true,
     },
   })
   if (!cob) return { ok: false, error: 'Cobrança não encontrada' }
   if (cob.status === 'PAGA') return { ok: true }
   if (cob.status === 'CANCELADA') return { ok: false, error: 'Cobrança cancelada' }
+
+  // Vaga de caravana: lotação segura = PAGOs. Se o ônibus já está cheio,
+  // não deixa baixar outra vaga (a pessoa fica CONFIRMADA com cobrança pendente).
+  if (cob.eventoId) {
+    const evento: {
+      valorVaga: { toNumber(): number } | number | null
+      capacidade: number | null
+      sede: { capacidade: number | null } | null
+    } | null = await db.evento.findFirst({
+      where: { id: cob.eventoId, tenantId: input.tenantId },
+      select: {
+        valorVaga: true,
+        capacidade: true,
+        sede: { select: { capacidade: true } },
+      },
+    })
+    if (evento) {
+      const valorVagaNum =
+        evento.valorVaga == null
+          ? null
+          : typeof evento.valorVaga === 'number'
+            ? evento.valorVaga
+            : evento.valorVaga.toNumber()
+      const { capacidadeEfetiva, lotacaoCheia, contarOcupacaoEvento } = await import(
+        '@/lib/eventos-capacidade'
+      )
+      const { temValorVaga } = await import('@torcida/types')
+      if (temValorVaga(valorVagaNum)) {
+        const ocupados = await contarOcupacaoEvento({
+          tenantId: input.tenantId,
+          eventoId: cob.eventoId,
+          valorVaga: valorVagaNum,
+        })
+        const cap = capacidadeEfetiva(evento)
+        if (lotacaoCheia(ocupados, cap)) {
+          return {
+            ok: false,
+            error: 'Lotação esgotada — não há mais vagas pagas disponíveis nesta caravana.',
+          }
+        }
+      }
+    }
+  }
+
+  // Vaga de caravana (eventoId setado) vai para categoria CARAVANA — mensalidade
+  // e adesão continuam MENSALIDADE. Sem isso o livro-caixa misturava as duas.
+  const categoria = cob.eventoId ? 'CARAVANA' : 'MENSALIDADE'
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     let lancamentoId = cob.financeiroLancamentoId
@@ -136,7 +185,7 @@ export async function baixarCobrancaComoPaga(input: {
         data: {
           tenantId: input.tenantId,
           tipo: 'RECEITA',
-          categoria: 'MENSALIDADE',
+          categoria,
           valor: cob.valor,
           descricao: cob.descricao,
           data: new Date(),

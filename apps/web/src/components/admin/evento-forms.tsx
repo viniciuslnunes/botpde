@@ -25,6 +25,13 @@ const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_L
 
 export type SedeOption = { id: string; nome: string; capacidade: number | null }
 
+/** Projetos abertos do tenant — para vincular o evento (Agenda ↔ Projeto). */
+export type ProjetoOption = {
+  id: string
+  titulo: string
+  departamentoNome: string
+}
+
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -220,7 +227,61 @@ function ValorVagaField({
         defaultValue={defaultValue != null && defaultValue > 0 ? String(defaultValue) : ''}
       />
       <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
-        Se preenchido, quem confirmar presença pode gerar cobrança avulsa da vaga.
+        Se preenchido, a lotação conta só quem pagou — confirmar RSVP gera a cobrança.
+      </p>
+      <FieldError errors={errors} />
+    </div>
+  )
+}
+
+function CheckInExigePagamentoField({ defaultChecked }: { defaultChecked?: boolean }) {
+  return (
+    <label className="flex items-start gap-2 text-xs text-[rgb(var(--foreground))]">
+      <input
+        type="checkbox"
+        name="checkInExigePagamento"
+        defaultChecked={defaultChecked}
+        className="mt-0.5"
+      />
+      <span>
+        <span className="font-medium">Exigir pagamento no check-in</span>
+        <span className="mt-0.5 block text-[11px] text-[rgb(var(--foreground-muted))]">
+          Bloqueia o QR/check-in se a vaga não estiver paga. O gestor pode liberar na porta.
+        </span>
+      </span>
+    </label>
+  )
+}
+
+function ProjetoSelect({
+  projetos,
+  defaultValue,
+  errors,
+}: {
+  projetos: ProjetoOption[]
+  defaultValue?: string | null
+  errors?: string[]
+}) {
+  if (projetos.length === 0) return null
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Projeto (opcional)
+      </label>
+      <select
+        name="projetoId"
+        defaultValue={defaultValue ?? ''}
+        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+      >
+        <option value="">Sem vínculo a projeto</option>
+        {projetos.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.titulo} · {p.departamentoNome}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Ex.: Festa das Crianças 2026 dentro do projeto homônimo do Social.
       </p>
       <FieldError errors={errors} />
     </div>
@@ -235,6 +296,7 @@ export function CriarEventoForm({
   lockTipo = false,
   sedes = [],
   partidas = [],
+  projetos = [],
   temAfiliacao = true,
   onCancel,
 }: {
@@ -244,6 +306,7 @@ export function CriarEventoForm({
   lockTipo?: boolean
   sedes?: SedeOption[]
   partidas?: PartidaOption[]
+  projetos?: ProjetoOption[]
   temAfiliacao?: boolean
   onCancel?: () => void
 }) {
@@ -335,9 +398,13 @@ export function CriarEventoForm({
         errorsLng={state.errors?.lng}
       />
       <RecorrenciaField errors={state.errors?.recorrenciasSemanas} />
+      <ProjetoSelect projetos={projetos} errors={state.errors?.projetoId} />
 
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
-        <ValorVagaField errors={state.errors?.valorVaga} />
+        <>
+          <ValorVagaField errors={state.errors?.valorVaga} />
+          <CheckInExigePagamentoField />
+        </>
       )}
 
       <div>
@@ -384,19 +451,23 @@ type EventoData = {
   lng?: number | null
   serieId?: string | null
   partidaId?: string | null
+  projetoId?: string | null
   valorVaga?: number | { toNumber(): number } | null
+  checkInExigePagamento?: boolean
 }
 
 export function EditarEventoForm({
   evento,
   sedes = [],
   partidas = [],
+  projetos = [],
   temAfiliacao = true,
   redirectTo,
 }: {
   evento: EventoData
   sedes?: SedeOption[]
   partidas?: PartidaOption[]
+  projetos?: ProjetoOption[]
   temAfiliacao?: boolean
   redirectTo?: string
 }) {
@@ -509,8 +580,17 @@ export function EditarEventoForm({
         </div>
       )}
 
+      <ProjetoSelect
+        projetos={projetos}
+        defaultValue={evento.projetoId}
+        errors={state.errors?.projetoId}
+      />
+
       {tipo === 'CARAVANA' && (
-        <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />
+        <>
+          <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />
+          <CheckInExigePagamentoField defaultChecked={Boolean(evento.checkInExigePagamento)} />
+        </>
       )}
 
       <div>

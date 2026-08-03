@@ -10,12 +10,14 @@ export function NovoEventoButton({
   defaultTipo,
   sedes,
   partidas = [],
+  projetos = [],
   temAfiliacao = true,
   redirectTo = '/admin/eventos',
 }: {
   defaultTipo?: string
   sedes: SedeOption[]
   partidas?: PartidaOption[]
+  projetos?: Array<{ id: string; titulo: string; departamentoNome: string }>
   temAfiliacao?: boolean
   redirectTo?: string
 }) {
@@ -36,6 +38,7 @@ export function NovoEventoButton({
           defaultTipo={defaultTipo ?? 'GERAL'}
           sedes={sedes}
           partidas={partidas}
+          projetos={projetos}
           temAfiliacao={temAfiliacao}
           redirectTo={redirectTo}
           onCancel={() => setOpen(false)}
