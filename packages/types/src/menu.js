@@ -167,7 +167,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     id: 'plataforma',
     label: 'Plataforma',
     href: '/admin/configuracoes',
-    permissao: [PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.ROLES_MANAGE, PERMISSIONS.AUDIT_VIEW],
+    permissao: [PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.ROLES_MANAGE, PERMISSIONS.AUDIT_VIEW, PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE],
     secao: 'governanca',
   },
 ])
@@ -392,7 +392,12 @@ export const ADMIN_MODULOS = ([
     menuId: 'plataforma',
     href: '/admin/configuracoes',
     tabs: [
-      { id: 'geral', label: 'Geral', href: '/admin/configuracoes', permissao: PERMISSIONS.SETTINGS_MANAGE },
+      {
+        id: 'geral',
+        label: 'Geral',
+        href: '/admin/configuracoes',
+        permissao: [PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE],
+      },
       {
         id: 'transparencia',
         label: 'Transparência',

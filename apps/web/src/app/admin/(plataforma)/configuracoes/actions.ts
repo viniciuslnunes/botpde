@@ -291,6 +291,37 @@ export async function salvarExigirDocumentosCadastro(formData: FormData) {
   invalidateTenantCache(tenant.slug)
 }
 
+/**
+ * Liga/desliga o serviço de solicitar dados pendentes aos sócios desta unidade.
+ * Escopo = tenant atual (Sede ou afiliada). Owner/admin/vice/liderança/super-admin.
+ */
+export async function salvarSolicitarPendenciasCadastro(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE)
+
+  const ativo = formData.get('solicitarPendenciasCadastro') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { solicitarPendenciasCadastro: ativo },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_PENDENCIAS_CADASTRO_ATUALIZADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { solicitarPendenciasCadastro: ativo },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal')
+  revalidatePath('/portal/cadastro/associacao')
+  invalidateTenantCache(tenant.slug)
+}
+
 /** Periodicidades oferecidas no onboarding «Já sou sócio». */
 export async function salvarPeriodicidadesOnboarding(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)

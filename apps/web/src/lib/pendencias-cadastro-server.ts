@@ -2,6 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import {
+  elegivelPendenciaCadastro,
   inadimplentePorPendenciaCadastro,
   pendenciasCadastroVisiveis,
   resolverPendenciasCadastro,
@@ -75,6 +76,7 @@ function paraInput(
   m: MembroPendenciaRow,
   temCarteirinha: boolean,
   exigirDocumentosCadastro: boolean,
+  solicitarPendenciasCadastro: boolean,
 ): MembroParaPendenciaCadastro {
   return {
     isSocio: m.tipo === 'SOCIO',
@@ -100,6 +102,7 @@ function paraInput(
     periodicidadePretendida: m.periodicidadePretendida,
     temCarteirinha,
     exigirDocumentosCadastro,
+    solicitarPendenciasCadastro,
     pendenciasCadastroDispensadas: m.pendenciasCadastroDispensadas,
   }
 }
@@ -110,7 +113,10 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
 ): Promise<PendenciasCadastroSnapshot | null> {
   const [membro, tenant]: [
     MembroPendenciaRow | null,
-    { exigirDocumentosCadastro: boolean } | null,
+    {
+      exigirDocumentosCadastro: boolean
+      solicitarPendenciasCadastro: boolean
+    } | null,
   ] = await Promise.all([
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
@@ -118,10 +124,24 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
     }),
     db.tenant.findUnique({
       where: { id: tenantId },
-      select: { exigirDocumentosCadastro: true },
+      select: {
+        exigirDocumentosCadastro: true,
+        solicitarPendenciasCadastro: true,
+      },
     }),
   ])
-  if (!membro || membro.tipo !== 'SOCIO' || membro.status !== 'APROVADO') return null
+  if (!membro || !elegivelPendenciaCadastro(membro)) return null
+
+  // Serviço desligado nesta unidade — não monta modal nem marca inadimplência por cadastro.
+  if (tenant && tenant.solicitarPendenciasCadastro === false) {
+    return {
+      membroId: membro.id,
+      tenantId: membro.tenantId,
+      ativas: [],
+      visiveis: [],
+      inadimplentePorCadastro: false,
+    }
+  }
 
   const carteirinha: { id: string } | null = await db.saasSocio.findFirst({
     where: { tenantId, userId },
@@ -131,6 +151,7 @@ export const carregarPendenciasCadastro = cache(async function carregarPendencia
     membro,
     Boolean(carteirinha),
     tenant?.exigirDocumentosCadastro ?? true,
+    tenant?.solicitarPendenciasCadastro ?? true,
   )
   return {
     membroId: membro.id,

@@ -46,6 +46,12 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Configurações (owner only)
   SETTINGS_MANAGE: 'settings:manage',
 
+  /**
+   * Liga/desliga o serviço de solicitar dados pendentes aos sócios desta unidade.
+   * Owner, admin, vice e liderança (owner da unidade) — não exige settings:manage.
+   */
+  ASSOCIACAO_PENDENCIAS_MANAGE: 'associacao:pendencias_manage',
+
   // Relatórios
   REPORTS_VIEW: 'reports:view',
 
@@ -223,6 +229,10 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.ROLES_MANAGE, label: 'Gerenciar cargos' },
       { key: PERMISSIONS.SETTINGS_MANAGE, label: 'Gerenciar configurações' },
+      {
+        key: PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE,
+        label: 'Gerenciar solicitação de dados pendentes (sócios)',
+      },
       { key: PERMISSIONS.REPORTS_VIEW, label: 'Ver relatórios' },
       { key: PERMISSIONS.AUDIT_VIEW, label: 'Ver registro de auditoria' },
     ],
@@ -575,6 +585,7 @@ export function permissoesForaDoAlcance(atorEfetivas, desejadas) {
  */
 const PERMISSION_LABELS_FORA_DO_FORMULARIO = {
   [PERMISSIONS.SETTINGS_MANAGE]: 'Configurações da torcida',
+  [PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE]: 'Solicitação de dados pendentes',
 }
 
 /**

@@ -393,6 +393,10 @@ model Tenant {
   /// Desligável em /admin/configuracoes → Cadastro de sócios.
   exigirDocumentosCadastro Boolean @default(true) @map("exigir_documentos_cadastro")
 
+  /// Portal: modal/fluxo de solicitar dados pendentes aos sócios desta unidade.
+  /// Escopo = este tenant (Sede ou afiliada). Default ligado.
+  solicitarPendenciasCadastro Boolean @default(true) @map("solicitar_pendencias_cadastro")
+
   /// Periodicidades oferecidas no onboarding «Já sou sócio».
   /// Vazio = fallback de app (QUADRIMENSAL + ANUAL). Config em /admin/configuracoes.
   periodicidadesOnboarding PeriodicidadePlanoAssociacao[] @default([]) @map("periodicidades_onboarding")

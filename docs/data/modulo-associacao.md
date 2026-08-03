@@ -17,6 +17,8 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
 - Periodicidades do wizard: `Tenant.periodicidadesOnboarding` (config em Cadastro de sócios); enum inclui `QUADRIMENSAL` e `SEMESTRAL`; fallback vazio = quadrimensal + anual.
 - Campos: `SaasMembro.dataExpedicaoCarteirinha`, `periodicidadePretendida`; `SaasSocio.expedidoEm`.
 - **Pendências de cadastro (2026-08-02):** usa a mesma **completude do cadastro** do card em `/admin/socios` (`lib/completude-cadastro-socio.ts` — nº, CPF, RG, nascimento, endereço, termo, prova, responsável se menor; + documentos se `exigirDocumentosCadastro`; + expedição/periodicidade se ainda não há `SaasSocio`). Modal no portal → `/portal/cadastro/associacao`. «Não mostrar de novo» → `adimplente = false` até completar (`pendenciasCadastroDispensadas`).
+- **Quem entra (2026-08-02):** todos os **sócios aprovados** da unidade (`tipo = SOCIO`) — membros, gestores de departamento, presidente/liderança/vice/admin desde que sócios. **Torcedores ficam de fora.**
+- **Toggle por unidade:** `Tenant.solicitarPendenciasCadastro` (default `true`) em `/admin/configuracoes` → Cadastro de sócios. Escopo = tenant atual (Sede ou afiliada). Quem gerencia: permissão `associacao:pendencias_manage` (owner, admin, vice + super-admin).
 
 ## Entidades
 

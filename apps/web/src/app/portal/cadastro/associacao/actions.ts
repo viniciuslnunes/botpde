@@ -15,6 +15,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { recalcularAdimplencia } from '@/lib/cobrancas'
 import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'
 import {
+  elegivelPendenciaCadastro,
   PENDENCIA_SOCIO_EXPEDICAO,
   PENDENCIA_SOCIO_FICHA,
   PENDENCIAS_CADASTRO_CODIGOS,
@@ -83,8 +84,11 @@ export async function completarDadosAssociacao(
       pendenciasCadastroDispensadas: true,
     },
   })
-  if (!membro || membro.tipo !== 'SOCIO' || membro.status !== 'APROVADO') {
+  if (!membro || !elegivelPendenciaCadastro(membro)) {
     return { message: 'Só sócios aprovados podem completar estes dados.' }
+  }
+  if (tenant.solicitarPendenciasCadastro === false) {
+    return { message: 'A solicitação de dados pendentes está desligada nesta unidade.' }
   }
 
   const errors: Record<string, string[]> = {}

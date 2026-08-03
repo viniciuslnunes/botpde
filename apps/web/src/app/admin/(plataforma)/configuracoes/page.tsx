@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { formatNomeAfiliacao, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
+import { assertAnyPermission } from '@/lib/authz'
 import { isExpectedError } from '@/lib/expected-error'
 import { Flag, IdCard, Link2, Lock, Radio, Settings } from 'lucide-react'
 import { ConviteForm } from './_components/convite-form'
@@ -11,7 +11,7 @@ import {
   CanalRestritoForm,
   type SolicitacaoReativacaoView,
 } from './_components/canal-restrito-form'
-import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, PeriodicidadesOnboardingForm, CanalOficialForm } from '@/components/admin/config-forms'
+import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, PeriodicidadesOnboardingForm, CanalOficialForm, SolicitarPendenciasCadastroForm } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -78,13 +78,17 @@ export default async function ConfiguracoesGeralPage({
   // Menu de Plataforma aponta para esta raiz; quem só tem Acessos/Auditoria
   // cai na própria etapa (mesmo padrão de Loja/Comunidade).
   try {
-    await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+    await assertAnyPermission([
+      PERMISSIONS.SETTINGS_MANAGE,
+      PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE,
+    ])
   } catch {
     const permissoes = await permissoesEfetivasNoAdmin()
     redirect(primeiraTabPermitida('plataforma', permissoes) ?? '/admin')
   }
 
-  const { userId, tenant, isOwner } = await getConfigContexto()
+  const { userId, tenant, isOwner, canManageSettings, canManagePendenciasCadastro } =
+    await getConfigContexto()
 
   const afiliacoes: AfiliacaoOption[] = await db.afiliacao
     .findMany({ orderBy: { nome: 'asc' }, select: { id: true, nome: true } })
@@ -159,48 +163,66 @@ export default async function ConfiguracoesGeralPage({
 
   return (
     <div className="space-y-6">
-      <ConfigSectionCard
-        icon={<Settings className={ICONE} />}
-        title="Perfil da torcida"
-        description="Nome da plataforma. Cores e visual ficam em Identidade."
-        ownerOnly
-        blocked={!isOwner}
-        index={0}
-      >
-        <PerfilTenantForm nome={tenant.nome} />
-      </ConfigSectionCard>
+      {canManageSettings ? (
+        <ConfigSectionCard
+          icon={<Settings className={ICONE} />}
+          title="Perfil da torcida"
+          description="Nome da plataforma. Cores e visual ficam em Identidade."
+          ownerOnly
+          blocked={!isOwner}
+          index={0}
+        >
+          <PerfilTenantForm nome={tenant.nome} />
+        </ConfigSectionCard>
+      ) : null}
 
-      <ConfigSectionCard
-        icon={<Flag className={ICONE} />}
-        title="Afiliação"
-        description="Defina qual time a torcida apoia para contexto global de notícias"
-        ownerOnly
-        blocked={!isOwner}
-        index={1}
-      >
-        <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
-      </ConfigSectionCard>
+      {canManageSettings ? (
+        <ConfigSectionCard
+          icon={<Flag className={ICONE} />}
+          title="Afiliação"
+          description="Defina qual time a torcida apoia para contexto global de notícias"
+          ownerOnly
+          blocked={!isOwner}
+          index={1}
+        >
+          <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
+        </ConfigSectionCard>
+      ) : null}
 
-      <ConfigSectionCard
-        icon={<IdCard className={ICONE} />}
-        title="Cadastro de sócios"
-        description="Documentos e planos (periodicidades) no onboarding"
-        ownerOnly
-        blocked={!isOwner}
-        index={2}
-      >
-        <div className="space-y-8">
-          <DocumentosCadastroForm
-            key={String(tenant.exigirDocumentosCadastro)}
-            exigir={tenant.exigirDocumentosCadastro}
-          />
-          <PeriodicidadesOnboardingForm
-            key={periodicidadesOnboarding.join(',') || 'padrao'}
-            periodicidades={periodicidadesOnboarding}
-          />
-        </div>
-      </ConfigSectionCard>
+      {(canManageSettings || canManagePendenciasCadastro) ? (
+        <ConfigSectionCard
+          icon={<IdCard className={ICONE} />}
+          title="Cadastro de sócios"
+          description="Documentos, planos e solicitação de dados pendentes nesta unidade"
+          ownerOnly={false}
+          blocked={false}
+          index={2}
+        >
+          <div className="space-y-8">
+            {canManagePendenciasCadastro ? (
+              <SolicitarPendenciasCadastroForm
+                key={String(tenant.solicitarPendenciasCadastro)}
+                ativo={tenant.solicitarPendenciasCadastro}
+                unidadeNome={formatNomeTorcida(tenant.nome)}
+              />
+            ) : null}
+            {canManageSettings && isOwner ? (
+              <>
+                <DocumentosCadastroForm
+                  key={String(tenant.exigirDocumentosCadastro)}
+                  exigir={tenant.exigirDocumentosCadastro}
+                />
+                <PeriodicidadesOnboardingForm
+                  key={periodicidadesOnboarding.join(',') || 'padrao'}
+                  periodicidades={periodicidadesOnboarding}
+                />
+              </>
+            ) : null}
+          </div>
+        </ConfigSectionCard>
+      ) : null}
 
+      {canManageSettings ? (
       <ConfigSectionCard
         id="canal-oficial"
         icon={<Radio className={ICONE} />}
@@ -223,7 +245,9 @@ export default async function ConfiguracoesGeralPage({
           />
         ) : null}
       </ConfigSectionCard>
+      ) : null}
 
+      {canManageSettings ? (
       <ConfigSectionCard
         id="convite"
         icon={<Link2 className={ICONE} />}
@@ -238,8 +262,9 @@ export default async function ConfiguracoesGeralPage({
           canalRestrito={estadoCanal.restrito}
         />
       </ConfigSectionCard>
+      ) : null}
 
-      {ehUnidadeDaTorcida ? (
+      {canManageSettings && ehUnidadeDaTorcida ? (
         <ConfigSectionCard
           id="canal-restrito"
           icon={<Lock className={ICONE} />}
@@ -262,6 +287,7 @@ export default async function ConfiguracoesGeralPage({
         </ConfigSectionCard>
       ) : null}
 
+      {canManageSettings ? (
       <MotionReveal index={ehUnidadeDaTorcida ? 6 : 5}>
         <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
           <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
@@ -286,6 +312,7 @@ export default async function ConfiguracoesGeralPage({
           </div>
         </section>
       </MotionReveal>
+      ) : null}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import {
   resumirCompletudeCadastroSocio,
 } from '../completude-cadastro-socio'
 import {
+  elegivelPendenciaCadastro,
   inadimplentePorPendenciaCadastro,
   PENDENCIA_SOCIO_EXPEDICAO,
   PENDENCIA_SOCIO_FICHA,
@@ -31,6 +32,7 @@ function base(over: Partial<MembroParaPendenciaCadastro> = {}): MembroParaPenden
     periodicidadePretendida: null,
     temCarteirinha: false,
     exigirDocumentosCadastro: false,
+    solicitarPendenciasCadastro: true,
     pendenciasCadastroDispensadas: [],
     ...over,
   }
@@ -50,6 +52,20 @@ describe('checklistCompletudeCadastro', () => {
     expect(byId.bairro).toBe(false)
     expect(byId.uf).toBe(false)
     expect(byId.termo).toBe(false)
+  })
+})
+
+describe('elegivelPendenciaCadastro', () => {
+  it('aceita só sócio aprovado (membro, gestor, liderança com tipo SOCIO)', () => {
+    expect(elegivelPendenciaCadastro({ tipo: 'SOCIO', status: 'APROVADO' })).toBe(true)
+  })
+
+  it('rejeita torcedor mesmo aprovado', () => {
+    expect(elegivelPendenciaCadastro({ tipo: 'TORCEDOR', status: 'APROVADO' })).toBe(false)
+  })
+
+  it('rejeita sócio pendente', () => {
+    expect(elegivelPendenciaCadastro({ tipo: 'SOCIO', status: 'PENDENTE' })).toBe(false)
   })
 })
 
@@ -87,7 +103,6 @@ describe('resolverPendenciasCadastro via completude', () => {
       periodicidadePretendida: 'ANUAL',
       temCarteirinha: true,
     })
-    // Com carteirinha, expedição não entra; ficha completa → sem pendência.
     expect(resolverPendenciasCadastro(m)).toEqual([])
     expect(resumirCompletudeCadastroSocio(m, { exigirDocumentos: false, temCarteirinha: true }).completo).toBe(
       true,
@@ -125,5 +140,22 @@ describe('resolverPendenciasCadastro via completude', () => {
       ]),
     )
     expect(p[0]?.camposFaltantes).not.toContain('dataExpedicaoCarteirinha')
+  })
+
+  it('TORCEDOR nunca entra no fluxo', () => {
+    expect(
+      resolverPendenciasCadastro(
+        base({ tipo: 'TORCEDOR', isSocio: false }),
+      ),
+    ).toEqual([])
+  })
+
+  it('serviço desligado na unidade não abre pendência', () => {
+    expect(
+      resolverPendenciasCadastro(base({ solicitarPendenciasCadastro: false })),
+    ).toEqual([])
+    expect(
+      inadimplentePorPendenciaCadastro(base({ solicitarPendenciasCadastro: false })),
+    ).toBe(false)
   })
 })

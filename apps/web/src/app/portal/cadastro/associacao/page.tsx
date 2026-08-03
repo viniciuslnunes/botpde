@@ -7,6 +7,7 @@ import { formatNomeTorcida, resolverPeriodicidadesOnboarding } from '@torcida/ty
 import { getTenantFromHost } from '@/lib/tenant'
 import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
+import { elegivelPendenciaCadastro } from '@/lib/pendencias-cadastro'
 import { preenchidoCompletude } from '@/lib/completude-cadastro-socio'
 import {
   AssociacaoAtualizarForm,
@@ -14,7 +15,7 @@ import {
 } from './associacao-atualizar-form'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Completar cadastro de sócio' }
+export const metadata: Metadata = { title: 'Completar cadastro' }
 
 const MEMBRO_CAMPOS = {
   tipo: true,
@@ -165,7 +166,10 @@ export default async function CadastroAssociacaoPage() {
     select: MEMBRO_CAMPOS,
   })
 
-  if (!membro || membro.tipo !== 'SOCIO' || membro.status !== 'APROVADO') {
+  if (!membro || !elegivelPendenciaCadastro(membro)) {
+    redirect('/portal/comunidade')
+  }
+  if (tenant.solicitarPendenciasCadastro === false) {
     redirect('/portal/comunidade')
   }
 

@@ -27,6 +27,7 @@ import {
   salvarLojaVisivelNasUnidades,
   salvarAgendaVisivelNasUnidades,
   salvarExigirDocumentosCadastro,
+  salvarSolicitarPendenciasCadastro,
   salvarPeriodicidadesOnboarding,
   salvarCanalOficial,
   criarRole,
@@ -419,6 +420,67 @@ export function DocumentosCadastroForm({ exigir }: DocumentosCadastroFormProps) 
               : ativo
                 ? 'Documentos obrigatórios na solicitação de sócio'
                 : 'Documentos opcionais — podem ser pedidos depois'}
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
+interface SolicitarPendenciasCadastroFormProps {
+  ativo: boolean
+  /** Nome da unidade atual — reforça que o toggle é só deste tenant. */
+  unidadeNome: string
+}
+
+/** Liga/desliga o modal/fluxo de dados pendentes para sócios desta unidade. */
+export function SolicitarPendenciasCadastroForm({
+  ativo: inicial,
+  unidadeNome,
+}: SolicitarPendenciasCadastroFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(inicial)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('solicitarPendenciasCadastro', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarSolicitarPendenciasCadastro(fd), {
+        success: next
+          ? `Solicitação de dados pendentes ligada em ${unidadeNome}.`
+          : `Solicitação de dados pendentes desligada em ${unidadeNome}.`,
+      })
+      if (!ok) setAtivo(!next)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Quando ligado, sócios aprovados desta unidade com ficha incompleta veem o
+        aviso no portal e podem completar o cadastro. Vale só para{' '}
+        <strong className="font-semibold text-[rgb(var(--foreground))]">{unidadeNome}</strong>
+        — Sede e afiliadas têm o próprio controle. Torcedores não entram neste fluxo.
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ativo}
+          disabled={pending}
+          onChange={(e) => salvar(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Solicitar dados pendentes aos sócios
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : ativo
+                ? 'Serviço ativo nesta unidade — modal e página de completar cadastro'
+                : 'Serviço desligado nesta unidade — sócios não são cobrados por ficha incompleta'}
           </span>
         </span>
       </label>

@@ -1,9 +1,14 @@
 /**
- * Pendências de cadastro do sócio — serviço puro (testável, sem banco).
+ * Pendências de cadastro dos sócios — serviço puro (testável, sem banco).
  *
- * Fonte de verdade dos campos: `completude-cadastro-socio.ts` (mesmo checklist
- * do card admin «Completude do cadastro»). Dispensar («não mostrar de novo»)
- * esconde o modal mas mantém a pendência → inadimplência até completar.
+ * Cobre **todos os sócios aprovados** da unidade (inclui membros, gestores de
+ * departamento, presidente/liderança/vice/admin desde que `tipo = SOCIO`).
+ * Torcedores ficam de fora.
+ *
+ * Fonte de verdade dos campos: `completude-cadastro-socio.ts`. Dispensar
+ * («não mostrar de novo») esconde o modal mas mantém a pendência →
+ * inadimplência até completar. O tenant pode desligar o serviço em
+ * Configurações (`solicitarPendenciasCadastro`).
  */
 
 import {
@@ -40,6 +45,8 @@ export type MembroParaPendenciaCadastro = MembroParaCompletude & {
   status: string
   temCarteirinha: boolean
   exigirDocumentosCadastro: boolean
+  /** Quando false (config da unidade), o resolver não abre pendências. */
+  solicitarPendenciasCadastro?: boolean
   pendenciasCadastroDispensadas?: readonly string[] | null
 }
 
@@ -66,8 +73,17 @@ const LABELS: Record<CompletudeItemId, string> = {
 
 export const CAMPO_PENDENCIA_LABEL = LABELS
 
+/** Sócio aprovado — torcedores nunca entram, mesmo com cargo de liderança. */
+export function elegivelPendenciaCadastro(m: {
+  tipo: string
+  status: string
+}): boolean {
+  return m.tipo === 'SOCIO' && m.status === 'APROVADO'
+}
+
 function pendenciaFicha(m: MembroParaPendenciaCadastro): PendenciaCadastro | null {
-  if (m.tipo !== 'SOCIO' || m.status !== 'APROVADO') return null
+  if (m.solicitarPendenciasCadastro === false) return null
+  if (!elegivelPendenciaCadastro(m)) return null
   if (!m.isSocio) return null
 
   const resumo = resumirCompletudeCadastroSocio(m, {
