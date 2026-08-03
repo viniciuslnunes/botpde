@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
 import { avaliarAcessoDm } from '@/lib/mensageria'
@@ -135,11 +136,14 @@ export default async function PerfilComunidadePage({
   const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
   const dmTenantContexto = await resolveTenantContextoDm(session.user.id, session.user.email)
+  // Mesmo critério de `solicitarSeguir`: tenant ATIVO do viewer (não o do
+  // perfil). Usar o tenant do perfil mostrava "Seguir" e a action negava → 500.
+  const viewerTenant = await getActiveTenant(session.user.id, session.user.email)
 
   const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge, acessoDm] = isSelf
     ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false, 'bloqueado' as const]
     : await Promise.all([
-        canFollowUser(session.user.id, userId, tenant.id),
+        canFollowUser(session.user.id, userId, viewerTenant?.id ?? null),
         getSeguimentoStatus(session.user.id, userId),
         podeVerConteudoSocial(session.user.id, userId, tenant.id),
         getContagensSeguimento(userId, tenant.id),

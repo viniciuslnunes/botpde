@@ -5,6 +5,7 @@ const findMany = vi.hoisted(() => vi.fn())
 const userRoleFindMany = vi.hoisted(() => vi.fn())
 const perfilTorcedorFindUnique = vi.hoisted(() => vi.fn())
 const getAlliedTenantIds = vi.hoisted(() => vi.fn())
+const getTorcidaLineageTenantIds = vi.hoisted(() => vi.fn())
 const getTenantRelation = vi.hoisted(() => vi.fn())
 const tenantsAreAllied = vi.hoisted(() => vi.fn())
 const getTenantIdsPorAfiliacao = vi.hoisted(() => vi.fn())
@@ -21,6 +22,7 @@ vi.mock('@torcida/db', () => ({
 
 vi.mock('@/lib/hierarquia', () => ({
   getAlliedTenantIds,
+  getTorcidaLineageTenantIds,
   getTenantRelation,
   tenantsAreAllied,
 }))
@@ -76,10 +78,13 @@ describe('canFollowUser × rivalidade', () => {
     userRoleFindMany.mockResolvedValue([])
     perfilTorcedorFindUnique.mockReset()
     getAlliedTenantIds.mockReset()
+    getTorcidaLineageTenantIds.mockReset()
     getTenantRelation.mockReset()
     tenantsAreAllied.mockReset()
     getTenantIdsPorAfiliacao.mockReset()
     getAlliedTenantIds.mockResolvedValue(['t2'])
+    // Default: contexto = worktree só com o tenant ativo (testes unitários).
+    getTorcidaLineageTenantIds.mockImplementation(async (id: string) => [id])
     tenantsAreAllied.mockResolvedValue(true)
     perfilTorcedorFindUnique.mockResolvedValue(null)
   })
@@ -153,5 +158,29 @@ describe('canFollowUser × rivalidade', () => {
     mockVinculos([{ userId: 'u2', tenantId: 't1', tipo: 'SOCIO' }])
     perfilTorcedorFindUnique.mockResolvedValue(null)
     await expect(canFollowUser('u1', 'u2', null)).resolves.toBe(false)
+  })
+
+  it('sócio da PDE segue sócio da Sede quando a worktree está no contexto', async () => {
+    mockVinculos([
+      { userId: 'u1', tenantId: 'pde', tipo: 'SOCIO' },
+      { userId: 'u2', tenantId: 'sede', tipo: 'SOCIO' },
+    ])
+    getTorcidaLineageTenantIds.mockResolvedValue(['sede', 'pde'])
+    getAlliedTenantIds.mockResolvedValue([])
+    getTenantRelation.mockResolvedValue('ancestor')
+    await expect(canFollowUser('u1', 'u2', 'pde')).resolves.toBe(true)
+  })
+
+  it('sócio da PDE NÃO segue sócio da Sede se o contexto ignorar a worktree', async () => {
+    // Regressão do bug: visíveis = [tenantAtivo] sem lineage filtrava o vínculo
+    // da Sede → seguidoTenants vazio (sem PerfilTorcedor) → false / 500 na action.
+    mockVinculos([
+      { userId: 'u1', tenantId: 'pde', tipo: 'SOCIO' },
+      { userId: 'u2', tenantId: 'sede', tipo: 'SOCIO' },
+    ])
+    getTorcidaLineageTenantIds.mockResolvedValue(['pde']) // worktree quebrada / só o ativo
+    getAlliedTenantIds.mockResolvedValue([])
+    perfilTorcedorFindUnique.mockResolvedValue(null)
+    await expect(canFollowUser('u1', 'u2', 'pde')).resolves.toBe(false)
   })
 })

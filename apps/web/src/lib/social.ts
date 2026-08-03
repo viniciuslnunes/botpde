@@ -1,7 +1,12 @@
 import { db, type Prisma } from '@torcida/db'
 import { saoRivais } from '@torcida/types'
 import { resolverPerfilPrivadoEfetivo } from './perfil-social'
-import { getAlliedTenantIds, getTenantRelation, tenantsAreAllied } from './hierarquia'
+import {
+  getAlliedTenantIds,
+  getTenantRelation,
+  getTorcidaLineageTenantIds,
+  tenantsAreAllied,
+} from './hierarquia'
 
 interface PerfilMembroLite {
   id: string
@@ -118,16 +123,18 @@ type VinculoMembro = { userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCED
 async function avaliarCanFollowComDados(
   seguidorId: string,
   seguidoId: string,
-  tenantContextoId: string | null,
-  aliadosContexto: string[],
+  /** Worktree do portal ativo + aliados; `null` = Comunidade Nacional (sem filtro). */
+  tenantsVisiveisContexto: string[] | null,
   vinculos: VinculoMembro[],
   tenantsClubeCache: Map<string, string[]>,
   relationCache: Map<string, Awaited<ReturnType<typeof getTenantRelation>>>,
 ): Promise<boolean> {
   if (seguidorId === seguidoId) return false
 
-  const visiveisNoContexto: Set<string> | null = tenantContextoId
-    ? new Set([tenantContextoId, ...aliadosContexto])
+  // Worktree completa (Sede↔PDE), não só o tenant ativo — senão sócio da
+  // unidade não enxerga vínculo na Sede e o follow 500 em produção.
+  const visiveisNoContexto: Set<string> | null = tenantsVisiveisContexto
+    ? new Set(tenantsVisiveisContexto)
     : null
   const noContexto = (tenantId: string): boolean =>
     visiveisNoContexto === null || visiveisNoContexto.has(tenantId)
@@ -202,8 +209,11 @@ export async function canFollowUsers(
   }
   if (alvos.length === 0) return result
 
-  const [aliadosContexto, vinculosMembro, cargos] = await Promise.all([
+  const [aliadosContexto, lineageContexto, vinculosMembro, cargos] = await Promise.all([
     tenantContextoId ? getAlliedTenantIds(tenantContextoId) : Promise.resolve([] as string[]),
+    tenantContextoId
+      ? getTorcidaLineageTenantIds(tenantContextoId)
+      : Promise.resolve([] as string[]),
     db.saasMembro.findMany({
       where: {
         status: 'APROVADO',
@@ -220,6 +230,10 @@ export async function canFollowUsers(
       select: { userId: true, tenantId: true },
     }) as Promise<Array<{ userId: string; tenantId: string }>>,
   ])
+
+  const tenantsVisiveisContexto = tenantContextoId
+    ? [...lineageContexto, ...aliadosContexto]
+    : null
 
   const vistosCargo = new Set(vinculosMembro.map((v) => `${v.userId}:${v.tenantId}`))
   const vinculos: VinculoMembro[] = [...vinculosMembro]
@@ -238,8 +252,7 @@ export async function canFollowUsers(
       const ok = await avaliarCanFollowComDados(
         seguidorId,
         seguidoId,
-        tenantContextoId,
-        aliadosContexto,
+        tenantsVisiveisContexto,
         vinculos,
         tenantsClubeCache,
         relationCache,

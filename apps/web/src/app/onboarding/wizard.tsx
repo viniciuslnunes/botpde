@@ -1851,22 +1851,37 @@ function PassoVinculo({
     }
   }
 
-  // ─── Endereço por localização (reaproveita o GPS do passo Região) ───────────
+  // ─── Endereço por localização (GPS fresco + só campos confiáveis) ───────────
   const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false)
   const [erroLocalizacaoEndereco, setErroLocalizacaoEndereco] = useState<string | null>(null)
-  const [enderecoPorLocalizacao, setEnderecoPorLocalizacao] = useState(false)
+  const [msgLocalizacaoEndereco, setMsgLocalizacaoEndereco] = useState<string | null>(null)
 
-  function coordsAtuais(): Promise<{ lat: number; lng: number } | null> {
-    // Já temos GPS confirmado no passo Região: não pede permissão de novo.
-    if (coordsDispositivo) return Promise.resolve(coordsDispositivo)
+  type CoordsComPrecisao = { lat: number; lng: number; accuracyM: number }
+
+  /** Sempre tenta GPS fresco (maximumAge: 0). Cache do passo Região só como fallback. */
+  function coordsFrescasParaEndereco(): Promise<CoordsComPrecisao | null> {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      if (coordsDispositivo) {
+        return Promise.resolve({ ...coordsDispositivo, accuracyM: Number.POSITIVE_INFINITY })
+      }
       return Promise.resolve(null)
     }
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracyM: pos.coords.accuracy,
+          }),
+        () => {
+          if (coordsDispositivo) {
+            resolve({ ...coordsDispositivo, accuracyM: Number.POSITIVE_INFINITY })
+            return
+          }
+          resolve(null)
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
       )
     })
   }
@@ -1874,10 +1889,10 @@ function PassoVinculo({
   async function preencherEnderecoPelaLocalizacao() {
     setBuscandoLocalizacao(true)
     setErroLocalizacaoEndereco(null)
-    setEnderecoPorLocalizacao(false)
+    setMsgLocalizacaoEndereco(null)
     setErroCepLocal(null)
     try {
-      const coords = await coordsAtuais()
+      const coords = await coordsFrescasParaEndereco()
       if (!coords) {
         setErroLocalizacaoEndereco(
           'Não conseguimos acessar sua localização. Preencha pelo CEP.',
@@ -1891,19 +1906,60 @@ function PassoVinculo({
         )
         return
       }
-      // Preenche só o que veio — não apaga o que o usuário já digitou à mão.
-      if (achado.cep) setCep(maskCep(achado.cep))
-      if (achado.logradouro) setLogradouro(achado.logradouro)
-      if (achado.numero) setNumero(achado.numero)
-      if (achado.bairro) setBairro(achado.bairro)
-      if (achado.cidade) setCidadeEndereco(achado.cidade)
-      if (achado.estado) setUfEndereco(achado.estado)
+
+      const accuracyM = coords.accuracyM
+      // GPS grosso: só cidade/UF. Rua/CEP a partir de um raio grande apontam
+      // endereço errado (ex.: outro bairro na mesma cidade).
+      const gpsGrosso = !Number.isFinite(accuracyM) || accuracyM > 200
+      const gpsModerado = !gpsGrosso && accuracyM > 80
+      const temRua = achado.precisao === 'exata' || achado.precisao === 'rua'
+      const podeRua = !gpsGrosso && temRua
+
+      const cepFinal = podeRua ? achado.cep : ''
+      let logradouroFinal = podeRua ? achado.logradouro : ''
+      let bairroFinal = gpsGrosso ? '' : achado.bairro
+      let cidadeFinal = achado.cidade
+      let ufFinal = achado.estado
+      // Número só com rooftop + GPS fino (≤80m) — nunca interpolado.
+      const numeroFinal =
+        !gpsGrosso && !gpsModerado && achado.numero ? achado.numero : ''
+
+      // ViaCEP confirma logradouro/bairro oficiais do CEP quando o GPS foi preciso o bastante.
+      if (cepFinal) {
+        const viaCep = await buscarEnderecoPorCep(cepFinal)
+        if (viaCep) {
+          if (viaCep.logradouro) logradouroFinal = viaCep.logradouro
+          if (viaCep.bairro) bairroFinal = viaCep.bairro
+          if (viaCep.localidade) cidadeFinal = viaCep.localidade
+          if (viaCep.uf) ufFinal = viaCep.uf
+        }
+      }
+
+      if (cepFinal) setCep(maskCep(cepFinal))
+      if (logradouroFinal) setLogradouro(logradouroFinal)
+      // Sem número confiável: limpa para não deixar lixo de tentativa anterior.
+      setNumero(numeroFinal)
+      if (bairroFinal) setBairro(bairroFinal)
+      if (cidadeFinal) setCidadeEndereco(cidadeFinal)
+      if (ufFinal) setUfEndereco(ufFinal)
+
       setErrosCampo((prev) => {
         const next = { ...prev }
         for (const campo of ['cep', 'logradouro', 'bairro', 'cidade', 'uf']) delete next[campo]
         return next
       })
-      setEnderecoPorLocalizacao(true)
+
+      if (numeroFinal) {
+        setMsgLocalizacaoEndereco(
+          'Endereço detectado com precisão — confira o número e o complemento',
+        )
+      } else if (logradouroFinal || cepFinal) {
+        setMsgLocalizacaoEndereco('Rua/CEP detectados — confira e informe o número')
+      } else {
+        setMsgLocalizacaoEndereco(
+          'Região detectada — complete o endereço pelo CEP ou à mão',
+        )
+      }
     } finally {
       setBuscandoLocalizacao(false)
     }
@@ -2957,18 +3013,17 @@ function PassoVinculo({
                 {buscandoLocalizacao ? 'Buscando endereço…' : 'Preencher pela minha localização'}
               </button>
               <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-                {coordsDispositivo
-                  ? 'Usa a localização que você já confirmou na etapa Região. Confira e ajuste o número.'
-                  : 'Completa CEP, logradouro, bairro, cidade e UF. Confira e ajuste o número.'}
+                Usa GPS atual com alta precisão. Preenche só o que der para
+                confirmar — número só quando a posição for exata. Confira antes de seguir.
               </p>
-              {enderecoPorLocalizacao && (
+              {msgLocalizacaoEndereco && (
                 <p
                   role="status"
                   aria-live="polite"
                   className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-success-fg))]"
                 >
                   <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  Endereço preenchido pela localização — confira antes de seguir
+                  {msgLocalizacaoEndereco}
                 </p>
               )}
               {erroLocalizacaoEndereco && (

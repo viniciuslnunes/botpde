@@ -651,6 +651,28 @@ describe('fluxo: excluir unidade remaneja quem dependia dela', () => {
       await db.evento.deleteMany({ where: { id: evento.id } })
     })
 
+    // Canal oficial da unidade — deve sumir com a exclusão (não ficar órfão na inbox).
+    const canal: { id: string } = await db.conversa.create({
+      data: {
+        tipo: 'CANAL',
+        tenantId: ctx.tenantId,
+        nome: `${MARCA} canal sede duplicada`,
+        institucional: true,
+        canalOficial: true,
+        criadoPorId: ctx.presidente,
+      },
+      select: { id: true },
+    })
+    await db.sede.update({
+      where: { id: duplicada.id },
+      data: { canalConversaId: canal.id },
+    })
+    aoDesfazer(`remover canal órfão ${canal.id}`, async () => {
+      await db.membroConversa.deleteMany({ where: { conversaId: canal.id } })
+      await db.mensagemDireta.deleteMany({ where: { conversaId: canal.id } })
+      await db.conversa.deleteMany({ where: { id: canal.id } })
+    })
+
     const { excluirSede } = await import('@/app/admin/(estrutura)/sedes/actions')
     const r = await comoUsuario(ctx.presidente, () =>
       tentativa(() => excluirSede(duplicada.id, ctx.sedePrincipalId)),
@@ -670,6 +692,16 @@ describe('fluxo: excluir unidade remaneja quem dependia dela', () => {
       removidaPelaAction = false
     } else {
       ok(AREA, 'Sede duplicada removida')
+    }
+
+    const canalDepois: { id: string } | null = await db.conversa.findUnique({
+      where: { id: canal.id },
+      select: { id: true },
+    })
+    if (canalDepois) {
+      erro(AREA, 'Canal oficial da unidade excluída continuou existindo — grupo/canal órfão na inbox')
+    } else {
+      ok(AREA, 'Canal oficial da unidade excluída foi removido junto')
     }
 
     const membroDepois: { sedeId: string | null } | null = await db.saasMembro.findUnique({

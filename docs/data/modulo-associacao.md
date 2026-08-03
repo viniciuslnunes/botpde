@@ -77,24 +77,23 @@ avança aba por aba — Identificação → Endereço → **Associação** → D
   `numeroAssociado`, `anosSocio`, expedição, periodicidade e departamentos;
   no caminho novo — só departamentos (nº vem na emissão admin).
 
-### Endereço pela localização (2026-07-30)
+### Endereço pela localização (2026-07-30; precisão 2026-08-03)
 
-Se o usuário confirmou a localização por GPS no passo **Região**, a aba Endereço
-oferece **"Preencher pela minha localização"**, que reaproveita aquelas
-coordenadas (sem pedir permissão de novo) e completa CEP, logradouro, número,
-bairro, cidade e UF via `reverseGeocodeEndereco`.
+A aba Endereço oferece **"Preencher pela minha localização"**: pede **GPS fresco**
+(`enableHighAccuracy`, `maximumAge: 0`) e completa só o que a precisão permitir
+via `reverseGeocodeEndereco` + ViaCEP.
 
-- Só o GPS conta: o geocode de cidade+UF devolve o **centróide do município** e
-  preencheria uma rua aleatória. `PassoRegiao.onLocalizacao` informa a origem
-  (`'gps' | 'cidade'`) e só a primeira alimenta `coordsDispositivo`.
-- Sem GPS prévio o botão continua aparecendo e pede geolocalização na hora;
-  negada a permissão, cai no CEP com aviso — nunca bloqueia o passo.
-- Gate por `isGoogleMapsConfigured()`: sem `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` o
-  bloco não é renderizado (degradação graciosa).
-- `reverseGeocodeEndereco` passou a devolver `logradouro`/`numero` separados e
-  `bairro` (`sublocality_level_1` → `neighborhood` → `sublocality`, que o Google
-  alterna no Brasil). O campo `endereco` concatenado segue existindo para
-  sedes/eventos.
+- Não reusa o GPS do passo Região como fonte primária (ele basta para cidade, mas
+  costuma ser grosso demais para rua). `coordsDispositivo` só entra se o GPS
+  fresco falhar, tratado como precisão desconhecida.
+- Faixas de `coords.accuracy`: >200m → só cidade/UF; 80–200m → +bairro e rua/CEP
+  se o geocode for `exata`/`rua`; ≤80m → +número só com `ROOFTOP`.
+- `reverseGeocodeEndereco` escolhe o melhor resultado (ROOFTOP/street_address
+  antes de APPROXIMATE), omite número interpolado, e expõe `precisao` /
+  `locationType`. ViaCEP confirma logradouro/bairro do CEP quando houver.
+- Só o GPS conta para rua: geocode de cidade+UF é centróide do município.
+  `PassoRegiao.onLocalizacao` distingue `'gps' | 'cidade'`.
+- Gate por `isGoogleMapsConfigured()`; sem permissão, cai no CEP — nunca bloqueia.
 
 ## Fila compartilhada de admissão (Caso B, 2026-07-27)
 

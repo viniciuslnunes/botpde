@@ -157,6 +157,8 @@ describe('google-maps', () => {
         status: 'OK',
         results: [
           {
+            types: ['street_address'],
+            geometry: { location_type: 'ROOFTOP' },
             address_components: [
               { long_name: '183', short_name: '183', types: ['street_number'] },
               { long_name: 'Rua Cristina Tomás', short_name: 'R. Cristina Tomás', types: ['route'] },
@@ -182,6 +184,104 @@ describe('google-maps', () => {
       cidade: 'São Paulo',
       estado: 'SP',
       cep: '05045-000',
+      precisao: 'exata',
+      locationType: 'ROOFTOP',
+    })
+
+    vi.unstubAllGlobals()
+  })
+
+  it('reverseGeocodeEndereco prioriza ROOFTOP/street_address sobre resultado aproximado', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'OK',
+        results: [
+          {
+            types: ['locality', 'political'],
+            geometry: { location_type: 'APPROXIMATE' },
+            address_components: [
+              { long_name: 'Praia Grande', short_name: 'Praia Grande', types: ['locality'] },
+              {
+                long_name: 'Praia Grande',
+                short_name: 'Praia Grande',
+                types: ['administrative_area_level_2'],
+              },
+              { long_name: 'São Paulo', short_name: 'SP', types: ['administrative_area_level_1'] },
+            ],
+          },
+          {
+            types: ['street_address'],
+            geometry: { location_type: 'ROOFTOP' },
+            address_components: [
+              { long_name: '1500', short_name: '1500', types: ['street_number'] },
+              {
+                long_name: 'Rua José da Costa Monteiro',
+                short_name: 'R. José da Costa Monteiro',
+                types: ['route'],
+              },
+              { long_name: 'Vila Sonia', short_name: 'Vila Sonia', types: ['sublocality_level_1'] },
+              {
+                long_name: 'Praia Grande',
+                short_name: 'Praia Grande',
+                types: ['administrative_area_level_2'],
+              },
+              { long_name: 'São Paulo', short_name: 'SP', types: ['administrative_area_level_1'] },
+              { long_name: '11722-040', short_name: '11722-040', types: ['postal_code'] },
+            ],
+          },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const endereco = await reverseGeocodeEndereco({ lat: -24.01, lng: -46.4 })
+    expect(endereco?.logradouro).toBe('Rua José da Costa Monteiro')
+    expect(endereco?.numero).toBe('1500')
+    expect(endereco?.bairro).toBe('Vila Sonia')
+    expect(endereco?.cep).toBe('11722-040')
+    expect(endereco?.precisao).toBe('exata')
+    expect(endereco?.locationType).toBe('ROOFTOP')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('reverseGeocodeEndereco omite número interpolado (RANGE_INTERPOLATED)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'OK',
+        results: [
+          {
+            types: ['street_address'],
+            geometry: { location_type: 'RANGE_INTERPOLATED' },
+            address_components: [
+              { long_name: '1184', short_name: '1184', types: ['street_number'] },
+              { long_name: 'Rua João Ramalho', short_name: 'R. João Ramalho', types: ['route'] },
+              { long_name: 'Aviação', short_name: 'Aviação', types: ['sublocality_level_1'] },
+              {
+                long_name: 'Praia Grande',
+                short_name: 'Praia Grande',
+                types: ['administrative_area_level_2'],
+              },
+              { long_name: 'São Paulo', short_name: 'SP', types: ['administrative_area_level_1'] },
+              { long_name: '11702-820', short_name: '11702-820', types: ['postal_code'] },
+            ],
+          },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const endereco = await reverseGeocodeEndereco({ lat: -24.01, lng: -46.4 })
+    expect(endereco).toMatchObject({
+      logradouro: 'Rua João Ramalho',
+      numero: '',
+      bairro: 'Aviação',
+      cep: '11702-820',
+      precisao: 'rua',
+      locationType: 'RANGE_INTERPOLATED',
+      endereco: 'Rua João Ramalho',
     })
 
     vi.unstubAllGlobals()
@@ -196,6 +296,8 @@ describe('google-maps', () => {
         status: 'OK',
         results: [
           {
+            types: ['street_address'],
+            geometry: { location_type: 'ROOFTOP' },
             address_components: [
               { long_name: '183', short_name: '183', types: ['street_number'] },
               { long_name: 'Rua Cristina Tomás', short_name: 'R. Cristina Tomás', types: ['route'] },
@@ -215,6 +317,7 @@ describe('google-maps', () => {
       expect(endereco?.bairro).toBe('Pinheiros')
       expect(endereco?.logradouro).toBe('Rua Cristina Tomás')
       expect(endereco?.numero).toBe('183')
+      expect(endereco?.precisao).toBe('exata')
       vi.unstubAllGlobals()
     }
   })

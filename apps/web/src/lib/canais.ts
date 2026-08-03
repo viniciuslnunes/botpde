@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { revalidateTag, unstable_cache } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, type Prisma } from '@torcida/db'
 import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
@@ -1023,8 +1023,11 @@ export async function getCanalDaUnidadeDoVinculo(
   const vinculo: { id: string } | null = await db.saasMembro.findFirst({
     where: {
       userId,
-      status: 'APROVADO',
       espelhado: false,
+      OR: [
+        { status: 'APROVADO' },
+        { status: 'PENDENTE', tipo: 'SOCIO' },
+      ],
       sede: { canalConversaId: conversaId },
     },
     select: { id: true },
@@ -1515,4 +1518,50 @@ export async function buscarCanaisEUnidades(
   })
 
   return { canais, unidades }
+}
+
+/**
+ * Remove canais e grupos ao excluir uma unidade.
+ *
+ * Cobre (a) o canal oficial apontado por `Sede.canalConversaId` — inclusive
+ * quando a conversa ficou com `tenantId` da mãe após promoção Caso B — e
+ * (b) todo CANAL/GRUPO do tenant filho que está sendo desativado. Tickets de
+ * pedido (`onDelete: Restrict`) saem antes; membros/mensagens cascateiam;
+ * posts e ponteiros de departamento/área/sede viram null pelo schema.
+ */
+export async function apagarConversasAoExcluirUnidade(
+  tx: Prisma.TransactionClient,
+  opts: { ids?: string[]; tenantId?: string },
+): Promise<number> {
+  const ids = (opts.ids ?? []).filter(Boolean)
+  if (ids.length === 0 && !opts.tenantId) return 0
+
+  const or: Prisma.ConversaWhereInput[] = []
+  if (ids.length > 0) or.push({ id: { in: ids } })
+  if (opts.tenantId) or.push({ tenantId: opts.tenantId })
+
+  const conversas: { id: string }[] = await tx.conversa.findMany({
+    where: { tipo: { in: ['CANAL', 'GRUPO'] }, OR: or },
+    select: { id: true },
+  })
+  const conversaIds = conversas.map((c) => c.id)
+  if (conversaIds.length === 0) return 0
+
+  await tx.saasPedidoTicket.deleteMany({ where: { conversaId: { in: conversaIds } } })
+  await tx.sede.updateMany({
+    where: { canalConversaId: { in: conversaIds } },
+    data: { canalConversaId: null },
+  })
+  await tx.departamento.updateMany({
+    where: { canalConversaId: { in: conversaIds } },
+    data: { canalConversaId: null },
+  })
+  await tx.departamentoArea.updateMany({
+    where: { canalConversaId: { in: conversaIds } },
+    data: { canalConversaId: null },
+  })
+  const result: { count: number } = await tx.conversa.deleteMany({
+    where: { id: { in: conversaIds } },
+  })
+  return result.count
 }

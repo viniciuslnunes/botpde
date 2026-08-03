@@ -118,10 +118,14 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
           onClick={() =>
             startTransition(async () => {
               try {
-                const status = await solicitarSeguir(userId)
-                setLocalStatus(status)
+                const resultado = await solicitarSeguir(userId)
+                if (!resultado.ok) {
+                  toast.error(resultado.message)
+                  return
+                }
+                setLocalStatus(resultado.status)
                 toast.success(
-                  status === 'APROVADO'
+                  resultado.status === 'APROVADO'
                     ? 'Você começou a seguir este membro.'
                     : 'Solicitação enviada.',
                 )

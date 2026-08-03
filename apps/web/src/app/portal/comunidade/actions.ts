@@ -723,19 +723,30 @@ export async function publicarPostNacional(
 
 export type SeguimentoResultado = 'APROVADO' | 'PENDENTE'
 
-export async function solicitarSeguir(userId: string): Promise<SeguimentoResultado> {
-  const { session, tenant } = await getSessionAndPortalTenant()
-  if (!session?.user?.id) throw new Error('Não autenticado')
+export type SolicitarSeguirResultado =
+  | { ok: true; status: SeguimentoResultado }
+  | { ok: false; message: string }
 
-  // canFollowUser é o ponto único do funil (mesma torcida, aliadas ou mesmo
-  // clube para torcedor global) — sem exigir SaasMembro do ator.
+export async function solicitarSeguir(userId: string): Promise<SolicitarSeguirResultado> {
+  const { session, tenant } = await getSessionAndPortalTenant()
+  if (!session?.user?.id) return { ok: false, message: 'Não autenticado' }
+
+  // canFollowUser é o ponto único do funil (mesma torcida/worktree, aliadas ou
+  // mesmo clube para torcedor global) — sem exigir SaasMembro do ator.
   const podeSeguir = await canFollowUser(session.user.id, userId, tenant?.id ?? null)
   if (!podeSeguir) {
-    throw new Error('Você só pode seguir torcedores do seu clube, da sua torcida ou de torcidas aliadas.')
+    // Não throw: em produção, throw de Server Action vira HTTP 500 sem corpo.
+    return {
+      ok: false,
+      message:
+        'Você só pode seguir torcedores do seu clube, da sua torcida ou de torcidas aliadas.',
+    }
   }
 
   const statusAtual = await getSeguimentoStatus(session.user.id, userId)
-  if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') return statusAtual
+  if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') {
+    return { ok: true, status: statusAtual }
+  }
 
   // Seguimento.tenantContextoId é FK obrigatória: sem tenant real do ator
   // (torcedor global), tenta a Comunidade Nacional dele (afiliação com
@@ -757,9 +768,11 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
     tenantContextoId = await resolveTenantIdPortalComunidade(userId, undefined)
   }
   if (!tenantContextoId) {
-    throw new Error(
-      'Não é possível seguir outro torcedor sem torcida ainda — funcionalidade em desenvolvimento.',
-    )
+    return {
+      ok: false,
+      message:
+        'Não é possível seguir outro torcedor sem torcida ainda — funcionalidade em desenvolvimento.',
+    }
   }
 
   // Privacidade do ALVO no tenant do perfil dele — não no contexto do
@@ -805,7 +818,7 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
   revalidatePath('/portal/comunidade/seguindo')
   invalidarLeituraComunidade(tenantContextoId)
 
-  return statusInicial
+  return { ok: true, status: statusInicial }
 }
 
 async function marcarNotificacoesSeguimentoPendentesLidas(

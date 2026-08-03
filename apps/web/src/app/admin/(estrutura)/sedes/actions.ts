@@ -24,7 +24,11 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { assertPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { ensureCanalOficialParaSede, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
+import {
+  apagarConversasAoExcluirUnidade,
+  ensureCanalOficialParaSede,
+  vincularResponsavelAoCanalDaSede,
+} from '@/lib/canais'
 import { notificarSafe } from '@/lib/notificacoes'
 import { assertPodeMutarSedeNaArvore } from '@/lib/sede-acesso-mae'
 import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
@@ -909,6 +913,12 @@ export async function excluirSede(
         where: { tenantId: sede.tenantId!, sedeId },
         data: { sedeId: null },
       })
+      // Canal oficial (pode ter ficado com tenantId da mãe pós-promoção) +
+      // canais/grupos do tenant filho — senão continuam na inbox após desativar.
+      await apagarConversasAoExcluirUnidade(tx, {
+        tenantId: sede.tenantId!,
+        ids: sede.canalConversaId ? [sede.canalConversaId] : undefined,
+      })
       await tx.sede.delete({ where: { id: sedeId } })
       await tx.tenant.update({
         where: { id: sede.tenantId! },
@@ -916,17 +926,21 @@ export async function excluirSede(
       })
     })
   } else {
-    const [{ count }] = await db.$transaction([
-      db.saasMembro.updateMany({
+    const { count } = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const remanejados: { count: number } = await tx.saasMembro.updateMany({
         where: { tenantId: tenant.id, sedeId },
         data: { sedeId: destinoSedeId },
-      }),
-      db.evento.updateMany({
+      })
+      await tx.evento.updateMany({
         where: { tenantId: tenant.id, sedeId },
         data: { sedeId: destinoSedeId },
-      }),
-      db.sede.delete({ where: { id: sedeId } }),
-    ])
+      })
+      if (sede.canalConversaId) {
+        await apagarConversasAoExcluirUnidade(tx, { ids: [sede.canalConversaId] })
+      }
+      await tx.sede.delete({ where: { id: sedeId } })
+      return remanejados
+    })
     membrosRemanejados = count
   }
 

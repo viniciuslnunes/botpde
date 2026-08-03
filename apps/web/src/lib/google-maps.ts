@@ -556,9 +556,15 @@ type GeocodeAddressComponent = {
   types: string[]
 }
 
+type GeocodeLocationType = 'ROOFTOP' | 'RANGE_INTERPOLATED' | 'GEOMETRIC_CENTER' | 'APPROXIMATE'
+
 type GeocodeResult = {
+  types?: string[]
   address_components?: GeocodeAddressComponent[]
-  geometry?: { location?: { lat: number; lng: number } }
+  geometry?: {
+    location?: { lat: number; lng: number }
+    location_type?: GeocodeLocationType | string
+  }
 }
 
 type GeocodeResponse = {
@@ -572,6 +578,66 @@ function componente(
   campo: 'long_name' | 'short_name' = 'long_name',
 ): string | null {
   return componentes.find((c) => c.types.includes(tipo))?.[campo] ?? null
+}
+
+const LOCATION_TYPE_SCORE: Record<string, number> = {
+  ROOFTOP: 400,
+  RANGE_INTERPOLATED: 300,
+  GEOMETRIC_CENTER: 200,
+  APPROXIMATE: 100,
+}
+
+const RESULT_TYPE_SCORE: Array<{ tipo: string; score: number }> = [
+  { tipo: 'street_address', score: 80 },
+  { tipo: 'premise', score: 70 },
+  { tipo: 'subpremise', score: 60 },
+  { tipo: 'route', score: 50 },
+  { tipo: 'postal_code', score: 40 },
+  { tipo: 'neighborhood', score: 30 },
+  { tipo: 'sublocality_level_1', score: 28 },
+  { tipo: 'sublocality', score: 25 },
+  { tipo: 'locality', score: 15 },
+  { tipo: 'administrative_area_level_2', score: 10 },
+]
+
+function pontuarResultadoGeocode(result: GeocodeResult): number {
+  const locationType = result.geometry?.location_type ?? ''
+  const locationScore = LOCATION_TYPE_SCORE[locationType] ?? 0
+  const types = result.types ?? []
+  let typeScore = 0
+  for (const { tipo, score } of RESULT_TYPE_SCORE) {
+    if (types.includes(tipo)) typeScore = Math.max(typeScore, score)
+  }
+  return locationScore + typeScore
+}
+
+function escolherMelhorResultadoGeocode(results: GeocodeResult[]): GeocodeResult | null {
+  let melhor: GeocodeResult | null = null
+  let melhorScore = -1
+  for (const result of results) {
+    if (!result.address_components?.length) continue
+    const score = pontuarResultadoGeocode(result)
+    if (score > melhorScore) {
+      melhor = result
+      melhorScore = score
+    }
+  }
+  return melhor
+}
+
+/** Quão confiável é o endereço revertido a partir de lat/lng. */
+export type GoogleMapsEnderecoPrecisao = 'exata' | 'rua' | 'bairro' | 'cidade'
+
+function classificarPrecisaoEndereco(opts: {
+  logradouro: string
+  numeroConfiavel: boolean
+  bairro: string
+  cidade: string
+}): GoogleMapsEnderecoPrecisao {
+  if (opts.numeroConfiavel && opts.logradouro) return 'exata'
+  if (opts.logradouro) return 'rua'
+  if (opts.bairro && opts.cidade) return 'bairro'
+  return 'cidade'
 }
 
 /**
@@ -614,17 +680,26 @@ export type GoogleMapsEnderecoReverso = {
   endereco: string
   /** Só o logradouro, sem número — formulários com campo Número separado. */
   logradouro: string
+  /**
+   * Número só quando `location_type === ROOFTOP`. Interpolado/aproximado
+   * costuma errar dezenas de metros — fica vazio para o usuário conferir.
+   */
   numero: string
   bairro: string
   cidade: string
   estado: string
   cep: string
+  /** Nível de confiança do resultado escolhido. */
+  precisao: GoogleMapsEnderecoPrecisao
+  /** `geometry.location_type` do resultado usado, se houver. */
+  locationType: string | null
 }
 
 /**
- * Resolve endereço completo (rua+número, bairro, cidade, UF, CEP) a partir de
- * lat/lng. Usado para preencher os campos de endereço ao colar um link do
- * Maps/arrastar o pin, e no onboarding a partir da localização do dispositivo.
+ * Resolve endereço (rua, bairro, cidade, UF, CEP) a partir de lat/lng.
+ * Escolhe o melhor resultado do Geocoding (ROOFTOP/street_address primeiro);
+ * número só entra com precisão de rooftop. Usado em sedes/eventos e no
+ * onboarding a partir do GPS do dispositivo.
  */
 export async function reverseGeocodeEndereco(
   coords: { lat: number; lng: number },
@@ -642,11 +717,18 @@ export async function reverseGeocodeEndereco(
   if (!res.ok) return null
 
   const data = (await res.json()) as GeocodeResponse
-  const componentes = data.results?.[0]?.address_components
-  if (data.status !== 'OK' || !componentes) return null
+  if (data.status !== 'OK' || !data.results?.length) return null
 
+  const escolhido = escolherMelhorResultadoGeocode(data.results)
+  const componentes = escolhido?.address_components
+  if (!escolhido || !componentes) return null
+
+  const locationType = escolhido.geometry?.location_type ?? null
   const rua = componente(componentes, 'route') ?? ''
-  const numero = componente(componentes, 'street_number') ?? ''
+  const streetNumber = componente(componentes, 'street_number') ?? ''
+  // Número só com ROOFTOP — RANGE_INTERPOLATED inventa número ao longo da rua.
+  const numeroConfiavel = locationType === 'ROOFTOP' && Boolean(streetNumber)
+  const numero = numeroConfiavel ? streetNumber : ''
   // No Brasil o Google devolve o bairro ora como `sublocality_level_1`, ora
   // como `neighborhood` — e `sublocality` genérico em algumas capitais.
   const bairro =
@@ -657,12 +739,19 @@ export async function reverseGeocodeEndereco(
   const cidade =
     componente(componentes, 'administrative_area_level_2') ??
     componente(componentes, 'locality') ??
-    componente(componentes, 'sublocality') ??
     ''
   const estado = componente(componentes, 'administrative_area_level_1', 'short_name') ?? ''
   const cep = componente(componentes, 'postal_code') ?? ''
 
   if (!rua && !cidade) return null
+
+  const precisao = classificarPrecisaoEndereco({
+    logradouro: rua,
+    numeroConfiavel,
+    bairro,
+    cidade,
+  })
+
   return {
     endereco: [rua, numero].filter(Boolean).join(', '),
     logradouro: rua,
@@ -671,6 +760,8 @@ export async function reverseGeocodeEndereco(
     cidade,
     estado,
     cep,
+    precisao,
+    locationType,
   }
 }
 

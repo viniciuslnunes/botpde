@@ -701,6 +701,10 @@ describe('seguir: rivalidade e perfil privado', () => {
         alerta(AREA, `Solicitação de seguir falhou: "${r.erro}" — regra do perfil privado não exercitada`)
         return
       }
+      if (!r.valor.ok) {
+        alerta(AREA, `Solicitação de seguir falhou: "${r.valor.message}" — regra do perfil privado não exercitada`)
+        return
+      }
 
       const seguimento: { status: string } | null = await db.seguimento.findFirst({
         where: { seguidorId: seguidor, seguidoId: alvo.userId },

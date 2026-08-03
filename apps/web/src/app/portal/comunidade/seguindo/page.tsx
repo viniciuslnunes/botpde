@@ -72,7 +72,11 @@ export default async function SeguindoPage() {
         itensIniciais={itens}
         onAprovar={aprovarSeguimento}
         onRejeitar={rejeitarSeguimento}
-        onSeguirDeVolta={solicitarSeguir}
+        onSeguirDeVolta={async (userId) => {
+          const r = await solicitarSeguir(userId)
+          if (!r.ok) throw new Error(r.message)
+          return r.status
+        }}
       />
     </div>
   )

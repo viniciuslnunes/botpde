@@ -45,6 +45,7 @@
     "audit:perfis-torcedores-privados": "node scripts/audit-perfis-torcedores-privados.js",
     "repair:perfis-socios-privados": "node scripts/repair-perfis-socios-privados.js",
     "db:repair-canal-oficial-duplicado": "node scripts/repair-canal-oficial-duplicado.js",
+    "db:repair-conversas-unidade-excluida": "node scripts/repair-conversas-unidade-excluida.js",
     "db:repair-responsavel-canal-membro": "node scripts/repair-responsavel-canal-membro.js",
     "db:repair-lideranca-canal-membro": "node scripts/repair-lideranca-canal-membro.js",
     "db:repair-canal-membro-pendente-aprovado": "node scripts/repair-canal-membro-pendente-aprovado.js",
