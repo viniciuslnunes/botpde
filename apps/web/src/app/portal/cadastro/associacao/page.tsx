@@ -3,41 +3,166 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { resolverPeriodicidadesOnboarding } from '@torcida/types'
+import { formatNomeTorcida, resolverPeriodicidadesOnboarding } from '@torcida/types'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
-import { AssociacaoAtualizarForm } from './associacao-atualizar-form'
+import { preenchidoCompletude } from '@/lib/completude-cadastro-socio'
+import {
+  AssociacaoAtualizarForm,
+  type ValoresAssociacaoForm,
+} from './associacao-atualizar-form'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Completar cadastro de sócio' }
+
+const MEMBRO_CAMPOS = {
+  tipo: true,
+  status: true,
+  telefone: true,
+  cidade: true,
+  numero: true,
+  complemento: true,
+  anosSocio: true,
+  numeroAssociado: true,
+  cpf: true,
+  rg: true,
+  dataNascimento: true,
+  logradouro: true,
+  bairro: true,
+  cep: true,
+  uf: true,
+  termoResponsabilidadeAceitoEm: true,
+  imagemProva: true,
+  fotoDocumentoUrl: true,
+  comprovanteResidenciaUrl: true,
+  responsavelNome: true,
+  responsavelDocumento: true,
+  dataExpedicaoCarteirinha: true,
+  periodicidadePretendida: true,
+  adimplente: true,
+  aprovadoEm: true,
+  sede: { select: { nome: true } },
+  departamento: { select: { nome: true } },
+} as const
+
+type MembroCampos = {
+  tipo: string
+  status: string
+  telefone: string | null
+  cidade: string | null
+  numero: string | null
+  complemento: string | null
+  anosSocio: number | null
+  numeroAssociado: string | null
+  cpf: string | null
+  rg: string | null
+  dataNascimento: Date | null
+  logradouro: string | null
+  bairro: string | null
+  cep: string | null
+  uf: string | null
+  termoResponsabilidadeAceitoEm: Date | null
+  imagemProva: string | null
+  fotoDocumentoUrl: string | null
+  comprovanteResidenciaUrl: string | null
+  responsavelNome: string | null
+  responsavelDocumento: string | null
+  dataExpedicaoCarteirinha: Date | null
+  periodicidadePretendida: string | null
+  adimplente: boolean
+  aprovadoEm: Date | null
+  sede: { nome: string } | null
+  departamento: { nome: string } | null
+}
+
+function scoreCompletude(m: MembroCampos): number {
+  const campos = [
+    m.numeroAssociado,
+    m.cpf,
+    m.rg,
+    m.dataNascimento,
+    m.logradouro,
+    m.bairro,
+    m.cep,
+    m.uf,
+    m.termoResponsabilidadeAceitoEm,
+    m.imagemProva,
+    m.fotoDocumentoUrl,
+    m.comprovanteResidenciaUrl,
+    m.dataExpedicaoCarteirinha,
+    m.periodicidadePretendida,
+  ]
+  return campos.filter((c) => preenchidoCompletude(c)).length
+}
+
+function coalesceStr(
+  preferido: string | null | undefined,
+  fallback: string | null | undefined,
+): string {
+  if (preferido?.trim()) return preferido.trim()
+  return fallback?.trim() ?? ''
+}
+
+function paraValores(
+  host: MembroCampos,
+  doacao: MembroCampos | null,
+): ValoresAssociacaoForm {
+  const d = doacao
+  return {
+    numeroAssociado: coalesceStr(host.numeroAssociado, d?.numeroAssociado),
+    cpf: coalesceStr(host.cpf, d?.cpf),
+    rg: coalesceStr(host.rg, d?.rg),
+    dataNascimento: host.dataNascimento
+      ? host.dataNascimento.toISOString().slice(0, 10)
+      : d?.dataNascimento
+        ? d.dataNascimento.toISOString().slice(0, 10)
+        : '',
+    telefone: coalesceStr(host.telefone, d?.telefone),
+    cidade: coalesceStr(host.cidade, d?.cidade),
+    logradouro: coalesceStr(host.logradouro, d?.logradouro),
+    numero: coalesceStr(host.numero, d?.numero),
+    complemento: coalesceStr(host.complemento, d?.complemento),
+    bairro: coalesceStr(host.bairro, d?.bairro),
+    cep: coalesceStr(host.cep, d?.cep),
+    uf: coalesceStr(host.uf, d?.uf),
+    imagemProva: coalesceStr(host.imagemProva, d?.imagemProva),
+    fotoDocumentoUrl: coalesceStr(host.fotoDocumentoUrl, d?.fotoDocumentoUrl),
+    comprovanteResidenciaUrl: coalesceStr(
+      host.comprovanteResidenciaUrl,
+      d?.comprovanteResidenciaUrl,
+    ),
+    responsavelNome: coalesceStr(host.responsavelNome, d?.responsavelNome),
+    responsavelDocumento: coalesceStr(host.responsavelDocumento, d?.responsavelDocumento),
+    dataExpedicaoIso: host.dataExpedicaoCarteirinha
+      ? host.dataExpedicaoCarteirinha.toISOString().slice(0, 10)
+      : d?.dataExpedicaoCarteirinha
+        ? d.dataExpedicaoCarteirinha.toISOString().slice(0, 10)
+        : '',
+    periodicidadeAtual: coalesceStr(
+      host.periodicidadePretendida,
+      d?.periodicidadePretendida,
+    ),
+    termoAceito: Boolean(
+      host.termoResponsabilidadeAceitoEm ?? d?.termoResponsabilidadeAceitoEm,
+    ),
+    anosSocio:
+      host.anosSocio != null
+        ? String(host.anosSocio)
+        : d?.anosSocio != null
+          ? String(d.anosSocio)
+          : '',
+  }
+}
 
 export default async function CadastroAssociacaoPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal/comunidade')
 
-  const membro = await db.saasMembro.findUnique({
+  const membro: MembroCampos | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: {
-      tipo: true,
-      status: true,
-      numeroAssociado: true,
-      cpf: true,
-      rg: true,
-      dataNascimento: true,
-      logradouro: true,
-      bairro: true,
-      cep: true,
-      uf: true,
-      termoResponsabilidadeAceitoEm: true,
-      imagemProva: true,
-      fotoDocumentoUrl: true,
-      comprovanteResidenciaUrl: true,
-      responsavelNome: true,
-      responsavelDocumento: true,
-      dataExpedicaoCarteirinha: true,
-      periodicidadePretendida: true,
-    },
+    select: MEMBRO_CAMPOS,
   })
 
   if (!membro || membro.tipo !== 'SOCIO' || membro.status !== 'APROVADO') {
@@ -54,16 +179,46 @@ export default async function CadastroAssociacaoPage() {
     redirect('/portal/comunidade')
   }
 
-  const pendencia = snap.ativas[0]!
-  const socioRow = await db.saasSocio.findFirst({
+  // Pré-preenche com a ficha mais completa da mesma torcida (ex.: Sede quando
+  // a unidade ativa ainda está vazia — caso SUBSEDE ITANHAEM × Gaviões).
+  const lineage = await getTorcidaLineageTenantIds(tenant.id)
+  const irmaos: (MembroCampos & { tenant: { id: string; nome: string } })[] =
+    lineage.length > 1
+      ? await db.saasMembro.findMany({
+          where: {
+            userId: session.user.id,
+            tipo: 'SOCIO',
+            status: 'APROVADO',
+            tenantId: { in: lineage.filter((id) => id !== tenant.id) },
+          },
+          select: {
+            ...MEMBRO_CAMPOS,
+            tenant: { select: { id: true, nome: true } },
+          },
+        })
+      : []
+
+  let doacao: MembroCampos | null = null
+  let prefillOrigemNome: string | null = null
+  if (irmaos.length > 0) {
+    const ranked = [...irmaos].sort((a, b) => scoreCompletude(b) - scoreCompletude(a))
+    const best = ranked[0]!
+    if (scoreCompletude(best) > scoreCompletude(membro)) {
+      doacao = best
+      prefillOrigemNome = formatNomeTorcida(best.tenant.nome)
+    }
+  }
+
+  const socioRow: { id: string; validade: Date } | null = await db.saasSocio.findFirst({
     where: { tenantId: tenant.id, userId: session.user.id },
-    select: { id: true },
+    select: { id: true, validade: true },
   })
 
   const periodicidades = resolverPeriodicidadesOnboarding(tenant.periodicidadesOnboarding)
+  const valores = paraValores(membro, doacao)
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <Link
           href="/portal/comunidade"
@@ -72,43 +227,34 @@ export default async function CadastroAssociacaoPage() {
           <ArrowLeft className="h-4 w-4" />
           Voltar ao portal
         </Link>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+        <h1 className="text-2xl font-bold leading-tight text-[rgb(var(--foreground))]">
           Completar cadastro de sócio
         </h1>
-        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Os mesmos campos obrigatórios da ficha no admin. Ao concluir, a carteirinha digital
-          pode ser emitida automaticamente.
+        <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+          Mesma organização da ficha no admin — só o que você precisa preencher.
+          <br />
+          Completar garante a vigência correta; ignorar o aviso deixa o cadastro inadimplente.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-6">
         <AssociacaoAtualizarForm
-          faltantes={pendencia.camposFaltantes}
-          progresso={pendencia.progresso ?? { ok: 0, total: pendencia.camposFaltantes.length }}
+          valores={valores}
           exigirDocumentos={tenant.exigirDocumentosCadastro}
           temCarteirinha={Boolean(socioRow)}
           periodicidades={periodicidades}
-          valores={{
-            numeroAssociado: membro.numeroAssociado?.trim() ?? '',
-            cpf: membro.cpf ?? '',
-            rg: membro.rg ?? '',
-            dataNascimento: membro.dataNascimento
-              ? membro.dataNascimento.toISOString().slice(0, 10)
-              : '',
-            logradouro: membro.logradouro ?? '',
-            bairro: membro.bairro ?? '',
-            cep: membro.cep ?? '',
-            uf: membro.uf ?? '',
-            imagemProva: membro.imagemProva ?? '',
-            fotoDocumentoUrl: membro.fotoDocumentoUrl ?? '',
-            comprovanteResidenciaUrl: membro.comprovanteResidenciaUrl ?? '',
-            responsavelNome: membro.responsavelNome ?? '',
-            responsavelDocumento: membro.responsavelDocumento ?? '',
-            dataExpedicaoIso: membro.dataExpedicaoCarteirinha
-              ? membro.dataExpedicaoCarteirinha.toISOString().slice(0, 10)
-              : '',
-            periodicidadeAtual: membro.periodicidadePretendida ?? '',
-            termoAceito: Boolean(membro.termoResponsabilidadeAceitoEm),
+          prefillOrigemNome={prefillOrigemNome}
+          operacao={{
+            unidadeNome: membro.sede?.nome ? formatNomeTorcida(membro.sede.nome) : null,
+            departamentoNome: membro.departamento?.nome ?? null,
+            aprovadoEmLabel: membro.aprovadoEm
+              ? membro.aprovadoEm.toLocaleDateString('pt-BR')
+              : null,
+            adimplente: membro.adimplente,
+            carteirinhaValidadeLabel: socioRow
+              ? socioRow.validade.toLocaleDateString('pt-BR')
+              : null,
+            statusLabel: 'Aprovado',
           }}
         />
       </div>

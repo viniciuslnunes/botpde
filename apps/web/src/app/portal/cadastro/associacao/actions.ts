@@ -58,6 +58,11 @@ export async function completarDadosAssociacao(
       tipo: true,
       status: true,
       idade: true,
+      telefone: true,
+      cidade: true,
+      numero: true,
+      complemento: true,
+      anosSocio: true,
       numeroAssociado: true,
       cpf: true,
       rg: true,
@@ -119,6 +124,17 @@ export async function completarDadosAssociacao(
   const logradouro = strOpt(formData.get('logradouro')) ?? membro.logradouro ?? undefined
   const bairro = strOpt(formData.get('bairro')) ?? membro.bairro ?? undefined
   const cep = strOpt(formData.get('cep')) ?? membro.cep ?? undefined
+  const telefone = strOpt(formData.get('telefone')) ?? membro.telefone ?? undefined
+  const cidade = strOpt(formData.get('cidade')) ?? membro.cidade ?? undefined
+  const numeroEndereco = strOpt(formData.get('numero')) ?? membro.numero ?? undefined
+  const complemento = strOpt(formData.get('complemento')) ?? membro.complemento ?? undefined
+  const anosRaw = strOpt(formData.get('anosSocio'))
+  let anosSocio = membro.anosSocio
+  if (anosRaw) {
+    const n = parseInt(anosRaw, 10)
+    if (!Number.isFinite(n) || n < 0 || n > 120) errors.anosSocio = ['Anos como sócio inválidos.']
+    else anosSocio = n
+  }
   let uf = strOpt(formData.get('uf')) ?? membro.uf ?? undefined
   if (uf && !UFS_BRASIL.includes(uf.toUpperCase())) {
     errors.uf = ['UF inválida.']
@@ -224,6 +240,11 @@ export async function completarDadosAssociacao(
       rg: rg ?? null,
       dataNascimento,
       idade: idade ?? null,
+      telefone: telefone ?? null,
+      cidade: cidade ?? null,
+      numero: numeroEndereco ?? null,
+      complemento: complemento ?? null,
+      anosSocio: anosSocio ?? null,
       logradouro: logradouro ?? null,
       bairro: bairro ?? null,
       cep: cep ?? null,

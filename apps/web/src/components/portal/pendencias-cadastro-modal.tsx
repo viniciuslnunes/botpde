@@ -3,7 +3,7 @@
 import { useEffect, useId, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
-import { AlertTriangle, IdCard } from 'lucide-react'
+import { AlertTriangle, IdCard, ShieldCheck } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   CAMPO_PENDENCIA_LABEL,
@@ -15,10 +15,32 @@ type Props = {
   pendencias: PendenciaCadastro[]
 }
 
+function motivoPrincipal(p: PendenciaCadastro): {
+  titulo: string
+  corpo: string
+  destaque: string
+} {
+  const faltaCarteirinha = p.camposFaltantes.some(
+    (c) => c === 'dataExpedicaoCarteirinha' || c === 'periodicidadePretendida',
+  )
+  if (faltaCarteirinha) {
+    return {
+      titulo: 'Por que atualizar agora',
+      corpo:
+        'A data de expedição e o plano definem a validade da carteirinha digital. Sem eles a torcida não consegue emitir nem confirmar se você está vigente neste ciclo.',
+      destaque: 'Atualizar = vigência correta · Ignorar = inadimplente até completar',
+    }
+  }
+  return {
+    titulo: 'Por que atualizar agora',
+    corpo:
+      'A ficha incompleta impede a torcida de confirmar sua situação de sócio. Completar os dados regulariza a vigência; ocultar o aviso sem preencher marca o cadastro como inadimplente.',
+    destaque: 'Atualizar = vigência em dia · Ignorar = inadimplente até completar',
+  }
+}
+
 /**
- * Modal insistente no portal. Montado via portal no `document.body` para não
- * herdar stacking/`overflow` do shell. Sem animação de opacity no backdrop —
- * `opacity: 0` + `fixed inset-0` travava a UI sem o card aparecer.
+ * Modal insistente no portal. Montado via portal no `document.body`.
  */
 export function PendenciasCadastroModal({ pendencias }: Props) {
   const router = useRouter()
@@ -47,7 +69,6 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
     setCiencia(false)
   }, [principal?.codigo])
 
-  // Trava scroll do body enquanto o modal exige ação.
   useEffect(() => {
     if (!aberta) return
     const prev = document.body.style.overflow
@@ -59,13 +80,10 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
 
   if (!aberta || !principal) return null
 
-  const nFalta = principal.camposFaltantes.length
-  const camposPreview = principal.camposFaltantes
-    .slice(0, 4)
-    .map((c) => CAMPO_PENDENCIA_LABEL[c])
-    .join(', ')
-  const camposExtra = nFalta > 4 ? ` e mais ${nFalta - 4}` : ''
-  const campos = camposPreview ? `${camposPreview}${camposExtra}` : ''
+  const motivo = motivoPrincipal(principal)
+  const faltantesLabels = principal.camposFaltantes.map((c) => CAMPO_PENDENCIA_LABEL[c])
+  const preview = faltantesLabels.slice(0, 5)
+  const resto = faltantesLabels.length - preview.length
 
   function irAtualizar() {
     router.push(principal.href)
@@ -96,52 +114,90 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
       aria-labelledby={tituloId}
       data-pendencia-cadastro="aberta"
     >
-      <div className="relative w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl">
+      <div className="relative max-h-[min(90vh,42rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
             <IdCard className="h-5 w-5" aria-hidden />
           </div>
-          <div>
+          <div className="min-w-0 space-y-2">
             <h2
               id={tituloId}
-              className="text-lg font-semibold text-[rgb(var(--foreground))]"
+              className="text-lg font-semibold leading-snug text-[rgb(var(--foreground))]"
             >
               {principal.titulo}
             </h2>
-            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
               {principal.descricao}
             </p>
-            {campos ? (
-              <p className="mt-2 text-xs font-medium text-[rgb(var(--foreground))]">
-                {principal.progresso
-                  ? `${principal.progresso.ok}/${principal.progresso.total} · `
-                  : null}
-                Falta: {campos}
-              </p>
-            ) : null}
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
+        <div className="mt-4 rounded-xl border border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.08)] p-3">
+          <div className="flex gap-2">
+            <ShieldCheck
+              className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+              aria-hidden
+            />
+            <div className="min-w-0 space-y-1.5 text-sm leading-relaxed">
+              <p className="font-semibold text-[rgb(var(--foreground))]">{motivo.titulo}</p>
+              <p className="text-[rgb(var(--foreground-muted))]">{motivo.corpo}</p>
+              <p className="pt-0.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
+                {motivo.destaque}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] px-3 py-2.5">
+          {principal.progresso ? (
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              {principal.progresso.ok}/{principal.progresso.total}
+              <span className="font-normal text-[rgb(var(--foreground-muted))]">
+                {' '}
+                · {principal.camposFaltantes.length} obrigatório(s) faltando
+              </span>
+            </p>
+          ) : null}
+          {preview.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-sm text-[rgb(var(--foreground-muted))]">
+              {preview.map((label) => (
+                <li key={label} className="flex gap-2">
+                  <span className="text-amber-600 dark:text-amber-400" aria-hidden>
+                    ·
+                  </span>
+                  <span>{label}</span>
+                </li>
+              ))}
+              {resto > 0 ? (
+                <li className="pl-3 text-xs">e mais {resto} campo(s)</li>
+              ) : null}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-950 dark:text-amber-100">
           <div className="flex gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              Se você marcar «não mostrar de novo» sem completar, o cadastro de sócio
-              fica <strong>inadimplente</strong> até os dados serem preenchidos.
+              Se você escolher <strong>não mostrar esta mensagem de novo</strong> sem
+              completar, o cadastro de sócio fica <strong>inadimplente</strong> até os
+              dados serem preenchidos — e a vigência deixa de estar regularizada.
             </p>
           </div>
         </div>
 
-        <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-[rgb(var(--foreground-muted))]">
+        <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
           <input
             type="checkbox"
-            className="mt-1"
+            className="mt-1 shrink-0"
             checked={ciencia}
             onChange={(e) => setCiencia(e.target.checked)}
           />
           <span>
-            Não mostrar esta mensagem de novo. Estou ciente de que meu cadastro de sócio
-            ficará inadimplente até eu atualizar os dados.
+            Não mostrar esta mensagem de novo.
+            <br />
+            Estou ciente de que meu cadastro de sócio ficará inadimplente até eu
+            atualizar os dados.
           </span>
         </label>
 

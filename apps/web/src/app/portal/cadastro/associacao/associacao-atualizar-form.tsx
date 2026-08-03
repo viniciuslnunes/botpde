@@ -1,15 +1,18 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition } from 'react'
+import { useActionState, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@torcida/ui'
-import { PERIODICIDADE_PLANO_LABEL } from '@torcida/types'
+import { maskRg, maskTelefone, PERIODICIDADE_PLANO_LABEL } from '@torcida/types'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
+import { CompletudeChecklist } from '@/components/portal/completude-checklist'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { UFS_BRASIL } from '@/lib/ufs-brasil'
 import {
-  CAMPO_PENDENCIA_LABEL,
-  type CampoPendenciaCadastro,
-} from '@/lib/pendencias-cadastro'
+  resumirCompletudeCadastroSocio,
+  type CompletudeItemId,
+} from '@/lib/completude-cadastro-socio'
 import {
   completarDadosAssociacao,
   type CompletarAssociacaoState,
@@ -20,7 +23,11 @@ export type ValoresAssociacaoForm = {
   cpf: string
   rg: string
   dataNascimento: string
+  telefone: string
+  cidade: string
   logradouro: string
+  numero: string
+  complemento: string
   bairro: string
   cep: string
   uf: string
@@ -32,50 +39,119 @@ export type ValoresAssociacaoForm = {
   dataExpedicaoIso: string
   periodicidadeAtual: string
   termoAceito: boolean
+  anosSocio: string
+}
+
+export type OperacaoView = {
+  unidadeNome: string | null
+  departamentoNome: string | null
+  aprovadoEmLabel: string | null
+  adimplente: boolean
+  carteirinhaValidadeLabel: string | null
+  statusLabel: string
 }
 
 type Props = {
-  faltantes: CampoPendenciaCadastro[]
-  progresso: { ok: number; total: number }
   valores: ValoresAssociacaoForm
   periodicidades: string[]
   exigirDocumentos: boolean
   temCarteirinha: boolean
+  prefillOrigemNome?: string | null
+  operacao: OperacaoView
+}
+
+type TabId = 'resumo' | 'cadastro' | 'documentos' | 'associacao' | 'operacao'
+
+const TAB_DO_CAMPO: Record<CompletudeItemId, TabId> = {
+  numeroAssociado: 'cadastro',
+  cpf: 'cadastro',
+  rg: 'cadastro',
+  nascimento: 'cadastro',
+  logradouro: 'cadastro',
+  bairro: 'cadastro',
+  cep: 'cadastro',
+  uf: 'cadastro',
+  'resp-nome': 'cadastro',
+  'resp-doc': 'cadastro',
+  termo: 'documentos',
+  prova: 'documentos',
+  documento: 'documentos',
+  residencia: 'documentos',
+  dataExpedicaoCarteirinha: 'associacao',
+  periodicidadePretendida: 'associacao',
 }
 
 const initial: CompletarAssociacaoState = {}
 
-function CampoArquivo({
+const inputClass =
+  'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))]'
+
+function maskCep(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 8)
+  if (d.length <= 5) return d
+  return `${d.slice(0, 5)}-${d.slice(5)}`
+}
+
+function maskCpf(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
+/** Idade a partir de YYYY-MM-DD (mesmo padrão do onboarding). */
+function calcularIdadeDeInput(isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim())
+  if (!m) return null
+  const nascimento = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - nascimento.getFullYear()
+  const aindaNaoFezAniversario =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())
+  if (aindaNaoFezAniversario) idade -= 1
+  return idade
+}
+
+function UploadDocumento({
   name,
   label,
+  hint,
   value,
-  onUploaded,
+  onChange,
 }: {
   name: string
   label: string
+  hint?: string
   value: string
-  onUploaded: (url: string) => void
+  onChange: (url: string) => void
 }) {
-  const [pending, start] = useTransition()
+  const [busy, start] = useTransition()
   return (
-    <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-[rgb(var(--foreground))]">{label}</span>
-      {value ? (
-        <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">Arquivo enviado</p>
+    <div className="space-y-1.5">
+      <span className="block text-sm font-medium text-[rgb(var(--foreground))]">{label}</span>
+      {hint ? (
+        <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+          {hint}
+        </span>
       ) : null}
       <input type="hidden" name={name} value={value} />
-      <input
-        type="file"
-        accept="image/*,application/pdf"
-        disabled={pending}
-        className="block w-full text-sm"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (!file) return
+      <ImageDropZone
+        layout="split"
+        busy={busy}
+        cameraLabel="Tirar foto"
+        file={
+          value
+            ? { name: 'arquivo.jpg', status: busy ? 'uploading' : 'done', previewUrl: value }
+            : null
+        }
+        onClear={value ? () => onChange('') : undefined}
+        onFile={(file) => {
           start(async () => {
             try {
               const url = await uploadMediaToCloudinary(file, undefined, 'cadastro')
-              onUploaded(url)
+              onChange(url)
               toast.success('Arquivo enviado.')
             } catch (err) {
               toast.error(err instanceof Error ? err.message : 'Falha no upload.')
@@ -83,26 +159,202 @@ function CampoArquivo({
           })
         }}
       />
-      {pending ? <span className="text-xs text-[rgb(var(--foreground-muted))]">Enviando…</span> : null}
+    </div>
+  )
+}
+
+function CampoTexto({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  hint,
+  inputMode,
+  maxLength,
+  type = 'text',
+}: {
+  id: string
+  name: string
+  label: string
+  value: string
+  onChange: (v: string) => void
+  hint?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
+  maxLength?: number
+  type?: string
+}) {
+  return (
+    <label htmlFor={id} className="block space-y-1.5">
+      <span className="block text-sm font-medium text-[rgb(var(--foreground))]">{label}</span>
+      {hint ? (
+        <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+          {hint}
+        </span>
+      ) : null}
+      <input
+        id={id}
+        name={name}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        className={inputClass}
+      />
     </label>
   )
 }
 
+function Secao({
+  titulo,
+  descricao,
+  children,
+}: {
+  titulo: string
+  descricao?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          {titulo}
+        </h2>
+        {descricao ? (
+          <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+            {descricao}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  )
+}
+
+function DadoLeitura({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+        {label}
+      </p>
+      <p className="text-sm text-[rgb(var(--foreground))]">{value || '—'}</p>
+    </div>
+  )
+}
+
 export function AssociacaoAtualizarForm({
-  faltantes,
-  progresso,
   valores,
   periodicidades,
   exigirDocumentos,
   temCarteirinha,
+  prefillOrigemNome,
+  operacao,
 }: Props) {
   const router = useRouter()
   const [state, action, pending] = useActionState(completarDadosAssociacao, initial)
-  const falta = new Set(faltantes)
+  const [tab, setTab] = useState<TabId>('resumo')
 
+  const [numeroAssociado, setNumeroAssociado] = useState(valores.numeroAssociado)
+  const [cpf, setCpf] = useState(valores.cpf ? maskCpf(valores.cpf) : '')
+  const [rg, setRg] = useState(valores.rg ? maskRg(valores.rg) : '')
+  const [dataNascimento, setDataNascimento] = useState(valores.dataNascimento)
+  const [telefone, setTelefone] = useState(
+    valores.telefone ? maskTelefone(valores.telefone) || valores.telefone : '',
+  )
+  const [cidade, setCidade] = useState(valores.cidade)
+  const [logradouro, setLogradouro] = useState(valores.logradouro)
+  const [numero, setNumero] = useState(valores.numero)
+  const [complemento, setComplemento] = useState(valores.complemento)
+  const [bairro, setBairro] = useState(valores.bairro)
+  const [cep, setCep] = useState(valores.cep ? maskCep(valores.cep) : '')
+  const [uf, setUf] = useState(valores.uf)
+  const [responsavelNome, setResponsavelNome] = useState(valores.responsavelNome)
+  const [responsavelDocumento, setResponsavelDocumento] = useState(
+    valores.responsavelDocumento,
+  )
+  const [termo, setTermo] = useState(valores.termoAceito)
   const [prova, setProva] = useState(valores.imagemProva)
   const [doc, setDoc] = useState(valores.fotoDocumentoUrl)
   const [residencia, setResidencia] = useState(valores.comprovanteResidenciaUrl)
+  const [expedicao, setExpedicao] = useState(valores.dataExpedicaoIso)
+  const [anosSocio, setAnosSocio] = useState(valores.anosSocio)
+  const [periodicidade, setPeriodicidade] = useState(
+    valores.periodicidadeAtual || periodicidades[0] || '',
+  )
+  const [cepBusy, startCep] = useTransition()
+
+  const resumo = useMemo(() => {
+    const idade = dataNascimento ? calcularIdadeDeInput(dataNascimento) : null
+    return resumirCompletudeCadastroSocio(
+      {
+        isSocio: true,
+        idade,
+        numeroAssociado: numeroAssociado || null,
+        cpf: cpf || null,
+        rg: rg || null,
+        dataNascimento: dataNascimento || null,
+        logradouro: logradouro || null,
+        bairro: bairro || null,
+        cep: cep || null,
+        uf: uf || null,
+        termoResponsabilidadeAceitoEm: termo ? new Date() : null,
+        imagemProva: prova || null,
+        responsavelNome: responsavelNome || null,
+        responsavelDocumento: responsavelDocumento || null,
+        fotoDocumentoUrl: doc || null,
+        comprovanteResidenciaUrl: residencia || null,
+        dataExpedicaoCarteirinha: expedicao || null,
+        periodicidadePretendida: periodicidade || null,
+      },
+      { exigirDocumentos, temCarteirinha },
+    )
+  }, [
+    numeroAssociado,
+    cpf,
+    rg,
+    dataNascimento,
+    logradouro,
+    bairro,
+    cep,
+    uf,
+    termo,
+    prova,
+    doc,
+    residencia,
+    responsavelNome,
+    responsavelDocumento,
+    expedicao,
+    periodicidade,
+    exigirDocumentos,
+    temCarteirinha,
+  ])
+
+  const badgeCadastro = useMemo(() => {
+    const ids: CompletudeItemId[] = [
+      'numeroAssociado',
+      'cpf',
+      'rg',
+      'nascimento',
+      'logradouro',
+      'bairro',
+      'cep',
+      'uf',
+      'resp-nome',
+      'resp-doc',
+    ]
+    return resumo.itens.filter((i) => ids.includes(i.id) && i.obrigatorio && !i.ok).length
+  }, [resumo.itens])
+
+  const badgeDocumentos = useMemo(() => {
+    const ids: CompletudeItemId[] = ['termo', 'prova', 'documento', 'residencia']
+    return resumo.itens.filter((i) => ids.includes(i.id) && i.obrigatorio && !i.ok).length
+  }, [resumo.itens])
+
+  const badgeAssociacao = useMemo(() => {
+    const ids: CompletudeItemId[] = ['dataExpedicaoCarteirinha', 'periodicidadePretendida']
+    return resumo.itens.filter((i) => ids.includes(i.id) && i.obrigatorio && !i.ok).length
+  }, [resumo.itens])
 
   useEffect(() => {
     if (!state.ok) return
@@ -116,222 +368,525 @@ export function AssociacaoAtualizarForm({
     router.refresh()
   }, [state, router])
 
-  const show = (id: CampoPendenciaCadastro) => falta.has(id)
+  function focarCampo(id: CompletudeItemId) {
+    const destino = TAB_DO_CAMPO[id]
+    setTab(destino)
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`campo-${id}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const input = el?.querySelector('input, select, textarea')
+      if (input instanceof HTMLElement) input.focus()
+    })
+  }
+
+  function onCepChange(raw: string) {
+    const masked = maskCep(raw)
+    setCep(masked)
+    const digitos = masked.replace(/\D/g, '')
+    if (digitos.length !== 8) return
+    startCep(async () => {
+      const end = await buscarEnderecoPorCep(digitos)
+      if (!end) return
+      if (end.logradouro) setLogradouro(end.logradouro)
+      if (end.bairro) setBairro(end.bairro)
+      if (end.uf) setUf(end.uf)
+      if (end.localidade) setCidade(end.localidade)
+    })
+  }
+
+  const idadeAtual = dataNascimento ? calcularIdadeDeInput(dataNascimento) : null
+  const mostraResponsavel =
+    (idadeAtual != null && idadeAtual < 18) ||
+    Boolean(responsavelNome || responsavelDocumento)
+
+  const tabs: { id: TabId; label: string; badge?: number }[] = [
+    { id: 'resumo', label: 'Resumo' },
+    { id: 'cadastro', label: 'Cadastro', badge: badgeCadastro || undefined },
+    { id: 'documentos', label: 'Documentos', badge: badgeDocumentos || undefined },
+    {
+      id: 'associacao',
+      label: 'Associação',
+      badge: badgeAssociacao || undefined,
+    },
+    { id: 'operacao', label: 'Operação' },
+  ]
 
   return (
     <form action={action} className="space-y-5">
-      <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Completude: {progresso.ok}/{progresso.total}
-        {faltantes.length > 0 ? ` · ${faltantes.length} obrigatório(s) faltando` : ' · completo'}
-      </p>
-
-      {state.message && state.errors && Object.keys(state.errors).length > 0 && !state.emitida ? (
-        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
-          {state.message}
+      {prefillOrigemNome ? (
+        <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] px-3 py-2.5 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+          Preenchemos com o que já existia em <strong>{prefillOrigemNome}</strong>.
+          <br />
+          Confira e complete o que faltar nesta unidade.
         </p>
       ) : null}
+
+      <div className="rounded-xl border border-[rgb(var(--color-primary)_/_0.28)] bg-[rgb(var(--color-primary)_/_0.08)] px-3 py-2.5 text-sm leading-relaxed">
+        <p className="font-semibold text-[rgb(var(--foreground))]">Por que atualizar</p>
+        <p className="mt-1 text-[rgb(var(--foreground-muted))]">
+          {temCarteirinha
+            ? 'Completar a ficha garante que a torcida confirme sua vigência corretamente. Ignorar o aviso deixa o cadastro inadimplente até você atualizar.'
+            : 'Expedição e plano definem a validade da carteirinha. Completar emite/regulariza a vigência; ocultar o aviso marca inadimplência até preencher.'}
+        </p>
+      </div>
+
       {state.message && !state.ok ? (
-        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-800 dark:text-red-200">
           {state.message}
         </p>
       ) : null}
 
-      {show('numeroAssociado') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.numeroAssociado}</span>
-          <input
-            name="numeroAssociado"
-            inputMode="numeric"
-            defaultValue={valores.numeroAssociado}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : (
-        <input type="hidden" name="numeroAssociado" value={valores.numeroAssociado} />
-      )}
+      <div
+        className="app-scrollbar-none flex gap-1 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible"
+        role="tablist"
+        aria-label="Seções do cadastro"
+      >
+        {tabs.map((item) => {
+          const active = tab === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(item.id)}
+              className={[
+                'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors',
+                active
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                  : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              {item.label}
+              {item.badge != null && item.badge > 0 ? (
+                <span
+                  className={[
+                    'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                    active
+                      ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+                  ].join(' ')}
+                >
+                  {item.badge}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
 
-      {show('cpf') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.cpf}</span>
-          <input
-            name="cpf"
-            defaultValue={valores.cpf}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
+      <div className="min-h-[16rem] space-y-6">
+        {tab === 'resumo' ? (
+          <div className="space-y-4">
+            <CompletudeChecklist itens={resumo.itens} onFocarCampo={focarCampo} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DadoLeitura label="Status" value={operacao.statusLabel} />
+              <DadoLeitura
+                label="Situação"
+                value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
+              />
+              <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
+              <DadoLeitura
+                label="Carteirinha"
+                value={
+                  operacao.carteirinhaValidadeLabel
+                    ? `Válida até ${operacao.carteirinhaValidadeLabel}`
+                    : 'Aguardando emissão'
+                }
+              />
+            </div>
+            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Use as abas Cadastro, Documentos e Associação para editar. Clique em um item
+              incompleto da lista para ir direto ao campo.
+            </p>
+          </div>
+        ) : null}
+
+        {tab === 'cadastro' ? (
+          <div className="space-y-6">
+            <Secao
+              titulo="Contato e identificação"
+              descricao="Dados pessoais da ficha. CPF, RG e telefone ganham máscara automática."
+            >
+              <div id="campo-numeroAssociado" className="sm:col-span-2">
+                <CampoTexto
+                  id="campo-numeroAssociado-input"
+                  name="numeroAssociado"
+                  label="Nº de associado"
+                  hint="Número da carteirinha física ou do recrutamento."
+                  value={numeroAssociado}
+                  onChange={setNumeroAssociado}
+                  inputMode="numeric"
+                />
+              </div>
+              <div id="campo-cpf">
+                <CampoTexto
+                  id="campo-cpf-input"
+                  name="cpf"
+                  label="CPF"
+                  value={cpf}
+                  onChange={(v) => setCpf(maskCpf(v))}
+                  inputMode="numeric"
+                  maxLength={14}
+                />
+              </div>
+              <div id="campo-rg">
+                <CampoTexto
+                  id="campo-rg-input"
+                  name="rg"
+                  label="RG"
+                  value={rg}
+                  onChange={(v) => setRg(maskRg(v))}
+                />
+              </div>
+              <div id="campo-nascimento">
+                <CampoTexto
+                  id="campo-nascimento-input"
+                  name="dataNascimento"
+                  label="Data de nascimento"
+                  type="date"
+                  value={dataNascimento}
+                  onChange={setDataNascimento}
+                />
+              </div>
+              <div>
+                <CampoTexto
+                  id="campo-telefone-input"
+                  name="telefone"
+                  label="Telefone"
+                  value={telefone}
+                  onChange={(v) => setTelefone(maskTelefone(v) || v)}
+                  inputMode="tel"
+                  maxLength={16}
+                />
+              </div>
+            </Secao>
+
+            <Secao
+              titulo="Endereço"
+              descricao="Com o CEP completo, buscamos logradouro, bairro, cidade e UF."
+            >
+              <div id="campo-cep">
+                <CampoTexto
+                  id="campo-cep-input"
+                  name="cep"
+                  label="CEP"
+                  hint={cepBusy ? 'Buscando endereço…' : '8 dígitos'}
+                  value={cep}
+                  onChange={onCepChange}
+                  inputMode="numeric"
+                  maxLength={9}
+                />
+              </div>
+              <div id="campo-logradouro" className="sm:col-span-2">
+                <CampoTexto
+                  id="campo-logradouro-input"
+                  name="logradouro"
+                  label="Logradouro"
+                  value={logradouro}
+                  onChange={setLogradouro}
+                />
+              </div>
+              <div>
+                <CampoTexto
+                  id="campo-numero-input"
+                  name="numero"
+                  label="Número"
+                  value={numero}
+                  onChange={setNumero}
+                />
+              </div>
+              <div>
+                <CampoTexto
+                  id="campo-complemento-input"
+                  name="complemento"
+                  label="Complemento"
+                  value={complemento}
+                  onChange={setComplemento}
+                />
+              </div>
+              <div id="campo-bairro">
+                <CampoTexto
+                  id="campo-bairro-input"
+                  name="bairro"
+                  label="Bairro"
+                  value={bairro}
+                  onChange={setBairro}
+                />
+              </div>
+              <div>
+                <CampoTexto
+                  id="campo-cidade-input"
+                  name="cidade"
+                  label="Cidade"
+                  value={cidade}
+                  onChange={setCidade}
+                />
+              </div>
+              <div id="campo-uf">
+                <label htmlFor="campo-uf-input" className="block space-y-1.5">
+                  <span className="block text-sm font-medium">UF</span>
+                  <select
+                    id="campo-uf-input"
+                    name="uf"
+                    value={uf}
+                    onChange={(e) => setUf(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Selecione</option>
+                    {UFS_BRASIL.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </Secao>
+
+            {mostraResponsavel ? (
+              <Secao titulo="Responsável legal (menor de idade)">
+                <div id="campo-resp-nome">
+                  <CampoTexto
+                    id="campo-resp-nome-input"
+                    name="responsavelNome"
+                    label="Nome do responsável"
+                    value={responsavelNome}
+                    onChange={setResponsavelNome}
+                  />
+                </div>
+                <div id="campo-resp-doc">
+                  <CampoTexto
+                    id="campo-resp-doc-input"
+                    name="responsavelDocumento"
+                    label="Documento do responsável"
+                    value={responsavelDocumento}
+                    onChange={setResponsavelDocumento}
+                  />
+                </div>
+              </Secao>
+            ) : null}
+          </div>
+        ) : null}
+
+        {tab === 'documentos' ? (
+          <div className="space-y-6">
+            <Secao
+              titulo="Anexos"
+              descricao="Comprovantes da ficha. Você pode trocar um arquivo já enviado."
+            >
+              <div id="campo-prova" className="sm:col-span-2">
+                <UploadDocumento
+                  name="imagemProva"
+                  label="Comprovante de vínculo"
+                  hint="Carteirinha, recibo ou documento que comprove a associação."
+                  value={prova}
+                  onChange={setProva}
+                />
+              </div>
+              {exigirDocumentos ? (
+                <>
+                  <div id="campo-documento" className="sm:col-span-2">
+                    <UploadDocumento
+                      name="fotoDocumentoUrl"
+                      label="Foto do documento"
+                      hint="Frente do RG ou documento oficial com foto."
+                      value={doc}
+                      onChange={setDoc}
+                    />
+                  </div>
+                  <div id="campo-residencia" className="sm:col-span-2">
+                    <UploadDocumento
+                      name="comprovanteResidenciaUrl"
+                      label="Comprovante de residência"
+                      value={residencia}
+                      onChange={setResidencia}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input type="hidden" name="fotoDocumentoUrl" value={doc} />
+                  <input type="hidden" name="comprovanteResidenciaUrl" value={residencia} />
+                </>
+              )}
+            </Secao>
+            <div id="campo-termo" className="rounded-xl border border-[rgb(var(--border))] p-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed">
+                <input
+                  type="checkbox"
+                  name="termoResponsabilidade"
+                  value="true"
+                  className="mt-1 shrink-0"
+                  checked={termo}
+                  onChange={(e) => setTermo(e.target.checked)}
+                />
+                <span>
+                  Li e aceito o termo de responsabilidade da torcida.
+                  <br />
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                    Obrigatório para regularizar o cadastro de sócio.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === 'associacao' ? (
+          <div className="space-y-6">
+            <Secao
+              titulo="Vínculo e carteirinha"
+              descricao={
+                temCarteirinha
+                  ? 'Sua carteirinha já foi emitida. Você ainda pode atualizar anos de sócio e conferir o plano.'
+                  : 'Com nº, data de expedição e plano, emitimos a carteirinha digital automaticamente.'
+              }
+            >
+              <div id="campo-numeroAssociado-assoc" className="sm:col-span-2">
+                <CampoTexto
+                  id="campo-numeroAssociado-assoc-input"
+                  name="numeroAssociado"
+                  label="Nº de associado"
+                  value={numeroAssociado}
+                  onChange={setNumeroAssociado}
+                  inputMode="numeric"
+                />
+              </div>
+              <div>
+                <CampoTexto
+                  id="campo-anosSocio-input"
+                  name="anosSocio"
+                  label="Anos como sócio"
+                  value={anosSocio}
+                  onChange={setAnosSocio}
+                  inputMode="numeric"
+                  maxLength={3}
+                />
+              </div>
+              <div id="campo-dataExpedicaoCarteirinha">
+                <CampoTexto
+                  id="campo-expedicao-input"
+                  name="dataExpedicaoCarteirinha"
+                  label="Data de expedição da carteirinha"
+                  hint="Data impressa ou registrada na carteirinha física."
+                  type="date"
+                  value={expedicao}
+                  onChange={setExpedicao}
+                />
+              </div>
+              <div id="campo-periodicidadePretendida" className="sm:col-span-2">
+                <label htmlFor="campo-periodicidade-input" className="block space-y-1.5">
+                  <span className="block text-sm font-medium">Periodicidade / plano</span>
+                  <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+                    Usado para calcular a validade da carteirinha digital.
+                  </span>
+                  <select
+                    id="campo-periodicidade-input"
+                    name="periodicidadePretendida"
+                    value={periodicidade}
+                    onChange={(e) => setPeriodicidade(e.target.value)}
+                    className={inputClass}
+                  >
+                    {periodicidades.map((p) => (
+                      <option key={p} value={p}>
+                        {PERIODICIDADE_PLANO_LABEL[p as keyof typeof PERIODICIDADE_PLANO_LABEL] ??
+                          p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {operacao.carteirinhaValidadeLabel ? (
+                <div className="sm:col-span-2">
+                  <DadoLeitura
+                    label="Validade atual"
+                    value={operacao.carteirinhaValidadeLabel}
+                  />
+                </div>
+              ) : null}
+            </Secao>
+          </div>
+        ) : null}
+
+        {tab === 'operacao' ? (
+          <div className="space-y-6">
+            <Secao titulo="Vínculo na torcida" descricao="Somente leitura — alterações de unidade passam pela administração.">
+              <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
+              <DadoLeitura
+                label="Departamento pretendido"
+                value={operacao.departamentoNome ?? '—'}
+              />
+              <DadoLeitura label="Status" value={operacao.statusLabel} />
+              <DadoLeitura
+                label="Situação financeira"
+                value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
+              />
+              <DadoLeitura label="Aprovado em" value={operacao.aprovadoEmLabel ?? '—'} />
+              <DadoLeitura
+                label="Carteirinha"
+                value={
+                  operacao.carteirinhaValidadeLabel
+                    ? `Válida até ${operacao.carteirinhaValidadeLabel}`
+                    : 'Aguardando emissão'
+                }
+              />
+            </Secao>
+            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Para mudar unidade ou área, fale com a administração da torcida. Aqui o foco é
+              completar a ficha para manter a vigência em dia.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Campos da aba inativa precisam ir no FormData — espelhamos como hidden. */}
+      {tab !== 'cadastro' ? (
+        <>
+          {tab !== 'associacao' ? (
+            <input type="hidden" name="numeroAssociado" value={numeroAssociado} />
+          ) : null}
+          <input type="hidden" name="cpf" value={cpf} />
+          <input type="hidden" name="rg" value={rg} />
+          <input type="hidden" name="dataNascimento" value={dataNascimento} />
+          <input type="hidden" name="telefone" value={telefone} />
+          <input type="hidden" name="cidade" value={cidade} />
+          <input type="hidden" name="logradouro" value={logradouro} />
+          <input type="hidden" name="numero" value={numero} />
+          <input type="hidden" name="complemento" value={complemento} />
+          <input type="hidden" name="bairro" value={bairro} />
+          <input type="hidden" name="cep" value={cep} />
+          <input type="hidden" name="uf" value={uf} />
+          <input type="hidden" name="responsavelNome" value={responsavelNome} />
+          <input type="hidden" name="responsavelDocumento" value={responsavelDocumento} />
+        </>
       ) : null}
-
-      {show('rg') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.rg}</span>
-          <input
-            name="rg"
-            defaultValue={valores.rg}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
+      {tab !== 'documentos' ? (
+        <>
+          <input type="hidden" name="imagemProva" value={prova} />
+          <input type="hidden" name="fotoDocumentoUrl" value={doc} />
+          <input type="hidden" name="comprovanteResidenciaUrl" value={residencia} />
+          {termo ? <input type="hidden" name="termoResponsabilidade" value="true" /> : null}
+        </>
       ) : null}
-
-      {show('nascimento') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.nascimento}</span>
-          <input
-            type="date"
-            name="dataNascimento"
-            defaultValue={valores.dataNascimento}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('logradouro') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.logradouro}</span>
-          <input
-            name="logradouro"
-            defaultValue={valores.logradouro}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('bairro') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.bairro}</span>
-          <input
-            name="bairro"
-            defaultValue={valores.bairro}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('cep') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.cep}</span>
-          <input
-            name="cep"
-            defaultValue={valores.cep}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('uf') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL.uf}</span>
-          <select
-            name="uf"
-            defaultValue={valores.uf}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          >
-            <option value="">Selecione</option>
-            {UFS_BRASIL.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
-      {show('resp-nome') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL['resp-nome']}</span>
-          <input
-            name="responsavelNome"
-            defaultValue={valores.responsavelNome}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('resp-doc') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{CAMPO_PENDENCIA_LABEL['resp-doc']}</span>
-          <input
-            name="responsavelDocumento"
-            defaultValue={valores.responsavelDocumento}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {show('termo') && !valores.termoAceito ? (
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="termoResponsabilidade" value="true" className="mt-1" />
-          <span>Li e aceito o termo de responsabilidade da torcida.</span>
-        </label>
-      ) : null}
-
-      {show('prova') ? (
-        <CampoArquivo
-          name="imagemProva"
-          label={CAMPO_PENDENCIA_LABEL.prova}
-          value={prova}
-          onUploaded={setProva}
-        />
-      ) : (
-        <input type="hidden" name="imagemProva" value={prova} />
-      )}
-
-      {exigirDocumentos && show('documento') ? (
-        <CampoArquivo
-          name="fotoDocumentoUrl"
-          label={CAMPO_PENDENCIA_LABEL.documento}
-          value={doc}
-          onUploaded={setDoc}
-        />
-      ) : null}
-
-      {exigirDocumentos && show('residencia') ? (
-        <CampoArquivo
-          name="comprovanteResidenciaUrl"
-          label={CAMPO_PENDENCIA_LABEL.residencia}
-          value={residencia}
-          onUploaded={setResidencia}
-        />
-      ) : null}
-
-      {!temCarteirinha && show('dataExpedicaoCarteirinha') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">
-            {CAMPO_PENDENCIA_LABEL.dataExpedicaoCarteirinha}
-          </span>
-          <input
-            type="date"
-            name="dataExpedicaoCarteirinha"
-            defaultValue={valores.dataExpedicaoIso}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          />
-        </label>
-      ) : null}
-
-      {!temCarteirinha && show('periodicidadePretendida') ? (
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">
-            {CAMPO_PENDENCIA_LABEL.periodicidadePretendida}
-          </span>
-          <select
-            name="periodicidadePretendida"
-            defaultValue={valores.periodicidadeAtual || periodicidades[0] || ''}
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm"
-          >
-            {periodicidades.map((p) => (
-              <option key={p} value={p}>
-                {PERIODICIDADE_PLANO_LABEL[p as keyof typeof PERIODICIDADE_PLANO_LABEL] ?? p}
-              </option>
-            ))}
-          </select>
-        </label>
+      {tab !== 'associacao' ? (
+        <>
+          <input type="hidden" name="anosSocio" value={anosSocio} />
+          <input type="hidden" name="dataExpedicaoCarteirinha" value={expedicao} />
+          <input type="hidden" name="periodicidadePretendida" value={periodicidade} />
+        </>
       ) : null}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-[rgb(var(--color-primary))] px-4 py-3 text-sm font-semibold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+        className="sticky bottom-4 z-10 w-full rounded-xl bg-[rgb(var(--color-primary))] px-4 py-3 text-sm font-semibold text-[rgb(var(--color-primary-fg))] shadow-lg disabled:opacity-60"
       >
-        {pending ? 'Salvando…' : 'Salvar cadastro'}
+        {pending
+          ? 'Salvando…'
+          : resumo.completo
+            ? 'Salvar e concluir'
+            : `Salvar progresso (${resumo.faltando.length} ainda faltando)`}
       </button>
     </form>
   )

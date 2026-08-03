@@ -76,11 +76,17 @@ function pendenciaFicha(m: MembroParaPendenciaCadastro): PendenciaCadastro | nul
   })
   if (resumo.completo) return null
 
+  const precisaCarteirinha = resumo.faltando.some(
+    (i) => i.id === 'dataExpedicaoCarteirinha' || i.id === 'periodicidadePretendida',
+  )
+  const descricao = precisaCarteirinha
+    ? 'Sem estes dados não dá para calcular a validade da carteirinha nem garantir sua vigência como sócio. Complete a ficha para emitir/regularizar e permanecer adimplente.'
+    : 'A ficha incompleta impede a torcida de confirmar sua vigência corretamente. Ao atualizar, você regulariza o cadastro; se optar por não ver este aviso, o vínculo fica inadimplente até completar.'
+
   return {
     codigo: PENDENCIA_SOCIO_FICHA,
     titulo: 'Complete o cadastro de sócio',
-    descricao:
-      'Seu cadastro está incompleto. Preencha os campos obrigatórios para regularizar a ficha e, quando couber, emitir a carteirinha digital.',
+    descricao,
     href: HREF_ATUALIZAR,
     camposFaltantes: resumo.faltando.map((i) => i.id),
     progresso: { ok: resumo.okCount, total: resumo.total },
