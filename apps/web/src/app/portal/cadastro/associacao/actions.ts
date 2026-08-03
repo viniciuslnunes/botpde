@@ -226,8 +226,16 @@ export async function completarDadosAssociacao(
     },
   )
 
-  // Salva o que veio mesmo se ainda incompleto — o sócio pode ir preenchendo.
-  // Só exige fechar a pendência (e emitir) quando o resumo ficar completo.
+  // Só persiste quando a ficha estiver completa — o botão do portal só libera nesse ponto.
+  if (!preview.completo) {
+    return {
+      message: `Complete todos os campos obrigatórios antes de salvar (${preview.faltando.length} faltando).`,
+      errors: Object.fromEntries(
+        preview.faltando.map((f) => [f.id, [`${f.label} ainda é obrigatório.`]]),
+      ),
+    }
+  }
+
   const dispensadas = membro.pendenciasCadastroDispensadas.filter(
     (c: string) => c !== PENDENCIA_SOCIO_FICHA && c !== PENDENCIA_SOCIO_EXPEDICAO,
   )
@@ -259,7 +267,7 @@ export async function completarDadosAssociacao(
       periodicidadePretendida: periodicidadePretendida
         ? (periodicidadePretendida as 'MENSAL' | 'TRIMESTRAL' | 'QUADRIMENSAL' | 'SEMESTRAL' | 'ANUAL' | 'UNICA')
         : null,
-      pendenciasCadastroDispensadas: preview.completo ? dispensadas : membro.pendenciasCadastroDispensadas,
+      pendenciasCadastroDispensadas: dispensadas,
     },
   })
 
@@ -313,17 +321,6 @@ export async function completarDadosAssociacao(
   revalidatePath('/portal/cadastro/associacao')
   revalidatePath('/portal/carteirinha')
   revalidatePath('/admin/socios')
-
-  if (!preview.completo) {
-    return {
-      ok: true,
-      emitida,
-      message: `Dados salvos. Ainda faltam ${preview.faltando.length} campo(s) obrigatório(s).`,
-      errors: Object.fromEntries(
-        preview.faltando.map((f) => [f.id, [`${f.label} ainda é obrigatório.`]]),
-      ),
-    }
-  }
 
   return {
     ok: true,

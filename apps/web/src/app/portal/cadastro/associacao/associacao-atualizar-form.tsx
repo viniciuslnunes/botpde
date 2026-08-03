@@ -2,13 +2,28 @@
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { m, AnimatePresence } from 'motion/react'
+import {
+  CheckCircle2,
+  IdCard,
+  Lock,
+  ShieldCheck,
+} from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { maskRg, maskTelefone, PERIODICIDADE_PLANO_LABEL } from '@torcida/types'
+import {
+  maskRg,
+  maskTelefone,
+  normalizarCpf,
+  PERIODICIDADE_PLANO_LABEL,
+  validarCpfDigitos,
+  validarRg,
+} from '@torcida/types'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { CompletudeChecklist } from '@/components/portal/completude-checklist'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { UFS_BRASIL } from '@/lib/ufs-brasil'
+import { fadeUp, springGentle, springSnappy } from '@/lib/motion-presets'
 import {
   resumirCompletudeCadastroSocio,
   type CompletudeItemId,
@@ -84,7 +99,7 @@ const TAB_DO_CAMPO: Record<CompletudeItemId, TabId> = {
 const initial: CompletarAssociacaoState = {}
 
 const inputClass =
-  'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))]'
+  'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] shadow-[inset_0_1px_0_rgb(var(--foreground)_/_0.03)] transition-[border-color,box-shadow] placeholder:text-[rgb(var(--foreground-muted))] focus-visible:border-[rgb(var(--color-primary)_/_0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.28)]'
 
 function maskCep(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 8)
@@ -173,6 +188,7 @@ function CampoTexto({
   inputMode,
   maxLength,
   type = 'text',
+  invalid,
 }: {
   id: string
   name: string
@@ -183,6 +199,7 @@ function CampoTexto({
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
   maxLength?: number
   type?: string
+  invalid?: boolean
 }) {
   return (
     <label htmlFor={id} className="block space-y-1.5">
@@ -200,7 +217,13 @@ function CampoTexto({
         onChange={(e) => onChange(e.target.value)}
         inputMode={inputMode}
         maxLength={maxLength}
-        className={inputClass}
+        aria-invalid={invalid || undefined}
+        className={[
+          inputClass,
+          invalid
+            ? 'border-amber-500/55 focus-visible:border-amber-500/70 focus-visible:ring-amber-500/25'
+            : '',
+        ].join(' ')}
       />
     </label>
   )
@@ -217,12 +240,12 @@ function Secao({
 }) {
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+      <div className="border-b border-[rgb(var(--border))] pb-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgb(var(--foreground-muted))]">
           {titulo}
         </h2>
         {descricao ? (
-          <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+          <p className="mt-1 max-w-prose text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
             {descricao}
           </p>
         ) : null}
@@ -234,11 +257,40 @@ function Secao({
 
 function DadoLeitura({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+    <div className="rounded-xl border border-[rgb(var(--border)_/_0.7)] bg-[rgb(var(--background)_/_0.45)] px-3.5 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[rgb(var(--foreground-muted))]">
         {label}
       </p>
-      <p className="text-sm text-[rgb(var(--foreground))]">{value || '—'}</p>
+      <p className="mt-1 text-sm font-medium text-[rgb(var(--foreground))]">{value || '—'}</p>
+    </div>
+  )
+}
+
+function ProgressoBarra({ ok, total }: { ok: number; total: number }) {
+  const pct = total > 0 ? Math.round((ok / total) * 100) : 0
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3 text-xs">
+        <span className="font-medium text-[rgb(var(--foreground-muted))]">Progresso da ficha</span>
+        <span className="tabular-nums text-[rgb(var(--foreground))]">
+          {ok}/{total}
+          <span className="text-[rgb(var(--foreground-muted))]"> · {pct}%</span>
+        </span>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--background-subtle))]"
+        role="progressbar"
+        aria-valuenow={ok}
+        aria-valuemin={0}
+        aria-valuemax={total}
+      >
+        <m.div
+          className="h-full rounded-full bg-[rgb(var(--color-primary))]"
+          initial={false}
+          animate={{ width: `${pct}%` }}
+          transition={springGentle}
+        />
+      </div>
     </div>
   )
 }
@@ -253,7 +305,7 @@ export function AssociacaoAtualizarForm({
 }: Props) {
   const router = useRouter()
   const [state, action, pending] = useActionState(completarDadosAssociacao, initial)
-  const [tab, setTab] = useState<TabId>('resumo')
+  const [tab, setTab] = useState<TabId>('cadastro')
 
   const [numeroAssociado, setNumeroAssociado] = useState(valores.numeroAssociado)
   const [cpf, setCpf] = useState(valores.cpf ? maskCpf(valores.cpf) : '')
@@ -330,6 +382,19 @@ export function AssociacaoAtualizarForm({
     temCarteirinha,
   ])
 
+  const formatosOk = useMemo(() => {
+    const cpfN = normalizarCpf(cpf)
+    if (!cpfN || !validarCpfDigitos(cpfN)) return false
+    if (!validarRg(rg)) return false
+    if (!/^\d+$/.test(numeroAssociado.trim())) return false
+    if (cep.replace(/\D/g, '').length !== 8) return false
+    if (!dataNascimento || calcularIdadeDeInput(dataNascimento) == null) return false
+    if (!temCarteirinha && !expedicao) return false
+    return true
+  }, [cpf, rg, numeroAssociado, cep, dataNascimento, temCarteirinha, expedicao])
+
+  const podeSalvar = resumo.completo && formatosOk && !pending
+
   const badgeCadastro = useMemo(() => {
     const ids: CompletudeItemId[] = [
       'numeroAssociado',
@@ -356,15 +421,24 @@ export function AssociacaoAtualizarForm({
     return resumo.itens.filter((i) => ids.includes(i.id) && i.obrigatorio && !i.ok).length
   }, [resumo.itens])
 
+  const faltandoIds = useMemo(
+    () => new Set(resumo.faltando.map((f) => f.id)),
+    [resumo.faltando],
+  )
+
   useEffect(() => {
-    if (!state.ok) return
+    if (state.ok === undefined && !state.message) return
+    if (!state.ok) {
+      if (state.message) toast.error(state.message)
+      return
+    }
     if (state.emitida) {
       toast.success(state.message ?? 'Carteirinha emitida.')
       router.push('/portal/carteirinha')
       router.refresh()
       return
     }
-    toast.message(state.message ?? 'Dados salvos.')
+    toast.success(state.message ?? 'Cadastro completo.')
     router.refresh()
   }, [state, router])
 
@@ -389,7 +463,7 @@ export function AssociacaoAtualizarForm({
       if (!end) return
       if (end.logradouro) setLogradouro(end.logradouro)
       if (end.bairro) setBairro(end.bairro)
-      if (end.uf) setUf(end.uf)
+      if (end.uf) setUf(end.uf.toUpperCase())
       if (end.localidade) setCidade(end.localidade)
     })
   }
@@ -411,433 +485,512 @@ export function AssociacaoAtualizarForm({
     { id: 'operacao', label: 'Operação' },
   ]
 
+  const hintSalvar = !resumo.completo
+    ? `Preencha os ${resumo.faltando.length} campo(s) obrigatório(s) para liberar o salvamento.`
+    : !formatosOk
+      ? 'Confira CPF, RG, CEP e datas — algum valor ainda está inválido.'
+      : null
+
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} className="flex flex-col gap-5">
       {prefillOrigemNome ? (
-        <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] px-3 py-2.5 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-          Preenchemos com o que já existia em <strong>{prefillOrigemNome}</strong>.
+        <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background)_/_0.55)] px-3.5 py-2.5 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+          Preenchemos com o que já existia em{' '}
+          <strong className="font-semibold text-[rgb(var(--foreground))]">
+            {prefillOrigemNome}
+          </strong>
+          .
           <br />
           Confira e complete o que faltar nesta unidade.
         </p>
       ) : null}
 
-      <div className="rounded-xl border border-[rgb(var(--color-primary)_/_0.28)] bg-[rgb(var(--color-primary)_/_0.08)] px-3 py-2.5 text-sm leading-relaxed">
-        <p className="font-semibold text-[rgb(var(--foreground))]">Por que atualizar</p>
-        <p className="mt-1 text-[rgb(var(--foreground-muted))]">
-          {temCarteirinha
-            ? 'Completar a ficha garante que a torcida confirme sua vigência corretamente. Ignorar o aviso deixa o cadastro inadimplente até você atualizar.'
-            : 'Expedição e plano definem a validade da carteirinha. Completar emite/regulariza a vigência; ocultar o aviso marca inadimplência até preencher.'}
-        </p>
+      <div className="flex gap-3 rounded-2xl border border-[rgb(var(--color-primary)_/_0.3)] bg-[linear-gradient(135deg,rgb(var(--color-primary)_/_0.12),rgb(var(--background)_/_0.2))] p-3.5 sm:p-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]">
+          <ShieldCheck className="h-4 w-4" aria-hidden />
+        </div>
+        <div className="min-w-0 space-y-1 text-sm leading-relaxed">
+          <p className="font-semibold text-[rgb(var(--foreground))]">Por que atualizar</p>
+          <p className="text-[rgb(var(--foreground-muted))]">
+            {temCarteirinha
+              ? 'Completar a ficha garante que a torcida confirme sua vigência corretamente. Ignorar o aviso deixa o cadastro inadimplente até você atualizar.'
+              : 'Expedição e plano definem a validade da carteirinha. Completar emite/regulariza a vigência; ocultar o aviso marca inadimplência até preencher.'}
+          </p>
+        </div>
       </div>
 
+      <ProgressoBarra ok={resumo.okCount} total={resumo.total} />
+
       {state.message && !state.ok ? (
-        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-800 dark:text-red-200">
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-red-800 dark:text-red-200">
           {state.message}
         </p>
       ) : null}
 
-      <div
-        className="app-scrollbar-none flex gap-1 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible"
-        role="tablist"
-        aria-label="Seções do cadastro"
-      >
-        {tabs.map((item) => {
-          const active = tab === item.id
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(item.id)}
-              className={[
-                'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors',
-                active
-                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                  : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-              ].join(' ')}
-            >
-              {item.label}
-              {item.badge != null && item.badge > 0 ? (
-                <span
-                  className={[
-                    'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
-                    active
-                      ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-                  ].join(' ')}
-                >
-                  {item.badge}
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
+      <div className="border-b border-[rgb(var(--border))]">
+        <div
+          className="app-scrollbar-none -mb-px flex gap-0.5 overflow-x-auto"
+          role="tablist"
+          aria-label="Seções do cadastro"
+        >
+          {tabs.map((item) => {
+            const active = tab === item.id
+            return (
+              <m.button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                whileTap={{ scale: 0.97 }}
+                transition={springSnappy}
+                onClick={() => setTab(item.id)}
+                className={[
+                  'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-sm transition-colors',
+                  active
+                    ? 'font-semibold text-[rgb(var(--color-primary-fg))]'
+                    : 'font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                ].join(' ')}
+              >
+                {item.label}
+                {item.badge != null && item.badge > 0 ? (
+                  <span
+                    className={[
+                      'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                      active
+                        ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+                    ].join(' ')}
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+                {active ? (
+                  <m.span
+                    layoutId="associacao-tab-underline"
+                    className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[rgb(var(--color-primary))]"
+                    transition={springSnappy}
+                  />
+                ) : null}
+              </m.button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="min-h-[16rem] space-y-6">
-        {tab === 'resumo' ? (
-          <div className="space-y-4">
-            <CompletudeChecklist itens={resumo.itens} onFocarCampo={focarCampo} />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DadoLeitura label="Status" value={operacao.statusLabel} />
-              <DadoLeitura
-                label="Situação"
-                value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
-              />
-              <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
-              <DadoLeitura
-                label="Carteirinha"
-                value={
-                  operacao.carteirinhaValidadeLabel
-                    ? `Válida até ${operacao.carteirinhaValidadeLabel}`
-                    : 'Aguardando emissão'
-                }
-              />
-            </div>
-            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-              Use as abas Cadastro, Documentos e Associação para editar. Clique em um item
-              incompleto da lista para ir direto ao campo.
-            </p>
-          </div>
-        ) : null}
-
-        {tab === 'cadastro' ? (
-          <div className="space-y-6">
-            <Secao
-              titulo="Contato e identificação"
-              descricao="Dados pessoais da ficha. CPF, RG e telefone ganham máscara automática."
-            >
-              <div id="campo-numeroAssociado" className="sm:col-span-2">
-                <CampoTexto
-                  id="campo-numeroAssociado-input"
-                  name="numeroAssociado"
-                  label="Nº de associado"
-                  hint="Número da carteirinha física ou do recrutamento."
-                  value={numeroAssociado}
-                  onChange={setNumeroAssociado}
-                  inputMode="numeric"
-                />
-              </div>
-              <div id="campo-cpf">
-                <CampoTexto
-                  id="campo-cpf-input"
-                  name="cpf"
-                  label="CPF"
-                  value={cpf}
-                  onChange={(v) => setCpf(maskCpf(v))}
-                  inputMode="numeric"
-                  maxLength={14}
-                />
-              </div>
-              <div id="campo-rg">
-                <CampoTexto
-                  id="campo-rg-input"
-                  name="rg"
-                  label="RG"
-                  value={rg}
-                  onChange={(v) => setRg(maskRg(v))}
-                />
-              </div>
-              <div id="campo-nascimento">
-                <CampoTexto
-                  id="campo-nascimento-input"
-                  name="dataNascimento"
-                  label="Data de nascimento"
-                  type="date"
-                  value={dataNascimento}
-                  onChange={setDataNascimento}
-                />
-              </div>
-              <div>
-                <CampoTexto
-                  id="campo-telefone-input"
-                  name="telefone"
-                  label="Telefone"
-                  value={telefone}
-                  onChange={(v) => setTelefone(maskTelefone(v) || v)}
-                  inputMode="tel"
-                  maxLength={16}
-                />
-              </div>
-            </Secao>
-
-            <Secao
-              titulo="Endereço"
-              descricao="Com o CEP completo, buscamos logradouro, bairro, cidade e UF."
-            >
-              <div id="campo-cep">
-                <CampoTexto
-                  id="campo-cep-input"
-                  name="cep"
-                  label="CEP"
-                  hint={cepBusy ? 'Buscando endereço…' : '8 dígitos'}
-                  value={cep}
-                  onChange={onCepChange}
-                  inputMode="numeric"
-                  maxLength={9}
-                />
-              </div>
-              <div id="campo-logradouro" className="sm:col-span-2">
-                <CampoTexto
-                  id="campo-logradouro-input"
-                  name="logradouro"
-                  label="Logradouro"
-                  value={logradouro}
-                  onChange={setLogradouro}
-                />
-              </div>
-              <div>
-                <CampoTexto
-                  id="campo-numero-input"
-                  name="numero"
-                  label="Número"
-                  value={numero}
-                  onChange={setNumero}
-                />
-              </div>
-              <div>
-                <CampoTexto
-                  id="campo-complemento-input"
-                  name="complemento"
-                  label="Complemento"
-                  value={complemento}
-                  onChange={setComplemento}
-                />
-              </div>
-              <div id="campo-bairro">
-                <CampoTexto
-                  id="campo-bairro-input"
-                  name="bairro"
-                  label="Bairro"
-                  value={bairro}
-                  onChange={setBairro}
-                />
-              </div>
-              <div>
-                <CampoTexto
-                  id="campo-cidade-input"
-                  name="cidade"
-                  label="Cidade"
-                  value={cidade}
-                  onChange={setCidade}
-                />
-              </div>
-              <div id="campo-uf">
-                <label htmlFor="campo-uf-input" className="block space-y-1.5">
-                  <span className="block text-sm font-medium">UF</span>
-                  <select
-                    id="campo-uf-input"
-                    name="uf"
-                    value={uf}
-                    onChange={(e) => setUf(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Selecione</option>
-                    {UFS_BRASIL.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </Secao>
-
-            {mostraResponsavel ? (
-              <Secao titulo="Responsável legal (menor de idade)">
-                <div id="campo-resp-nome">
-                  <CampoTexto
-                    id="campo-resp-nome-input"
-                    name="responsavelNome"
-                    label="Nome do responsável"
-                    value={responsavelNome}
-                    onChange={setResponsavelNome}
-                  />
-                </div>
-                <div id="campo-resp-doc">
-                  <CampoTexto
-                    id="campo-resp-doc-input"
-                    name="responsavelDocumento"
-                    label="Documento do responsável"
-                    value={responsavelDocumento}
-                    onChange={setResponsavelDocumento}
-                  />
-                </div>
-              </Secao>
-            ) : null}
-          </div>
-        ) : null}
-
-        {tab === 'documentos' ? (
-          <div className="space-y-6">
-            <Secao
-              titulo="Anexos"
-              descricao="Comprovantes da ficha. Você pode trocar um arquivo já enviado."
-            >
-              <div id="campo-prova" className="sm:col-span-2">
-                <UploadDocumento
-                  name="imagemProva"
-                  label="Comprovante de vínculo"
-                  hint="Carteirinha, recibo ou documento que comprove a associação."
-                  value={prova}
-                  onChange={setProva}
-                />
-              </div>
-              {exigirDocumentos ? (
-                <>
-                  <div id="campo-documento" className="sm:col-span-2">
-                    <UploadDocumento
-                      name="fotoDocumentoUrl"
-                      label="Foto do documento"
-                      hint="Frente do RG ou documento oficial com foto."
-                      value={doc}
-                      onChange={setDoc}
-                    />
-                  </div>
-                  <div id="campo-residencia" className="sm:col-span-2">
-                    <UploadDocumento
-                      name="comprovanteResidenciaUrl"
-                      label="Comprovante de residência"
-                      value={residencia}
-                      onChange={setResidencia}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <input type="hidden" name="fotoDocumentoUrl" value={doc} />
-                  <input type="hidden" name="comprovanteResidenciaUrl" value={residencia} />
-                </>
-              )}
-            </Secao>
-            <div id="campo-termo" className="rounded-xl border border-[rgb(var(--border))] p-3">
-              <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed">
-                <input
-                  type="checkbox"
-                  name="termoResponsabilidade"
-                  value="true"
-                  className="mt-1 shrink-0"
-                  checked={termo}
-                  onChange={(e) => setTermo(e.target.checked)}
-                />
-                <span>
-                  Li e aceito o termo de responsabilidade da torcida.
-                  <br />
-                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Obrigatório para regularizar o cadastro de sócio.
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-        ) : null}
-
-        {tab === 'associacao' ? (
-          <div className="space-y-6">
-            <Secao
-              titulo="Vínculo e carteirinha"
-              descricao={
-                temCarteirinha
-                  ? 'Sua carteirinha já foi emitida. Você ainda pode atualizar anos de sócio e conferir o plano.'
-                  : 'Com nº, data de expedição e plano, emitimos a carteirinha digital automaticamente.'
-              }
-            >
-              <div id="campo-numeroAssociado-assoc" className="sm:col-span-2">
-                <CampoTexto
-                  id="campo-numeroAssociado-assoc-input"
-                  name="numeroAssociado"
-                  label="Nº de associado"
-                  value={numeroAssociado}
-                  onChange={setNumeroAssociado}
-                  inputMode="numeric"
-                />
-              </div>
-              <div>
-                <CampoTexto
-                  id="campo-anosSocio-input"
-                  name="anosSocio"
-                  label="Anos como sócio"
-                  value={anosSocio}
-                  onChange={setAnosSocio}
-                  inputMode="numeric"
-                  maxLength={3}
-                />
-              </div>
-              <div id="campo-dataExpedicaoCarteirinha">
-                <CampoTexto
-                  id="campo-expedicao-input"
-                  name="dataExpedicaoCarteirinha"
-                  label="Data de expedição da carteirinha"
-                  hint="Data impressa ou registrada na carteirinha física."
-                  type="date"
-                  value={expedicao}
-                  onChange={setExpedicao}
-                />
-              </div>
-              <div id="campo-periodicidadePretendida" className="sm:col-span-2">
-                <label htmlFor="campo-periodicidade-input" className="block space-y-1.5">
-                  <span className="block text-sm font-medium">Periodicidade / plano</span>
-                  <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
-                    Usado para calcular a validade da carteirinha digital.
-                  </span>
-                  <select
-                    id="campo-periodicidade-input"
-                    name="periodicidadePretendida"
-                    value={periodicidade}
-                    onChange={(e) => setPeriodicidade(e.target.value)}
-                    className={inputClass}
-                  >
-                    {periodicidades.map((p) => (
-                      <option key={p} value={p}>
-                        {PERIODICIDADE_PLANO_LABEL[p as keyof typeof PERIODICIDADE_PLANO_LABEL] ??
-                          p}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {operacao.carteirinhaValidadeLabel ? (
-                <div className="sm:col-span-2">
+      <div className="min-h-[18rem]">
+        <AnimatePresence mode="wait" initial={false}>
+          <m.div
+            key={tab}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            transition={{ duration: 0.18 }}
+            className="space-y-6"
+          >
+            {tab === 'resumo' ? (
+              <div className="space-y-5">
+                <CompletudeChecklist itens={resumo.itens} onFocarCampo={focarCampo} />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <DadoLeitura label="Status" value={operacao.statusLabel} />
                   <DadoLeitura
-                    label="Validade atual"
-                    value={operacao.carteirinhaValidadeLabel}
+                    label="Situação"
+                    value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
+                  />
+                  <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
+                  <DadoLeitura
+                    label="Carteirinha"
+                    value={
+                      operacao.carteirinhaValidadeLabel
+                        ? `Válida até ${operacao.carteirinhaValidadeLabel}`
+                        : 'Aguardando emissão'
+                    }
                   />
                 </div>
-              ) : null}
-            </Secao>
-          </div>
-        ) : null}
+                <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                  Use as abas Cadastro, Documentos e Associação para editar. Clique em um item
+                  incompleto da lista para ir direto ao campo.
+                </p>
+              </div>
+            ) : null}
 
-        {tab === 'operacao' ? (
-          <div className="space-y-6">
-            <Secao titulo="Vínculo na torcida" descricao="Somente leitura — alterações de unidade passam pela administração.">
-              <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
-              <DadoLeitura
-                label="Departamento pretendido"
-                value={operacao.departamentoNome ?? '—'}
-              />
-              <DadoLeitura label="Status" value={operacao.statusLabel} />
-              <DadoLeitura
-                label="Situação financeira"
-                value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
-              />
-              <DadoLeitura label="Aprovado em" value={operacao.aprovadoEmLabel ?? '—'} />
-              <DadoLeitura
-                label="Carteirinha"
-                value={
-                  operacao.carteirinhaValidadeLabel
-                    ? `Válida até ${operacao.carteirinhaValidadeLabel}`
-                    : 'Aguardando emissão'
-                }
-              />
-            </Secao>
-            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-              Para mudar unidade ou área, fale com a administração da torcida. Aqui o foco é
-              completar a ficha para manter a vigência em dia.
-            </p>
-          </div>
-        ) : null}
+            {tab === 'cadastro' ? (
+              <div className="space-y-8">
+                <Secao
+                  titulo="Contato e identificação"
+                  descricao="Dados pessoais da ficha. CPF, RG e telefone ganham máscara automática."
+                >
+                  <div id="campo-numeroAssociado" className="sm:col-span-2">
+                    <CampoTexto
+                      id="campo-numeroAssociado-input"
+                      name="numeroAssociado"
+                      label="Nº de associado"
+                      hint="Número da carteirinha física ou do recrutamento."
+                      value={numeroAssociado}
+                      onChange={setNumeroAssociado}
+                      inputMode="numeric"
+                      invalid={faltandoIds.has('numeroAssociado')}
+                    />
+                  </div>
+                  <div id="campo-cpf">
+                    <CampoTexto
+                      id="campo-cpf-input"
+                      name="cpf"
+                      label="CPF"
+                      value={cpf}
+                      onChange={(v) => setCpf(maskCpf(v))}
+                      inputMode="numeric"
+                      maxLength={14}
+                      invalid={
+                        faltandoIds.has('cpf') ||
+                        (cpf.replace(/\D/g, '').length === 11 &&
+                          !validarCpfDigitos(normalizarCpf(cpf) ?? ''))
+                      }
+                    />
+                  </div>
+                  <div id="campo-rg">
+                    <CampoTexto
+                      id="campo-rg-input"
+                      name="rg"
+                      label="RG"
+                      value={rg}
+                      onChange={(v) => setRg(maskRg(v))}
+                      invalid={faltandoIds.has('rg')}
+                    />
+                  </div>
+                  <div id="campo-nascimento">
+                    <CampoTexto
+                      id="campo-nascimento-input"
+                      name="dataNascimento"
+                      label="Data de nascimento"
+                      type="date"
+                      value={dataNascimento}
+                      onChange={setDataNascimento}
+                      invalid={faltandoIds.has('nascimento')}
+                    />
+                  </div>
+                  <div>
+                    <CampoTexto
+                      id="campo-telefone-input"
+                      name="telefone"
+                      label="Telefone"
+                      value={telefone}
+                      onChange={(v) => setTelefone(maskTelefone(v) || v)}
+                      inputMode="tel"
+                      maxLength={16}
+                    />
+                  </div>
+                </Secao>
+
+                <Secao
+                  titulo="Endereço"
+                  descricao="Com o CEP completo, buscamos logradouro, bairro, cidade e UF."
+                >
+                  <div id="campo-cep">
+                    <CampoTexto
+                      id="campo-cep-input"
+                      name="cep"
+                      label="CEP"
+                      hint={cepBusy ? 'Buscando endereço…' : '8 dígitos'}
+                      value={cep}
+                      onChange={onCepChange}
+                      inputMode="numeric"
+                      maxLength={9}
+                      invalid={faltandoIds.has('cep')}
+                    />
+                  </div>
+                  <div id="campo-logradouro" className="sm:col-span-2">
+                    <CampoTexto
+                      id="campo-logradouro-input"
+                      name="logradouro"
+                      label="Logradouro"
+                      value={logradouro}
+                      onChange={setLogradouro}
+                      invalid={faltandoIds.has('logradouro')}
+                    />
+                  </div>
+                  <div>
+                    <CampoTexto
+                      id="campo-numero-input"
+                      name="numero"
+                      label="Número"
+                      value={numero}
+                      onChange={setNumero}
+                    />
+                  </div>
+                  <div>
+                    <CampoTexto
+                      id="campo-complemento-input"
+                      name="complemento"
+                      label="Complemento"
+                      value={complemento}
+                      onChange={setComplemento}
+                    />
+                  </div>
+                  <div id="campo-bairro">
+                    <CampoTexto
+                      id="campo-bairro-input"
+                      name="bairro"
+                      label="Bairro"
+                      value={bairro}
+                      onChange={setBairro}
+                      invalid={faltandoIds.has('bairro')}
+                    />
+                  </div>
+                  <div>
+                    <CampoTexto
+                      id="campo-cidade-input"
+                      name="cidade"
+                      label="Cidade"
+                      value={cidade}
+                      onChange={setCidade}
+                    />
+                  </div>
+                  <div id="campo-uf">
+                    <label htmlFor="campo-uf-input" className="block space-y-1.5">
+                      <span className="block text-sm font-medium">UF</span>
+                      <select
+                        id="campo-uf-input"
+                        name="uf"
+                        value={uf}
+                        onChange={(e) => setUf(e.target.value)}
+                        aria-invalid={faltandoIds.has('uf') || undefined}
+                        className={[
+                          inputClass,
+                          faltandoIds.has('uf')
+                            ? 'border-amber-500/55 focus-visible:border-amber-500/70 focus-visible:ring-amber-500/25'
+                            : '',
+                        ].join(' ')}
+                      >
+                        <option value="">Selecione</option>
+                        {UFS_BRASIL.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </Secao>
+
+                {mostraResponsavel ? (
+                  <Secao titulo="Responsável legal (menor de idade)">
+                    <div id="campo-resp-nome">
+                      <CampoTexto
+                        id="campo-resp-nome-input"
+                        name="responsavelNome"
+                        label="Nome do responsável"
+                        value={responsavelNome}
+                        onChange={setResponsavelNome}
+                        invalid={faltandoIds.has('resp-nome')}
+                      />
+                    </div>
+                    <div id="campo-resp-doc">
+                      <CampoTexto
+                        id="campo-resp-doc-input"
+                        name="responsavelDocumento"
+                        label="Documento do responsável"
+                        value={responsavelDocumento}
+                        onChange={setResponsavelDocumento}
+                        invalid={faltandoIds.has('resp-doc')}
+                      />
+                    </div>
+                  </Secao>
+                ) : null}
+              </div>
+            ) : null}
+
+            {tab === 'documentos' ? (
+              <div className="space-y-8">
+                <Secao
+                  titulo="Anexos"
+                  descricao="Comprovantes da ficha. Você pode trocar um arquivo já enviado."
+                >
+                  <div id="campo-prova" className="sm:col-span-2">
+                    <UploadDocumento
+                      name="imagemProva"
+                      label="Comprovante de vínculo"
+                      hint="Carteirinha, recibo ou documento que comprove a associação."
+                      value={prova}
+                      onChange={setProva}
+                    />
+                  </div>
+                  {exigirDocumentos ? (
+                    <>
+                      <div id="campo-documento" className="sm:col-span-2">
+                        <UploadDocumento
+                          name="fotoDocumentoUrl"
+                          label="Foto do documento"
+                          hint="Frente do RG ou documento oficial com foto."
+                          value={doc}
+                          onChange={setDoc}
+                        />
+                      </div>
+                      <div id="campo-residencia" className="sm:col-span-2">
+                        <UploadDocumento
+                          name="comprovanteResidenciaUrl"
+                          label="Comprovante de residência"
+                          value={residencia}
+                          onChange={setResidencia}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <input type="hidden" name="fotoDocumentoUrl" value={doc} />
+                      <input type="hidden" name="comprovanteResidenciaUrl" value={residencia} />
+                    </>
+                  )}
+                </Secao>
+                <div
+                  id="campo-termo"
+                  className={[
+                    'rounded-2xl border p-4',
+                    faltandoIds.has('termo')
+                      ? 'border-amber-500/40 bg-amber-500/5'
+                      : 'border-[rgb(var(--border))] bg-[rgb(var(--background)_/_0.4)]',
+                  ].join(' ')}
+                >
+                  <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                    <input
+                      type="checkbox"
+                      name="termoResponsabilidade"
+                      value="true"
+                      className="mt-1 h-4 w-4 shrink-0 accent-[rgb(var(--color-primary))]"
+                      checked={termo}
+                      onChange={(e) => setTermo(e.target.checked)}
+                    />
+                    <span>
+                      Li e aceito o termo de responsabilidade da torcida.
+                      <br />
+                      <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                        Obrigatório para regularizar o cadastro de sócio.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            ) : null}
+
+            {tab === 'associacao' ? (
+              <div className="space-y-8">
+                <Secao
+                  titulo="Vínculo e carteirinha"
+                  descricao={
+                    temCarteirinha
+                      ? 'Sua carteirinha já foi emitida. Você ainda pode atualizar anos de sócio e conferir o plano.'
+                      : 'Com nº, data de expedição e plano, emitimos a carteirinha digital automaticamente.'
+                  }
+                >
+                  <div id="campo-numeroAssociado-assoc" className="sm:col-span-2">
+                    <CampoTexto
+                      id="campo-numeroAssociado-assoc-input"
+                      name="numeroAssociado"
+                      label="Nº de associado"
+                      value={numeroAssociado}
+                      onChange={setNumeroAssociado}
+                      inputMode="numeric"
+                      invalid={faltandoIds.has('numeroAssociado')}
+                    />
+                  </div>
+                  <div>
+                    <CampoTexto
+                      id="campo-anosSocio-input"
+                      name="anosSocio"
+                      label="Anos como sócio"
+                      value={anosSocio}
+                      onChange={setAnosSocio}
+                      inputMode="numeric"
+                      maxLength={3}
+                    />
+                  </div>
+                  <div id="campo-dataExpedicaoCarteirinha">
+                    <CampoTexto
+                      id="campo-expedicao-input"
+                      name="dataExpedicaoCarteirinha"
+                      label="Data de expedição da carteirinha"
+                      hint="Data impressa ou registrada na carteirinha física."
+                      type="date"
+                      value={expedicao}
+                      onChange={setExpedicao}
+                      invalid={faltandoIds.has('dataExpedicaoCarteirinha')}
+                    />
+                  </div>
+                  <div id="campo-periodicidadePretendida" className="sm:col-span-2">
+                    <label htmlFor="campo-periodicidade-input" className="block space-y-1.5">
+                      <span className="block text-sm font-medium">Periodicidade / plano</span>
+                      <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+                        Usado para calcular a validade da carteirinha digital.
+                      </span>
+                      <select
+                        id="campo-periodicidade-input"
+                        name="periodicidadePretendida"
+                        value={periodicidade}
+                        onChange={(e) => setPeriodicidade(e.target.value)}
+                        aria-invalid={faltandoIds.has('periodicidadePretendida') || undefined}
+                        className={[
+                          inputClass,
+                          faltandoIds.has('periodicidadePretendida')
+                            ? 'border-amber-500/55 focus-visible:border-amber-500/70 focus-visible:ring-amber-500/25'
+                            : '',
+                        ].join(' ')}
+                      >
+                        {periodicidades.map((p) => (
+                          <option key={p} value={p}>
+                            {PERIODICIDADE_PLANO_LABEL[
+                              p as keyof typeof PERIODICIDADE_PLANO_LABEL
+                            ] ?? p}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {operacao.carteirinhaValidadeLabel ? (
+                    <div className="sm:col-span-2">
+                      <DadoLeitura
+                        label="Validade atual"
+                        value={operacao.carteirinhaValidadeLabel}
+                      />
+                    </div>
+                  ) : null}
+                </Secao>
+              </div>
+            ) : null}
+
+            {tab === 'operacao' ? (
+              <div className="space-y-5">
+                <Secao
+                  titulo="Vínculo na torcida"
+                  descricao="Somente leitura — alterações de unidade passam pela administração."
+                >
+                  <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
+                  <DadoLeitura
+                    label="Departamento pretendido"
+                    value={operacao.departamentoNome ?? '—'}
+                  />
+                  <DadoLeitura label="Status" value={operacao.statusLabel} />
+                  <DadoLeitura
+                    label="Situação financeira"
+                    value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
+                  />
+                  <DadoLeitura label="Aprovado em" value={operacao.aprovadoEmLabel ?? '—'} />
+                  <DadoLeitura
+                    label="Carteirinha"
+                    value={
+                      operacao.carteirinhaValidadeLabel
+                        ? `Válida até ${operacao.carteirinhaValidadeLabel}`
+                        : 'Aguardando emissão'
+                    }
+                  />
+                </Secao>
+                <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                  Para mudar unidade ou área, fale com a administração da torcida. Aqui o foco é
+                  completar a ficha para manter a vigência em dia.
+                </p>
+              </div>
+            ) : null}
+          </m.div>
+        </AnimatePresence>
       </div>
 
       {/* Campos da aba inativa precisam ir no FormData — espelhamos como hidden. */}
@@ -877,17 +1030,35 @@ export function AssociacaoAtualizarForm({
         </>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="sticky bottom-4 z-10 w-full rounded-xl bg-[rgb(var(--color-primary))] px-4 py-3 text-sm font-semibold text-[rgb(var(--color-primary-fg))] shadow-lg disabled:opacity-60"
-      >
-        {pending
-          ? 'Salvando…'
-          : resumo.completo
-            ? 'Salvar e concluir'
-            : `Salvar progresso (${resumo.faltando.length} ainda faltando)`}
-      </button>
+      <div className="sticky bottom-3 z-10 -mx-1 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.92)] p-3 shadow-[0_-8px_30px_rgb(0_0_0_/_0.18)] backdrop-blur-md sm:mx-0">
+        {hintSalvar ? (
+          <p className="mb-2.5 flex items-start gap-2 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{hintSalvar}</span>
+          </p>
+        ) : (
+          <p className="mb-2.5 flex items-start gap-2 text-xs leading-relaxed text-[rgb(var(--color-success-fg))]">
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Ficha completa. Você já pode salvar e concluir.</span>
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={!podeSalvar}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-4 py-3 text-sm font-semibold text-[rgb(var(--color-primary-fg))] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {pending ? (
+            'Salvando…'
+          ) : resumo.completo && formatosOk ? (
+            <>
+              <IdCard className="h-4 w-4" aria-hidden />
+              Salvar e concluir
+            </>
+          ) : (
+            `Preencha tudo para salvar (${resumo.faltando.length} faltando)`
+          )}
+        </button>
+      </div>
     </form>
   )
 }

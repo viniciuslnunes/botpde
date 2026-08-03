@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, IdCard } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { formatNomeTorcida, resolverPeriodicidadesOnboarding } from '@torcida/types'
@@ -218,26 +218,34 @@ export default async function CadastroAssociacaoPage() {
   const valores = paraValores(membro, doacao)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
+    <div className="mx-auto max-w-3xl space-y-6 px-1 pb-8 sm:px-0">
+      <div className="space-y-3">
         <Link
           href="/portal/comunidade"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+          className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar ao portal
         </Link>
-        <h1 className="text-2xl font-bold leading-tight text-[rgb(var(--foreground))]">
-          Completar cadastro de sócio
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-          Mesma organização da ficha no admin — só o que você precisa preencher.
-          <br />
-          Completar garante a vigência correta; ignorar o aviso deixa o cadastro inadimplente.
-        </p>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--color-primary)_/_0.16)] text-[rgb(var(--color-primary-fg))]">
+            <IdCard className="h-5 w-5" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-balance text-2xl font-bold leading-tight tracking-tight text-[rgb(var(--foreground))]">
+              Completar cadastro de sócio
+            </h1>
+            <p className="mt-1.5 max-w-prose text-pretty text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Mesma organização da ficha no admin — só o que você precisa preencher.
+              <br />
+              Completar garante a vigência correta; ignorar o aviso deixa o cadastro
+              inadimplente.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-6">
+      <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-[0_12px_40px_rgb(0_0_0_/_0.12)] sm:p-6">
         <AssociacaoAtualizarForm
           valores={valores}
           exigirDocumentos={tenant.exigirDocumentosCadastro}
