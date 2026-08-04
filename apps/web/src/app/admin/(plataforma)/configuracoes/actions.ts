@@ -719,7 +719,9 @@ export async function salvarCanalOficial(
       }
     }
 
-    await db.conversa.update({
+    const avatarUrl = parsed.data.avatarUrl ?? null
+
+    const canalAtualizado: { id: string; tenantId: string } = await db.conversa.update({
       where: { id: canal.id },
       data: {
         nome: parsed.data.nome,
@@ -727,9 +729,23 @@ export async function salvarCanalOficial(
         visibilidadeCanal: parsed.data.visibilidadeCanal,
         somenteAdminPublica: parsed.data.somenteAdminPublica,
         publica: parsed.data.publica,
-        avatarUrl: parsed.data.avatarUrl ?? null,
+        avatarUrl,
       },
+      select: { id: true, tenantId: true },
     })
+
+    // Espelha salvarFotoSede (foto unidade ↔ avatar do canal): capa/header
+    // usam Sede.fotoUrl e Tenant.logoUrl antes do fallback do canal. Em Caso B
+    // o canal pode estar no tenant da mãe — o ponteiro e o logo ficam no tenant ativo.
+    await db.sede.updateMany({
+      where: { tenantId: tenant.id, canalConversaId: canal.id },
+      data: { fotoUrl: avatarUrl },
+    })
+    await db.tenant.update({
+      where: { id: tenant.id },
+      data: { logoUrl: avatarUrl },
+    })
+    invalidateTenantCache(tenant.slug)
 
     await db.auditLog.create({
       data: {
@@ -745,11 +761,14 @@ export async function salvarCanalOficial(
     revalidatePath('/admin/configuracoes')
     revalidatePath(`/portal/comunidade/canais/${canal.id}`)
     revalidatePath('/portal/comunidade/canais')
-    // Avatar do canal oficial também alimenta o fallback de logo da topbar
-    // (ver resolverContextoComunidade) quando a unidade não tem Tenant.logoUrl
-    // nem Sede.fotoUrl — sem revalidar o layout, a topbar fica com a foto velha.
+    // Topbar admin + portal: logo vem do layout (resolveTenantLogoUrl).
+    revalidatePath('/admin', 'layout')
     revalidatePath('/portal', 'layout')
     invalidarCachesComunidadeFeed(tenant.id)
+    // Listagem de canais na mãe (Caso B: canal emprestado) também cacheia avatar.
+    if (canalAtualizado.tenantId !== tenant.id) {
+      invalidarCachesComunidadeFeed(canalAtualizado.tenantId)
+    }
     return { success: true }
   } catch (error) {
     console.error('[salvarCanalOficial]', error)

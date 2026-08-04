@@ -95,6 +95,7 @@ export function LogoImage({
       key={src}
       src={src}
       alt={alt}
+      {...(size != null ? { width: size, height: size } : {})}
       loading={priority ? 'eager' : 'lazy'}
       decoding="async"
       className={cls}

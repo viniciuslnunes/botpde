@@ -536,9 +536,11 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
+        /** Slot fixo 28×28 — evita escudo com alpha (ex.: Corinthians) estourar
+         *  o tamanho ou desalinhando dos badges circulares / iniciais. */
         const visual = (
           <m.span
-            className="relative flex items-center justify-center"
+            className="relative flex h-7 w-7 shrink-0 items-center justify-center"
             whileHover={
               arrastando || draggingKey
                 ? undefined
@@ -553,13 +555,13 @@ export function ComunidadeEscopoTabs({
                 src={tab.logoUrl}
                 alt=""
                 size={28}
-                className="pointer-events-none h-7 w-7 object-contain"
+                className="pointer-events-none h-full w-full object-contain"
               />
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold',
+                  'pointer-events-none flex h-full w-full items-center justify-center rounded-full text-[11px] font-bold',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
@@ -574,18 +576,11 @@ export function ComunidadeEscopoTabs({
                 aria-hidden
               />
             ) : null}
-            {ativo && (
-              <m.span
-                layoutId="comunidade-escopo-tab-indicator"
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))] shadow-[0_0_10px_rgb(var(--primary)/0.55)]"
-                transition={springSnappy}
-              />
-            )}
           </m.span>
         )
 
         const className = [
-          'relative -mb-px flex touch-none items-center justify-center pb-2.5 pt-1',
+          'relative -mb-px flex h-10 w-7 touch-none items-center justify-center pt-1',
           ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
@@ -659,6 +654,14 @@ export function ComunidadeEscopoTabs({
           ) : null
         ) : null
 
+        const indicator = ativo ? (
+          <m.span
+            layoutId="comunidade-escopo-tab-indicator"
+            className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[rgb(var(--primary))] shadow-[0_0_10px_rgb(var(--primary)/0.55)]"
+            transition={springSnappy}
+          />
+        ) : null
+
         const shell = (
           <m.div
             key={tab.id}
@@ -701,6 +704,7 @@ export function ComunidadeEscopoTabs({
                   className={className}
                 >
                   {visual}
+                  {indicator}
                 </button>
               </form>
             ) : (
@@ -717,6 +721,7 @@ export function ComunidadeEscopoTabs({
                 }}
               >
                 {visual}
+                {indicator}
               </ComunidadePrefetchLink>
             )}
           </m.div>

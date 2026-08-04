@@ -108,22 +108,44 @@ function fallbackTenantSlug(host: string): string | null {
  * Logo efetivo do tenant para topbar / comunidade:
  * 1. `Sede.fotoUrl` da sede raiz (foto da unidade)
  * 2. `Tenant.logoUrl` (Design)
- * 3. avatar do canal oficial
+ * 3. avatar do canal oficial — via `Sede.canalConversaId` (Caso B: canal
+ *    pode viver no tenant da mãe) e só então `findFirst` por `tenantId`
  */
 export async function resolveTenantLogoUrl(
   tenantId: string,
   tenantLogoUrl: string | null,
 ): Promise<string | null> {
-  const sedesDoTenant: Array<{ id: string; sedeId: string | null; fotoUrl: string | null }> =
-    await db.sede.findMany({
-      where: { tenantId },
-      select: { id: true, sedeId: true, fotoUrl: true },
-    })
+  const sedesDoTenant: Array<{
+    id: string
+    sedeId: string | null
+    tipo: string
+    fotoUrl: string | null
+    canalConversaId: string | null
+  }> = await db.sede.findMany({
+    where: { tenantId },
+    select: { id: true, sedeId: true, tipo: true, fotoUrl: true, canalConversaId: true },
+  })
   const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
   const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
   if (raiz?.fotoUrl) return raiz.fotoUrl
 
   if (tenantLogoUrl) return tenantLogoUrl
+
+  // Mesma ordem de getOrCreateCanalOficial: SEDE com ponteiro → única sede
+  // com canal (unidade Caso B / PDE promovida) → canal nativo do tenant.
+  const sedesComCanal = sedesDoTenant.filter((s) => s.canalConversaId)
+  const ponteiro =
+    sedesComCanal.find((s) => s.tipo === 'SEDE')?.canalConversaId ??
+    (sedesComCanal.length === 1 ? sedesComCanal[0]?.canalConversaId : null) ??
+    null
+
+  if (ponteiro) {
+    const viaPonteiro: { avatarUrl: string | null } | null = await db.conversa.findUnique({
+      where: { id: ponteiro },
+      select: { avatarUrl: true },
+    })
+    if (viaPonteiro?.avatarUrl) return viaPonteiro.avatarUrl
+  }
 
   const canalOficial: { avatarUrl: string | null } | null = await db.conversa.findFirst({
     where: { tenantId, tipo: 'CANAL', canalOficial: true },
