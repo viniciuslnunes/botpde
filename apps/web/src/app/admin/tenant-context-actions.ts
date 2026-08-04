@@ -82,9 +82,10 @@ export type SelecionarUnidadeState = {
 
 /**
  * Navega para uma unidade da worktree (super-admin):
- * - modo `tenant` (Caso B): troca `torcida_ctx` e abre `/admin` ou portal
- * - modo `sede` (Caso A): sem portal próprio — devolve `semPortal` para o
- *   modal; se `confirmarAdmin=1`, só grava o cookie (client navega para a ficha)
+ * - modo `tenant` (Caso B / SEDE raiz): troca `torcida_ctx` e abre `/admin` ou portal
+ * - modo `sede` + destino portal + tipo SEDE: portal do próprio tenant
+ * - modo `sede` + destino portal + SUBSEDE/PDE (Caso A): devolve `semPortal`
+ * - modo `sede` + `confirmarAdmin=1`: só grava o cookie (client navega para a ficha)
  */
 export async function selecionarUnidadeAction(
   _prev: SelecionarUnidadeState,
@@ -125,17 +126,28 @@ export async function selecionarUnidadeAction(
     redirect('/admin')
   }
 
-  const sede: { id: string; tenantId: string | null; nome: string } | null =
-    await db.sede.findUnique({
-      where: { id: data.sedeId },
-      select: { id: true, tenantId: true, nome: true },
-    })
+  const sede: {
+    id: string
+    tenantId: string | null
+    nome: string
+    tipo: string
+  } | null = await db.sede.findUnique({
+    where: { id: data.sedeId },
+    select: { id: true, tenantId: true, nome: true, tipo: true },
+  })
   if (!sede || sede.tenantId !== tenant.id) {
     return { message: 'Unidade não encontrada nesta torcida.' }
   }
 
-  // Portal pedido explicitamente (botão "Ir ao portal"): Caso A não tem portal.
+  // Portal pedido explicitamente (botão "Ir ao portal").
+  // SEDE raiz = o próprio portal do tenant — não é Caso A.
+  // SUBSEDE/PDE Caso A (vivem no portal da mãe) → modal no client.
   if (String(formData.get('destino') ?? '') === 'portal') {
+    if (sede.tipo === 'SEDE') {
+      await setTenantContextSlug(tenant.slug)
+      await abrirCanalOperador(tenant.slug)
+      redirect('/portal/comunidade')
+    }
     return {
       semPortal: { sedeId: sede.id, nome: sede.nome },
     }

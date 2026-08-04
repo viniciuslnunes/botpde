@@ -217,8 +217,13 @@ export function AdminSuperContextSwitchers({
       return
     }
 
-    // Caso A: dispara action com destino=portal → devolve semPortal → modal.
-    if (unidadeAtual.origem === 'sede' && unidadeAtual.sedeId) {
+    // SEDE raiz (origem sede) e Caso B (origem tenant): o portal é o do tenant.
+    // SUBSEDE/PDE Caso A: action devolve semPortal → modal.
+    if (
+      unidadeAtual.origem === 'sede' &&
+      unidadeAtual.sedeId &&
+      unidadeAtual.tipo !== 'SEDE'
+    ) {
       startPortal(() => {
         const fd = new FormData()
         fd.set('modo', 'sede')
@@ -231,7 +236,6 @@ export function AdminSuperContextSwitchers({
       return
     }
 
-    // Caso B / Sede raiz com tenant próprio.
     startPortal(() => {
       const fd = new FormData()
       fd.set('modo', 'tenant')
