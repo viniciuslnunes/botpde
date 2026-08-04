@@ -199,14 +199,14 @@ export function PortalNavbar({
               <LogoImage
                 src={brandTenant.logoUrl}
                 alt={brandTenant.nome}
-                size={56}
+                size={64}
                 quality={95}
-                className="h-7 w-7 shrink-0 object-contain"
+                className="h-8 w-8 shrink-0 object-contain"
                 rounded="rounded-lg"
               />
             ) : (
               <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
                 style={{ backgroundColor: brandTenant.corPrimaria }}
               >
                 {brandTenant.nome.charAt(0).toUpperCase()}
