@@ -53,6 +53,8 @@ export interface ConversaInboxItem {
   aguardandoAprovacao: boolean
   silenciada: boolean
   totalMembros: number
+  /** Canal ligado a Departamento ou DepartamentoArea. */
+  ehCanalDepartamento: boolean
   /** No caso de DM, o outro participante (para nome/avatar da linha). */
   outroMembro: AutorLite | null
   ultimaMensagem: {
@@ -809,6 +811,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
           tipo: true,
           tenantId: true,
           nome: true,
+          canalOficial: true,
           avatarUrl: true,
           atualizadoEm: true,
           _count: {
@@ -835,11 +838,14 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
   const dmIds = rows
     .filter((row) => row.conversa.tipo === 'DIRETA')
     .map((row) => row.conversa.id)
+  const canalIds = rows
+    .filter((row) => row.conversa.tipo === 'CANAL')
+    .map((row) => row.conversa.id)
   const canalSemAvatarIds = rows
     .filter((row) => row.conversa.tipo === 'CANAL' && !row.conversa.avatarUrl)
     .map((row) => row.conversa.id)
 
-  const [naoLidasMap, outrosDm, avatarCanalPorSede] = await Promise.all([
+  const [naoLidasMap, outrosDm, avatarCanalPorSede, deptosCanal, areasCanal] = await Promise.all([
     contarNaoLidasPorConversa(userId, { conversaIds }),
     dmIds.length === 0
       ? Promise.resolve(
@@ -858,7 +864,27 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
           },
         }),
     resolveAvatarCanalPorSede(canalSemAvatarIds),
+    canalIds.length === 0
+      ? Promise.resolve([] as Array<{ canalConversaId: string | null }>)
+      : db.departamento.findMany({
+          where: { canalConversaId: { in: canalIds } },
+          select: { canalConversaId: true },
+        }),
+    canalIds.length === 0
+      ? Promise.resolve([] as Array<{ canalConversaId: string | null }>)
+      : db.departamentoArea.findMany({
+          where: { canalConversaId: { in: canalIds } },
+          select: { canalConversaId: true },
+        }),
   ])
+
+  const canaisDepartamento = new Set<string>()
+  for (const d of deptosCanal) {
+    if (d.canalConversaId) canaisDepartamento.add(d.canalConversaId)
+  }
+  for (const a of areasCanal) {
+    if (a.canalConversaId) canaisDepartamento.add(a.canalConversaId)
+  }
 
   const outroPorConversa = new Map<string, AutorLite>()
   const outroStatusPorConversa = new Map<string, StatusParticipacaoConversa>()
@@ -907,6 +933,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       aguardandoAprovacao,
       silenciada: row.silenciada,
       totalMembros: row.conversa._count.membros,
+      ehCanalDepartamento: canaisDepartamento.has(row.conversa.id),
       outroMembro:
         row.conversa.tipo === 'DIRETA'
           ? (outroPorConversa.get(row.conversa.id) ?? null)

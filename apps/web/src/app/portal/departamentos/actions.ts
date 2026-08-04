@@ -28,6 +28,7 @@ import {
   removerMembroDepartamento,
 } from '@/app/admin/(plataforma)/acessos/actions'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
+import { isCloudinaryUrl } from '@/lib/social-embed'
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
@@ -1211,4 +1212,129 @@ export async function vincularCanalDepartamentoArea(
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível vincular o canal' }
   }
+}
+
+const AvatarCanalDepartamentoSchema = z.object({
+  conversaId: z.string().uuid(),
+  /** URL Cloudinary, ou string vazia/`__none__` para remover. */
+  avatarUrl: z.string().max(2048).nullable(),
+  /** Slug do depto — revalidate do cockpit (opcional em Mensagens). */
+  slug: z.string().min(1).optional(),
+})
+
+/**
+ * Atualiza só a foto de um canal de departamento ou de área.
+ * Gate: `canManageDepartamento` **ou** ADMIN ativo na conversa.
+ */
+export async function atualizarAvatarCanalDepartamento(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const rawAvatar = formData.get('avatarUrl')
+  const rawSlug = formData.get('slug')
+  const parsed = AvatarCanalDepartamentoSchema.safeParse({
+    conversaId: formData.get('conversaId'),
+    avatarUrl:
+      rawAvatar === null || rawAvatar === '' || rawAvatar === '__none__'
+        ? null
+        : String(rawAvatar).trim(),
+    slug:
+      rawSlug === null || rawSlug === '' ? undefined : String(rawSlug).trim(),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Não autorizado' }
+  const tenant = await getTenantFromHost()
+  if (!tenant) return { error: 'Não autorizado' }
+
+  const canal: { id: string; tenantId: string; tipo: string; avatarUrl: string | null } | null =
+    await db.conversa.findFirst({
+      where: { id: parsed.data.conversaId, tenantId: tenant.id, tipo: 'CANAL' },
+      select: { id: true, tenantId: true, tipo: true, avatarUrl: true },
+    })
+  if (!canal) return { error: 'Canal não encontrado' }
+
+  const [deptoDono, areaDona]: [
+    { id: string; slug: string } | null,
+    { id: string; departamentoId: string; departamento: { slug: string } } | null,
+  ] = await Promise.all([
+    db.departamento.findFirst({
+      where: { canalConversaId: canal.id, tenantId: tenant.id },
+      select: { id: true, slug: true },
+    }),
+    db.departamentoArea.findFirst({
+      where: { canalConversaId: canal.id, tenantId: tenant.id },
+      select: {
+        id: true,
+        departamentoId: true,
+        departamento: { select: { slug: true } },
+      },
+    }),
+  ])
+  if (!deptoDono && !areaDona) {
+    return { error: 'Só canais de departamento ou área podem ter foto por aqui.' }
+  }
+
+  const departamentoId = deptoDono?.id ?? areaDona!.departamentoId
+  const slugDepto = parsed.data.slug ?? deptoDono?.slug ?? areaDona?.departamento.slug
+
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+    session.user.id,
+    tenant.id,
+  )
+  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  const gestao: Array<{ departamentoId: string }> = await db.departamentoGestor.findMany({
+    where: { userId: session.user.id, departamento: { tenantId: tenant.id } },
+    select: { departamentoId: true },
+  })
+  const podeGerir = canManageDepartamento(
+    effective,
+    gestao.map((g) => g.departamentoId),
+    departamentoId,
+  )
+
+  if (!podeGerir) {
+    const souAdmin: { id: string } | null = await db.membroConversa.findFirst({
+      where: {
+        conversaId: canal.id,
+        userId: session.user.id,
+        papel: 'ADMIN',
+        saiuEm: null,
+        status: 'ATIVO',
+      },
+      select: { id: true },
+    })
+    if (!souAdmin) return { error: 'Sem permissão para alterar a foto deste canal.' }
+  }
+
+  const avatarNovo = parsed.data.avatarUrl
+  if (avatarNovo != null && avatarNovo !== canal.avatarUrl && !isCloudinaryUrl(avatarNovo)) {
+    return { error: 'Foto do canal inválida.' }
+  }
+
+  await db.conversa.update({
+    where: { id: canal.id },
+    data: { avatarUrl: avatarNovo },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'canal.avatar_atualizado',
+      entidade: 'Conversa',
+      entidadeId: canal.id,
+      detalhes: {
+        departamentoId,
+        areaId: areaDona?.id ?? null,
+        avatarAntes: canal.avatarUrl,
+        avatarUrl: avatarNovo,
+      },
+    },
+  })
+
+  if (slugDepto) revalidatePath(`/portal/departamentos/${slugDepto}`)
+  revalidatePath('/portal/mensagens')
+  return { ok: true }
 }

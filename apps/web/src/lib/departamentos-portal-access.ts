@@ -76,6 +76,7 @@ export type AreaBase = {
   /** Canal da frente (opcional). */
   canalConversaId?: string | null
   canalNome?: string | null
+  canalAvatarUrl?: string | null
 }
 
 export type AreaAcesso = AreaBase & {

@@ -59,6 +59,7 @@ export default async function MensagensPage({
           aguardandoAprovacao: false,
           silenciada: false,
           totalMembros: conversa._count.membros,
+          ehCanalDepartamento: false,
           outroMembro: null,
           ultimaMensagem: null,
           naoLidas: 0,

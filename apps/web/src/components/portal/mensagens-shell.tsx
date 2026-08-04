@@ -327,6 +327,11 @@ export function MensagensShell({
               })
             }}
             onSolicitacaoResolvida={() => void atualizarInbox()}
+            onAvatarChange={(conversaId, avatarUrl) => {
+              setConversas((prev) =>
+                prev.map((c) => (c.id === conversaId ? { ...c, avatarUrl } : c)),
+              )
+            }}
           />
         ) : (
           !embedded && (

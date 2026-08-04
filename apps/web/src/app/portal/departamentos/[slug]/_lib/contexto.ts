@@ -29,7 +29,7 @@ export type DeptoRow = {
   permissionsGestor: string[]
   meta: unknown
   canalConversaId: string | null
-  canalConversa: { id: string; nome: string | null } | null
+  canalConversa: { id: string; nome: string | null; avatarUrl: string | null } | null
 }
 
 export interface DepartamentoContexto {
@@ -91,7 +91,7 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
         permissionsGestor: true,
         meta: true,
         canalConversaId: true,
-        canalConversa: { select: { id: true, nome: true } },
+        canalConversa: { select: { id: true, nome: true, avatarUrl: true } },
       },
     }),
     db.userDepartamento.findMany({
@@ -159,7 +159,7 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     sazonal: boolean
     meta: unknown
     canalConversaId: string | null
-    canalConversa: { id: string; nome: string | null } | null
+    canalConversa: { id: string; nome: string | null; avatarUrl: string | null } | null
   }
   const areasDb: AreaRow[] = await db.departamentoArea.findMany({
     where: { departamentoId: depto.id, tenantId: tenant.id },
@@ -175,7 +175,7 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
       sazonal: true,
       meta: true,
       canalConversaId: true,
-      canalConversa: { select: { id: true, nome: true } },
+      canalConversa: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
   const areasRaw: AreaBase[] = areasDb.map((r) => ({
@@ -190,6 +190,7 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     meta: r.meta,
     canalConversaId: r.canalConversaId,
     canalNome: r.canalConversa?.nome ?? null,
+    canalAvatarUrl: r.canalConversa?.avatarUrl ?? null,
   }))
 
   const meusVinculos: Array<{ areaId: string; papel: string }> =

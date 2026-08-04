@@ -538,8 +538,10 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Slot fixo 28×28; ícone em 24×24 no centro — peso óptico próximo
-         *  entre escudo com alpha (Corinthians) e badges circulares. */
+        /** Slot fixo 28×28; arte em caixa 20×20 (`fill`) — o escudo do clube
+         *  (badge full-bleed) não estoura o peso óptico dos canais com alpha.
+         *  Nacional leva inset extra: crests oficiais quase sempre enchem o canvas. */
+        const ehEscudoClube = tab.escopo === 'nacional' && !ehTematico
         const visual = (
           <m.span
             className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden"
@@ -553,17 +555,26 @@ export function ComunidadeEscopoTabs({
             }
           >
             {tab.logoUrl ? (
-              <LogoImage
-                src={tab.logoUrl}
-                alt=""
-                size={24}
-                className="pointer-events-none block h-6 w-6 max-h-6 max-w-6 object-contain"
-              />
+              <span
+                className={[
+                  'pointer-events-none relative block h-5 w-5 shrink-0 overflow-hidden',
+                  ehEscudoClube ? 'scale-[0.88]' : '',
+                ].join(' ')}
+              >
+                <LogoImage
+                  src={tab.logoUrl}
+                  alt=""
+                  fill
+                  sizes="20px"
+                  balanceCircular={!ehEscudoClube}
+                  className="object-contain"
+                />
+              </span>
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold',
+                  'pointer-events-none flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',

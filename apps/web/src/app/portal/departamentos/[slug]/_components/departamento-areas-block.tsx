@@ -24,6 +24,7 @@ import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import type { AreaAcesso } from '@/lib/departamentos-portal-access'
 import { toast } from '@torcida/ui/services/toast'
+import { CanalDepartamentoAvatarField } from '../../_components/canal-departamento-avatar-field'
 import {
   AREA_CHECKLIST_MODELOS,
   checklistItemsFromMeta,
@@ -392,15 +393,18 @@ function AreaCanalPainel({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const canalId = area.canalConversaId ?? null
+  const nomeCanal = area.canalNome?.trim() || 'Canal da frente'
 
   if (canalId && !podeGerir) {
     return (
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <MessageCircle className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-          <p className="truncate text-xs text-[rgb(var(--foreground))]">
-            {area.canalNome?.trim() || 'Canal da frente'}
-          </p>
+          <Avatar
+            nome={nomeCanal}
+            avatarUrl={area.canalAvatarUrl ?? null}
+            size={6}
+          />
+          <p className="truncate text-xs text-[rgb(var(--foreground))]">{nomeCanal}</p>
         </div>
         <Link
           href={`/portal/mensagens?c=${canalId}`}
@@ -473,6 +477,15 @@ function AreaCanalPainel({
         </button>
       </form>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {canalId ? (
+        <CanalDepartamentoAvatarField
+          conversaId={canalId}
+          nome={nomeCanal}
+          avatarUrl={area.canalAvatarUrl ?? null}
+          slug={slug}
+          compact
+        />
+      ) : null}
     </div>
   )
 }

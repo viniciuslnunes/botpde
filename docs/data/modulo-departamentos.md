@@ -389,6 +389,11 @@ só devolve se o viewer for `MembroConversa` ATIVO). Vínculo manual
 (`vincularCanalDepartamentoArea`) continua válido; uma conversa não pode ser
 sede + departamento + área ao mesmo tempo (`validarVinculoCanalArea`).
 
+Foto (`Conversa.avatarUrl`): gestor do departamento (ou ADMIN do canal) define
+no cockpit do portal e no painel de participantes em Mensagens —
+`atualizarAvatarCanalDepartamento`. Aparece na lista de Conversas e no header
+do thread.
+
 ### Anti-padrões (novos)
 
 - **Dar permissão ao responsável de área.** Se aparecer a necessidade, a

@@ -34,6 +34,8 @@ export interface InboxItemDto {
   aguardandoAprovacao: boolean
   silenciada: boolean
   totalMembros: number
+  /** Canal de departamento ou área — permite editar foto no painel. */
+  ehCanalDepartamento: boolean
   outroMembro: AutorDto | null
   ultimaMensagem: {
     conteudo: string

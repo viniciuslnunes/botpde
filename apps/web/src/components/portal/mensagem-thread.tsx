@@ -59,6 +59,7 @@ import { isConversaGrupoLike } from '@/lib/canais-shared'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { ComunidadePrefetchLink } from './comunidade-prefetch-link'
 import { PedidoTicketBanner } from './pedido-ticket-banner'
+import { CanalDepartamentoAvatarField } from '@/app/portal/departamentos/_components/canal-departamento-avatar-field'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -76,6 +77,8 @@ interface MensagemThreadProps {
   onMensagemEnviada?: (preview: { conteudo: string; criadoEm: string }) => void
   /** Após aprovar/recusar solicitação de mensagem. */
   onSolicitacaoResolvida?: () => void
+  /** Atualiza avatar do canal (depto/área) na inbox. */
+  onAvatarChange?: (conversaId: string, avatarUrl: string | null) => void
 }
 
 function isTemp(id: string): boolean {
@@ -129,6 +132,7 @@ export function MensagemThread({
   active = true,
   onMensagemEnviada,
   onSolicitacaoResolvida,
+  onAvatarChange,
 }: MensagemThreadProps) {
   const confirmAction = useConfirmAction()
   const [mensagens, setMensagens] = useState<MensagemDto[]>([])
@@ -762,7 +766,11 @@ export function MensagemThread({
               conversaId={conversaId}
               currentUserId={currentUserId}
               isAdmin={conversa.meuPapel === 'ADMIN'}
+              ehCanalDepartamento={conversa.ehCanalDepartamento}
+              canalNome={titulo}
+              canalAvatarUrl={conversa.avatarUrl}
               onSaiu={() => onSaiu(conversaId)}
+              onAvatarChange={(url) => onAvatarChange?.(conversaId, url)}
             />
           </m.div>
         </AnimatePresence>
@@ -1384,12 +1392,20 @@ function PainelMembros({
   conversaId,
   currentUserId,
   isAdmin,
+  ehCanalDepartamento,
+  canalNome,
+  canalAvatarUrl,
   onSaiu,
+  onAvatarChange,
 }: {
   conversaId: string
   currentUserId: string
   isAdmin: boolean
+  ehCanalDepartamento: boolean
+  canalNome: string
+  canalAvatarUrl: string | null
   onSaiu: () => void
+  onAvatarChange?: (url: string | null) => void
 }) {
   const confirmAction = useConfirmAction()
   const [membros, setMembros] = useState<MembroConversaDto[]>([])
@@ -1499,6 +1515,20 @@ function PainelMembros({
 
   return (
     <div className="max-h-64 space-y-2 overflow-y-auto border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3">
+      {isAdmin && ehCanalDepartamento ? (
+        <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2.5">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Foto do canal
+          </p>
+          <CanalDepartamentoAvatarField
+            conversaId={conversaId}
+            nome={canalNome}
+            avatarUrl={canalAvatarUrl}
+            compact
+            onAvatarChange={onAvatarChange}
+          />
+        </div>
+      ) : null}
       <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
         <AnimatePresence mode="popLayout">
           {membros.map((membro, i) => (

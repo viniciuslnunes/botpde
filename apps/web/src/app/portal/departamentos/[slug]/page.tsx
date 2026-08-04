@@ -815,7 +815,7 @@ export default async function DepartamentoHomePage({
       <DepartamentoCanalBlock
         departamentoId={depto.id}
         slug={depto.slug}
-        isGestor={isGestor}
+        isGestor={podeGerirEquipe}
         canal={depto.canalConversa}
         canaisDisponiveis={canaisDisponiveis}
       />
