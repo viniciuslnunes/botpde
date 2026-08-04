@@ -4,7 +4,11 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
-import { setTenantContextSlug } from '@/lib/tenant-context'
+import { setTenantContextSlug, isSuperAdminEmail } from '@/lib/tenant-context'
+import {
+  abrirCanalOperador,
+  fecharCanalOperador,
+} from '@/lib/operador-canais-abertos'
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -17,11 +21,11 @@ export type TrocarTorcidaState = {
 }
 
 /**
- * Troca a torcida ativa do usuário durante a sessão atual — só para quem tem
- * vínculo de sócio APROVADO em mais de uma torcida (ex.: liderança que também
- * é owner de uma Subsede/PDE promovida). Diferente de `selecionarTorcidaAction`
- * (admin/tenant-context-actions.ts), que é exclusiva de super-admin e não
- * valida vínculo — aqui a lista nunca vem do client, sempre confirmada no banco.
+ * Troca a torcida ativa do usuário durante a sessão atual.
+ *
+ * - Sócio com vínculo APROVADO em mais de uma torcida (ex.: liderança Caso B).
+ * - Super-admin (modo operador): troca sem vínculo — mesma regra de
+ *   `selecionarTorcidaAction` no admin — e registra o canal na barra aberta.
  *
  * Também usada pelas abas-escudo da Comunidade (Sede ↔ unidade Caso B): o
  * `escopo` opcional monta o redirect para `/portal/comunidade?escopo=…`.
@@ -46,19 +50,31 @@ export async function trocarTorcidaAction(
   }
 
   const { slug, destino, escopo } = parsed.data
+  const superAdmin = isSuperAdminEmail(session.user.email)
 
-  const vinculo: { id: string } | null = await db.saasMembro.findFirst({
-    where: {
-      userId: session.user.id,
-      status: 'APROVADO',
-      tipo: 'SOCIO',
-      tenant: { slug },
-    },
-    select: { id: true },
-  })
+  if (!superAdmin) {
+    const vinculo: { id: string } | null = await db.saasMembro.findFirst({
+      where: {
+        userId: session.user.id,
+        status: 'APROVADO',
+        tipo: 'SOCIO',
+        tenant: { slug },
+      },
+      select: { id: true },
+    })
 
-  if (!vinculo) {
-    return { message: 'Você não tem vínculo aprovado com essa torcida.' }
+    if (!vinculo) {
+      return { message: 'Você não tem vínculo aprovado com essa torcida.' }
+    }
+  } else {
+    const tenant = await db.tenant.findFirst({
+      where: { slug, ativo: true, sintetico: false },
+      select: { slug: true },
+    })
+    if (!tenant) {
+      return { message: 'Torcida não encontrada ou inativa.' }
+    }
+    await abrirCanalOperador(slug)
   }
 
   await setTenantContextSlug(slug)
@@ -68,4 +84,54 @@ export async function trocarTorcidaAction(
     redirect(`/portal/comunidade?escopo=${escopo}`)
   }
   redirect('/portal/comunidade')
+}
+
+export type FecharCanalOperadorState = {
+  message?: string
+}
+
+/**
+ * Remove um canal da barra aberta do super-admin. Se o fechado era o ativo,
+ * muda o cookie para outro aberto (ou a Sede do fechado) e redireciona.
+ */
+export async function fecharCanalOperadorAction(
+  _prev: FecharCanalOperadorState,
+  formData: FormData,
+): Promise<FecharCanalOperadorState> {
+  const session = await auth()
+  if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
+    return { message: 'Acesso negado.' }
+  }
+
+  const slug = String(formData.get('slug') ?? '').trim()
+  const atualSlug = String(formData.get('atualSlug') ?? '').trim() || null
+  const fallbackSlug = String(formData.get('fallbackSlug') ?? '').trim() || null
+  if (!slug) return { message: 'Canal inválido.' }
+
+  const restantes = await fecharCanalOperador(slug)
+
+  if (atualSlug && atualSlug === slug) {
+    const proximo = restantes[0] ?? fallbackSlug
+    if (proximo) {
+      await setTenantContextSlug(proximo)
+      redirect('/portal/comunidade')
+    }
+    redirect('/portal/comunidade?escopo=nacional')
+  }
+
+  redirect('/portal/comunidade')
+}
+
+/** Garante que o tenant atual entre na barra (chamado ao montar o portal). */
+export async function registrarCanalAbertoAction(slug: string): Promise<void> {
+  const session = await auth()
+  if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) return
+  const limpo = slug.trim()
+  if (!limpo) return
+  const tenant = await db.tenant.findFirst({
+    where: { slug: limpo, ativo: true, sintetico: false },
+    select: { slug: true },
+  })
+  if (!tenant) return
+  await abrirCanalOperador(tenant.slug)
 }

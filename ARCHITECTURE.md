@@ -1295,6 +1295,12 @@ UI é só cosmética: `ModoOperadorProvider` (`lib/modo-operador.tsx`, montado e
 `portal/layout.tsx`) desabilita curtir/salvar/compartilhar e o campo de
 comentário. Nunca é critério de autorização.
 
+Mural do operador: `getCanalLeituraDireta` + `getPostsDoCanal({ leituraOperador })`
+(sem vínculo/`MembroConversa`). Super-admin troca cookie sem vínculo via
+`trocarTorcidaAction`. Barra multi-canal: cookie `operador_canais_abertos` +
+badge X (`fecharCanalOperadorAction`). Admin: botão "Ir ao portal" sob
+Afiliações; Caso A (`origem === 'sede'`) abre modal em vez do portal.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o

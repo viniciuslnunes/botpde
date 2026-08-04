@@ -7,6 +7,7 @@ import {
   listarTorcidasParaSelecao,
   setTenantContextSlug,
 } from '@/lib/tenant-context'
+import { abrirCanalOperador } from '@/lib/operador-canais-abertos'
 import { db } from '@torcida/db'
 import { z } from 'zod'
 
@@ -50,6 +51,7 @@ export async function selecionarTorcidaAction(
   }
 
   await setTenantContextSlug(slug)
+  await abrirCanalOperador(slug)
 
   if (destino === 'portal') redirect('/portal/comunidade')
   if (destino === 'super-admin') redirect('/super-admin/torcidas')
@@ -65,17 +67,24 @@ const unidadeSchema = z.discriminatedUnion('modo', [
   z.object({
     modo: z.literal('tenant'),
     tenantSlug: z.string().min(1),
+    destino: z.enum(['admin', 'portal']).optional().default('admin'),
   }),
 ])
 
 export type SelecionarUnidadeState = {
   message?: string
+  /**
+   * Caso A: unidade sem portal próprio. O client abre o modal pedindo se
+   * deseja ir ao admin da unidade para promover/criar.
+   */
+  semPortal?: { sedeId: string; nome?: string }
 }
 
 /**
  * Navega para uma unidade da worktree (super-admin):
- * - modo `tenant` (Caso B): troca `torcida_ctx` e abre `/admin`
- * - modo `sede` (Caso A): garante o tenant dono no cookie e abre `/admin/sedes/[id]`
+ * - modo `tenant` (Caso B): troca `torcida_ctx` e abre `/admin` ou portal
+ * - modo `sede` (Caso A): sem portal próprio — devolve `semPortal` para o
+ *   modal; se `confirmarAdmin=1`, abre `/admin/sedes/[id]`
  */
 export async function selecionarUnidadeAction(
   _prev: SelecionarUnidadeState,
@@ -92,6 +101,7 @@ export async function selecionarUnidadeAction(
     modo: modoRaw,
     sedeId: formData.get('sedeId') || undefined,
     tenantSlug: formData.get('tenantSlug') || undefined,
+    destino: formData.get('destino') || undefined,
   })
 
   if (!parsed.success) {
@@ -110,17 +120,34 @@ export async function selecionarUnidadeAction(
 
   if (data.modo === 'tenant') {
     await setTenantContextSlug(tenant.slug)
+    await abrirCanalOperador(tenant.slug)
+    if (data.destino === 'portal') redirect('/portal/comunidade')
     redirect('/admin')
   }
 
-  const sede: { id: string; tenantId: string | null } | null = await db.sede.findUnique({
-    where: { id: data.sedeId },
-    select: { id: true, tenantId: true },
-  })
+  const sede: { id: string; tenantId: string | null; nome: string } | null =
+    await db.sede.findUnique({
+      where: { id: data.sedeId },
+      select: { id: true, tenantId: true, nome: true },
+    })
   if (!sede || sede.tenantId !== tenant.id) {
     return { message: 'Unidade não encontrada nesta torcida.' }
   }
 
+  // Portal pedido explicitamente (botão "Ir ao portal"): Caso A não tem portal.
+  if (String(formData.get('destino') ?? '') === 'portal') {
+    return {
+      semPortal: { sedeId: sede.id, nome: sede.nome },
+    }
+  }
+
+  // Pedido explícito após confirmar o modal (abrir admin da unidade).
+  if (String(formData.get('confirmarAdmin') ?? '') === '1') {
+    await setTenantContextSlug(tenant.slug)
+    redirect(`/admin/sedes/${sede.id}`)
+  }
+
+  // Select de afiliação no admin: navegação usual para a ficha da unidade.
   await setTenantContextSlug(tenant.slug)
   redirect(`/admin/sedes/${sede.id}`)
 }

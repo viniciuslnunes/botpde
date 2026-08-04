@@ -73,6 +73,8 @@ interface CanalFeedCompositionProps {
   /** Composer (mesmo `FeedComposer` do feed principal) — só quando `podePublicar`. */
   composer: ReactNode
   children: ReactNode
+  /** Super-admin sem vínculo: mural em leitura, sem pedir entrada. */
+  leituraOperador?: boolean
 }
 
 export function CanalFeedComposition({
@@ -89,6 +91,7 @@ export function CanalFeedComposition({
   candidatos,
   composer,
   children,
+  leituraOperador = false,
 }: CanalFeedCompositionProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [gerenciarOpen, setGerenciarOpen] = useState(false)
@@ -97,6 +100,7 @@ export function CanalFeedComposition({
   const [pending, startTransition] = useTransition()
   const [silenciada, setSilenciada] = useState(canal.silenciada)
   const [souMembro, setSouMembro] = useState(canal.souMembro)
+  const verMural = souMembro || leituraOperador
 
   function inscrever() {
     startTransition(async () => {
@@ -225,7 +229,7 @@ export function CanalFeedComposition({
           </Link>
         )}
 
-        {!souMembro && canal.publica && (
+        {!leituraOperador && !souMembro && canal.publica && (
           <m.button
             type="button"
             disabled={pending}
@@ -238,13 +242,13 @@ export function CanalFeedComposition({
           </m.button>
         )}
 
-        {!souMembro && !canal.publica && canal.pedidoPendente && (
+        {!leituraOperador && !souMembro && !canal.publica && canal.pedidoPendente && (
           <span className="shrink-0 rounded-full border border-[rgb(var(--border))] px-3.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Pedido enviado
           </span>
         )}
 
-        {!souMembro && !canal.publica && !canal.pedidoPendente && (
+        {!leituraOperador && !souMembro && !canal.publica && !canal.pedidoPendente && (
           <m.button
             type="button"
             disabled={pending}
@@ -421,7 +425,7 @@ export function CanalFeedComposition({
 
       {souMembro && podePublicar && composer}
 
-      {!souMembro ? (
+      {!verMural ? (
         <MotionEmptyState
           className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
           title="Inscreva-se no canal"

@@ -45,6 +45,7 @@ export async function CanalFeedView({
   viewerTenantId,
   permissoes,
   podeCompartilhar = true,
+  leituraOperador = false,
 }: {
   canal: CanalItem
   currentUser: CurrentUser
@@ -56,9 +57,12 @@ export async function CanalFeedView({
   permissoes: string[]
   /** Sócio compartilha; torcedor só curte/comenta/salva. */
   podeCompartilhar?: boolean
+  /** Super-admin sem vínculo: lê o mural sem inscrição. */
+  leituraOperador?: boolean
 }) {
-  const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial
-  const podeGerenciarMembros = await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes)
+  const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial && !leituraOperador
+  const podeGerenciarMembros =
+    !leituraOperador && (await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes))
   const podeGerenciarPedidos = podeGerenciarMembros && !canal.publica
 
   const [tenant, membros, pedidos, recusados, candidatos] = await Promise.all([
@@ -84,6 +88,7 @@ export async function CanalFeedView({
       recusados={recusados}
       podeGerenciarPedidos={podeGerenciarPedidos}
       candidatos={candidatos}
+      leituraOperador={leituraOperador}
       composer={
         <Suspense fallback={<ComposerFallback />}>
           <CanalComposerSection
@@ -97,7 +102,7 @@ export async function CanalFeedView({
         </Suspense>
       }
     >
-      {canal.souMembro ? (
+      {canal.souMembro || leituraOperador ? (
         <Suspense fallback={<CanalFeedFallback />}>
           <ComunidadePostsSection
             tenantId={viewerTenantId}

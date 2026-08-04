@@ -737,3 +737,13 @@ super-admin, `assertNaoOperador` nas ações da CN) e em
 `resolverContextoEngajamento`. `assertComunidadeNacional` continua livre porque
 também serve leitura (SSE do feed nacional, inbox). UI: `lib/modo-operador.tsx`
 — cosmético, nunca critério de autorização. Ver `ARCHITECTURE.md` §5.19.
+
+**Leitura do mural + canais abertos (2026-08-03):** o mural oficial da unidade/
+Sede exige vínculo (`getCanalDaUnidadeDoVinculo`) ou membership — o operador
+passa por `getCanalLeituraDireta` / `getPostsDoCanal({ leituraOperador })` e
+vê o canal sem pedir entrada. `trocarTorcidaAction` aceita super-admin sem
+vínculo (alinhar com o select do admin). A barra de escudos do super-admin
+mantém **canais abertos** (cookie `operador_canais_abertos`) com badge X
+(`fecharCanalOperadorAction`); cada visita via select/"Ir ao portal"/troca
+registra o slug. Sem portal próprio (Caso A): botão "Ir ao portal" no menu
+admin abre modal e oferece o admin da unidade (`origem === 'sede'`).

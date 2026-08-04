@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { ExternalLink, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   selecionarTorcidaAction,
@@ -10,6 +11,7 @@ import {
   type SelecionarUnidadeState,
 } from '@/app/admin/tenant-context-actions'
 import { SearchableContextSwitcher } from '@/components/admin/searchable-context-switcher'
+import { useConfirmDialog } from '@/lib/confirm-action'
 import {
   labelClubeOpcao,
   labelUnidadeSub,
@@ -71,6 +73,8 @@ export function AdminSuperContextSwitchers({
   mostrarAfiliacoes,
 }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
+  const confirmDialog = useConfirmDialog()
   const torcidaAtual = useMemo(
     () => torcidas.find((t) => t.slug === torcidaAtualSlug) ?? null,
     [torcidas, torcidaAtualSlug],
@@ -96,9 +100,11 @@ export function AdminSuperContextSwitchers({
     SelecionarUnidadeState,
     FormData
   >(selecionarUnidadeAction, {})
+  const [portalPending, startPortal] = useTransition()
 
   const wasTorcidaPending = useRef(false)
   const wasUnidadePending = useRef(false)
+  const handledSemPortal = useRef<string | null>(null)
 
   useEffect(() => {
     if (wasTorcidaPending.current && !torcidaPending && torcidaState.message) {
@@ -113,6 +119,37 @@ export function AdminSuperContextSwitchers({
     }
     wasUnidadePending.current = unidadePending
   }, [unidadePending, unidadeState.message])
+
+  useEffect(() => {
+    const sem = unidadeState.semPortal
+    if (!sem) return
+    if (handledSemPortal.current === sem.sedeId) return
+    handledSemPortal.current = sem.sedeId
+
+    const unidade = unidades.find((u) => u.sedeId === sem.sedeId)
+    void (async () => {
+      const ok = await confirmDialog({
+        titulo: 'Esta unidade não tem portal',
+        descricao: `${sem.nome ?? 'Esta afiliação'} ainda não tem portal próprio (Caso A — vive no portal da Sede). Deseja abrir o admin da unidade para promover ou configurar um portal?`,
+        labelConfirmar: 'Abrir admin da unidade',
+        labelCancelar: 'Cancelar',
+        cancelled: false,
+        execute: async () => {
+          if (!unidade) {
+            router.push(`/admin/sedes/${sem.sedeId}`)
+            return
+          }
+          const fd = new FormData()
+          fd.set('modo', 'sede')
+          fd.set('sedeId', sem.sedeId)
+          fd.set('tenantSlug', unidade.tenantSlug)
+          fd.set('confirmarAdmin', '1')
+          await selecionarUnidadeAction({}, fd)
+        },
+      })
+      if (!ok) handledSemPortal.current = null
+    })()
+  }, [unidadeState.semPortal, confirmDialog, unidades, router])
 
   const clubesItems: ClubeItem[] = useMemo(
     () => clubes.map((c) => ({ ...c, recentKey: c.id })),
@@ -144,8 +181,54 @@ export function AdminSuperContextSwitchers({
     return resolverUnidadeAtual(unidades, tenantAtualId, pathname)
   }, [unidades, tenantAtualId, pathname])
 
+  const unidadeAtual = useMemo(
+    () => unidades.find((u) => u.id === unidadeAtualId) ?? null,
+    [unidades, unidadeAtualId],
+  )
+
   const isSuper = variant === 'super-admin'
   const semTorcida = !torcidaAtualSlug
+
+  function irAoPortal() {
+    if (!unidadeAtual && !torcidaAtualSlug) {
+      toast.error('Selecione uma torcida ou afiliação primeiro.')
+      return
+    }
+
+    // Sem afiliação selecionada: portal da torcida ativa.
+    if (!unidadeAtual) {
+      startPortal(() => {
+        const fd = new FormData()
+        fd.set('slug', torcidaAtualSlug!)
+        fd.set('destino', 'portal')
+        void selecionarTorcidaAction({}, fd)
+      })
+      return
+    }
+
+    // Caso A: dispara action com destino=portal → devolve semPortal → modal.
+    if (unidadeAtual.origem === 'sede' && unidadeAtual.sedeId) {
+      startPortal(() => {
+        const fd = new FormData()
+        fd.set('modo', 'sede')
+        fd.set('sedeId', unidadeAtual.sedeId!)
+        fd.set('tenantSlug', unidadeAtual.tenantSlug)
+        fd.set('destino', 'portal')
+        handledSemPortal.current = null
+        void unidadeAction(fd)
+      })
+      return
+    }
+
+    // Caso B / Sede raiz com tenant próprio.
+    startPortal(() => {
+      const fd = new FormData()
+      fd.set('modo', 'tenant')
+      fd.set('tenantSlug', unidadeAtual.tenantSlug)
+      fd.set('destino', 'portal')
+      void unidadeAction(fd)
+    })
+  }
 
   return (
     <div className="space-y-3">
@@ -195,42 +278,64 @@ export function AdminSuperContextSwitchers({
       />
 
       {exibirAfiliacoes ? (
-        <SearchableContextSwitcher<UnidadeItem>
-          label="Afiliações"
-          placeholder={
-            semTorcida
-              ? 'Selecione uma torcida primeiro'
-              : unidades.length === 0
-                ? 'Sem unidades cadastradas'
-                : 'Buscar unidade…'
-          }
-          emptyMessage="Nenhuma unidade na worktree."
-          items={unidadeItems}
-          valueId={unidadeAtualId}
-          getLabel={(u) => u.nome}
-          getSubLabel={labelUnidadeSub}
-          getSearchText={(u) =>
-            [u.nome, u.tipo, u.cidade ?? '', u.tenantSlug].join(' ')
-          }
-          getIndentRem={(u) => u.depth}
-          recentNamespace="unidade"
-          variant={variant}
-          disabled={semTorcida || unidades.length === 0}
-          pending={unidadePending}
-          formAction={unidadeAction}
-          valueFieldName={null}
-          getFormFields={(u): Record<string, string> => {
-            if (u.origem === 'tenant' || !u.sedeId) {
-              return { modo: 'tenant', tenantSlug: u.tenantSlug }
+        <div className="space-y-2">
+          <SearchableContextSwitcher<UnidadeItem>
+            label="Afiliações"
+            placeholder={
+              semTorcida
+                ? 'Selecione uma torcida primeiro'
+                : unidades.length === 0
+                  ? 'Sem unidades cadastradas'
+                  : 'Buscar unidade…'
             }
-            return {
-              modo: 'sede',
-              sedeId: u.sedeId,
-              tenantSlug: u.tenantSlug,
+            emptyMessage="Nenhuma unidade na worktree."
+            items={unidadeItems}
+            valueId={unidadeAtualId}
+            getLabel={(u) => u.nome}
+            getSubLabel={labelUnidadeSub}
+            getSearchText={(u) =>
+              [u.nome, u.tipo, u.cidade ?? '', u.tenantSlug].join(' ')
             }
-          }}
-          shouldSubmitOnSelect={(u) => u.id !== unidadeAtualId}
-        />
+            getIndentRem={(u) => u.depth}
+            recentNamespace="unidade"
+            variant={variant}
+            disabled={semTorcida || unidades.length === 0}
+            pending={unidadePending}
+            formAction={unidadeAction}
+            valueFieldName={null}
+            getFormFields={(u): Record<string, string> => {
+              if (u.origem === 'tenant' || !u.sedeId) {
+                return { modo: 'tenant', tenantSlug: u.tenantSlug }
+              }
+              return {
+                modo: 'sede',
+                sedeId: u.sedeId,
+                tenantSlug: u.tenantSlug,
+              }
+            }}
+            shouldSubmitOnSelect={(u) => u.id !== unidadeAtualId}
+          />
+
+          <button
+            type="button"
+            disabled={portalPending || semTorcida}
+            onClick={irAoPortal}
+            className={[
+              'flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              isSuper
+                ? 'border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white'
+                : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
+            ].join(' ')}
+          >
+            {portalPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            )}
+            Ir ao portal
+          </button>
+        </div>
       ) : null}
     </div>
   )

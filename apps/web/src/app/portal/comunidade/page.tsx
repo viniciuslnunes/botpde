@@ -6,7 +6,17 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
-import { getCanalDaUnidadeDoVinculo, getCanalOficialDaSede, podePublicarNoCanal } from '@/lib/canais'
+import {
+  getCanalDaUnidadeDoVinculo,
+  getCanalLeituraDireta,
+  getCanalOficialDaSede,
+  podePublicarNoCanal,
+} from '@/lib/canais'
+import {
+  carregarCanaisAbertosOperador,
+  lerSlugsCanaisAbertosOperador,
+} from '@/lib/operador-canais-abertos'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { podeVerFeedSocios } from '@/lib/feed'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { calculateEffectivePermissions } from '@torcida/types'
@@ -69,11 +79,16 @@ export default async function ComunidadePage({
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
-    const [salasAtivas, solicitacaoPendente, tenantIdsClube] = await Promise.all([
-      listSalasNacionais(afiliacao.id),
-      getSolicitacaoSocioPendente(session.user.id),
-      getTenantIdsPorAfiliacao(afiliacao.id),
-    ])
+    const superAdminNacional = isSuperAdminEmail(session.user.email)
+    const [salasAtivas, solicitacaoPendente, tenantIdsClube, canaisAbertosNacional] =
+      await Promise.all([
+        listSalasNacionais(afiliacao.id),
+        getSolicitacaoSocioPendente(session.user.id),
+        getTenantIdsPorAfiliacao(afiliacao.id),
+        superAdminNacional
+          ? carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
+          : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
+      ])
 
     return (
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -101,6 +116,8 @@ export default async function ComunidadePage({
           slugUnidade={slugUnidade}
           atualSlug={atualSlug}
           solicitacaoPendente={solicitacaoPendente}
+          superAdmin={superAdminNacional}
+          canaisAbertos={canaisAbertosNacional}
         />
       </div>
     )
@@ -116,6 +133,14 @@ export default async function ComunidadePage({
     ? { id: unidade.tenantId, nome: unidade.nome }
     : { id: torcidaReal.id, nome: torcidaReal.nome }
 
+  const operador = ctx.modo === 'torcida' && Boolean(ctx.operador)
+  const superAdmin = isSuperAdminEmail(session.user.email)
+
+  // Cookie de abertos é gravado nas actions de troca — aqui só lê.
+  const canaisAbertos = superAdmin
+    ? await carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
+    : []
+
   const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
   let conteudoCanal: React.ReactNode = null
@@ -127,17 +152,18 @@ export default async function ComunidadePage({
       unidade.tenantId,
     )
     const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
-    // Gate pelo VÍNCULO, não por `podeVerCanal`: a aba é do torcedor por
-    // definição e o gate de descoberta barra todo não-sócio fora de canal
-    // PÚBLICO. Também cobre o canal emprestado (Caso B com a Conversa no
-    // tenant da mãe), onde a relação de tenant nem seria `self`.
-    const canal = await getCanalDaUnidadeDoVinculo(unidade.canalId, session.user.id)
+    // Gate pelo VÍNCULO, não por `podeVerCanal` — exceto modo operador, que
+    // lê o mural oficial sem SaasMembro (`getCanalLeituraDireta`).
+    const canal = operador
+      ? await getCanalLeituraDireta(unidade.canalId, session.user.id)
+      : await getCanalDaUnidadeDoVinculo(unidade.canalId, session.user.id)
 
     if (canal) {
       conversaIdCanal = canal.id
       // Publicar no mural da unidade é de sócio: torcedor lê, participa de
-      // grupos/salas/loja, mas não publica no canal oficial.
-      const ehSocio = await podeVerFeedSocios(session.user.id, unidade.tenantId)
+      // grupos/salas/loja, mas não publica no canal oficial. Operador nunca publica.
+      const ehSocio =
+        !operador && (await podeVerFeedSocios(session.user.id, unidade.tenantId))
       const podePublicar =
         ehSocio && (await podePublicarNoCanal(canal, unidade.tenantId, permissoes))
 
@@ -149,6 +175,7 @@ export default async function ComunidadePage({
           viewerTenantId={unidade.tenantId}
           permissoes={permissoes}
           podeCompartilhar={ehSocio}
+          leituraOperador={operador}
         />
       )
     }
@@ -158,11 +185,14 @@ export default async function ComunidadePage({
       torcidaReal.id,
     )
     const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
-    const canal = await getCanalOficialDaSede(torcidaReal.id, session.user.id)
+    const canal = await getCanalOficialDaSede(torcidaReal.id, session.user.id, {
+      leituraOperador: operador,
+    })
 
     if (canal) {
       conversaIdCanal = canal.id
-      const ehSocio = await podeVerFeedSocios(session.user.id, torcidaReal.id)
+      const ehSocio =
+        !operador && (await podeVerFeedSocios(session.user.id, torcidaReal.id))
       const podePublicar =
         ehSocio && (await podePublicarNoCanal(canal, torcidaReal.id, permissoes))
 
@@ -174,6 +204,7 @@ export default async function ComunidadePage({
           viewerTenantId={torcidaReal.id}
           permissoes={permissoes}
           podeCompartilhar={ehSocio}
+          leituraOperador={operador}
         />
       )
     }
@@ -205,6 +236,8 @@ export default async function ComunidadePage({
         slugTorcida={slugTorcida}
         slugUnidade={slugUnidade}
         atualSlug={atualSlug}
+        superAdmin={superAdmin}
+        canaisAbertos={canaisAbertos}
       />
     </div>
   )

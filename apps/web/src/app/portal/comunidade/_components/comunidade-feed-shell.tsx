@@ -17,6 +17,7 @@ import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
+import type { CanalAbertoOperador } from '@/lib/operador-canais-abertos'
 
 interface CurrentUser {
   id: string
@@ -77,6 +78,9 @@ interface ComunidadeFeedShellProps {
   atualSlug?: string | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
+  /** Super-admin: barra multi-canal com X. */
+  superAdmin?: boolean
+  canaisAbertos?: CanalAbertoOperador[]
 }
 
 function ComposerFallback() {
@@ -106,6 +110,8 @@ export function ComunidadeFeedShell({
   slugUnidade = null,
   atualSlug = null,
   solicitacaoPendente = null,
+  superAdmin = false,
+  canaisAbertos = [],
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
   // TORCEDOR default nacional: sem `?escopo=` ainda precisa preservar CN nas subrotas.
@@ -133,6 +139,8 @@ export function ComunidadeFeedShell({
           slugUnidade={slugUnidade}
           atualSlug={atualSlug}
           modoContexto={modoContexto}
+          superAdmin={superAdmin}
+          canaisAbertos={canaisAbertos}
         />
 
         {modoNacional && clubeNacional && (

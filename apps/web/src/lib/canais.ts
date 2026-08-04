@@ -1039,12 +1039,27 @@ export async function getCanalDaUnidadeDoVinculo(
 }
 
 /**
+ * Leitura direta do canal — sem gate de vínculo nem descoberta.
+ * Usado pelo **modo operador** (super-admin sem `SaasMembro` no tenant):
+ * a doc garante leitura do mural oficial sem exigir pedido de entrada.
+ * Escrita continua barrada por `assertVozComunidade`.
+ */
+export async function getCanalLeituraDireta(
+  conversaId: string,
+  userId: string,
+): Promise<CanalItem | null> {
+  const row = await carregarCanalRow(conversaId, userId)
+  return row ? projetarCanalItem(row) : null
+}
+
+/**
  * Canal oficial da Sede (tipo `SEDE`) — mural da aba "Minha torcida".
  * Leitura pura (sem `getOrCreate`): sem ponteiro, a aba cai no feed legado.
  */
 export async function getCanalOficialDaSede(
   tenantId: string,
   userId: string,
+  opts?: { leituraOperador?: boolean },
 ): Promise<CanalItem | null> {
   const sede: { canalConversaId: string | null } | null = await db.sede.findFirst({
     where: { tenantId, tipo: 'SEDE', canalConversaId: { not: null } },
@@ -1052,6 +1067,10 @@ export async function getCanalOficialDaSede(
   })
   const conversaId = sede?.canalConversaId
   if (!conversaId) return null
+
+  if (opts?.leituraOperador) {
+    return getCanalLeituraDireta(conversaId, userId)
+  }
 
   const viaDiscovery = await getCanalPorId(conversaId, tenantId, userId)
   if (viaDiscovery) return viaDiscovery
@@ -1154,6 +1173,11 @@ export type PostsDoCanalOpts = FeedOpts & {
   incluirFeedInterno?: boolean
   /** Tenant da aba (Sede ou unidade). Default: `tenantId` posicional. */
   viewerTenantId?: string
+  /**
+   * Modo operador: lê o mural sem `MembroConversa`. Quem chama já autenticou
+   * o super-admin sem vínculo (`ehOperadorPlataforma`).
+   */
+  leituraOperador?: boolean
 }
 
 export async function getPostsDoCanal(
@@ -1162,11 +1186,13 @@ export async function getPostsDoCanal(
   userId: string,
   opts: PostsDoCanalOpts = {},
 ): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
-  const membro: { id: string } | null = await db.membroConversa.findFirst({
-    where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
-    select: { id: true },
-  })
-  if (!membro) return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  if (!opts.leituraOperador) {
+    const membro: { id: string } | null = await db.membroConversa.findFirst({
+      where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
+      select: { id: true },
+    })
+    if (!membro) return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
 
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const cursorWhere = buildCursorWhere(decodeCursor(opts.cursor))

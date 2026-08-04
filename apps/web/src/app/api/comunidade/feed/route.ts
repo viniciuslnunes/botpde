@@ -10,8 +10,8 @@ import {
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
-import { getCanalDaUnidadeDoVinculo, getCanalPorId, getPostsDoCanal } from '@/lib/canais'
-import { resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
+import { getCanalDaUnidadeDoVinculo, getCanalLeituraDireta, getCanalPorId, getPostsDoCanal } from '@/lib/canais'
+import { ehOperadorPlataforma, resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
 
 const querySchema = z.object({
   cursor: z.string().optional(),
@@ -119,11 +119,19 @@ export async function GET(request: NextRequest) {
       }
       // Aba "Minha unidade": o gate é o vínculo, não a descoberta cross-tenant
       // (`getCanalPorId` exige sócio fora de canal PÚBLICO e devolveria 404
-      // para o torcedor no mural da própria unidade).
+      // para o torcedor no mural da própria unidade). Modo operador lê direto.
+      const operador = await ehOperadorPlataforma(
+        session.user.id,
+        session.user.email,
+        tenant.id,
+      )
       const canal =
         (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
-        (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id))
-      if (!canal || !canal.souMembro) {
+        (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id)) ??
+        (operador
+          ? await getCanalLeituraDireta(parsed.data.conversaId, session.user.id)
+          : null)
+      if (!canal || (!canal.souMembro && !operador)) {
         return NextResponse.json({ error: 'Canal não encontrado.' }, { status: 404 })
       }
       const { posts, pageInfo } = await getPostsDoCanal(canal.id, tenant.id, session.user.id, {
@@ -131,6 +139,7 @@ export async function GET(request: NextRequest) {
         take,
         incluirFeedInterno: canal.canalOficial,
         viewerTenantId: tenant.id,
+        leituraOperador: operador,
       })
 
       return NextResponse.json({ posts, pageInfo })
