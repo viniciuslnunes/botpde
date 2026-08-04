@@ -75,6 +75,11 @@ interface CanalFeedCompositionProps {
   children: ReactNode
   /** Super-admin sem vínculo: mural em leitura, sem pedir entrada. */
   leituraOperador?: boolean
+  /**
+   * Chrome sticky de busca (shell da Comunidade). Quando presente, encaixa
+   * logo abaixo do banner — mesma ordem do Nacional (banner → busca → mural).
+   */
+  buscaChrome?: ReactNode
 }
 
 export function CanalFeedComposition({
@@ -92,6 +97,7 @@ export function CanalFeedComposition({
   composer,
   children,
   leituraOperador = false,
+  buscaChrome = null,
 }: CanalFeedCompositionProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [gerenciarOpen, setGerenciarOpen] = useState(false)
@@ -397,6 +403,8 @@ export function CanalFeedComposition({
           </AnimatePresence>
         </div>
       </header>
+
+      {buscaChrome}
 
       {configOpen && (
         <CanalConfigModal canal={canal} onClose={() => setConfigOpen(false)} />

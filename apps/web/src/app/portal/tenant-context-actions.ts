@@ -8,6 +8,7 @@ import { setTenantContextSlug, isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   abrirCanalOperador,
   fecharCanalOperador,
+  reordenarCanaisOperador,
 } from '@/lib/operador-canais-abertos'
 
 const schema = z.object({
@@ -134,4 +135,24 @@ export async function registrarCanalAbertoAction(slug: string): Promise<void> {
   })
   if (!tenant) return
   await abrirCanalOperador(tenant.slug)
+}
+
+/**
+ * Persiste a ordem dos canais abertos (drag na barra).
+ * `ordem` deve ser permutação exata dos slugs já abertos.
+ */
+export async function reordenarCanaisOperadorAction(
+  ordem: string[],
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const session = await auth()
+  if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
+    return { ok: false, message: 'Acesso negado.' }
+  }
+  if (!Array.isArray(ordem) || ordem.length === 0) {
+    return { ok: false, message: 'Ordem inválida.' }
+  }
+  const limpos = ordem.map((s) => String(s).trim()).filter(Boolean)
+  const next = await reordenarCanaisOperador(limpos)
+  if (!next) return { ok: false, message: 'Ordem inválida.' }
+  return { ok: true }
 }

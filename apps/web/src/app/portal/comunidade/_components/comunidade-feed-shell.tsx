@@ -18,6 +18,7 @@ import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 import type { CanalAbertoOperador } from '@/lib/operador-canais-abertos'
+import type { CanalTematicoAberto } from '@/lib/socio-canais-abertos'
 
 interface CurrentUser {
   id: string
@@ -52,12 +53,10 @@ interface ComunidadeFeedShellProps {
   /** Canal do escopo `unidade` (mural oficial da subsede/PDE). */
   conversaId?: string
   /**
-   * Conteúdo do escopo `unidade`: o mural do canal, já com composer, gate de
-   * membership e pedido de entrada (`CanalFeedView`). Quando presente, o shell
-   * entrega só o cromo (abas, salas) — nada de composer genérico nem feed
-   * agregado, que é justamente o que a aba da unidade não é.
+   * Mural do escopo Sede/unidade (`CanalFeedView`). Recebe o chrome de busca
+   * para encaixar abaixo do banner — mesma ordem do Nacional.
    */
-  conteudoCanal?: ReactNode
+  renderConteudoCanal?: (slots: { busca: ReactNode }) => ReactNode
   /** Escopo ativo (Nacional × Minha torcida × Minha unidade). */
   escopo?: EscopoComunidade
   escopos?: EscoposDisponiveis
@@ -81,6 +80,10 @@ interface ComunidadeFeedShellProps {
   /** Super-admin: barra multi-canal com X. */
   superAdmin?: boolean
   canaisAbertos?: CanalAbertoOperador[]
+  /** Sócio: temáticos abertos na barra (cookie separado). */
+  canaisTematicosAbertos?: CanalTematicoAberto[]
+  /** Página `/canais/[id]` — destaca a aba temática. */
+  canalAtivoId?: string | null
 }
 
 function ComposerFallback() {
@@ -98,7 +101,7 @@ export function ComunidadeFeedShell({
   salasAtivas = [],
   eventoIdInicial,
   conversaId,
-  conteudoCanal = null,
+  renderConteudoCanal,
   escopo = 'torcida',
   escopos = { torcida: false, unidade: false },
   nomeUnidade = null,
@@ -112,10 +115,67 @@ export function ComunidadeFeedShell({
   solicitacaoPendente = null,
   superAdmin = false,
   canaisAbertos = [],
+  canaisTematicosAbertos = [],
+  canalAtivoId = null,
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
+  const modoCanal = Boolean(renderConteudoCanal)
   // TORCEDOR default nacional: sem `?escopo=` ainda precisa preservar CN nas subrotas.
   const sufixoEscopo = escopo === modoContexto ? '' : `?escopo=${escopo}`
+
+  const buscaChrome = (
+    <ComunidadeStickySearchChrome
+      escopo={escopo}
+      modoContexto={modoContexto}
+      ocultarFiltrosFeed={modoCanal}
+    />
+  )
+
+  const navMobile = (
+    <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+      {[
+        { href: `/portal/comunidade/salas${sufixoEscopo}`, label: 'Salas', icon: Video },
+        ...(modoNacional
+          ? []
+          : [{ href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart }]),
+        { href: `/portal/comunidade/grupos${sufixoEscopo}`, label: 'Grupos', icon: Users },
+        { href: `/portal/comunidade/canais${sufixoEscopo}`, label: 'Canais', icon: Radio },
+        { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
+        ...(tenant.balancoFinanceiroVisivel && !modoNacional
+          ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
+          : []),
+        ...(modoNacional
+          ? []
+          : [
+              { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
+              { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
+            ]),
+      ].map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        >
+          <Icon className="h-4 w-4" /> {label}
+        </Link>
+      ))}
+    </nav>
+  )
+
+  const salasMobile = (
+    <Suspense fallback={null}>
+      <ComunidadeSalasMobile salas={salasAtivas} />
+    </Suspense>
+  )
+
+  /** Busca + atalhos mobile — no mural de canal, encaixa abaixo do banner (ordem Nacional). */
+  const chromeAposBanner = (
+    <>
+      {buscaChrome}
+      {navMobile}
+      {salasMobile}
+    </>
+  )
 
   return (
     <>
@@ -141,6 +201,8 @@ export function ComunidadeFeedShell({
           modoContexto={modoContexto}
           superAdmin={superAdmin}
           canaisAbertos={canaisAbertos}
+          canaisTematicosAbertos={canaisTematicosAbertos}
+          canalAtivoId={canalAtivoId}
         />
 
         {modoNacional && clubeNacional && (
@@ -173,54 +235,23 @@ export function ComunidadeFeedShell({
           </div>
         )}
 
-        <ComunidadeStickySearchChrome
-          escopo={escopo}
-          modoContexto={modoContexto}
-          ocultarFiltrosFeed={Boolean(conteudoCanal)}
-        />
+        {!modoCanal && (
+          <>
+            {buscaChrome}
+            {navMobile}
+            {salasMobile}
+          </>
+        )}
 
-        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
-          {[
-            { href: `/portal/comunidade/salas${sufixoEscopo}`, label: 'Salas', icon: Video },
-            ...(modoNacional
-              ? []
-              : [{ href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart }]),
-            { href: `/portal/comunidade/grupos${sufixoEscopo}`, label: 'Grupos', icon: Users },
-            { href: `/portal/comunidade/canais${sufixoEscopo}`, label: 'Canais', icon: Radio },
-            { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
-            ...(tenant.balancoFinanceiroVisivel && !modoNacional
-              ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
-              : []),
-            ...(modoNacional
-              ? []
-              : [
-                  { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
-                  { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
-                ]),
-          ].map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </Link>
-          ))}
-        </nav>
+        {renderConteudoCanal?.({ busca: chromeAposBanner })}
 
-        <Suspense fallback={null}>
-          <ComunidadeSalasMobile salas={salasAtivas} />
-        </Suspense>
-
-        {conteudoCanal}
-
-        {!conteudoCanal && !modoNacional && currentUser.id && (
+        {!modoCanal && !modoNacional && currentUser.id && (
           <Suspense fallback={<FeedStoriesSkeleton />}>
             <ComunidadeStoriesSection tenantId={tenant.id} currentUser={currentUser} />
           </Suspense>
         )}
 
-        {!conteudoCanal && currentUser.id && (
+        {!modoCanal && currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
             {modoNacional ? (
               <ComunidadeNacionalComposerSection
@@ -244,7 +275,7 @@ export function ComunidadeFeedShell({
           </Suspense>
         )}
 
-        {!conteudoCanal && (
+        {!modoCanal && (
           <>
             <FeedLiveBanner
               filtro={filtro}

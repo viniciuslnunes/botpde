@@ -127,6 +127,7 @@ export function AdminSuperContextSwitchers({
     handledSemPortal.current = sem.sedeId
 
     const unidade = unidades.find((u) => u.sedeId === sem.sedeId)
+    const hrefAdmin = `/admin/sedes/${sem.sedeId}`
     void (async () => {
       const ok = await confirmDialog({
         titulo: 'Esta unidade não tem portal',
@@ -135,21 +136,31 @@ export function AdminSuperContextSwitchers({
         labelCancelar: 'Cancelar',
         cancelled: false,
         execute: async () => {
-          if (!unidade) {
-            router.push(`/admin/sedes/${sem.sedeId}`)
+          // Já na ficha: redirect/push para a mesma URL parece “nada acontece”.
+          if (pathname === hrefAdmin) {
+            toast.message(
+              'Você já está no admin desta unidade. Use “Promover a tenant próprio” se quiser criar o portal.',
+            )
             return
           }
-          const fd = new FormData()
-          fd.set('modo', 'sede')
-          fd.set('sedeId', sem.sedeId)
-          fd.set('tenantSlug', unidade.tenantSlug)
-          fd.set('confirmarAdmin', '1')
-          await selecionarUnidadeAction({}, fd)
+          if (unidade) {
+            const fd = new FormData()
+            fd.set('modo', 'sede')
+            fd.set('sedeId', sem.sedeId)
+            fd.set('tenantSlug', unidade.tenantSlug)
+            fd.set('confirmarAdmin', '1')
+            const result = await selecionarUnidadeAction({}, fd)
+            if (result.message) {
+              toast.error(result.message)
+              return false
+            }
+          }
+          router.push(hrefAdmin)
         },
       })
       if (!ok) handledSemPortal.current = null
     })()
-  }, [unidadeState.semPortal, confirmDialog, unidades, router])
+  }, [unidadeState.semPortal, confirmDialog, unidades, router, pathname])
 
   const clubesItems: ClubeItem[] = useMemo(
     () => clubes.map((c) => ({ ...c, recentKey: c.id })),

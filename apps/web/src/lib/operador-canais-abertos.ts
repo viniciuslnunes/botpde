@@ -7,14 +7,17 @@ import { isProd } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 import { resolveTenantLogoUrl } from '@/lib/tenant'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
+import {
+  MAX_CANAIS_OPERADOR,
+  abrirCanalNaOrdem,
+  reordenarCanaisOperador as aplicarOrdemCanais,
+} from '@/lib/operador-canais-ordem'
 
 /**
  * Canais que o super-admin manteve abertos na barra da Comunidade.
  * Cookie próprio (não é sessão de tenant) — sobrevive à troca de `torcida_ctx`.
  */
 export const OPERADOR_CANAIS_COOKIE = 'operador_canais_abertos'
-
-const MAX_CANAIS = 8
 
 export type CanalAbertoOperador = {
   slug: string
@@ -30,7 +33,20 @@ function parseSlugs(raw: string | undefined): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-    .slice(0, MAX_CANAIS)
+    .slice(0, MAX_CANAIS_OPERADOR)
+}
+
+async function gravarSlugs(slugs: string[]): Promise<void> {
+  const store = await cookies()
+  if (slugs.length === 0) {
+    store.delete(OPERADOR_CANAIS_COOKIE)
+    return
+  }
+  store.set(OPERADOR_CANAIS_COOKIE, slugs.join(','), {
+    ...sharedCookieOptions(isProd),
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 30,
+  })
 }
 
 export async function lerSlugsCanaisAbertosOperador(): Promise<string[]> {
@@ -38,33 +54,28 @@ export async function lerSlugsCanaisAbertosOperador(): Promise<string[]> {
   return parseSlugs(store.get(OPERADOR_CANAIS_COOKIE)?.value)
 }
 
+/** Abre sem reordenar (selecionar ≠ trazer para a frente). */
 export async function abrirCanalOperador(slug: string): Promise<void> {
-  const limpo = slug.trim()
-  if (!limpo) return
   const atuais = await lerSlugsCanaisAbertosOperador()
-  const next = [limpo, ...atuais.filter((s) => s !== limpo)].slice(0, MAX_CANAIS)
-  const store = await cookies()
-  store.set(OPERADOR_CANAIS_COOKIE, next.join(','), {
-    ...sharedCookieOptions(isProd),
-    httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30,
-  })
+  const next = abrirCanalNaOrdem(atuais, slug)
+  if (next.length === atuais.length && next.every((s, i) => s === atuais[i])) return
+  await gravarSlugs(next)
 }
 
 export async function fecharCanalOperador(slug: string): Promise<string[]> {
   const limpo = slug.trim()
   const atuais = await lerSlugsCanaisAbertosOperador()
   const next = atuais.filter((s) => s !== limpo)
-  const store = await cookies()
-  if (next.length === 0) {
-    store.delete(OPERADOR_CANAIS_COOKIE)
-  } else {
-    store.set(OPERADOR_CANAIS_COOKIE, next.join(','), {
-      ...sharedCookieOptions(isProd),
-      httpOnly: true,
-      maxAge: 60 * 60 * 24 * 30,
-    })
-  }
+  await gravarSlugs(next)
+  return next
+}
+
+/** Persiste ordem manual (drag) da barra do operador. */
+export async function reordenarCanaisOperador(novaOrdem: string[]): Promise<string[] | null> {
+  const atuais = await lerSlugsCanaisAbertosOperador()
+  const next = aplicarOrdemCanais(atuais, novaOrdem)
+  if (!next) return null
+  await gravarSlugs(next)
   return next
 }
 

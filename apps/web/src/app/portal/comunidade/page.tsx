@@ -16,6 +16,10 @@ import {
   carregarCanaisAbertosOperador,
   lerSlugsCanaisAbertosOperador,
 } from '@/lib/operador-canais-abertos'
+import {
+  carregarCanaisAbertosSocio,
+  lerIdsCanaisAbertosSocio,
+} from '@/lib/socio-canais-abertos'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { podeVerFeedSocios } from '@/lib/feed'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
@@ -80,7 +84,7 @@ export default async function ComunidadePage({
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
     const superAdminNacional = isSuperAdminEmail(session.user.email)
-    const [salasAtivas, solicitacaoPendente, tenantIdsClube, canaisAbertosNacional] =
+    const [salasAtivas, solicitacaoPendente, tenantIdsClube, canaisAbertosNacional, canaisTematicosNacional] =
       await Promise.all([
         listSalasNacionais(afiliacao.id),
         getSolicitacaoSocioPendente(session.user.id),
@@ -88,6 +92,13 @@ export default async function ComunidadePage({
         superAdminNacional
           ? carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
           : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
+        !superAdminNacional && torcidaReal
+          ? carregarCanaisAbertosSocio(
+              await lerIdsCanaisAbertosSocio(),
+              session.user.id,
+              torcidaReal.id,
+            )
+          : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>),
       ])
 
     return (
@@ -118,6 +129,7 @@ export default async function ComunidadePage({
           solicitacaoPendente={solicitacaoPendente}
           superAdmin={superAdminNacional}
           canaisAbertos={canaisAbertosNacional}
+          canaisTematicosAbertos={canaisTematicosNacional}
         />
       </div>
     )
@@ -140,11 +152,21 @@ export default async function ComunidadePage({
   const canaisAbertos = superAdmin
     ? await carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
     : []
+  const canaisTematicosAbertos = !superAdmin
+    ? await carregarCanaisAbertosSocio(
+        await lerIdsCanaisAbertosSocio(),
+        session.user.id,
+        torcidaReal.id,
+      )
+    : []
 
   const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
-  let conteudoCanal: React.ReactNode = null
+  let renderConteudoCanal:
+    | ((slots: { busca: React.ReactNode }) => React.ReactNode)
+    | null = null
   let conversaIdCanal: string | undefined
+  let temMuralCanal = false
 
   if (unidade) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
@@ -160,6 +182,7 @@ export default async function ComunidadePage({
 
     if (canal) {
       conversaIdCanal = canal.id
+      temMuralCanal = true
       // Publicar no mural da unidade é de sócio: torcedor lê, participa de
       // grupos/salas/loja, mas não publica no canal oficial. Operador nunca publica.
       const ehSocio =
@@ -167,7 +190,7 @@ export default async function ComunidadePage({
       const podePublicar =
         ehSocio && (await podePublicarNoCanal(canal, unidade.tenantId, permissoes))
 
-      conteudoCanal = (
+      renderConteudoCanal = ({ busca }) => (
         <CanalFeedView
           canal={canal}
           currentUser={currentUser}
@@ -176,6 +199,7 @@ export default async function ComunidadePage({
           permissoes={permissoes}
           podeCompartilhar={ehSocio}
           leituraOperador={operador}
+          buscaChrome={busca}
         />
       )
     }
@@ -191,12 +215,13 @@ export default async function ComunidadePage({
 
     if (canal) {
       conversaIdCanal = canal.id
+      temMuralCanal = true
       const ehSocio =
         !operador && (await podeVerFeedSocios(session.user.id, torcidaReal.id))
       const podePublicar =
         ehSocio && (await podePublicarNoCanal(canal, torcidaReal.id, permissoes))
 
-      conteudoCanal = (
+      renderConteudoCanal = ({ busca }) => (
         <CanalFeedView
           canal={canal}
           currentUser={currentUser}
@@ -205,6 +230,7 @@ export default async function ComunidadePage({
           permissoes={permissoes}
           podeCompartilhar={ehSocio}
           leituraOperador={operador}
+          buscaChrome={busca}
         />
       )
     }
@@ -220,9 +246,9 @@ export default async function ComunidadePage({
           balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
         }}
         currentUser={currentUser}
-        filtro={conteudoCanal ? 'canal' : filtro}
+        filtro={temMuralCanal ? 'canal' : filtro}
         conversaId={conversaIdCanal}
-        conteudoCanal={conteudoCanal}
+        renderConteudoCanal={renderConteudoCanal ?? undefined}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
         eventoIdInicial={eventoIdComposer}
@@ -238,6 +264,7 @@ export default async function ComunidadePage({
         atualSlug={atualSlug}
         superAdmin={superAdmin}
         canaisAbertos={canaisAbertos}
+        canaisTematicosAbertos={canaisTematicosAbertos}
       />
     </div>
   )

@@ -233,7 +233,19 @@ function ConfirmDialog({
         return
       }
       onConfirm()
-    } catch {
+    } catch (error) {
+      // Server Actions que chamam `redirect()` lançam NEXT_REDIRECT — tem que
+      // subir para o App Router. Engolir aqui deixa o modal “travado” e a
+      // navegação nunca acontece (ex.: Abrir admin da unidade).
+      if (
+        error &&
+        typeof error === 'object' &&
+        'digest' in error &&
+        typeof (error as { digest?: unknown }).digest === 'string' &&
+        String((error as { digest: string }).digest).startsWith('NEXT_REDIRECT')
+      ) {
+        throw error
+      }
       setBusy(false)
     }
   }

@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { db } from '@torcida/db'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 import {
@@ -46,6 +46,7 @@ export async function CanalFeedView({
   permissoes,
   podeCompartilhar = true,
   leituraOperador = false,
+  buscaChrome = null,
 }: {
   canal: CanalItem
   currentUser: CurrentUser
@@ -59,6 +60,8 @@ export async function CanalFeedView({
   podeCompartilhar?: boolean
   /** Super-admin sem vínculo: lê o mural sem inscrição. */
   leituraOperador?: boolean
+  /** Shell: busca sticky logo abaixo do banner (ordem Nacional). */
+  buscaChrome?: ReactNode
 }) {
   const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial && !leituraOperador
   const podeGerenciarMembros =
@@ -89,6 +92,7 @@ export async function CanalFeedView({
       podeGerenciarPedidos={podeGerenciarPedidos}
       candidatos={candidatos}
       leituraOperador={leituraOperador}
+      buscaChrome={buscaChrome}
       composer={
         <Suspense fallback={<ComposerFallback />}>
           <CanalComposerSection

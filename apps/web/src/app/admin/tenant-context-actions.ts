@@ -84,7 +84,7 @@ export type SelecionarUnidadeState = {
  * Navega para uma unidade da worktree (super-admin):
  * - modo `tenant` (Caso B): troca `torcida_ctx` e abre `/admin` ou portal
  * - modo `sede` (Caso A): sem portal próprio — devolve `semPortal` para o
- *   modal; se `confirmarAdmin=1`, abre `/admin/sedes/[id]`
+ *   modal; se `confirmarAdmin=1`, só grava o cookie (client navega para a ficha)
  */
 export async function selecionarUnidadeAction(
   _prev: SelecionarUnidadeState,
@@ -142,9 +142,11 @@ export async function selecionarUnidadeAction(
   }
 
   // Pedido explícito após confirmar o modal (abrir admin da unidade).
+  // Só grava o cookie — o client faz `router.push` (redirect dentro do
+  // ConfirmDialog engolia NEXT_REDIRECT e o botão parecia morto).
   if (String(formData.get('confirmarAdmin') ?? '') === '1') {
     await setTenantContextSlug(tenant.slug)
-    redirect(`/admin/sedes/${sede.id}`)
+    return {}
   }
 
   // Select de afiliação no admin: navegação usual para a ficha da unidade.
