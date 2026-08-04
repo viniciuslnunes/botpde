@@ -19,11 +19,6 @@ type Props = {
   quality?: number
   unoptimized?: boolean
   priority?: boolean
-  /**
-   * Em fileiras de ícones (abas de canal), badges full-bleed parecem maiores
-   * que escudos com alpha — aplica leve inset quando a máscara circular entra.
-   */
-  balanceCircular?: boolean
 }
 
 /**
@@ -31,6 +26,9 @@ type Props = {
  * (`detectarEscudoCircular`): badges redondos com fundo opaco “assado”
  * (branco, preto ou cor) ganham máscara circular; PNG com alpha nos cantos
  * (fundo transparente) fica natural. Ver `EscudoClube` (onboarding).
+ *
+ * `size` é resolução da fonte (Next Image / attrs); o tamanho visual vem de
+ * `className` (ex.: `h-7 w-7`) — não aplicar style width/height com `size`.
  */
 export function LogoImage({
   src,
@@ -43,7 +41,6 @@ export function LogoImage({
   quality,
   unoptimized,
   priority,
-  balanceCircular = false,
 }: Props) {
   const [circular, setCircular] = useState(false)
   const [pronto, setPronto] = useState(false)
@@ -64,17 +61,9 @@ export function LogoImage({
 
   const masked = pronto && circular
   const radiusClass = masked ? 'rounded-full overflow-hidden' : rounded
-  const balanceClass = balanceCircular && masked ? 'scale-[0.86] origin-center' : ''
-  const cls = [
-    className,
-    fill ? 'absolute inset-0 h-full w-full' : '',
-    radiusClass,
-    balanceClass,
-  ]
+  const cls = [className, fill ? 'absolute inset-0 h-full w-full' : '', radiusClass]
     .filter(Boolean)
     .join(' ')
-  const dimStyle =
-    !fill && size != null ? ({ width: size, height: size } as const) : undefined
 
   if (canOptimizeImageUrl(src)) {
     return fill ? (
@@ -100,7 +89,6 @@ export function LogoImage({
         unoptimized={unoptimized}
         priority={priority}
         className={cls}
-        style={dimStyle}
       />
     )
   }
@@ -115,7 +103,6 @@ export function LogoImage({
       loading={priority ? 'eager' : 'lazy'}
       decoding="async"
       className={cls}
-      style={dimStyle}
     />
   )
 }
