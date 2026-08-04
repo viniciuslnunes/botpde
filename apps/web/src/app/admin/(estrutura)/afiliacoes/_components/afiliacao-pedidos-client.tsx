@@ -8,12 +8,13 @@ import { MotionTabBar } from '@/components/motion/motion-tab-bar'
 import { springSnappy } from '@/lib/motion-presets'
 import { AfiliacaoPedidoCard, type SolicitacaoView } from './afiliacao-pedido-card'
 
-type FiltroStatus = 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+type FiltroStatus = 'PENDENTE' | 'APROVADA' | 'RECUSADA' | 'REMOVIDA'
 
 const FILTRO_LABEL: Record<FiltroStatus, string> = {
   PENDENTE: 'Pendentes',
   APROVADA: 'Aprovadas',
   RECUSADA: 'Recusadas',
+  REMOVIDA: 'Removidas',
 }
 
 export function AfiliacaoPedidosClient({
@@ -24,9 +25,10 @@ export function AfiliacaoPedidosClient({
   podeDecidir: boolean
 }) {
   const [filtro, setFiltro] = useState<FiltroStatus>(() => {
-    if (pedidos.some((p) => p.status === 'PENDENTE')) return 'PENDENTE'
-    if (pedidos.some((p) => p.status === 'APROVADA')) return 'APROVADA'
-    return 'RECUSADA'
+    const primeiroComItens = (['PENDENTE', 'APROVADA', 'RECUSADA', 'REMOVIDA'] as const).find((s) =>
+      pedidos.some((p) => p.status === s),
+    )
+    return primeiroComItens ?? 'PENDENTE'
   })
 
   const contagens = useMemo(() => {
@@ -34,6 +36,7 @@ export function AfiliacaoPedidosClient({
       PENDENTE: 0,
       APROVADA: 0,
       RECUSADA: 0,
+      REMOVIDA: 0,
     }
     for (const p of pedidos) base[p.status] += 1
     return base

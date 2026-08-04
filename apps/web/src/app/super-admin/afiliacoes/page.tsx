@@ -4,7 +4,10 @@ import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
-import { herdarDadosSedeNaSolicitacao } from '@/lib/afiliacao-unidade'
+import {
+  herdarDadosSedeNaSolicitacao,
+  resolverStatusExibicaoSolicitacao,
+} from '@/lib/afiliacao-unidade'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import {
@@ -135,7 +138,8 @@ export default async function AfiliacoesSuperAdminPage() {
     )
     return {
       id: s.id,
-      status: s.status,
+      // Status mais recente: APROVADA cuja Sede foi excluída vira REMOVIDA.
+      status: resolverStatusExibicaoSolicitacao(s.status, Boolean(s.sede)),
       torcidaNome: formatNomeTorcida(s.tenant.nome),
       nome: locais.nome,
       tipo: locais.tipo,

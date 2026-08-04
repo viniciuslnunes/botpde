@@ -11,6 +11,7 @@ import {
   recusarSolicitacao,
   type SolicitacaoActionState,
 } from '@/app/admin/(estrutura)/afiliacoes/afiliacao-actions'
+import type { StatusExibicaoSolicitacao } from '@/lib/afiliacao-unidade'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { normalizarInicioEndereco } from '@/lib/endereco'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
@@ -25,7 +26,8 @@ import { SearchableSelect, type ComboOption } from './searchable-select'
 
 export interface SolicitacaoView {
   id: string
-  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+  /** Derivado na leitura — `REMOVIDA` = foi aprovada e a unidade excluída depois. */
+  status: StatusExibicaoSolicitacao
   torcidaNome: string
   nome: string
   tipo: 'SUBSEDE' | 'PONTO_ENCONTRO'
@@ -64,6 +66,7 @@ const STATUS_VARIANT: Record<SolicitacaoView['status'], BadgeVariant> = {
   PENDENTE: 'warning',
   APROVADA: 'success',
   RECUSADA: 'neutral',
+  REMOVIDA: 'neutral',
 }
 
 const INPUT_CLASS =
@@ -683,20 +686,21 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
   )
 }
 
-type FiltroStatus = 'TODAS' | 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+type FiltroStatus = 'TODAS' | StatusExibicaoSolicitacao
 
 const FILTRO_LABEL: Record<FiltroStatus, string> = {
   TODAS: 'Todas',
   PENDENTE: 'Pendentes',
   APROVADA: 'Aprovadas',
   RECUSADA: 'Recusadas',
+  REMOVIDA: 'Removidas',
 }
 
 function GerenciarSolicitacoes({ solicitacoes }: { solicitacoes: SolicitacaoView[] }) {
   const [filtro, setFiltro] = useState<FiltroStatus>('TODAS')
 
   const filtros: { id: FiltroStatus; count: number }[] = (
-    ['TODAS', 'PENDENTE', 'APROVADA', 'RECUSADA'] as FiltroStatus[]
+    ['TODAS', 'PENDENTE', 'APROVADA', 'RECUSADA', 'REMOVIDA'] as FiltroStatus[]
   ).map((id) => ({
     id,
     count: id === 'TODAS' ? solicitacoes.length : solicitacoes.filter((s) => s.status === id).length,

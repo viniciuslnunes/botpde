@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   herdarDadosSedeNaSolicitacao,
   podeDecidirSolicitacao,
+  resolverStatusExibicaoSolicitacao,
   transicionarSolicitacao,
   type AtorSolicitacao,
 } from '../afiliacao-unidade'
@@ -127,5 +128,20 @@ describe('herdarDadosSedeNaSolicitacao', () => {
       endereco: null,
       lat: null,
     })
+  })
+})
+
+describe('resolverStatusExibicaoSolicitacao (status mais recente)', () => {
+  it('APROVADA sem Sede vira REMOVIDA — a unidade foi excluída depois', () => {
+    expect(resolverStatusExibicaoSolicitacao('APROVADA', false)).toBe('REMOVIDA')
+  })
+
+  it('APROVADA com Sede viva continua APROVADA', () => {
+    expect(resolverStatusExibicaoSolicitacao('APROVADA', true)).toBe('APROVADA')
+  })
+
+  it('PENDENTE e RECUSADA nunca viram REMOVIDA (nunca tiveram Sede)', () => {
+    expect(resolverStatusExibicaoSolicitacao('PENDENTE', false)).toBe('PENDENTE')
+    expect(resolverStatusExibicaoSolicitacao('RECUSADA', false)).toBe('RECUSADA')
   })
 })

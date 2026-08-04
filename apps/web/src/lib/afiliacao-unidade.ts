@@ -53,6 +53,30 @@ export const STATUS_SOLICITACAO_LABEL: Record<StatusSolicitacaoUnidade, string> 
 }
 
 /**
+ * Status DE EXIBIÇÃO — inclui `REMOVIDA`, que não existe no banco: a Sede
+ * criada ao aprovar pode ser excluída depois (`sedeId` vira null por
+ * `onDelete: SetNull`), mas a coluna `status` continua `APROVADA`. A fila
+ * mostraria "Aprovada" para uma unidade que não existe mais.
+ */
+export type StatusExibicaoSolicitacao = StatusSolicitacaoUnidade | 'REMOVIDA'
+
+/**
+ * Resolve o status mais recente da solicitação. Aprovar SEMPRE grava `sedeId`
+ * (`aprovarSolicitacao`), então APROVADA sem sede = unidade excluída depois.
+ */
+export function resolverStatusExibicaoSolicitacao(
+  status: StatusSolicitacaoUnidade,
+  temSede: boolean,
+): StatusExibicaoSolicitacao {
+  return status === 'APROVADA' && !temSede ? 'REMOVIDA' : status
+}
+
+export const STATUS_EXIBICAO_SOLICITACAO_LABEL: Record<StatusExibicaoSolicitacao, string> = {
+  ...STATUS_SOLICITACAO_LABEL,
+  REMOVIDA: 'Removida',
+}
+
+/**
  * Campos locais gravados no snapshot da solicitação — após APROVADA a fonte
  * de verdade passa a ser a `Sede` vinculada (edições em /admin/sedes).
  */

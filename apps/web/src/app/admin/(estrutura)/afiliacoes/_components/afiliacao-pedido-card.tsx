@@ -10,10 +10,15 @@ import {
   MapPin,
   Pencil,
   Phone,
+  Trash2,
   User,
   X,
 } from 'lucide-react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
+import {
+  STATUS_EXIBICAO_SOLICITACAO_LABEL,
+  type StatusExibicaoSolicitacao,
+} from '@/lib/afiliacao-unidade'
 import { EventoMapaLinks } from '@/components/eventos/evento-mapa-links'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import { MotionTabBar } from '@/components/motion/motion-tab-bar'
@@ -29,7 +34,8 @@ import {
 
 export interface SolicitacaoView {
   id: string
-  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+  /** Derivado na leitura — `REMOVIDA` = foi aprovada e a unidade excluída depois. */
+  status: StatusExibicaoSolicitacao
   nome: string
   tipo: 'SUBSEDE' | 'PONTO_ENCONTRO'
   cidade: string
@@ -64,13 +70,10 @@ const STATUS_VARIANT: Record<SolicitacaoView['status'], BadgeVariant> = {
   PENDENTE: 'warning',
   APROVADA: 'success',
   RECUSADA: 'danger',
+  REMOVIDA: 'neutral',
 }
 
-const STATUS_LABEL: Record<SolicitacaoView['status'], string> = {
-  PENDENTE: 'Pendente',
-  APROVADA: 'Aprovada',
-  RECUSADA: 'Recusada',
-}
+const STATUS_LABEL = STATUS_EXIBICAO_SOLICITACAO_LABEL
 
 type AbaPedido = 'resumo' | 'local' | 'provas' | 'contato'
 
@@ -285,6 +288,16 @@ export function AfiliacaoPedidoCard({
       <div className="space-y-4 p-4 sm:p-5">
         {aba === 'resumo' && (
           <div className="space-y-4">
+            {pedido.status === 'REMOVIDA' && (
+              <div className="flex gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.6)] p-3">
+                <Trash2 className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                  Esta solicitação foi aprovada, mas a unidade criada foi excluída depois. Os dados
+                  abaixo são o snapshot do pedido original — para reativar, é preciso um novo
+                  cadastro.
+                </p>
+              </div>
+            )}
             <dl className="grid gap-3 sm:grid-cols-2">
               <CampoLeitura label="Tipo">{TIPO_LABEL[pedido.tipo]}</CampoLeitura>
               <CampoLeitura label="Cidade">

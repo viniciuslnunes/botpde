@@ -1,5 +1,8 @@
 import { db } from '@torcida/db'
-import { herdarDadosSedeNaSolicitacao } from '@/lib/afiliacao-unidade'
+import {
+  herdarDadosSedeNaSolicitacao,
+  resolverStatusExibicaoSolicitacao,
+} from '@/lib/afiliacao-unidade'
 import { AfiliacaoPedidosClient } from './afiliacao-pedidos-client'
 import type { SolicitacaoView } from './afiliacao-pedido-card'
 
@@ -133,7 +136,8 @@ export async function AfiliacaoPedidos({
       )
       return {
         id: r.id,
-        status: r.status,
+        // Status mais recente: APROVADA cuja Sede foi excluída vira REMOVIDA.
+        status: resolverStatusExibicaoSolicitacao(r.status, Boolean(r.sede)),
         nome: locais.nome,
         tipo: locais.tipo,
         cidade: locais.cidade,

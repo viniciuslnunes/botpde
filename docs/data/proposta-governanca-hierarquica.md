@@ -356,6 +356,15 @@ enum StatusSolicitacaoUnidade { PENDENTE APROVADA RECUSADA }
   `AFFILIATION_MANAGE` mas **não decide** (peso final é do Presidente). Editar
   (nome/tipo/cidade/UF/endereço) enquanto PENDENTE: owner ou super-admin.
 - Ator não-super-admin só mexe em solicitações do **próprio** tenant.
+- **Status de exibição `REMOVIDA` (2026-08-03, derivado — não existe no enum):**
+  excluir a unidade zera `sedeId` (`onDelete: SetNull`) mas **não** mexe em
+  `status`, então a fila mostrava "Aprovada" para unidade que já não existe.
+  `resolverStatusExibicaoSolicitacao(status, temSede)` deriva na leitura —
+  aprovar SEMPRE grava `sedeId`, logo `APROVADA` sem Sede = excluída depois.
+  Derivar (em vez de gravar no delete) cobre **todos** os caminhos de exclusão
+  de graça — inclusive o cascade do tenant filho — e conserta as linhas
+  legadas sem backfill. Toda leitura da fila (`/admin/afiliacoes` e
+  `/super-admin/afiliacoes`) passa por ela e tem aba própria "Removidas".
 
 ### Materialização ao aprovar (`lib/afiliacao.ts`, na transação)
 
