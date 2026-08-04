@@ -38,6 +38,7 @@ export function ComunidadeChromeRail({
   canaisTorcida = [],
   salasNacional,
   canaisNacional = [],
+  tenantAtivoEhUnidade = false,
 }: {
   currentUserId: string
   tenantId: string | null
@@ -45,6 +46,8 @@ export function ComunidadeChromeRail({
   escopos: EscoposDisponiveis
   /** TORCEDOR = nacional (default CN); sócio = torcida. */
   modoContexto?: 'nacional' | 'torcida'
+  /** Unidade Caso B ativa: o default do escopo é ela, não a Sede raiz. */
+  tenantAtivoEhUnidade?: boolean
   salasTorcida: SalaAtivaListItem[]
   canaisTorcida?: SugestaoCanalAside[]
   salasNacional: SalaAtivaListItem[]
@@ -57,6 +60,7 @@ export function ComunidadeChromeRail({
     modoContexto,
     escopos,
     searchParams.get('escopo'),
+    { tenantAtivoEhUnidade },
   )
   const modoNacional = escopo === 'nacional'
 

@@ -49,6 +49,7 @@ pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant p
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
+pnpm --filter @torcida/db db:repair-carteirinha-espelho  # carteirinha do sócio Caso B nos dois níveis
 pnpm --filter @torcida/db audit:regras       # invariantes de negócio + matriz de relações
 pnpm --filter @torcida/web audit:dados       # auditoria funcional (código real × banco semeado)
 pnpm --filter @torcida/web audit:fluxos      # fluxos ponta a ponta (Server Actions reais; muta e reverte)

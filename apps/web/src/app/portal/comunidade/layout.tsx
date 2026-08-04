@@ -8,6 +8,7 @@ import { COMUNIDADE_RAIL_SCROLL } from './_components/comunidade-rail-scroll'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 import { ComunidadeRailSkeleton } from '@/components/portal/feed-skeletons'
 import { ScrollChromeVisibilityProvider } from '@/lib/scroll-chrome-context'
+import { ModoOperadorAviso } from '@/lib/modo-operador'
 
 /**
  * Layout da Comunidade: dock mobile, QueryProvider (cache do feed) e rail de
@@ -29,6 +30,7 @@ export default function ComunidadeLayout({
         <ComunidadeNavbarSlot />
       </Suspense>
       <div className="pb-28 lg:pb-0">
+        <ModoOperadorAviso />
         <ScrollChromeVisibilityProvider>
           <ComunidadeLayoutChrome
             aside={

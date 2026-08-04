@@ -8,10 +8,12 @@ export interface ConfigSectionCardProps {
   description: string
   /** Âncora estável para deep links (ex.: `#canal-oficial`). */
   id?: string
-  /** Seção restrita ao owner da torcida (não é permissão do RBAC). */
+  /**
+   * Seção restrita ao owner da torcida (não é permissão do RBAC). Só rende o
+   * selo — quem não pode editar não deve receber o card, e sim não vê-lo:
+   * as páginas não o montam. Ver `_lib/contexto.ts`.
+   */
   ownerOnly?: boolean
-  /** True quando a seção é ownerOnly e o usuário atual não é owner. */
-  blocked?: boolean
   /** Ordem de entrada na animação de revelação. */
   index?: number
   children: ReactNode
@@ -28,7 +30,6 @@ export function ConfigSectionCard({
   description,
   id,
   ownerOnly = false,
-  blocked = false,
   index = 0,
   children,
 }: ConfigSectionCardProps) {
@@ -36,10 +37,7 @@ export function ConfigSectionCard({
     <MotionReveal index={index}>
       <section
         id={id}
-        className={[
-          'overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
-          blocked ? 'opacity-60' : '',
-        ].join(' ')}
+        className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
       >
         <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))]">
@@ -58,15 +56,7 @@ export function ConfigSectionCard({
           </div>
         </div>
 
-        <div className="px-6 py-5">
-          {blocked ? (
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Apenas o owner da torcida pode alterar esta configuração.
-            </p>
-          ) : (
-            children
-          )}
-        </div>
+        <div className="px-6 py-5">{children}</div>
       </section>
     </MotionReveal>
   )

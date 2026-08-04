@@ -411,6 +411,18 @@ model Tenant {
   /// Vazio = fallback de app (QUADRIMENSAL + ANUAL). Config em /admin/configuracoes.
   periodicidadesOnboarding PeriodicidadePlanoAssociacao[] @default([]) @map("periodicidades_onboarding")
 
+  /// Suporte da plataforma: consentimento DESTA unidade para o super-admin
+  /// operar as configurações reservadas ao owner. Isolado por tenant — a Sede
+  /// não decide pelas unidades nem vice-versa. Só tem efeito quando a unidade
+  /// já tem owner; sem liderança o super-admin opera por padrão (senão a
+  /// unidade fica sem quem configure). Nunca ler direto: usar
+  /// `lib/suporte-plataforma.ts`.
+  suportePlataforma      Boolean   @default(false) @map("suporte_plataforma")
+
+  suportePlataformaDesde DateTime? @map("suporte_plataforma_desde")
+
+  suportePlataformaPorId String?   @map("suporte_plataforma_por_id")
+
   @@map("saas_tenants")
 
 }

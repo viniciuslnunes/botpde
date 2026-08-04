@@ -38,6 +38,7 @@ export function ComunidadeEscopoNavbarOverride({
   escopos,
   modoContexto = 'torcida',
   corPrimariaNacional,
+  tenantAtivoEhUnidade = false,
 }: {
   afiliacao: AfiliacaoBrand | null
   torcidaReal: TorcidaBrand | null
@@ -48,6 +49,8 @@ export function ComunidadeEscopoNavbarOverride({
   modoContexto?: 'nacional' | 'torcida'
   /** Cor do tenant sintético da Comunidade Nacional (paleta do clube). */
   corPrimariaNacional: string | null
+  /** Unidade Caso B ativa: o default do escopo é ela, não a Sede raiz. */
+  tenantAtivoEhUnidade?: boolean
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -57,6 +60,7 @@ export function ComunidadeEscopoNavbarOverride({
     modoContexto,
     escopos,
     searchParams.get('escopo'),
+    { tenantAtivoEhUnidade },
   )
 
   const onCanalDetalhe = CANAL_DETALHE_RE.test(pathname)

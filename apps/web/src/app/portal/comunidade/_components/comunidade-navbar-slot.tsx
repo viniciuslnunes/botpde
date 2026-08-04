@@ -44,6 +44,7 @@ export async function ComunidadeNavbarSlot() {
         escopos={ctx.escopos}
         modoContexto={ctx.modo}
         corPrimariaNacional={corPrimaria}
+        tenantAtivoEhUnidade={ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade)}
       />
       {afiliacao && corPrimaria ? (
         <ComunidadeNacionalPaletaSync

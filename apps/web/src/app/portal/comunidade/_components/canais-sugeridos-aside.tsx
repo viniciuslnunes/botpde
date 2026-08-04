@@ -9,6 +9,7 @@ import { formatNomeTorcida } from '@torcida/types'
 import { entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
+import { nomesEquivalentes } from '@/lib/torcida-labels'
 import {
   linkCanalComunidade,
   type SugestaoCanalAside,
@@ -92,7 +93,9 @@ export function CanaisSugeridosAside({
                   </span>
                   {' · '}
                   {canal.canalOficial ? 'Oficial' : 'Temático'}
-                  {canal.tenantId !== tenantAtualId ? ` · ${tenantNome}` : null}
+                  {canal.tenantId !== tenantAtualId && !nomesEquivalentes(canalNome, tenantNome)
+                    ? ` · ${tenantNome}`
+                    : null}
                 </p>
               </Link>
               {canal.pedidoEnviado ? (

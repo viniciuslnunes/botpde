@@ -166,6 +166,46 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
   `ComunidadeUserCardSection` (`_components/comunidade-user-card-section.tsx`),
   computado por `getComposerContext` — reage ao `tenantId` ativo (troca junto com
   o tenant, inclusive ao abrir um canal de outra unidade).
+  **"Membro" ⇒ departamento (2026-08-03)**: o cargo de sistema `member` é o
+  vínculo base e se chama **"Sócio"** em toda a plataforma — `rotuloCargoSistema`
+  (`packages/types/src/permissions.js`) devolve "Sócio", então `/admin/acessos`,
+  card do membro, lista de perfis e log de acesso já dizem Sócio. "Membro" fica
+  reservado a quem compõe um departamento/área de ofício: só o badge do feed
+  promove o rótulo, via `rotuloCargoBadge(role, tipoSede, { temDepartamento })`
+  (`lib/autor-badges.ts`), quando `resolverDepartamentoBadge` resolve uma área.
+  Quem é `tipo: TORCEDOR` continua "Torcedor" (nunca vira "Sócio"); os demais
+  cargos de sistema não mudam. Não confundir com `PAPEL_DEPARTAMENTO`
+  (Membro/Gestor **dentro** de um departamento), que é outro eixo.
+  **Unidade não repete a torcida (2026-08-03)**: onde torcida e unidade
+  aparecem lado a lado, a unidade some quando não identifica nada além da
+  torcida — dois casos reais: unidade promovida a tenant próprio (Caso B, mesmo
+  nome nos dois: "PDE FIEL BAIXADA - PRAIA GRANDE · PDE PDE FIEL BAIXADA -
+  PRAIA GRANDE") e Sede raiz nomeada a partir da torcida ("CAMISA 12" +
+  "Sede — Camisa 12"). Regra única e pura em `lib/torcida-labels.ts`
+  (client-safe): `unidadeRepeteTorcida` compara os nomes normalizados (caixa,
+  acento, pontuação) e também o **miolo** — só tokens de tipo/ligação
+  (`sede`/`subsede`/`pde`/`ponto`/`encontro`/`unidade`/`de`/`do`/`da`) são
+  descartados nas pontas, então "Sede Santos" numa torcida "Gaviões Santos"
+  continua visível. `formatUnidadeLabel` devolve `null` nesse caso e, quando
+  exibe, não repete o tipo que já está no nome ("PDE PDE Praia Grande").
+  A primitiva é `nomesEquivalentes(a, b)` (`unidadeRepeteTorcida` é o alias de
+  domínio), porque o mesmo choque acontece no **canal oficial**, cujo nome é o
+  da própria unidade. Consumidores:
+  - badge do autor — `formatAutorUnidadeBadge` (`lib/autor-badges-format.ts`) em
+    `feed-post-card.tsx` (compara com `post.tenant.nome` mesmo quando o badge de
+    torcida está oculto) e `videos-reels-feed.tsx`;
+  - sugestão de membro na busca — `busca/membro-sugestao-card.tsx` (sem unidade,
+    cai para a cidade);
+  - canal oficial — subtítulo/rodapé com a torcida em `canais-client.tsx`,
+    `canais/[id]/canal-feed-composition.tsx`, `_components/canais-sugeridos-aside.tsx`
+    e a seção Canais de `busca/busca-membros-client.tsx`.
+
+  Fora do escopo (checado): `PerfilSobre` (campo próprio da aba Sobre, sem
+  torcida ao lado — esconder deixaria a seção sem o dado), chip de tipo em
+  Canais/Loja e a coluna Unidade das listagens admin (dado isolado). A origem
+  "Sede — <Torcida>" vem dos seeds (`seed-torcidas-tenants.js`,
+  `seed-torcidas-nacional.js`, `seed-sedes-onboarding.js`); o onboarding real
+  usa o nome declarado da unidade, então o tratamento é de exibição.
 - **Moderação**: link "Ver post" na fila em `/admin/comunidade/moderacao`.
 
 ## Engajamento e lives (Sprint 5)
@@ -673,3 +713,27 @@ comentários no período vs anterior + interações por dia + denúncias abertas
 membros aprovados). Superfícies: `InsightSection` no hub `/admin/comunidade`
 (gates `COMMUNITY_MANAGE` / `ANNOUNCEMENTS_PUBLISH` respeitados) e seção
 Comunidade em `/admin/relatorios`. Padrões: `docs/frontend/admin-ui-kit.md`.
+
+## Escopo segue o tenant ativo + modo operador (2026-08-03)
+
+Regra única, válida para **toda torcida e unidade**: o escopo default da
+Comunidade é o do **tenant ativo**. Se o portal está numa subsede/PDE promovida
+(Caso B), abre no canal dela; se está na Sede, abre no canal da Sede. Vive em
+`resolverEscopoComunidadePorModo` (`lib/comunidade-escopo.ts`, pura) via
+`tenantAtivoEhUnidade`, e o feed não tem mais regra própria — antes só
+`comunidade/page.tsx` sabia disso e o header trocava de marca ao ir para
+`/canais`.
+
+A aba "Minha unidade" passa a existir também quando o **portal ativo é** a
+unidade (`resolverUnidadeDoTenantAtivo`), não só quando há `SaasMembro.sedeId`.
+Cobre liderança com o membro gravado na Sede e o operador da plataforma.
+
+**Modo operador** = super-admin sem `SaasMembro` APROVADO no tenant ativo
+(`ctx.operador`). Navega tudo em leitura — canais, perfis, posts, sem solicitar
+entrada — e não publica, comenta, reage, salva, segue, entra em canal/grupo nem
+envia DM. Super-admin com vínculo (presidente na própria torcida) **não** é
+operador. Gates em `lib/authz.ts` (`assertVozComunidade` dentro do atalho de
+super-admin, `assertNaoOperador` nas ações da CN) e em
+`resolverContextoEngajamento`. `assertComunidadeNacional` continua livre porque
+também serve leitura (SSE do feed nacional, inbox). UI: `lib/modo-operador.tsx`
+— cosmético, nunca critério de autorização. Ver `ARCHITECTURE.md` §5.19.

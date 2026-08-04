@@ -25,6 +25,11 @@ export type EmitirCarteirinhaParams = {
   atorId: string
   /** Se true, não notifica o sócio (ex.: lote). Default: notifica. */
   silencioso?: boolean
+  /**
+   * Emissão espelhada: tenant de onde a carteirinha veio (origem↔Sede raiz).
+   * Só marca o `AuditLog` — quem propaga é `lib/carteirinha-espelho.ts`.
+   */
+  espelhoDeTenantId?: string
 }
 
 export type EmitirCarteirinhaResultado = {
@@ -124,6 +129,9 @@ export async function emitirCarteirinhaInterna(
         numeroAssociado: numeroRaw,
         auto: Boolean(params.expedidoEm),
         validade: params.validade.toISOString().slice(0, 10),
+        ...(params.espelhoDeTenantId
+          ? { espelho: true, origemTenantId: params.espelhoDeTenantId }
+          : {}),
       },
     },
   })

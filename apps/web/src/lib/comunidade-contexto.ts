@@ -4,7 +4,7 @@ import type { Tenant } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { filtrarTenantsRestritos } from '@/lib/isolamento'
 import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
-import { resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
+import { isSuperAdminEmail, resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
 import {
   COR_PRIMARIA_PLATAFORMA,
@@ -80,6 +80,20 @@ export type ContextoComunidadePortal =
       escopos: EscoposDisponiveis
       torcidaReal?: TorcidaRealComunidade | null
       unidade?: UnidadeComunidade | null
+      /**
+       * Tenant ativo é uma unidade promovida (Caso B), não a Sede raiz —
+       * default do escopo vira `unidade`. Ver `resolverEscopoComunidadePorModo`.
+       */
+      tenantAtivoEhUnidade?: boolean
+      /**
+       * **Modo operador**: super-admin navegando um tenant onde não tem
+       * `SaasMembro` APROVADO. Lê tudo (canais, perfis, posts, sem solicitar
+       * entrada) e **não** escreve nada — publicar/reagir/comentar/salvar/
+       * seguir ficam bloqueados no servidor por `assertVozComunidade` e
+       * `resolverContextoEngajamento`. Super-admin **com** vínculo (o
+       * presidente na própria torcida) não é operador: publica normalmente.
+       */
+      operador?: boolean
     }
   | {
       modo: 'nacional'
@@ -100,7 +114,9 @@ export function resolverEscopoComunidade(
   ctx: ContextoComunidadePortal,
   escopoParam: string | undefined,
 ): EscopoComunidade {
-  return resolverEscopoComunidadePorModo(ctx.modo, ctx.escopos, escopoParam)
+  return resolverEscopoComunidadePorModo(ctx.modo, ctx.escopos, escopoParam, {
+    tenantAtivoEhUnidade: ctx.modo === 'torcida' && ctx.tenantAtivoEhUnidade,
+  })
 }
 
 /**
@@ -175,6 +191,48 @@ const resolverUnidadeDoVinculo = cache(
       nome: sede.nome,
       logoUrl,
     }
+  },
+)
+
+/**
+ * Unidade do **tenant ativo** — quando o portal está numa subsede/PDE promovida
+ * (Caso B), a aba "Minha unidade" é essa, com ou sem `SaasMembro.sedeId`.
+ *
+ * O vínculo sozinho não basta: liderança da unidade cujo membro está gravado na
+ * Sede, e o operador da plataforma (super-admin sem vínculo), ficavam sem a aba
+ * — e a Comunidade caía no canal da raiz, contradizendo o tenant selecionado no
+ * `/admin`. Leitura pura, sem write-on-GET (mesma regra de
+ * `resolverUnidadeDoVinculo`).
+ */
+const resolverUnidadeDoTenantAtivo = cache(
+  async (tenantId: string, tenantSlug: string): Promise<UnidadeComunidade | null> => {
+    const sede: {
+      nome: string
+      canalConversaId: string | null
+      fotoUrl: string | null
+    } | null = await db.sede.findFirst({
+      where: {
+        tenantId,
+        tipo: { in: ['SUBSEDE', 'PONTO_ENCONTRO'] },
+        canalConversaId: { not: null },
+      },
+      orderBy: { criadoEm: 'asc' },
+      select: { nome: true, canalConversaId: true, fotoUrl: true },
+    })
+
+    const canalId = sede?.canalConversaId
+    if (!sede || !canalId) return null
+
+    let logoUrl = sede.fotoUrl
+    if (!logoUrl) {
+      const canal: { avatarUrl: string | null } | null = await db.conversa.findFirst({
+        where: { id: canalId },
+        select: { avatarUrl: true },
+      })
+      logoUrl = canal?.avatarUrl ?? null
+    }
+
+    return { canalId, tenantId, tenantSlug, nome: sede.nome, logoUrl }
   },
 )
 
@@ -274,7 +332,19 @@ export const resolverContextoComunidade = cache(
         select: { id: true },
       })
 
-      if (socioAprovado) {
+      // Operador da plataforma: super-admin sem vínculo APROVADO no tenant
+      // ativo. Entra na comunidade DESSE tenant (o mesmo que ele selecionou no
+      // /admin) em vez de cair na CN do próprio clube, e só lê — a trava de
+      // escrita é servidor-side (`assertVozComunidade`).
+      const superAdmin = isSuperAdminEmail(email)
+      const operador = superAdmin
+        ? !(await db.saasMembro.findFirst({
+            where: { userId, tenantId: tenant.id, status: 'APROVADO', espelhado: false },
+            select: { id: true },
+          }))
+        : false
+
+      if (socioAprovado || operador) {
         let afiliacao: AfiliacaoComunidade | null = null
         if (tenant.afiliacaoId) {
           const raw = await db.afiliacao.findUnique({
@@ -304,21 +374,30 @@ export const resolverContextoComunidade = cache(
           balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
         }
 
-        // Worktree inteira: canônico Caso B está no tenant da PDE; no portal da
-        // Sede o sócio só tem espelho (sem sedeId) — sem a lineage a 3ª aba some.
+        // Tenant ativo é uma unidade promovida? Então a aba "Minha unidade" é a
+        // dele — é o que a pessoa selecionou. Só quando o portal está na raiz a
+        // unidade vem do vínculo (worktree inteira: o canônico Caso B mora no
+        // tenant da PDE e na Sede o sócio só tem espelho, sem sedeId).
+        const tenantAtivoEhUnidade = torcidaReal.id !== portalAtivo.id
         const lineageIds = await getTorcidaLineageTenantIds(torcidaReal.id)
-        const unidade = await resolverUnidadeDoVinculo(userId, lineageIds)
+        const unidade = tenantAtivoEhUnidade
+          ? ((await resolverUnidadeDoTenantAtivo(portalAtivo.id, portalAtivo.slug)) ??
+            (await resolverUnidadeDoVinculo(userId, lineageIds)))
+          : await resolverUnidadeDoVinculo(userId, lineageIds)
 
         return {
           modo: 'torcida',
           tenant: portalAtivo,
           afiliacao,
           tenantSintetico,
-          // Sócio vê a torcida inteira; a aba da unidade só quando ele está
-          // vinculado a uma subsede/PDE com canal.
+          // Sócio vê a torcida inteira; a aba da unidade quando ele está
+          // vinculado a uma subsede/PDE com canal — ou quando o portal ativo
+          // já é essa unidade.
           escopos: { torcida: true, unidade: Boolean(unidade) },
           torcidaReal,
           unidade,
+          tenantAtivoEhUnidade,
+          operador,
         }
       }
       // Sem sócio aprovado: cai no ramo nacional (Timão + PDE) abaixo.

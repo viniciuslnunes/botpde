@@ -1,6 +1,7 @@
 import { db } from '@torcida/db'
 import type { ConfiancaRecomendacao, StatusAlianca } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
+import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 
 /** @deprecated Prefer findAliancaEntreTenants — pares de aliança não são canônicos por UUID. */
 export function normalizeTenantPair(a: string, b: string): [string, string] {
@@ -248,6 +249,70 @@ export function buildCoIrmaRecomendacoes(
   })
 }
 
+interface SedeAncoraRow {
+  tenantId: string | null
+  sede: { tenantId: string | null } | null
+}
+
+/**
+ * Quais desses tenants são UNIDADE de outra torcida (Caso B: subsede/PDE
+ * promovido a tenant próprio) — e portanto não são parte de aliança.
+ *
+ * `promoverSede` copia o `afiliacaoId` da mãe para o tenant novo, então a
+ * unidade cai em toda query por clube e apareceria como "co-irmã". Aliança é
+ * vínculo entre TORCIDAS (raiz da worktree); unidade herda o vínculo da sede.
+ *
+ * Detecção: alguma Sede do tenant pendurada numa Sede de OUTRO tenant — a
+ * âncora que `promoverSede` deixa. Sedes internas (subsede/PDE no mesmo
+ * tenant) apontam para uma Sede do próprio tenant e não contam.
+ */
+export function unidadesEntreTenants(sedes: SedeAncoraRow[]): Set<string> {
+  const unidades = new Set<string>()
+  for (const sede of sedes) {
+    const paiTenantId = sede.sede?.tenantId ?? null
+    if (sede.tenantId && paiTenantId && paiTenantId !== sede.tenantId) {
+      unidades.add(sede.tenantId)
+    }
+  }
+  return unidades
+}
+
+/** Candidatos elegíveis a aliança/co-irmã: nem unidade, nem da própria worktree. */
+export function filtrarTorcidasElegiveis<T extends { id: string }>(
+  candidatos: T[],
+  unidadeIds: Set<string>,
+  linhagemIds: Set<string>,
+): T[] {
+  return candidatos.filter((c: T) => !unidadeIds.has(c.id) && !linhagemIds.has(c.id))
+}
+
+async function carregarUnidadeIds(tenantIds: string[]): Promise<Set<string>> {
+  if (tenantIds.length === 0) return new Set()
+
+  const sedes: SedeAncoraRow[] = await db.sede.findMany({
+    where: { tenantId: { in: tenantIds }, sedeId: { not: null } },
+    select: { tenantId: true, sede: { select: { tenantId: true } } },
+  })
+  return unidadesEntreTenants(sedes)
+}
+
+/**
+ * Remove da lista quem não pode ser parte de uma aliança vista por `tenantId`:
+ * unidades promovidas (Caso B) e a própria worktree (ancestrais/descendentes).
+ */
+export async function filtrarTenantsDeAlianca<T extends { id: string }>(
+  tenantId: string,
+  candidatos: T[],
+): Promise<T[]> {
+  if (candidatos.length === 0) return []
+
+  const [unidadeIds, linhagem]: [Set<string>, string[]] = await Promise.all([
+    carregarUnidadeIds(candidatos.map((c: T) => c.id)),
+    getTorcidaLineageTenantIds(tenantId),
+  ])
+  return filtrarTorcidasElegiveis(candidatos, unidadeIds, new Set(linhagem))
+}
+
 export async function listRecomendacoesForTenant(
   tenantId: string,
 ): Promise<RecomendacaoAliancaListItem[]> {
@@ -320,37 +385,52 @@ export async function listRecomendacoesForTenant(
     }
   }
 
-  /** Omitir da lista de aliadas quem é co-irmã (mesmo clube). */
-  const sameClubIds = new Set<string>()
+  type CoIrmaRow = TenantLogoRow & { afiliacao: { nome: string } | null }
 
-  let coIrmaItems: RecomendacaoAliancaListItem[] = []
+  let coirmasRaw: CoIrmaRow[] = []
   if (me?.afiliacaoId) {
-    const coirmas: Array<TenantLogoRow & { afiliacao: { nome: string } | null }> =
-      await db.tenant.findMany({
-        where: {
-          ativo: true,
-          sintetico: false,
-          afiliacaoId: me.afiliacaoId,
-          id: { not: tenantId },
-        },
-        orderBy: { nome: 'asc' },
-        select: {
-          ...TENANT_LITE_SELECT,
-          afiliacao: { select: { nome: true } },
-        },
-      })
-    for (const c of coirmas) sameClubIds.add(c.id)
-    coIrmaItems = buildCoIrmaRecomendacoes(
-      tenantId,
-      coirmas.map((c) => ({
-        id: c.id,
-        nome: c.nome,
-        slug: c.slug,
-        afiliacaoNome: c.afiliacao?.nome ?? null,
-        logoUrl: resolveTenantLogoUrl(c),
-      })),
-    )
+    coirmasRaw = await db.tenant.findMany({
+      where: {
+        ativo: true,
+        sintetico: false,
+        afiliacaoId: me.afiliacaoId,
+        id: { not: tenantId },
+      },
+      orderBy: { nome: 'asc' },
+      select: {
+        ...TENANT_LITE_SELECT,
+        afiliacao: { select: { nome: true } },
+      },
+    })
   }
+
+  // O `where` acima só sabe de clube: unidade promovida (Caso B) herda o
+  // `afiliacaoId` da mãe e entraria como "co-irmã", assim como as unidades da
+  // própria worktree. Aliança é vínculo entre torcidas — unidade herda o da
+  // sede. Uma consulta cobre co-irmãs e sugestões mapeadas.
+  const [unidadeIds, linhagem]: [Set<string>, string[]] = await Promise.all([
+    carregarUnidadeIds(
+      Array.from(new Set([...coirmasRaw.map((c: CoIrmaRow) => c.id), ...tenantsById.keys()])),
+    ),
+    getTorcidaLineageTenantIds(tenantId),
+  ])
+  const linhagemIds = new Set(linhagem)
+
+  const coirmas: CoIrmaRow[] = filtrarTorcidasElegiveis(coirmasRaw, unidadeIds, linhagemIds)
+
+  /** Omitir da lista de aliadas quem é co-irmã (mesmo clube). */
+  const sameClubIds = new Set<string>(coirmas.map((c: CoIrmaRow) => c.id))
+
+  const coIrmaItems: RecomendacaoAliancaListItem[] = buildCoIrmaRecomendacoes(
+    tenantId,
+    coirmas.map((c: CoIrmaRow) => ({
+      id: c.id,
+      nome: c.nome,
+      slug: c.slug,
+      afiliacaoNome: c.afiliacao?.nome ?? null,
+      logoUrl: resolveTenantLogoUrl(c),
+    })),
+  )
 
   const mapped: RecomendacaoAliancaListItem[] = recomendacoes
     .map((item: RecomendacaoAliancaRow) => {
@@ -377,8 +457,12 @@ export async function listRecomendacoesForTenant(
       }
     })
     .filter((item: RecomendacaoAliancaListItem) => {
+      if (!item.tenantSugeridoId) return true
       // Seed legado / erro: não mostrar “aliada” quem é do mesmo clube.
-      if (item.tenantSugeridoId && sameClubIds.has(item.tenantSugeridoId)) return false
+      if (sameClubIds.has(item.tenantSugeridoId)) return false
+      // Nem unidade de outra torcida, nem a própria worktree.
+      if (unidadeIds.has(item.tenantSugeridoId)) return false
+      if (linhagemIds.has(item.tenantSugeridoId)) return false
       return true
     })
 

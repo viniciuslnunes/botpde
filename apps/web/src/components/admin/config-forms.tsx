@@ -31,6 +31,7 @@ import {
   salvarSolicitarPendenciasCadastro,
   salvarPropagarPendenciasCadastroUnidades,
   salvarPeriodicidadesOnboarding,
+  salvarSuportePlataforma,
   salvarCanalOficial,
   criarRole,
   atualizarRole,
@@ -571,6 +572,95 @@ export function PropagarPendenciasCadastroForm({
           </span>
         </span>
       </label>
+    </div>
+  )
+}
+
+// ── Suporte da plataforma ─────────────────────────────────────────────────────
+
+interface SuportePlataformaFormProps {
+  ativo: boolean
+  /** Nome da unidade/canal atual — a chave é isolada por unidade. */
+  unidadeNome: string
+  /**
+   * Só o owner edita. Super-admin (ou quem chegou aqui sem o cargo) vê o
+   * estado, nunca o controle — consentimento não se autoconcede.
+   */
+  somenteLeitura?: boolean
+}
+
+/**
+ * Consentimento desta unidade para o suporte da plataforma operar as
+ * configurações reservadas ao presidente.
+ */
+export function SuportePlataformaForm({
+  ativo: inicial,
+  unidadeNome,
+  somenteLeitura = false,
+}: SuportePlataformaFormProps) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(inicial)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('suportePlataforma', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarSuportePlataforma(fd), {
+        success: next
+          ? `Suporte da plataforma liberado em ${unidadeNome}.`
+          : `Suporte da plataforma bloqueado em ${unidadeNome}.`,
+      })
+      if (!ok) {
+        setAtivo(!next)
+        return
+      }
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Quando ligado, a equipe da plataforma pode alterar as configurações
+        marcadas como{' '}
+        <strong className="font-semibold text-[rgb(var(--foreground))]">Somente owner</strong> em{' '}
+        <strong className="font-semibold text-[rgb(var(--foreground))]">{unidadeNome}</strong> —
+        para ajudar na configuração inicial ou destravar um ajuste. Tudo que a
+        plataforma fizer fica registrado na auditoria desta unidade. Vale só
+        aqui: Sede e cada subsede/PDE têm a própria chave.
+      </p>
+
+      {somenteLeitura ? (
+        <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+          {ativo
+            ? 'A liderança desta unidade liberou o suporte da plataforma.'
+            : 'A liderança desta unidade não liberou o suporte da plataforma. Só o presidente pode alterar esta chave.'}
+        </p>
+      ) : (
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+          <input
+            type="checkbox"
+            checked={ativo}
+            disabled={pending}
+            onChange={(e) => salvar(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+              Permitir que a plataforma me ajude nas configurações
+            </span>
+            <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+              {pending
+                ? 'Salvando…'
+                : ativo
+                  ? 'Liberado — a plataforma pode ajustar as configurações de presidente nesta unidade'
+                  : 'Bloqueado — só o presidente desta unidade altera essas configurações'}
+            </span>
+          </span>
+        </label>
+      )}
     </div>
   )
 }

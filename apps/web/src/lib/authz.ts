@@ -78,6 +78,74 @@ async function podePublicarComoTorcedorFeed(
 }
 
 /**
+ * Permissões que dão **voz** na Comunidade — publicar, comentar, reagir,
+ * mensagens, grupos/canais. O super-admin passa por cima do RBAC por tenant
+ * (é a definição do papel), mas voz não é operação: quem opera uma torcida
+ * onde não é sócio lê tudo e não fala. Ver `assertVozComunidade`.
+ */
+const PERMISSOES_VOZ_COMUNIDADE: ReadonlySet<string> = new Set([
+  PERMISSIONS.COMMUNITY_POST,
+  PERMISSIONS.MESSAGES_SEND,
+  PERMISSIONS.GROUPS_CREATE,
+])
+
+export const ERRO_MODO_OPERADOR =
+  'Modo operador: você navega esta torcida como super-admin da plataforma e não pode publicar, comentar ou reagir aqui.'
+
+/**
+ * Operador da plataforma: super-admin **sem** `SaasMembro` APROVADO no tenant
+ * em questão. Super-admin com vínculo (o presidente na própria torcida) não é
+ * operador — segue publicando normalmente.
+ */
+export async function ehOperadorPlataforma(
+  userId: string,
+  email: string | null | undefined,
+  tenantId: string,
+): Promise<boolean> {
+  if (!isSuperAdminEmail(email)) return false
+
+  const membro: { id: string } | null = await db.saasMembro.findFirst({
+    where: { userId, tenantId, status: 'APROVADO', espelhado: false },
+    select: { id: true },
+  })
+  return !membro
+}
+
+/**
+ * Barra escrita quando o portal ativo está em modo operador. Use nas ações
+ * que **não** passam por `assertPermission` — as da Comunidade Nacional, que
+ * não têm RBAC por tenant (`assertComunidadeNacional` continua livre porque
+ * também serve leitura: SSE do feed nacional, inbox de mensagens).
+ */
+export async function assertNaoOperador(): Promise<void> {
+  const session = await auth()
+  if (!session?.user?.id || !isSuperAdminEmail(session.user.email)) return
+
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) return
+  if (await ehOperadorPlataforma(session.user.id, session.user.email, tenant.id)) {
+    throw new Error(ERRO_MODO_OPERADOR)
+  }
+}
+
+/**
+ * Trava de voz do modo operador. Aplicada **dentro** do atalho de super-admin
+ * de `assertPermission`/`assertAnyPermission`: um único ponto cobre todas as
+ * Server Actions da Comunidade (post, comentário, enquete, story, repost,
+ * grupo, canal, DM) sem afetar o resto do admin, onde o bypass continua igual.
+ */
+async function assertVozComunidade(
+  session: Session,
+  tenantId: string,
+  permissoes: string[],
+): Promise<void> {
+  if (!permissoes.some((p) => PERMISSOES_VOZ_COMUNIDADE.has(p))) return
+  if (await ehOperadorPlataforma(session.user.id, session.user.email, tenantId)) {
+    throw new Error(ERRO_MODO_OPERADOR)
+  }
+}
+
+/**
  * Sessão + tenant resolvidos, com o usuário logado tendo a permissão efetiva
  * indicada (perfil ou permissão adicional) no tenant atual. Único critério de
  * autorização do admin — não exige cargo de sistema, funciona com perfis
@@ -91,6 +159,7 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
   if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
+    await assertVozComunidade(session, tenant.id, [permission])
     return { session, tenant, isSuperAdmin: true }
   }
 
@@ -143,6 +212,7 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
   if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
+    await assertVozComunidade(session, tenant.id, permissions)
     return { session, tenant, isSuperAdmin: true }
   }
 
@@ -305,6 +375,32 @@ export async function assertTenantOwner(userId: string, tenantId: string): Promi
   if (!ownerRole) throw new Error('Apenas o owner pode alterar esta configuração')
 }
 
+/**
+ * Igual a `assertTenantOwner`, mas abre exceção para o super-admin quando a
+ * unidade autoriza o suporte da plataforma (ou ainda não tem liderança).
+ *
+ * Use em toda configuração marcada como "Somente owner": `assertPermission`
+ * deixa o super-admin passar, mas `assertTenantOwner` não — sem este caminho o
+ * super-admin enxerga o formulário e a gravação estoura. Regra e motivação em
+ * `lib/suporte-plataforma.ts`.
+ */
+export async function assertOwnerOuSuportePlataforma(
+  ctx: Pick<AuthzResult, 'isSuperAdmin'> & { session: Session; tenant: Pick<Tenant, 'id'> },
+): Promise<void> {
+  if (!ctx.isSuperAdmin) {
+    await assertTenantOwner(ctx.session.user.id, ctx.tenant.id)
+    return
+  }
+
+  const { getEstadoSuportePlataforma } = await import('@/lib/suporte-plataforma')
+  const estado = await getEstadoSuportePlataforma(ctx.tenant.id)
+  if (!estado.superAdminPodeOperar) {
+    throw new Error(
+      'Esta unidade tem liderança própria e não autorizou o suporte da plataforma. Peça ao presidente para ligar “Suporte da plataforma” nas configurações desta unidade.',
+    )
+  }
+}
+
 /** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */
 export async function assertStoreView(): Promise<AuthzResult> {
   const session = await auth()
@@ -376,6 +472,9 @@ export async function assertAutorPublicacaoPost(
   if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
+    if (await ehOperadorPlataforma(session.user.id, session.user.email, tenant.id)) {
+      throw new Error(ERRO_MODO_OPERADOR)
+    }
     return { session, tenant }
   }
 

@@ -54,8 +54,19 @@ export function escolherCargoPrincipal(roles: RoleBadgeLite[]): RoleBadgeLite | 
   })[0]!
 }
 
-export function rotuloCargoBadge(role: RoleBadgeLite, tipoSede: TipoSede): string {
-  return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
+/**
+ * "Membro" só faz sentido quando a pessoa compõe algum departamento (ofício).
+ * Sem área, o cargo de sistema `member` é "Sócio" — o vínculo real dela com a
+ * torcida, e já o rótulo padrão de `rotuloCargoSistema`. Demais cargos não mudam.
+ */
+export function rotuloCargoBadge(
+  role: RoleBadgeLite,
+  tipoSede: TipoSede,
+  opts?: { temDepartamento?: boolean },
+): string {
+  if (!role.isSystem) return role.nome
+  if (role.nome === SYSTEM_ROLES.MEMBER && opts?.temDepartamento) return 'Membro'
+  return rotuloCargoSistema(role.nome, tipoSede)
 }
 
 /**
@@ -224,19 +235,24 @@ async function carregarBadgesPorAutorTenant(
       .map((m) => m.departamento.nome)
       .filter((nome, i, arr) => arr.indexOf(nome) === i)
 
-    let cargoNome = principal ? rotuloCargoBadge(principal, tipoSede) : null
-    if (!cargoNome && membro?.tipo === 'TORCEDOR') {
+    const departamentoNome = resolverDepartamentoBadge({
+      memberships: deptoNomes,
+      roleDepartamento: principal?.departamentoNome ?? null,
+      preferencia: membro?.departamento?.nome ?? null,
+    })
+
+    let cargoNome = principal
+      ? rotuloCargoBadge(principal, tipoSede, { temDepartamento: departamentoNome != null })
+      : null
+    // Quem não é sócio não vira "Sócio" pelo cargo base de sistema.
+    if (membro?.tipo === 'TORCEDOR' && (!cargoNome || cargoNome === 'Sócio')) {
       cargoNome = 'Torcedor'
     }
 
     map.set(chave(p.autorId, p.tenantId), {
       sedeNome: membro?.sede?.nome ?? null,
       cargoNome,
-      departamentoNome: resolverDepartamentoBadge({
-        memberships: deptoNomes,
-        roleDepartamento: principal?.departamentoNome ?? null,
-        preferencia: membro?.departamento?.nome ?? null,
-      }),
+      departamentoNome,
     })
   }
   return map

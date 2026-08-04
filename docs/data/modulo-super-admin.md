@@ -80,6 +80,34 @@ ganharam bypass de leitura para super admin, sem exigir associação real:
   Criar/moderar mídia/encerrar sala já funcionavam via `assertPermission`
   (RBAC tem bypass próprio) — não mudou.
 
+## Suporte da plataforma — configurações “Somente owner” (2026-08-03)
+
+Entrar numa torcida não dá ao super admin as configurações reservadas ao
+presidente. `assertPermission` tem bypass, mas `assertTenantOwner` sempre foi um
+gate à parte — o super admin via o formulário em `/admin/configuracoes` e a
+gravação estourava com “Apenas o owner pode alterar esta configuração”.
+
+Regra atual, **isolada por unidade** (`Tenant.suportePlataforma`, sempre lido
+por `apps/web/src/lib/suporte-plataforma.ts` — nunca o campo direto):
+
+| Estado da unidade | Super admin edita as seções “Somente owner”? |
+| --- | --- |
+| Sem ninguém com cargo `owner` | **Sim** — não há quem configure a unidade |
+| Com owner, suporte desligado (default) | Não — erro pedindo a liberação |
+| Com owner, suporte ligado pela liderança | **Sim** |
+
+- Gate único: `assertOwnerOuSuportePlataforma` (`lib/authz.ts`), usado por todas
+  as ações “Somente owner” de `admin/(plataforma)/configuracoes/actions.ts`.
+- Toggle: `salvarSuportePlataforma`, gate `assertTenantOwner` **estrito** — o
+  super admin não liga a própria chave; ele só vê o estado (read-only) na seção
+  `#suporte-plataforma`. Ligar/desligar grava `SUPORTE_PLATAFORMA_ATIVADO` /
+  `SUPORTE_PLATAFORMA_DESATIVADO` no `AuditLog` da unidade.
+- Escopo: cada tenant tem a própria chave. Ligar na Sede não libera nenhuma
+  subsede/PDE, e vice-versa.
+- UI: seção que o usuário não pode gerir **não aparece** — ver
+  `ARCHITECTURE.md` §5.18. Invariantes:
+  `apps/web/src/lib/__tests__/suporte-plataforma.test.ts`.
+
 ## Pendências conhecidas
 
 - **LGPD — exclusão/anonimização de conta (fase 2)**: só existe exportação

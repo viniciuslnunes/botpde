@@ -1222,6 +1222,79 @@ RSVP, cobrança AVULSA e check-in continuam trilhos separados. Com
 Regras puras em `packages/types/src/caravana-embarque.js`. Spec:
 `docs/data/modulo-caravanas.md`.
 
+### 5.18 Suporte da plataforma — consentimento por unidade (2026-08-03)
+
+`assertPermission` sempre deixou o super-admin passar, mas `assertTenantOwner`
+não: as configurações marcadas “Somente owner” em `/admin/configuracoes`
+(perfil, afiliação, canal oficial, Discord, hierarquia visível, documentos do
+cadastro, periodicidades, canal restrito) exigem o cargo de sistema `owner` no
+tenant. O efeito era o pior dos dois mundos — o super-admin via o formulário e
+a gravação estourava.
+
+A regra agora é explícita e **isolada por tenant** (`Tenant.suportePlataforma`,
+lido só via `lib/suporte-plataforma.ts`):
+
+- unidade **sem owner**: o super-admin opera — senão não há quem configure a
+  unidade recém-criada;
+- unidade **com owner**: só opera se a liderança tiver ligado o consentimento
+  em `/admin/configuracoes#suporte-plataforma`.
+
+O gate único é `assertOwnerOuSuportePlataforma` (`lib/authz.ts`), aplicado em
+**todas** as ações “Somente owner” — inclusive `salvarPerfilTenant`,
+`salvarCanalOficial` e `salvarDiscordGuildId`, que exibiam o selo sem gate no
+servidor. O toggle em si usa `assertTenantOwner` **estrito**: quem se beneficia
+do acesso não se autoconcede o acesso, então o super-admin nunca liga a própria
+chave. Chaves da Sede e das unidades são independentes — ligar na Sede não liga
+em nenhum PDE.
+
+Consequência de UI: seção que o usuário não pode gerir **não é renderizada**
+(antes vinha um card opaco explicando o bloqueio). `ConfigSectionCard` perdeu a
+prop `blocked`; `podeEditarConfigDeOwner` em `_lib/contexto.ts` é a fonte única,
+e espelha exatamente o que a Server Action recusaria. Invariantes em
+`lib/__tests__/suporte-plataforma.test.ts`.
+
+### 5.19 Comunidade segue o tenant ativo + modo operador (2026-08-03)
+
+Duas verdades conviviam no portal: o `/admin` respeitava o tenant ativo (cookie
+`torcida_ctx`) e a Comunidade sempre subia para a **raiz da worktree**
+(`projetarTorcidaOrganizada`). Com a PDE selecionada, o feed mostrava o canal da
+Sede, e a marca do header trocava ao sair do feed para `/canais` — o feed tinha
+uma regra local (`portalEhUnidadeCasoB`, por comparação de slug) que nenhuma
+outra rota conhecia.
+
+**Fonte única = tenant ativo.** A regra passou para
+`resolverEscopoComunidadePorModo` (pura, `lib/comunidade-escopo.ts`), que ganhou
+`tenantAtivoEhUnidade`: tenant ativo ≠ raiz e com aba de unidade → default
+`unidade`. Feed, navbar, rail, canais, busca, grupos e salas resolvem pelo mesmo
+ponto. A unidade também deixou de depender só do vínculo: quando o portal ativo
+**é** a unidade Caso B, ela vem do próprio tenant
+(`resolverUnidadeDoTenantAtivo`, leitura pura, sem write-on-GET) — antes,
+liderança com o `SaasMembro` gravado na Sede e o operador da plataforma ficavam
+sem a aba, e a Comunidade caía na raiz.
+
+**Modo operador** (`ContextoComunidadePortal.operador`): super-admin **sem**
+`SaasMembro` APROVADO no tenant ativo. Lê tudo — canais, perfis, posts, sem
+solicitar entrada (`podeVerFeedSocios` já o deixava passar) — e **não** escreve
+nada. Super-admin *com* vínculo (o presidente na própria torcida) não é
+operador e publica normalmente. O gate fica em `lib/authz.ts`:
+
+- `assertVozComunidade` roda **dentro** do atalho de super-admin de
+  `assertPermission`/`assertAnyPermission` e recusa `community:post`,
+  `messages:send` e `groups:create` — um ponto cobre as ~40 Server Actions da
+  Comunidade sem tocar o resto do admin, onde o bypass continua igual;
+- `assertNaoOperador` cobre o que não passa por RBAC (Comunidade Nacional:
+  publicar, criar grupo/sala, entrar em grupo/canal, enviar DM). É obrigatório
+  nas ações com `try { assertPermission } catch { assertComunidadeNacional }` —
+  sem ele a recusa cairia justamente no `catch` e a ação passaria;
+- `resolverContextoEngajamento` recusa reagir/comentar/salvar antes do fallback
+  “engaja como CN do clube”;
+- `assertComunidadeNacional` segue **livre**: também serve leitura (SSE do feed
+  nacional, inbox de mensagens).
+
+UI é só cosmética: `ModoOperadorProvider` (`lib/modo-operador.tsx`, montado em
+`portal/layout.tsx`) desabilita curtir/salvar/compartilhar e o campo de
+comentário. Nunca é critério de autorização.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o

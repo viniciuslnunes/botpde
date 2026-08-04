@@ -39,14 +39,29 @@ export function ehEscopoNacional(escopo: EscopoComunidade): boolean {
  *
  * - Modo nacional (TORCEDOR) → default nacional
  * - Modo torcida (sócio) → default torcida, quando tem a aba
+ * - Modo torcida com **unidade ativa** → default unidade: o tenant ativo é a
+ *   fonte única. Quem selecionou a PDE (liderança da unidade Caso B ou
+ *   operador da plataforma) tem que cair no canal dela, não no da Sede —
+ *   senão o portal fica com duas verdades (admin na unidade, comunidade na
+ *   raiz) e a marca do header troca de rota em rota.
  */
 export function resolverEscopoComunidadePorModo(
   modo: 'nacional' | 'torcida',
   disponiveis: EscoposDisponiveis,
   escopoParam: string | undefined | null,
+  opcoes?: {
+    /** Tenant ativo é uma subsede/PDE promovida (Caso B), não a Sede raiz. */
+    tenantAtivoEhUnidade?: boolean
+  },
 ): EscopoComunidade {
   const padrao: EscopoComunidade =
-    modo === 'torcida' && disponiveis.torcida ? 'torcida' : 'nacional'
+    modo === 'torcida'
+      ? opcoes?.tenantAtivoEhUnidade && disponiveis.unidade
+        ? 'unidade'
+        : disponiveis.torcida
+          ? 'torcida'
+          : 'nacional'
+      : 'nacional'
 
   if (!ehEscopo(escopoParam)) return padrao
   if (escopoParam === 'torcida' && !disponiveis.torcida) return padrao

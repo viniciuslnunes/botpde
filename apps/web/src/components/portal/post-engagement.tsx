@@ -15,6 +15,7 @@ import {
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import { AVISO_MODO_OPERADOR, useModoOperador } from '@/lib/modo-operador'
 import {
   paraTextoLegivel,
   podarMencoes,
@@ -76,6 +77,7 @@ function EngajamentoBtn({
   activeTransition?: Transition
   /** Keyframes de ativação (default: `scale: [1, 1.08, 1]`). */
   activeAnimate?: TargetAndTransition
+  title?: string
   'aria-label'?: string
   'aria-pressed'?: boolean
   'aria-expanded'?: boolean
@@ -125,6 +127,9 @@ export function PostEngagement({
   const [comentarioRepost, setComentarioRepost] = useState('')
   const [motivo, setMotivo] = useState('')
   const [pending, startTransition] = useTransition()
+  // Operador (super-admin sem vínculo) lê o post e não engaja — o servidor já
+  // recusa; aqui só evitamos o clique que vira erro.
+  const operador = useModoOperador()
   const inputRef = useRef<HTMLInputElement>(null)
   const comentarioCampoRef = useRef<HTMLDivElement>(null)
   const comentariosCarregadosRef = useRef(false)
@@ -375,7 +380,8 @@ export function PostEngagement({
 
       <div className="flex flex-wrap items-center gap-1 border-t border-[rgb(var(--border))] pt-2">
         <EngajamentoBtn
-          disabled={pending}
+          disabled={pending || operador}
+          title={operador ? AVISO_MODO_OPERADOR : undefined}
           active={reacao === 'CURTIR'}
           onClick={() => handleReacao('CURTIR')}
           aria-pressed={reacao === 'CURTIR'}
@@ -419,7 +425,7 @@ export function PostEngagement({
           <MessageCircle className="h-4 w-4" />
           {comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
         </EngajamentoBtn>
-        {!isRepost && podeCompartilhar && (
+        {!isRepost && podeCompartilhar && !operador && (
           <EngajamentoBtn
             active={repostando || compartilhado}
             onClick={() => setRepostando((v) => !v)}
@@ -444,6 +450,8 @@ export function PostEngagement({
         )}
         <EngajamentoBtn
           active={salvo}
+          disabled={operador}
+          title={operador ? AVISO_MODO_OPERADOR : undefined}
           activeTransition={bookmarkDrop}
           activeAnimate={{ scale: [1, 1.15, 1], y: [0, -3, 0] }}
           onClick={toggleSalvar}
@@ -614,7 +622,13 @@ export function PostEngagement({
               })}
             </m.div>
 
-            {comentariosAbertos && (
+            {comentariosAbertos && operador && (
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                {AVISO_MODO_OPERADOR}
+              </p>
+            )}
+
+            {comentariosAbertos && !operador && (
               <form onSubmit={enviarComentario} className="flex items-center gap-2">
                 <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
                 <div ref={comentarioCampoRef} className="relative min-w-0 flex-1">

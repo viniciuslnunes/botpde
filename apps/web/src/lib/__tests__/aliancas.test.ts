@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RecomendacaoAliancaListItem } from '@/lib/aliancas'
-import { buildCoIrmaRecomendacoes, confiancaRank, filterAndSortRecomendacoes } from '@/lib/aliancas'
+import {
+  buildCoIrmaRecomendacoes,
+  confiancaRank,
+  filterAndSortRecomendacoes,
+  filtrarTorcidasElegiveis,
+  unidadesEntreTenants,
+} from '@/lib/aliancas'
 
 function rec(
   overrides: Partial<RecomendacaoAliancaListItem> &
@@ -93,6 +99,37 @@ describe('buildCoIrmaRecomendacoes', () => {
     expect(items[0]?.fonte).toBe('Mesmo time (CORINTHIANS)')
     expect(items[0]?.observacao).toBeNull()
     expect(items[0]?.tenantSugeridoLogoUrl).toBe('https://example.com/camisa12.png')
+  })
+})
+
+describe('unidadesEntreTenants', () => {
+  it('marca como unidade quem tem Sede pendurada em Sede de outro tenant (Caso B)', () => {
+    const unidades = unidadesEntreTenants([
+      // PDE promovido: âncora sob a Sede da mãe.
+      { tenantId: 'pde-baixada', sede: { tenantId: 'gavioes' } },
+      // Subsede interna da própria torcida: pai no mesmo tenant.
+      { tenantId: 'gavioes', sede: { tenantId: 'gavioes' } },
+      // Sede-mãe fora da plataforma: sem tenant, não define unidade.
+      { tenantId: 'camisa-12', sede: { tenantId: null } },
+    ])
+    expect(unidades).toEqual(new Set(['pde-baixada']))
+  })
+})
+
+describe('filtrarTorcidasElegiveis', () => {
+  it('descarta unidade promovida e a própria worktree', () => {
+    const candidatos = [
+      { id: 'camisa-12' },
+      { id: 'pde-baixada' },
+      { id: 'minha-subsede' },
+      { id: 'coringao-chopp' },
+    ]
+    const elegiveis = filtrarTorcidasElegiveis(
+      candidatos,
+      new Set(['pde-baixada']),
+      new Set(['gavioes', 'minha-subsede']),
+    )
+    expect(elegiveis.map((t) => t.id)).toEqual(['camisa-12', 'coringao-chopp'])
   })
 })
 

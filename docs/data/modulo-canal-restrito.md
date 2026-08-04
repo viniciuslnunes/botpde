@@ -160,11 +160,15 @@ grupos herdam de `getVisibleTenantIds` — sem código novo.
 
 | Ação | Onde | Gate |
 |---|---|---|
-| `ativarCanalRestrito` | `/admin/configuracoes` | `SETTINGS_MANAGE` + `assertTenantOwner` |
+| `ativarCanalRestrito` | `/admin/configuracoes` | `SETTINGS_MANAGE` + `assertOwnerOuSuportePlataforma` |
 | `desativarCanalRestrito` | `/admin/configuracoes` | idem |
 | `responderReativacaoCanal` | `/admin/configuracoes` | idem |
 | `solicitarReativacaoCanal` | `/admin/sedes` | `assertPresidenteGlobal` + alvo ∈ descendentes |
 | `imporReativacaoCanal` | `/admin/sedes` | `assertPresidenteGlobal` + `assertTenantOwner` + motivo |
+
+`assertOwnerOuSuportePlataforma` = owner da unidade, ou super-admin quando a
+unidade liberou o suporte da plataforma (ou ainda não tem liderança). Ver
+`ARCHITECTURE.md` §5.18 e `docs/data/modulo-super-admin.md`.
 
 Cron: `/api/cron/canal-restrito-expiracao` (`CRON_SECRET`, idempotente) —
 **materializa** a expiração (flag, status, `AuditLog`, notificações). Não é o que

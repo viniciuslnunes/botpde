@@ -6,6 +6,11 @@ import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { emitirCarteirinhaInterna } from '@/lib/carteirinha-emissao'
+import {
+  espelharCarteirinhaDoTenant,
+  espelharRenovacaoCarteirinha,
+  espelharRevogacaoCarteirinha,
+} from '@/lib/carteirinha-espelho'
 import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -73,6 +78,13 @@ export async function emitirCarteirinha(formData: FormData) {
   })
   if (resultado.jaExistia) throw new Error('Este membro já possui carteirinha')
 
+  // Mesmo sócio nos dois níveis: replica no gêmeo (unidade↔Sede raiz).
+  await espelharCarteirinhaDoTenant({
+    tenantId: tenant.id,
+    userId,
+    atorId: session.user.id,
+  })
+
   await notificarSafe({
     userId,
     tenantId: tenant.id,
@@ -117,6 +129,14 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
       entidadeId: socio.id,
       detalhes: { novaValidade: parsed.data.novaValidade },
     },
+  })
+
+  // A validade não pode divergir entre unidade e Sede — é a mesma carteirinha.
+  await espelharRenovacaoCarteirinha({
+    tenantId: tenant.id,
+    userId: socio.userId,
+    validade,
+    atorId: session.user.id,
   })
 
   await notificarSafe({
@@ -240,6 +260,13 @@ export async function revogarCarteirinha(socioId: string) {
       entidadeId: socio.id,
       detalhes: { nome: socio.nome, numeroSocio: socio.numeroSocio },
     },
+  })
+
+  // Revogar de um lado só deixaria o `numeroSocio` preso no outro tenant.
+  await espelharRevogacaoCarteirinha({
+    tenantId: tenant.id,
+    userId: socio.userId,
+    atorId: session.user.id,
   })
 
   await notificarSafe({

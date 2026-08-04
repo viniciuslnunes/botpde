@@ -5,7 +5,7 @@ import { m } from 'motion/react'
 import { FileText, Lock, MapPin, Users } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
-import { labelTipoUnidade } from '@/lib/canais-shared'
+import { formatUnidadeLabel } from '@/lib/torcida-labels'
 import { menuItemStagger } from '@/lib/motion-presets'
 import type { SugestaoMembroBusca } from '@/lib/comunidade-busca'
 
@@ -17,9 +17,15 @@ function formatContagem(n: number): string {
 
 function subtituloMembro(membro: SugestaoMembroBusca): string {
   const partes: string[] = [membro.tenantNome]
-  if (membro.unidadeNome) {
-    const tipo = membro.unidadeTipo ? labelTipoUnidade(membro.unidadeTipo) : 'Unidade'
-    partes.push(`${tipo} ${membro.unidadeNome}`)
+  // Unidade só entra quando não repete a torcida (Caso B / "Sede — <Torcida>");
+  // sem ela, a cidade é o dado de origem que sobra.
+  const unidade = formatUnidadeLabel({
+    nome: membro.unidadeNome,
+    tipo: membro.unidadeTipo,
+    torcidaNome: membro.tenantNome,
+  })
+  if (unidade) {
+    partes.push(unidade)
   } else if (membro.cidade) {
     partes.push(membro.cidade)
   }

@@ -47,6 +47,7 @@ import {
   linkCanalComunidade,
   type CanalItem,
 } from '@/lib/canais-shared'
+import { nomesEquivalentes } from '@/lib/torcida-labels'
 
 /** Mesma chave do explorer de sedes — localização persiste entre telas do portal. */
 const GEO_STORAGE_KEY = 'portal:sedes:geo'
@@ -808,7 +809,7 @@ function CanalCard({
                 />
                 <span className="truncate">{local}</span>
               </p>
-            ) : (
+            ) : nomesEquivalentes(canalNome, tenantNome) ? null : (
               <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
             )}
             {distLabel ? (

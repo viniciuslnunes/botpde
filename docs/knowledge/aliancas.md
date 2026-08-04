@@ -166,6 +166,18 @@ organização territorial. Ao aceitar uma aliança na sede, **toda a worktree**
 (sede + PDEs/subsedes promovidos) herda o vínculo `allied` com a worktree
 aliada (decisão de produto #3).
 
+**Unidade promovida nunca é candidata (2026-08-03)**: `promoverSede` copia o
+`afiliacaoId` da mãe para o tenant novo (Caso B), então a unidade satisfazia o
+`where` por clube das recomendações e aparecia como "co-irmã" — inclusive
+unidades da própria worktree (ex.: *PDE Fiel Baixada* listado como co-irmã dos
+Gaviões). Quem monta candidato de aliança/co-irmã passa por
+`filtrarTenantsDeAlianca` (`lib/aliancas.ts`), que descarta (a) unidades — algum
+`Sede` do tenant pendurado numa `Sede` de **outro** tenant, a âncora que a
+promoção deixa — e (b) a própria linhagem (`getTorcidaLineageTenantIds`). Vale
+para as recomendações **e** para a lista da aba Propor. Invariante coberto por
+`unidadesEntreTenants` / `filtrarTorcidasElegiveis` em
+`lib/__tests__/aliancas.test.ts`.
+
 **Enforcement co-irmã no servidor**: `proporAlianca` (`admin/aliancas/actions.ts`)
 rejeita a proposta se as duas torcidas compartilham `afiliacaoId` — "organizadas
 do mesmo time são co-irmãs, não aliadas" não é só vocabulário, é regra

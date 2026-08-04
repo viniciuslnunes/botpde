@@ -16,6 +16,10 @@ Pacote **ao vivo** via `SYSTEM_ROLE_PERMISSIONS` (não depende do array gravado 
 | **admin** | Operação ampla | Tudo exceto `settings:manage`, `torcida:global_view`, `affiliation:manage`, `members:purge` |
 | **member** | Sócio padrão | `community:post`, `messages:send`, `groups:create` |
 
+Rótulo na UI: `rotuloCargoSistema` — `member` aparece como **"Sócio"** (2026-08-03).
+"Membro" é reservado a quem compõe departamento: perfis de área (`Membro · {Área}`),
+`PAPEL_DEPARTAMENTO.MEMBRO` e o badge do feed (`rotuloCargoBadge` com área resolvida).
+
 Bootstrap liga owner/admin/vice à **Diretoria** como GESTOR, mas o pacote efetivo é o de sistema.
 
 **Caso B:** `owner` no tenant-filho = **Liderança da unidade** — opera o `/admin` local. Espelho na Sede costuma ser `member` (sem admin na Sede).

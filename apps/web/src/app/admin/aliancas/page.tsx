@@ -3,7 +3,11 @@ import type { Metadata } from 'next'
 import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
-import { listAliancasForTenant, listRecomendacoesForTenant } from '@/lib/aliancas'
+import {
+  filtrarTenantsDeAlianca,
+  listAliancasForTenant,
+  listRecomendacoesForTenant,
+} from '@/lib/aliancas'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
@@ -92,7 +96,11 @@ export default async function AdminAliancasPage() {
   // (pendente/histórico) é exclusivo de quem propôs/recebeu na sede raiz.
   const aliancas = isSedeRaiz ? aliancasRaw : aliancasRaw.filter((a) => a.status === 'ATIVA')
 
-  const tenantOptions: TenantOption[] = tenantsRaw.map((t) => ({
+  // Aliança é vínculo entre torcidas: fora unidades promovidas (Caso B, que
+  // herdam o vínculo da sede) e a própria worktree. Ver `filtrarTenantsDeAlianca`.
+  const tenantsElegiveis = await filtrarTenantsDeAlianca(rootTenantId, tenantsRaw)
+
+  const tenantOptions: TenantOption[] = tenantsElegiveis.map((t) => ({
     id: t.id,
     nome: formatNomeTorcida(t.nome),
     slug: t.slug,

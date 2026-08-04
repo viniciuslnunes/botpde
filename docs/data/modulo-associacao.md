@@ -114,6 +114,27 @@ Exceção pontual à R1 da governança hierárquica — ver
 `docs/data/proposta-governanca-hierarquica.md` §1. Caso A (unidade leve no
 mesmo tenant) não muda: fila única da Sede.
 
+### Carteirinha espelhada (2026-08-03)
+
+`SaasSocio` é por tenant, mas o sócio é o **mesmo** nos dois níveis — mesmo
+`numeroAssociado`, mesma validade; o que difere é a atuação em departamentos.
+`lib/carteirinha-espelho.ts` propaga a carteirinha entre origem↔espelho:
+
+- **Emissão** (auto na aprovação e manual em `/admin/socios`) replica no par —
+  `AuditLog` com `detalhes.espelho: true` + `origemTenantId`.
+- **Renovação** alinha a validade; se o par ainda não tem carteirinha (vínculo
+  anterior a esta regra), emite — auto-cura do legado.
+- **Revogação** apaga nos dois: senão o `numeroSocio` fica preso no outro tenant.
+- Tudo **best-effort**: falha (nº já ocupado por outra pessoa no destino) não
+  desfaz a operação original e grava `SOCIO_CARTEIRINHA_ESPELHO_FALHOU`.
+
+Antes disso a auto-emissão rodava só no tenant da origem: o sócio aprovado no
+PDE ficava `APROVADO` na Sede **sem** `SaasSocio` — invisível nas abas
+Emitidas/Ativos/Vencendo (que leem `SaasSocio`) e tratado como sócio sem
+carteirinha nos gates que checam `SaasSocio.validade` (`canais.ts`, `authz.ts`).
+Backfill dos casos anteriores: `pnpm --filter @torcida/db
+db:repair-carteirinha-espelho` (aceita `-- --dry-run`).
+
 `rg`/`cpf`/`dataNascimento`/`logradouro`/`bairro`/`uf` passam a ser
 obrigatórios para SOCIO no próprio onboarding (antes só eram exigidos depois,
 pelo admin). `nomePai`/`nomeMae` coletados no formulário **não** viram coluna

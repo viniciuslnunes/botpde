@@ -255,7 +255,8 @@ describe('rótulos de cargos de sistema por tipo de Sede', () => {
     expect(rotuloCargoSistema('owner', 'SUBSEDE')).toBe('Liderança')
     expect(rotuloCargoSistema('vice', 'SEDE')).toBe('Vice-presidente')
     expect(rotuloCargoSistema('admin', 'SUBSEDE')).toBe('Administrador')
-    expect(rotuloCargoSistema('member', 'SEDE')).toBe('Membro')
+    // `member` é o vínculo base: "Sócio". "Membro" só quem compõe departamento.
+    expect(rotuloCargoSistema('member', 'SEDE')).toBe('Sócio')
     expect(rotuloCargoSistema('tesoureiro', 'SEDE')).toBe('tesoureiro')
   })
 })

@@ -659,6 +659,10 @@ export function rotuloCargoMaximo(tipoSede) {
  * Rótulo PT-BR de um cargo de sistema, contextualizado pelo tipo da Sede.
  * Cargos não mapeados retornam o próprio nome.
  *
+ * `member` é o vínculo base com a torcida e se chama **"Sócio"**: "Membro" é
+ * reservado a quem compõe um departamento (ofício) — ver `rotuloCargoBadge`
+ * em `apps/web/src/lib/autor-badges.ts` e `PAPEL_DEPARTAMENTO`.
+ *
  * @param {string} nome - nome interno do cargo de sistema ('owner', 'vice', ...)
  * @param {string} tipoSede - TipoSede ('SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO')
  * @returns {string}
@@ -672,7 +676,7 @@ export function rotuloCargoSistema(nome, tipoSede) {
     case SYSTEM_ROLES.ADMIN:
       return 'Administrador'
     case SYSTEM_ROLES.MEMBER:
-      return 'Membro'
+      return 'Sócio'
     default:
       return nome
   }

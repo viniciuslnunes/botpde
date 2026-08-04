@@ -49,6 +49,7 @@ import {
   type VisibilidadeCanal,
 } from '@/lib/canais-shared'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
+import { nomesEquivalentes } from '@/lib/torcida-labels'
 
 interface CurrentUser {
   id: string
@@ -205,7 +206,7 @@ export function CanalFeedComposition({
                   {localLabel}
                 </span>
               </>
-            ) : (
+            ) : nomesEquivalentes(canalNome, tenantNome) ? null : (
               <>
                 {' · '}
                 {tenantNome}
@@ -306,7 +307,7 @@ export function CanalFeedComposition({
                   )}
                   {canal.canalOficial && podeGerenciarMembros && (
                     <Link
-                      href="/admin/configuracoes#canal-oficial"
+                      href="/admin/configuracoes?secao=canal-oficial"
                       onClick={() => setMenuOpen(false)}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >

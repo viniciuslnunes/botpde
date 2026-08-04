@@ -27,6 +27,7 @@ import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'
+import { espelharCarteirinhaDoTenant } from '@/lib/carteirinha-espelho'
 import { diffCamposMembro } from '@/lib/membro-audit-diff'
 import {
   executarPurgeMembro,
@@ -726,6 +727,14 @@ export async function aprovarMembro(
           ? `Você é o sócio nº ${origem.numeroAssociado}.`
           : 'Sua carteirinha digital foi ativada.',
         link: '/portal/carteirinha',
+        atorId: aprovadoPorId,
+      })
+      // É o mesmo sócio nos dois níveis (mesmo nº, mesma validade): sem isto o
+      // espelho na Sede fica preso em "Aguardando emissão" e some das abas
+      // Emitidas/Ativos, que leem `SaasSocio`. Sem notificar de novo.
+      await espelharCarteirinhaDoTenant({
+        tenantId: origem.tenantId,
+        userId: origem.userId,
         atorId: aprovadoPorId,
       })
     }

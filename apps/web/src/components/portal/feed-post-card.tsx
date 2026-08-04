@@ -21,7 +21,7 @@ import { PostComunicadoEmbed } from './post-comunicado-embed'
 import { PostEventoEmbed } from './post-evento-embed'
 import { ComunicadoShareButton } from './comunicado-share-button'
 import type { PostSocialItem } from '@/lib/feed'
-import { formatAutorCargoBadge } from '@/lib/autor-badges-format'
+import { formatAutorCargoBadge, formatAutorUnidadeBadge } from '@/lib/autor-badges-format'
 
 interface FeedPostCardProps {
   post: PostSocialItem
@@ -53,6 +53,12 @@ export function FeedPostCard({
     ? linkTorcidaComunidadePublica(post.tenantId)
     : `/portal/comunidade/perfil/${post.autor.id}`
   const headerNome = isComunicadoOficial ? post.tenant.nome : (post.autor.nome ?? 'Membro')
+  const tenantBadge = showTenantBadge && !isComunicadoOficial ? post.tenant.nome : null
+  // Unidade que repete a torcida (Caso B, ou Sede raiz "Sede — <Torcida>") não
+  // vira badge — compara com a torcida do post mesmo quando ela não é exibida.
+  const unidadeBadge = isComunicadoOficial
+    ? null
+    : formatAutorUnidadeBadge(post.autor.sedeNome, post.tenant.nome)
   const headerAvatar = isComunicadoOficial ? post.tenant.logoUrl : post.autor.avatarUrl
   const midias = ensureSocialEmbedInMidias(post.conteudo, post.midiaUrls)
   const conteudoVisivel = stripEmbeddedSocialUrls(post.conteudo, midias)
@@ -86,14 +92,14 @@ export function FeedPostCard({
             >
               {headerNome}
             </ComunidadePrefetchLink>
-            {showTenantBadge && !isComunicadoOficial && (
+            {tenantBadge && (
               <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-                {post.tenant.nome}
+                {tenantBadge}
               </span>
             )}
-            {!isComunicadoOficial && post.autor.sedeNome && (
+            {unidadeBadge && (
               <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                {post.autor.sedeNome}
+                {unidadeBadge}
               </span>
             )}
             {cargoBadge && (

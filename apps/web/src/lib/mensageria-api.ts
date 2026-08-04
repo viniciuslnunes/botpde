@@ -1,6 +1,6 @@
 import type { Session } from 'next-auth'
 import { auth } from '@/lib/auth'
-import { assertComunidadeNacional, assertMembroAtivo } from '@/lib/authz'
+import { assertComunidadeNacional, assertMembroAtivo, assertNaoOperador } from '@/lib/authz'
 import { db } from '@torcida/db'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
@@ -157,6 +157,9 @@ export async function assertPodeEnviarMensagensNacional(): Promise<{
   afiliacaoId: string
   userId: string
 }> {
+  // Envio é voz: operador (super-admin sem vínculo no tenant ativo) lê o inbox
+  // mas não escreve. A leitura segue livre em `assertUsuarioMensageriaNacional`.
+  await assertNaoOperador()
   return assertUsuarioMensageriaNacional()
 }
 

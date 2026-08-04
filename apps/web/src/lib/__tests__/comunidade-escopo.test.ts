@@ -132,12 +132,42 @@ describe('resolverEscopoComunidade', () => {
     expect(resolverEscopoComunidade(semUnidade, 'lixo')).toBe('torcida')
   })
 
+  it('unidade ativa (Caso B): default é o canal dela, não o da Sede', () => {
+    // Quem selecionou a PDE no /admin — liderança da unidade ou operador da
+    // plataforma — tem que cair no mural da PDE ao abrir a Comunidade.
+    const ctx = { ...ctxSocioComUnidade(), tenantAtivoEhUnidade: true }
+    expect(resolverEscopoComunidade(ctx, undefined)).toBe('unidade')
+    // As outras abas continuam alcançáveis pela query.
+    expect(resolverEscopoComunidade(ctx, 'torcida')).toBe('torcida')
+    expect(resolverEscopoComunidade(ctx, 'nacional')).toBe('nacional')
+  })
+
+  it('unidade ativa sem aba de unidade cai na torcida (nunca quebra)', () => {
+    const ctx = { ...ctxTorcida(), tenantAtivoEhUnidade: true }
+    expect(resolverEscopoComunidade(ctx, undefined)).toBe('torcida')
+  })
+
+  it('Sede ativa mantém o default na torcida mesmo tendo unidade', () => {
+    const ctx = ctxSocioComUnidade()
+    expect(resolverEscopoComunidade(ctx, undefined)).toBe('torcida')
+  })
+
   it('por modo: TORCEDOR sem query fica nacional; sócio sem query fica torcida', () => {
     const so = { torcida: true, unidade: false }
     expect(resolverEscopoComunidadePorModo('nacional', so, null)).toBe('nacional')
     expect(resolverEscopoComunidadePorModo('nacional', so, 'torcida')).toBe('torcida')
     expect(resolverEscopoComunidadePorModo('torcida', so, null)).toBe('torcida')
     expect(resolverEscopoComunidadePorModo('torcida', so, 'nacional')).toBe('nacional')
+  })
+
+  it('por modo: unidade ativa muda o default só do sócio, nunca do TORCEDOR', () => {
+    const comUnidade = { torcida: true, unidade: true }
+    const opts = { tenantAtivoEhUnidade: true }
+    expect(resolverEscopoComunidadePorModo('torcida', comUnidade, null, opts)).toBe('unidade')
+    // TORCEDOR continua abrindo na praça nacional do clube.
+    expect(
+      resolverEscopoComunidadePorModo('nacional', { torcida: false, unidade: true }, null, opts),
+    ).toBe('nacional')
   })
 })
 

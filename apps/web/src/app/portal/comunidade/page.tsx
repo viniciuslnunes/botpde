@@ -60,22 +60,11 @@ export default async function ComunidadePage({
   const slugTorcida = torcidaReal?.slug ?? null
   const slugUnidade = ctx.unidade?.tenantSlug ?? null
 
-  // Caso B: cookie já na unidade → default do feed é o mural da unidade
-  // (não o da Sede). Caso A (mesmo slug) permanece em torcida.
-  const portalEhUnidadeCasoB =
-    !params.escopo &&
-    Boolean(
-      atualSlug &&
-        slugUnidade &&
-        slugTorcida &&
-        atualSlug === slugUnidade &&
-        slugUnidade !== slugTorcida &&
-        ctx.escopos.unidade,
-    )
-
-  const escopoDesejado = portalEhUnidadeCasoB
-    ? 'unidade'
-    : resolverEscopoComunidade(ctx, params.escopo)
+  // Caso B (tenant ativo já é a unidade) → default do feed é o mural dela, não
+  // o da Sede. A regra vive em `resolverEscopoComunidadePorModo`, para o feed,
+  // a navbar, o rail e as demais rotas da Comunidade responderem igual — quando
+  // só o feed sabia disso, o header trocava de marca ao sair para /canais.
+  const escopoDesejado = resolverEscopoComunidade(ctx, params.escopo)
   const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {

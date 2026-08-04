@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed, invalidarFeedNacional } from '@/lib/comunidade-cache'
 import { emitFeedNacionalPing } from '@/lib/feed-bus'
-import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
+import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertNaoOperador, assertPermission, assertPodePublicarNoFeed, ehOperadorPlataforma, ERRO_MODO_OPERADOR } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
@@ -254,6 +254,12 @@ async function resolverContextoEngajamento(): Promise<{
       where: { tenantId_userId: { tenantId: tenant.id, userId: viewerId } },
       select: { status: true, tipo: true },
     })
+
+    // Modo operador: super-admin sem vínculo APROVADO neste tenant lê tudo e
+    // não engaja — nem por aqui, nem caindo no fallback da CN abaixo.
+    if (await ehOperadorPlataforma(viewerId, session.user.email, tenant.id)) {
+      throw new Error(ERRO_MODO_OPERADOR)
+    }
 
     if (membro?.status === 'APROVADO') {
       if (isSuperAdminEmail(session.user.email)) {
@@ -642,6 +648,9 @@ export async function publicarPostNacional(
   formData: FormData,
 ): Promise<PublicarPostState> {
   try {
+    // CN não tem RBAC por tenant — a trava de voz do operador entra aqui.
+    await assertNaoOperador()
+
     const parsed = postSchema.safeParse({
       conteudo: formData.get('conteudo'),
       midias: parseMidias(formData.get('midias')),
@@ -730,6 +739,12 @@ export type SolicitarSeguirResultado =
 export async function solicitarSeguir(userId: string): Promise<SolicitarSeguirResultado> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) return { ok: false, message: 'Não autenticado' }
+
+  // Operador vê qualquer perfil sem seguir — seguir é vínculo social, não
+  // leitura. Retorno tratado (não throw): Server Action com throw vira 500.
+  if (tenant && (await ehOperadorPlataforma(session.user.id, session.user.email, tenant.id))) {
+    return { ok: false, message: ERRO_MODO_OPERADOR }
+  }
 
   // canFollowUser é o ponto único do funil (mesma torcida/worktree, aliadas ou
   // mesmo clube para torcedor global) — sem exigir SaasMembro do ator.
@@ -1928,6 +1943,10 @@ export async function criarGrupo(
   const parsed = criarGrupoSchema.safeParse({ nome, descricao, publica })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Grupo inválido')
 
+  // O fallback para a CN é um `catch` do gate de permissão — sem esta trava, a
+  // recusa do modo operador cairia justamente nele e a ação passaria.
+  await assertNaoOperador()
+
   let session: Session
   let tenantId: string
 
@@ -2479,6 +2498,8 @@ export async function ocultarPostGrupo(postId: string): Promise<void> {
 }
 
 export async function entrarGrupoPublico(conversaId: string): Promise<void> {
+  await assertNaoOperador()
+
   let session: Session
   let tenantId: string
 
@@ -2974,6 +2995,9 @@ async function permissoesEfetivas(userId: string, tenantId: string): Promise<str
 export async function entrarCanal(conversaId: string): Promise<void> {
   const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  // Operador navega canais sem entrar — virar membro é participação.
+  await assertNaoOperador()
 
   let contexto: { session: Session; tenantId: string } | null = null
   try {

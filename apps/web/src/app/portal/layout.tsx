@@ -11,6 +11,7 @@ import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { getTenantFromHost } from '@/lib/tenant'
 import { NavbarBrandOverrideProvider } from '@/lib/navbar-brand-override'
+import { ModoOperadorProvider } from '@/lib/modo-operador'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
 import { PendenciasCadastroModal } from '@/components/portal/pendencias-cadastro-modal'
@@ -119,7 +120,11 @@ export default async function PortalLayout({
       <NavbarBrandOverrideProvider>
         <Suspense fallback={navbar}>{navbar}</Suspense>
         <main className="app-container relative py-4 sm:py-8">
-          <PortalMotionShell>{children}</PortalMotionShell>
+          <ModoOperadorProvider
+            ativo={ctx?.modo === 'torcida' && Boolean(ctx.operador)}
+          >
+            <PortalMotionShell>{children}</PortalMotionShell>
+          </ModoOperadorProvider>
         </main>
         {pendenciasSnap && pendenciasSnap.visiveis.length > 0 ? (
           <PendenciasCadastroModal pendencias={pendenciasSnap.visiveis} />

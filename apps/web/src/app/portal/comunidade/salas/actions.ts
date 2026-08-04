@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import type { Session } from 'next-auth'
-import { assertComunidadeNacional, assertPermission } from '@/lib/authz'
+import { assertComunidadeNacional, assertNaoOperador, assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { isLiveKitConfigured } from '@/lib/env'
 import { deleteLiveKitRoom } from '@/lib/livekit-room'
@@ -126,6 +126,7 @@ export async function criarSalaNacional(
   formData: FormData,
 ): Promise<CriarSalaState> {
   try {
+    await assertNaoOperador()
     const { session, tenantSintetico } = await assertComunidadeNacional()
 
     if (!isLiveKitConfigured()) {

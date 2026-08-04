@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
-import { assertPermission, assertPodeDelegar, assertTenantOwner } from '@/lib/authz'
+import {
+  assertOwnerOuSuportePlataforma,
+  assertPermission,
+  assertPodeDelegar,
+  assertTenantOwner,
+} from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { getAncestorTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -56,7 +61,9 @@ function parseDepartamentoPapel(formData: FormData): {
 // ── Perfil do tenant ──────────────────────────────────────────────────────────
 
 export async function salvarPerfilTenant(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const nome = formatNomeTorcida(String(formData.get('nome') ?? ''))
 
@@ -84,7 +91,9 @@ export async function salvarPerfilTenant(formData: FormData) {
 }
 
 export async function salvarDiscordGuildId(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const discordGuildId = String(formData.get('discordGuildId') ?? '').trim() || null
 
@@ -166,8 +175,9 @@ export async function salvarBalancoDetalheNivel(formData: FormData) {
 
 /** R3 — permite que subsedes/PDEs descendentes vejam a hierarquia completa da torcida. */
 export async function salvarHierarquiaVisivel(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const visivel = formData.get('hierarquiaVisivelParaFilhos') === 'true'
 
@@ -265,8 +275,9 @@ export async function salvarAgendaVisivelNasUnidades(formData: FormData) {
 
 /** Onboarding SOCIO: exige (ou não) foto do RG e comprovante de residência. */
 export async function salvarExigirDocumentosCadastro(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const exigir = formData.get('exigirDocumentosCadastro') === 'true'
 
@@ -362,8 +373,9 @@ export async function salvarPropagarPendenciasCadastroUnidades(formData: FormDat
 
 /** Periodicidades oferecidas no onboarding «Já sou sócio». */
 export async function salvarPeriodicidadesOnboarding(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const raw = formData.getAll('periodicidades').map(String)
   const parsed = SalvarPeriodicidadesOnboardingSchema.safeParse({ periodicidades: raw })
@@ -391,6 +403,49 @@ export async function salvarPeriodicidadesOnboarding(formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/onboarding')
+  invalidateTenantCache(tenant.slug)
+}
+
+// ── Suporte da plataforma ─────────────────────────────────────────────────────
+
+/**
+ * Liga/desliga o consentimento desta unidade para o super-admin operar as
+ * configurações reservadas ao owner.
+ *
+ * Gate deliberadamente `assertTenantOwner` **estrito**, sem a variante de
+ * suporte: quem se beneficia do acesso não pode se autoconceder o acesso. Um
+ * super-admin que não seja owner aqui cai fora, mesmo com o suporte já ligado.
+ * Vale só para o tenant atual — Sede e unidades têm chaves independentes.
+ */
+export async function salvarSuportePlataforma(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const ativo = formData.get('suportePlataforma') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: {
+      suportePlataforma: ativo,
+      suportePlataformaDesde: ativo ? new Date() : null,
+      suportePlataformaPorId: ativo ? session.user.id : null,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: ativo ? 'SUPORTE_PLATAFORMA_ATIVADO' : 'SUPORTE_PLATAFORMA_DESATIVADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { ativo },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/configuracoes/transparencia')
+  revalidatePath('/admin/configuracoes/integracoes')
   invalidateTenantCache(tenant.slug)
 }
 
@@ -425,8 +480,9 @@ const motivoSchema = z
  * continua descendo. Reversível a qualquer momento pela própria liderança.
  */
 export async function ativarCanalRestrito(): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
   await assertEhUnidadeDaTorcida(tenant.id)
 
   const estado = await getEstadoCanalRestrito(tenant.id)
@@ -464,8 +520,9 @@ export async function ativarCanalRestrito(): Promise<void> {
 
 /** Liderança reabre o canal por conta própria — não depende de ninguém. */
 export async function desativarCanalRestrito(): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   await reabrirCanal({
     tenantId: tenant.id,
@@ -481,8 +538,9 @@ export async function desativarCanalRestrito(): Promise<void> {
 
 /** Liderança responde à solicitação da Sede: aprovar reabre; recusar mantém. */
 export async function responderReativacaoCanal(formData: FormData): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const aprovar = formData.get('decisao') === 'aprovar'
 
@@ -626,7 +684,9 @@ export async function alternarConviteTenant(formData: FormData): Promise<void> {
 // ── Canal oficial (mural da unidade na Comunidade) ────────────────────────────
 
 export async function salvarCanalOficial(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const parsed = editarCanalOficialSchema.safeParse({
     nome: String(formData.get('nome') ?? ''),
@@ -689,8 +749,9 @@ interface AfiliacaoLite {
 }
 
 export async function salvarAfiliacao(formData: FormData): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  await assertTenantOwner(session.user.id, tenant.id)
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
 
   const parsed = afiliacaoSchema.safeParse({
     afiliacaoId: String(formData.get('afiliacaoId') ?? ''),

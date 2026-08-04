@@ -72,6 +72,7 @@ export async function ComunidadeChromeRailSlot() {
       tenantSinteticoId={ctx.tenantSintetico?.id ?? null}
       escopos={ctx.escopos}
       modoContexto={ctx.modo}
+      tenantAtivoEhUnidade={ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade)}
       salasTorcida={salasTorcida}
       canaisTorcida={canaisTorcida}
       salasNacional={salasNacional}
