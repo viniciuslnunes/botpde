@@ -34,7 +34,7 @@ function ProdutoCard({ produto }: { produto: AdminProdutoItem }) {
           : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-70',
       ].join(' ')}
     >
-      <ProdutoImagem src={produto.imagemUrl} alt={produto.nome} variant="admin" className={produto.ativo ? undefined : 'h-32'} />
+      <ProdutoImagem src={produto.imagemUrl} alt={produto.nome} variant="admin" />
       <div className="p-4 space-y-3">
         <div>
           {produto.destaque && produto.ativo && (

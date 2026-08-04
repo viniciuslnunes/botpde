@@ -135,6 +135,48 @@ export const listarPatrimonio = cache(async function listarPatrimonio(
   return { itens: rows, page, pageSize, total }
 })
 
+export type PatrimonioEmprestimoLite = {
+  id: string
+  status: 'ABERTO' | 'DEVOLVIDO' | 'COM_DANO'
+  fotoSaidaUrl: string
+  fotoGuardaUrl: string | null
+  abertoEm: Date
+  devolvidoEm: Date | null
+  danoReportado: boolean
+  danoObservacao: string | null
+  item: { id: string; nome: string; categoria: CategoriaPatrimonioItem; status: StatusPatrimonioItem }
+  user: { id: string; nome: string | null }
+}
+
+/** Empréstimos abertos (+ recentes devolvidos) para inbox admin / meus empréstimos. */
+export const listarEmprestimosPatrimonio = cache(async function listarEmprestimosPatrimonio(
+  tenantId: string,
+  opts?: { userId?: string; status?: 'ABERTO' | 'DEVOLVIDO' | 'COM_DANO'; limite?: number },
+): Promise<PatrimonioEmprestimoLite[]> {
+  const rows: PatrimonioEmprestimoLite[] = await db.patrimonioEmprestimo.findMany({
+    where: {
+      tenantId,
+      ...(opts?.userId ? { userId: opts.userId } : {}),
+      ...(opts?.status ? { status: opts.status } : {}),
+    },
+    orderBy: { abertoEm: 'desc' },
+    take: opts?.limite ?? 40,
+    select: {
+      id: true,
+      status: true,
+      fotoSaidaUrl: true,
+      fotoGuardaUrl: true,
+      abertoEm: true,
+      devolvidoEm: true,
+      danoReportado: true,
+      danoObservacao: true,
+      item: { select: { id: true, nome: true, categoria: true, status: true } },
+      user: { select: { id: true, nome: true } },
+    },
+  })
+  return rows
+})
+
 export const carregarPainelPatrimonio = cache(async function carregarPainelPatrimonio(
   tenantId: string,
   recentes = 5,

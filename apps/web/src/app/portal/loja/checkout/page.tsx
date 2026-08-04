@@ -55,14 +55,32 @@ export default async function CheckoutPage() {
         : `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(c.valor))} off`,
   }))
 
+  const lojas = tenants.map((t) => ({
+    tenantId: t.id,
+    nome: formatNomeTorcida(t.nome),
+  }))
+
   return (
     <div className="space-y-6">
-      <Link href="/portal/loja/sacola" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-        <ArrowLeft className="h-4 w-4" />
+      <Link
+        href="/portal/loja/sacola"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
         Voltar à sacola
       </Link>
-      <h1 className="text-2xl font-bold">Finalizar pedido</h1>
-      <CheckoutForm itens={itens} subtotal={subtotal} cuponsDisponiveis={cuponsDisponiveis} />
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[rgb(var(--foreground-muted))]">
+          [ Fluxo de compra ]
+        </p>
+        <h1 className="mt-1 text-2xl font-black uppercase tracking-tight sm:text-3xl">Finalizar pedido</h1>
+      </div>
+      <CheckoutForm
+        itens={itens}
+        subtotal={subtotal}
+        cuponsDisponiveis={cuponsDisponiveis}
+        lojas={lojas}
+      />
     </div>
   )
 }

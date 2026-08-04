@@ -1,19 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const userRoleFindFirst = vi.hoisted(() => vi.fn())
+const userRoleFindMany = vi.hoisted(() => vi.fn())
 const tenantFindUnique = vi.hoisted(() => vi.fn())
+const isSuperAdminEmail = vi.hoisted(() => vi.fn((email: string | null | undefined) => email === 'sa@plataforma.app'))
 
 vi.mock('@torcida/db', () => ({
   db: {
-    userRole: { findFirst: userRoleFindFirst },
+    userRole: { findMany: userRoleFindMany },
     tenant: { findUnique: tenantFindUnique },
   },
+}))
+
+vi.mock('@/lib/tenant-context', () => ({
+  isSuperAdminEmail: (email: string | null | undefined) => isSuperAdminEmail(email),
 }))
 
 // `React.cache` memoiza por render — nos testes queremos cada chamada crua.
 vi.mock('react', () => ({ cache: <T,>(fn: T) => fn }))
 
-const COM_OWNER = { id: 'user-role-1' }
+const PRESIDENTE = [{ user: { email: 'presidente@torcida.app' } }]
+const OWNER_TECNICO_SA = [{ user: { email: 'sa@plataforma.app' } }]
 
 async function estado(tenantId: string) {
   const { getEstadoSuportePlataforma } = await import('@/lib/suporte-plataforma')
@@ -22,13 +28,14 @@ async function estado(tenantId: string) {
 
 describe('suporte da plataforma — quando o super-admin pode operar', () => {
   beforeEach(() => {
-    userRoleFindFirst.mockReset()
+    userRoleFindMany.mockReset()
     tenantFindUnique.mockReset()
+    isSuperAdminEmail.mockClear()
     vi.resetModules()
   })
 
   it('unidade sem liderança: super-admin opera mesmo sem consentimento', async () => {
-    userRoleFindFirst.mockResolvedValue(null)
+    userRoleFindMany.mockResolvedValue([])
     tenantFindUnique.mockResolvedValue({ suportePlataforma: false })
 
     expect(await estado('unidade-nova')).toEqual({
@@ -38,8 +45,19 @@ describe('suporte da plataforma — quando o super-admin pode operar', () => {
     })
   })
 
+  it('só owner técnico do setup (SA): não conta como liderança — SA opera sem consentimento', async () => {
+    userRoleFindMany.mockResolvedValue(OWNER_TECNICO_SA)
+    tenantFindUnique.mockResolvedValue({ suportePlataforma: false })
+
+    expect(await estado('torcida-recem-criada')).toEqual({
+      temLideranca: false,
+      consentido: false,
+      superAdminPodeOperar: true,
+    })
+  })
+
   it('unidade com liderança e sem consentimento: super-admin NÃO opera', async () => {
-    userRoleFindFirst.mockResolvedValue(COM_OWNER)
+    userRoleFindMany.mockResolvedValue(PRESIDENTE)
     tenantFindUnique.mockResolvedValue({ suportePlataforma: false })
 
     expect(await estado('unidade-com-presidente')).toEqual({
@@ -50,7 +68,7 @@ describe('suporte da plataforma — quando o super-admin pode operar', () => {
   })
 
   it('unidade com liderança que liberou o suporte: super-admin opera', async () => {
-    userRoleFindFirst.mockResolvedValue(COM_OWNER)
+    userRoleFindMany.mockResolvedValue(PRESIDENTE)
     tenantFindUnique.mockResolvedValue({ suportePlataforma: true })
 
     expect(await estado('unidade-que-pediu-ajuda')).toEqual({
@@ -61,7 +79,7 @@ describe('suporte da plataforma — quando o super-admin pode operar', () => {
   })
 
   it('tenant inexistente não vira consentimento implícito', async () => {
-    userRoleFindFirst.mockResolvedValue(COM_OWNER)
+    userRoleFindMany.mockResolvedValue(PRESIDENTE)
     tenantFindUnique.mockResolvedValue(null)
 
     const resultado = await estado('sumiu')
@@ -70,7 +88,7 @@ describe('suporte da plataforma — quando o super-admin pode operar', () => {
   })
 
   it('a chave é lida do tenant recebido — nunca da Sede', async () => {
-    userRoleFindFirst.mockResolvedValue(COM_OWNER)
+    userRoleFindMany.mockResolvedValue(PRESIDENTE)
     tenantFindUnique.mockResolvedValue({ suportePlataforma: false })
 
     await estado('pde-filho')
@@ -79,7 +97,7 @@ describe('suporte da plataforma — quando o super-admin pode operar', () => {
       where: { id: 'pde-filho' },
       select: { suportePlataforma: true },
     })
-    expect(userRoleFindFirst).toHaveBeenCalledWith(
+    expect(userRoleFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ tenantId: 'pde-filho' }) }),
     )
   })

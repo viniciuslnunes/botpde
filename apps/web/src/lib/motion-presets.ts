@@ -142,3 +142,45 @@ export const shareSpin: Transition = {
   duration: 0.4,
   ease: 'easeOut',
 }
+
+/**
+ * Barra de escudos da Comunidade (operador / sócio): entrada, saída, lift ao
+ * arrastar e dim sutil nos vizinhos. Só `opacity` / `transform` / `boxShadow`
+ * — o FLIP da reordenação fica no `layout` do item.
+ */
+export const canalTabBarItem: Variants = {
+  hidden: { opacity: 0, scale: 0.84, y: 8 },
+  show: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    zIndex: 1,
+    boxShadow: '0 0 0 0 rgba(0,0,0,0)',
+    transition: springSnappy,
+  },
+  dimmed: {
+    opacity: 0.55,
+    scale: 0.96,
+    y: 0,
+    zIndex: 1,
+    boxShadow: '0 0 0 0 rgba(0,0,0,0)',
+    transition: springSnappy,
+  },
+  dragging: {
+    opacity: 1,
+    scale: 1.14,
+    y: -6,
+    zIndex: 40,
+    boxShadow: '0 14px 28px -10px rgba(0,0,0,0.32)',
+    transition: springSnappy,
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.78,
+    y: 6,
+    transition: { duration: 0.16, ease: 'easeOut' },
+  },
+}
+
+/** Micro-interação do escudo (hover/tap) — não misturar com o lift do drag. */
+export const canalTabIconTap: Transition = springSnappy

@@ -17,6 +17,12 @@ export const StatusPatrimonioSchema = z.enum([
   'BAIXADO',
 ])
 
+export const StatusPatrimonioEmprestimoSchema = z.enum([
+  'ABERTO',
+  'DEVOLVIDO',
+  'COM_DANO',
+])
+
 /** Itens por página (portal e admin alinhados). */
 export const PATRIMONIO_PAGE_SIZE = 40
 
@@ -45,6 +51,10 @@ const itemCampos = {
     .union([z.literal(''), z.string().uuid('Responsável inválido')])
     .optional()
     .transform((v) => (v === '' || v === undefined ? undefined : v)),
+  areaId: z
+    .union([z.literal(''), z.string().min(1)])
+    .optional()
+    .transform((v) => (v === '' || v === undefined ? undefined : v)),
 }
 
 export const CriarPatrimonioItemSchema = z.object(itemCampos)
@@ -54,9 +64,42 @@ export const AtualizarPatrimonioItemSchema = z.object({
   ...itemCampos,
 })
 
+export const AbrirEmprestimoPatrimonioSchema = z.object({
+  itemId: z.string().uuid('Item inválido'),
+  fotoSaidaUrl: z.string().url('Foto da retirada obrigatória').max(2000),
+  observacao: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+export const DevolverEmprestimoPatrimonioSchema = z.object({
+  emprestimoId: z.string().uuid('Empréstimo inválido'),
+  fotoGuardaUrl: z.string().url('Foto de como ficou guardado é obrigatória').max(2000),
+  observacao: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+export const MarcarDanoEmprestimoSchema = z.object({
+  emprestimoId: z.string().uuid('Empréstimo inválido'),
+  danoObservacao: z.string().trim().min(3, 'Descreva o dano').max(500),
+})
+
 export const FiltroPatrimonioSchema = z.object({
   categoria: CategoriaPatrimonioSchema.optional(),
   status: StatusPatrimonioSchema.optional(),
+  areaId: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
   q: z
     .string()
     .trim()
@@ -88,4 +131,19 @@ export const STATUS_PATRIMONIO_LABEL = {
   EM_USO: 'Em uso',
   MANUTENCAO: 'Manutenção',
   BAIXADO: 'Baixado',
+}
+
+/** @type {Record<string, string>} */
+export const STATUS_EMPRESTIMO_PATRIMONIO_LABEL = {
+  ABERTO: 'Em aberto',
+  DEVOLVIDO: 'Devolvido',
+  COM_DANO: 'Com dano',
+}
+
+/**
+ * Instrumentos e bandeirões sempre exigem evidência fotográfica.
+ * @param {string} categoria
+ */
+export function categoriaExigeEvidencia(categoria) {
+  return categoria === 'INSTRUMENTO' || categoria === 'BANDEIRA'
 }

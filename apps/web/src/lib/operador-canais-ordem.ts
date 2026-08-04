@@ -48,3 +48,65 @@ export function moverItem<T>(lista: T[], from: number, to: number): T[] {
   next.splice(to, 0, item)
   return next
 }
+
+/**
+ * Prefixo fixo da barra do operador (após Nacional):
+ * torcida e, se houver vínculo/unidade distinta, a unidade.
+ */
+export function slugsHierarquiaFixos(opts: {
+  slugTorcida: string | null | undefined
+  slugUnidade: string | null | undefined
+  temTorcida: boolean
+  temUnidade: boolean
+}): string[] {
+  const out: string[] = []
+  const torcida = opts.slugTorcida?.trim() || ''
+  const unidade = opts.slugUnidade?.trim() || ''
+  if (opts.temTorcida && torcida) out.push(torcida)
+  if (opts.temUnidade && unidade && unidade !== torcida) out.push(unidade)
+  return out
+}
+
+/** Canais do cookie que podem ser arrastados/fechados (fora da hierarquia). */
+export function ordemArrastavelSemFixos(ordem: string[], fixos: string[]): string[] {
+  if (fixos.length === 0) return [...ordem]
+  const set = new Set(fixos)
+  return ordem.filter((slug) => !set.has(slug))
+}
+
+/**
+ * Reaplica a ordem dos arrastáveis mantendo os fixos (que existirem no cookie)
+ * no início, na ordem canônica da hierarquia.
+ */
+export function aplicarOrdemArrastavel(
+  atuais: string[],
+  novaOrdemArrastaveis: string[],
+  fixos: string[],
+): string[] | null {
+  const arrastaveisAtuais = ordemArrastavelSemFixos(atuais, fixos)
+  const permutacao = reordenarCanaisOperador(arrastaveisAtuais, novaOrdemArrastaveis)
+  if (!permutacao) return null
+  const fixosNoCookie = fixos.filter((slug) => atuais.includes(slug))
+  return [...fixosNoCookie, ...permutacao]
+}
+
+/**
+ * Drag entre dois slugs da zona móvel — fixos no cookie ficam intactos no prefixo.
+ */
+export function moverSlugArrastavel(
+  ordem: string[],
+  fromKey: string,
+  toKey: string,
+  fixos: string[],
+): string[] {
+  if (fromKey === toKey) return [...ordem]
+  const fixosSet = new Set(fixos)
+  if (fixosSet.has(fromKey) || fixosSet.has(toKey)) return [...ordem]
+  const arrastaveis = ordemArrastavelSemFixos(ordem, fixos)
+  const from = arrastaveis.indexOf(fromKey)
+  const to = arrastaveis.indexOf(toKey)
+  if (from < 0 || to < 0) return [...ordem]
+  const nextArr = moverItem(arrastaveis, from, to)
+  const fixosNoCookie = fixos.filter((slug) => ordem.includes(slug))
+  return [...fixosNoCookie, ...nextArr]
+}

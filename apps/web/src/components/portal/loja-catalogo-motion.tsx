@@ -18,13 +18,13 @@ export function LojaCategoriaChips({ chips }: { chips: LojaCategoriaChip[] }) {
         <m.div key={chip.slug} whileTap={{ scale: 0.96 }} transition={springSnappy} className="shrink-0">
           <Link
             href={chip.href}
-            className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium ${
+            className={`inline-flex whitespace-nowrap border px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] ${
               chip.active
                 ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                 : 'border-[rgb(var(--foreground-muted)_/_0.35)] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.5)]'
             }`}
           >
-            {chip.nome}
+            [ {chip.nome} ]
           </Link>
         </m.div>
       ))}
@@ -43,27 +43,27 @@ export function LojaPaginacao({ page, totalPages, prevHref, nextHref }: LojaPagi
   if (totalPages <= 1) return null
 
   return (
-    <div className="flex items-center justify-center gap-3 pt-4">
+    <div className="flex items-center justify-center gap-4 pt-6">
       {prevHref && (
         <m.div whileTap={{ scale: 0.96 }} transition={springSnappy}>
           <Link
             href={prevHref}
-            className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+            className="font-mono text-[11px] uppercase tracking-[0.16em] text-[rgb(var(--foreground-muted))] underline-offset-4 hover:text-[rgb(var(--foreground))] hover:underline"
           >
-            Anterior
+            ← Anterior
           </Link>
         </m.div>
       )}
-      <m.span layout className="text-sm text-[rgb(var(--foreground-muted))]">
-        Página {page} de {totalPages}
+      <m.span layout className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgb(var(--foreground-muted))]">
+        {page} / {totalPages}
       </m.span>
       {nextHref && (
         <m.div whileTap={{ scale: 0.96 }} transition={springSnappy}>
           <Link
             href={nextHref}
-            className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+            className="font-mono text-[11px] uppercase tracking-[0.16em] text-[rgb(var(--foreground-muted))] underline-offset-4 hover:text-[rgb(var(--foreground))] hover:underline"
           >
-            Próxima
+            Próxima →
           </Link>
         </m.div>
       )}

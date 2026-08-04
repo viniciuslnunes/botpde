@@ -1307,9 +1307,20 @@ Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o
 código de produção exercitado contra o banco (`pnpm --filter @torcida/web
 audit:dados`) e com as Server Actions executadas de verdade (`audit:fluxos`,
 sessão simulada). Lista completa, impacto e método em
-`docs/ops/auditoria-funcional-2026-07.md`. Correções **pendentes**:
+`docs/ops/auditoria-funcional-2026-07.md`.
 
-1. **Cargos de sistema desatualizados em 562/565 torcidas** — `owner`/`vice`
+> **Status é medido, não anotado (2026-08-04).** `pnpm --filter @torcida/web
+> audit:achados` confere item a item contra o código e o banco de hoje e
+> imprime `FECHADO` / `EM ABERTO` / regressão. Foi assim que se descobriu que
+> a lista abaixo estava desatualizada em cinco pontos: os itens **1, 2, 6, 8,
+> 9, 11 e 12 já estavam corrigidos** e continuavam marcados como pendentes —
+> uma lista de pendências que mistura resolvido com não-resolvido deixa de ser
+> usada para priorizar. Ao fechar um item, marque aqui **e** deixe a sonda
+> correspondente em `achados.audit.ts`: é ela que impede a volta.
+
+Estado por item (✅ fechado com rede na auditoria · ⏳ em aberto):
+
+1. ✅ **FECHADO** — Cargos de sistema desatualizados em 562/565 torcidas — `owner`/`vice`
    sem `bar:operate`, `bar:manage`, `members:dismiss`, `members:export_lge`,
    `affiliation:manage`. O módulo Bar está inacessível ao Presidente em
    praticamente toda torcida pré-existente. Cargo de sistema resolve pelo
@@ -1318,19 +1329,19 @@ sessão simulada). Lista completa, impacto e método em
    ou fazer cargo de sistema resolver pela constante em runtime (elimina a
    classe de bug). **Confirmado em fluxo real**: o Presidente de
    `torcida-fiel-macabra-sp` recebe "Sem permissão" ao chamar `abrirTurnoBar()`.
-2. **`listarComentariosPost` não respeita rivalidade** — comentário de post
+2. ✅ **FECHADO** — `listarComentariosPost` não respeitava rivalidade — comentário de post
    `PUBLICO` é legível por qualquer autenticado, sem escopo de tenant,
    contra `resolveVisibility(rival, PUBLICO) === false`. Decidir se a
    exceção é intencional (e documentá-la em `visibility.js`) ou se o gate
    precisa do escopo de tenants.
-3. **`podeVerPost` tem nome de gate completo mas não checa hierarquia nem
+3. ⏳ **EM ABERTO** — `podeVerPost` tem nome de gate completo mas não checa hierarquia nem
    rivalidade** — só privacidade de perfil. Seguro hoje porque o único
    chamador filtra tenants antes; renomear ou passar o escopo.
-4. **`alcanceNacional` em post `INSTITUCIONAL` é inerte** — o feed nacional
+4. ⏳ **EM ABERTO** — `alcanceNacional` em post `INSTITUCIONAL` é inerte — o feed nacional
    filtra `tipo: MEMBRO`. Bloquear no composer ou passar a incluir.
-5. **1 `MembroConversa` órfão** em canal privado de
+5. ⏳ **EM ABERTO** — `MembroConversa` órfão em canal privado de
    `torcida-organizada-remista-pa` — nenhum script de repair cobre o caso.
-6. **`roles:manage` escala privilégio** (rodada 3, 2026-07-30) — `criarRole`
+6. ✅ **FECHADO** (`assertPodeDelegar`) — `roles:manage` escalava privilégio (rodada 3, 2026-07-30) — `criarRole`
    não limita as permissões concedidas ao conjunto efetivo de quem cria.
    Provado em fluxo: ator sem `settings:manage` criou cargo com
    `settings:manage`, vestiu, e passou a ter. Na prática `roles:manage`
@@ -1338,18 +1349,18 @@ sessão simulada). Lista completa, impacto e método em
    `salvarAcessoUsuario` grava overrides com a mesma lacuna. **Decisão em
    aberto**: documentar como intencional, restringir ao conjunto do ator, ou
    separar a permissão de conceder permissões sensíveis.
-7. **Override negado não rege o feed público** (alerta) — com
+7. ⏳ **EM ABERTO** — Override negado não rege o feed público (alerta) — com
    `community:post` negado, `assertAutorPublicacaoPost` cai no caminho de
    torcedor (`podePublicarComoTorcedorFeed`). Confirmar se é intencional e
    documentar em `permissions.js`.
-8. **`promoverSedeParaTenant` estoura a transação** (rodada 4, 2026-07-30) —
+8. ✅ **FECHADO** (`TRANSACAO_PROMOCAO_OPTS`) — `promoverSedeParaTenant` estourava a transação (rodada 4, 2026-07-30) —
    `lib/promover-sede.ts:122` faz ~40 round-trips sequenciais numa interactive
    transaction **sem `timeout`** (default 5 s do Prisma); só o seed canônico
    (10 deptos + 22 perfis, em série) mediu 5,86 s contra o banco remoto. A
    promoção faz rollback inteiro. O orçamento é o RTT, não a lógica — passa
    co-localizado, cai em rede distante. Mesma classe de `03d62a8`. Fix:
    `{ timeout: 30_000 }` ou tirar o seed canônico da transação.
-9. **Relação de tenant parte de um nó arbitrário da árvore** (rodada 4,
+9. ✅ **FECHADO** (`getTenantRelationCrua` usa `findSedeRaiz`) — relação de tenant partia de um nó arbitrário da árvore (rodada 4,
    **latente**) — `getTenantRelationImpl` (`lib/hierarquia.ts:305`) escolhe a
    sede do ator com `findFirst({ where: { tenantId } })`, sem preferir
    `tipo: 'SEDE'` e **sem `orderBy`**, ao contrário das funções irmãs
@@ -1360,7 +1371,7 @@ sessão simulada). Lista completa, impacto e método em
    Sem `orderBy`, a ordem do Postgres não é estável — o mesmo tenant passa
    numa execução e falha na seguinte. Provado por contraste em
    `docs/ops/auditoria-funcional-2026-07.md` §Achado 9.
-10. **Super admin no `/portal` resolve tenant só por cookie** (2026-07-30,
+10. ⏳ **EM ABERTO** — Super admin no `/portal` resolve tenant só por cookie (2026-07-30,
     **UX/diagnóstico**) — `getActiveTenant` (`lib/tenant.ts:186`) pula toda a
     resolução por vínculo quando `isSuperAdminEmail(email)`, caindo direto em
     `torcida_ctx` → `TENANT_SLUG` do deploy. Quem administra a plataforma tem
@@ -1376,7 +1387,7 @@ sessão simulada). Lista completa, impacto e método em
     admin, ou (c) diferenciar a resposta quando a entidade existe em outro
     tenant. A opção (a) resolve a classe toda; (b) é o mínimo para o 404
     deixar de ser mudo.
-11. **Reconciliação de leitura cobre 1 de N** (rodada 5, 2026-07-30) — o
+11. ✅ **FECHADO** (`reconciliarNotificacoesDoEvento`) — reconciliação de leitura cobria 1 de N (rodada 5, 2026-07-30) — o
     fan-out cria uma `Notificacao` por destinatário, mas o `updateMany` que
     marca lida é escopado em `userId: session.user.id`. Medido: pedido de
     grupo resolvido deixa 1 de 2 admins com badge preso; denúncia resolvida
@@ -1384,12 +1395,170 @@ sessão simulada). Lista completa, impacto e método em
     `decidirPedidoCanal`, as 4 funções de moderação e
     `marcarSolicitacoesLidas`. Quanto maior a equipe, pior. Fix: reconciliar
     por critério do evento (tipo + ator + entidade), não por destinatário.
-12. **Ex-membro segue recebendo comunicado** (rodada 5) — `desligarMembro`
+12. ✅ **FECHADO** (`desligadoEm: null` no filtro) — ex-membro seguia recebendo comunicado (rodada 5) — `desligarMembro`
     grava `desligadoEm` sem mexer no `status`, e
     `listarUserIdsMembrosAprovados` filtra só `status: 'APROVADO'`. Quem saiu
     continua no fan-out de `notificarMembrosAprovados` (comunicado urgente).
     Fix: incluir `desligadoEm: null` no filtro e conferir os demais
     consumidores de "membro aprovado".
+
+### Rodada 8 (2026-08-04) — lote de jornadas, áreas/projetos e status medido
+
+Método novo: em vez de semear `SaasMembro` por `createMany`, o lote
+**jornadas** (`docs/ops/lote-jornadas.md`) faz as pessoas entrarem pelas
+Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
+áreas e projetos. Achados que só aparecem quando o caminho é percorrido:
+
+13. ✅ **FECHADO** — **Escalada de privilégio por `salvarPerfilComposto`**
+    (segunda porta do Achado 6). `salvarAcessoUsuario` ganhou
+    `assertPodeDelegar`; a criação de **perfil composto** ficou de fora e
+    continuava concedendo o que o ator não tem. Provado em fluxo: um `admin`
+    de `torcida-organizada-coringao-chopp-sp` criou um cargo com
+    `settings:manage` sem possuí-la (o formulário ainda aceita `userId`, então
+    dava para vestir no mesmo request). Guard aplicado; regressão coberta por
+    `audit:achados` §7 #6.
+14. ✅ **FECHADO** — **Transação de acesso e de vínculo sem `timeout`**
+    (mesma classe de `03d62a8` e do item 8). `salvarAcessoUsuario` sincroniza
+    a presença do usuário nos canais de todos os departamentos dentro da
+    transação: falhou em **5 de 5** torcidas com `Transaction not found`,
+    tornando impossível promover alguém a admin. `solicitarVinculo` toma o
+    advisory lock do nº de associado e checa unicidade na linhagem inteira:
+    falhou em 3 inscrições, todas no Gaviões (a maior torcida), devolvendo
+    "Aguarde e tente novamente" num cadastro válido. Os dois com
+    `{ timeout: 20_000, maxWait: 10_000 }`.
+15. ⏳ **EM ABERTO** — **Sócio aprovado pode nascer com a carteirinha
+    vencida.** `aprovarMembro` auto-emite a digital com
+    `validade = dataExpedicaoCarteirinha + periodicidade`, e quem entra por
+    «já sou sócio» **declara** a expedição do cartão físico. Cartão com mais de
+    um ano + plano ANUAL ⇒ digital nasce vencida, e `canais.ts` barra a pessoa
+    em **todos** os canais no minuto seguinte à aprovação — sócia, com cargo
+    `member` e `messages:send`, sem conseguir entrar em canal nenhum. Medido:
+    12 carteirinhas emitidas pelo lote, todas com validade no passado.
+    **Decisão em aberto**: contar a validade da aprovação, exigir cartão
+    vigente no wizard, ou manter (e então dar à pessoa uma saída visível em
+    vez de "canal não encontrado"). O lote mantém um caso por torcida de
+    propósito, para a tela de regularização ter sujeito.
+16. ⏳ **EM ABERTO** — **O ramo de Comunidade Nacional de `entrarCanal` é
+    inalcançável.** O ramo valida exatamente o que deveria bastar para um
+    torcedor sem torcida ativa (canal `PUBLICO`, tenant não-sintético, mesma
+    afiliação) e então chama `inscreverCanal` →
+    `assertElegibilidadeMembroCanal`, que exige `SaasMembro` no tenant do
+    canal — o que um torcedor da CN, por definição, não tem. Resultado:
+    "Você precisa ter vínculo com a torcida deste canal para participar",
+    sempre. **Decisão em aberto**: liberar CN em canal `PUBLICO` (e então o
+    gate precisa de um nível novo) ou remover o ramo, que hoje só engana quem
+    lê o código. Medido em `seed:jornadas` §canais/nacional.
+
+17. ⏳ **EM ABERTO** — **Convite da Sede raiz coloca torcedor e sócio pendente
+    dentro do canal oficial da Sede.** A regra está escrita duas vezes no
+    código: `vincularMembroCanaisAposAprovacao` diz *"TORCEDOR entra só no
+    canal da unidade que o convidou — nunca no da Sede; o canal da Sede é
+    espaço de sócio"*, e `solicitarVinculo` reforça *"sem sedeId não chama —
+    vincular sem unidade cairia no canal da Sede, que é de sócio"*. Só que
+    `decidirPassoInicialConvite` pré-seleciona a **própria SEDE** como unidade
+    quando o convite é da raiz — então `sedeId` existe, o guard passa, e
+    `canalDaUnidade` **é** o canal da Sede. A regra é burlada pela geometria,
+    não por uma falha de lógica. Medido no lote de jornadas: 8 dos 10
+    torcedores e todos os pendentes de convite-da-raiz entraram lá. No banco
+    inteiro há 688 TORCEDOR, 8 SOCIO PENDENTE e 4 SOCIO REPROVADO ativos em
+    canal oficial de `tipo: 'SEDE'` (número é teto — parte vem de seed/repair,
+    não do fluxo). **Decisão em aberto**: (a) tratar "unidade == Sede raiz"
+    como caso de sócio e não inscrever torcedor, aceitando que em torcida de
+    unidade única o torcedor fica sem canal; (b) manter e reescrever a regra,
+    que hoje descreve algo que não acontece; (c) separar o canal da organizada
+    do canal da sede territorial.
+18. ⏳ **EM ABERTO** — **Reprovado continua no canal da unidade.** A inscrição
+    acontece na **solicitação** (sócio pendente = experiência de torcedor), e
+    `reprovarMembro` não a desfaz. Quem foi recusado — inclusive por
+    `DUPLICIDADE`, com `permiteReenvio: false` — segue lendo o canal da
+    unidade por tempo indeterminado. 4 casos no banco. **Decisão em aberto**:
+    remover a inscrição na reprovação, ou documentar que recusado mantém o
+    acesso de torcedor.
+
+19. ✅ **FECHADO** — **Sócio pendente de unidade Caso B não entrava em canal
+    nenhum.** A unidade promovida tem canal **emprestado**: a `Sede` é do
+    tenant-filho (`subsede-rio-claro`), mas a `Conversa` está hospedada no
+    tenant da mãe (`pde-gavioes-fiel`). Na inscrição,
+    `assertElegibilidadeMembroCanal` resolve o vínculo pelo `conversa.tenantId`
+    e acha o **espelho** PENDENTE na mãe; o fallback de canal emprestado só
+    troca o `tenantVinculoId` quando o vínculo da unidade está **ativo**
+    (`if (naUnidade && (!membro || estaAtivo(naUnidade)))`) — e pendente não
+    está. A carve-out seguinte, que existe justamente para liberar o SOCIO
+    PENDENTE no canal da própria unidade, então procura em
+    `tenantId: <mãe>, espelhado: false` e não acha nada. Resultado: quem entra
+    pelo convite da unidade Caso B fica com **zero** `MembroConversa`, enquanto
+    quem entra pelo convite da Sede raiz entra. Medido: 2 de 2 pendentes de
+    `subsede-rio-claro` no lote de jornadas. **Corrigido**: o bloco só roda
+    quando o vínculo do tenant hospedeiro **não** está ativo, então o da
+    unidade dona nunca é pior — a guarda `(!membro || estaAtivo(naUnidade))`
+    virou `if (naUnidade)`. Verificado em fluxo: os 2 pendentes de
+    `subsede-rio-claro` passaram de 0 para 1 canal, e os outros 8 pendentes do
+    lote não mudaram.
+
+20. ⏳ **EM ABERTO** — **Carteirinha do Caso B diverge entre os dois níveis.**
+    `garantirCarteirinhaNoPar` sincroniza a validade (compara e faz `update`
+    quando difere), mas há sócios **reais** com o mesmo `numeroSocio` e
+    validades diferentes na unidade e na Sede — 2 casos em
+    `pde-fiel-baixada-praia-grande-praia-grande` × `pde-gavioes-fiel`, com 2 e
+    3 dias de diferença. As duas carteirinhas foram emitidas de forma
+    independente e nunca passaram pelo espelho. Importa porque o gate de canal
+    (`assertElegibilidadeMembroCanal`) resolve pelo `tenantVinculoId`: a mesma
+    pessoa pode estar vigente num nível e vencida no outro, e a resposta muda
+    conforme o canal que ela abre. `db:repair-carteirinha-espelho` existe para
+    isso — **decisão em aberto**: rodar o repair (dado de produção, exige
+    confirmação) e depois fechar a porta que permitiu a emissão independente.
+    Detectado por `audit:carteirinha-patrimonio`, primeira execução.
+
+21. ⏳ **EM ABERTO** — **Promover unidade a tenant deixa as carteirinhas para
+    trás.** `promoverSedeParaTenant` migra os `SaasMembro` da unidade para o
+    tenant novo (`findMany` → `update` do `tenantId`), mas **não toca em
+    `SaasSocio`**. A carteirinha fica no tenant da mãe, apontando para uma
+    torcida onde a pessoa já não tem vínculo. **45 casos** no banco (ex.:
+    `douglas.mendes.901` tem `SaasMembro` em `subsede-rio-claro` e
+    `SaasSocio` em `pde-gavioes-fiel`). Duas consequências, e a segunda é a
+    grave: (a) o sócio some das abas Ativos/Vencendo do tenant novo e volta
+    para "Aguardando emissão", apesar de ter carteirinha; (b) a carteirinha
+    órfã mantém `numeroSocio` — bloqueando aquele número na Sede — e um
+    `qrToken` **válido**, que segue validando no portão de uma torcida da qual
+    a pessoa saiu. **Fix**: mover `SaasSocio` junto na mesma transação da
+    promoção (`@@unique([tenantId, numeroSocio])` exige checar colisão no
+    destino), e um repair para os 45 já existentes. Detectado por
+    `audit:carteirinha-patrimonio`, primeira execução.
+
+22. ⏳ **EM ABERTO — o mais estrutural desta rodada.** **Três lugares do
+    código discordam sobre se SOCIO PENDENTE pode estar no canal da unidade**,
+    e um deles desfaz ativamente o que outro cria:
+    - `solicitarVinculo` **inscreve** o pendente no canal da unidade, com
+      comentário explícito: *"sócio pendente: mesma experiência de torcedor
+      (CN + PDE) até a aprovação"*;
+    - `assertElegibilidadeMembroCanal` tem uma **carve-out** dedicada que
+      libera SOCIO PENDENTE no canal da própria unidade;
+    - `dados-reais.audit.ts` (§*membro PENDENTE não está em canal oficial da
+      unidade*) reporta **erro** para qualquer não-APROVADO ATIVO em canal de
+      unidade, e aponta para `repair-canal-membro-pendente-aprovado.js`, que
+      *"encerra ATIVO sem SaasMembro local aprovado/ativo"* — ou seja, expulsa
+      exatamente quem o onboarding acabou de colocar.
+    Consequência prática: o estado do roster **oscila conforme o que rodou por
+    último**, e nenhuma das duas leituras é estável. Hoje são 14 casos.
+    Também é o motivo de a correção do item 19 *aumentar* a contagem do
+    `audit:dados` — ela faz o Caso B se comportar como o Caso A já se
+    comportava, o que está certo pelas regras (1) e (2) e errado pela (3).
+    **Decisão em aberto, e é uma só**: pendente entra no canal da unidade,
+    sim ou não? Escolhida a resposta, as outras duas fontes têm de mudar
+    junto — inclusive `ESPERADO_POR_FLUXO`
+    (`apps/web/src/lib/__seed__/_jornadas.ts`), que hoje segue (1) e (2).
+
+Cobertura nova: `audit:areas-projetos` (áreas de atuação e projetos —
+**zero** cobertura antes; o banco também estava sem nenhuma
+`DepartamentoAreaMembro` e nenhum `Projeto`), `audit:carteirinha-patrimonio`
+(`SaasSocio` e `PatrimonioItem`, os dois últimos modelos sem rede — achou o
+item 20 e um bug do seed que gerava carteirinha vencendo **antes** de ser
+expedida) e `audit:achados` (status medido desta lista).
+
+`audit:tudo` roda as 13 em sequência e consolida — sequencial de propósito,
+porque várias mutam e revertem no mesmo banco. O resumo distingue "encontrou
+achado" de "não conseguiu rodar": uma suíte que não executa não é uma suíte
+sem achados.
 
 Rodada 7 (`audit:loja`) fechou **sem achados**, com destaque para a
 **concorrência de estoque**: dois checkouts simultâneos na última unidade

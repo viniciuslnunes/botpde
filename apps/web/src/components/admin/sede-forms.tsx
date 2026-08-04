@@ -1420,7 +1420,7 @@ function SedeOperacaoFields({
         <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Dados operacionais</p>
         <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
           Contato, capacidade e informações úteis no portal. A liderança vinculada vira owner se a
-          unidade for promovida a tenant próprio.
+          unidade ganhar portal próprio.
         </p>
       </div>
 

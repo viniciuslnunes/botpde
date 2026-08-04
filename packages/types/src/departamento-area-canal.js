@@ -1,7 +1,9 @@
 /**
- * Canal por área de atuação — vínculo manual a `Conversa` tipo CANAL.
- * Anti-spam: nunca auto-cria canal; uma conversa só pode apontar para um
- * dono (área XOR departamento XOR sede — validado na action).
+ * Canal por área de atuação — ponteiro `DepartamentoArea.canalConversaId` →
+ * `Conversa` tipo CANAL. Provisionamento automático em
+ * `ensureCanaisDepartamentosTenant` / `ensureCanalArea` (db); vínculo manual
+ * (`vincularCanalDepartamentoArea`) continua válido. Uma conversa só pode
+ * apontar para um dono (área XOR departamento XOR sede — validado na action).
  */
 
 /**

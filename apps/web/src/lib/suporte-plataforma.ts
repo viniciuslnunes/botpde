@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 /**
  * Suporte da plataforma — quando o super-admin pode operar as configurações
@@ -13,10 +14,12 @@ import { db } from '@torcida/db'
  *
  * A regra passa a ser explícita e **isolada por unidade**:
  *
- * - unidade **sem owner** (recém-criada, liderança ainda não definida): o
- *   super-admin opera — senão não há quem configure;
- * - unidade **com owner**: só opera se a própria liderança tiver ligado o
- *   consentimento (`Tenant.suportePlataforma`). O toggle é do owner, nunca do
+ * - unidade **sem liderança da torcida** (recém-criada, presidente ainda não
+ *   definido): o super-admin opera — senão não há quem configure. Owner
+ *   técnico do setup (`SUPER_ADMIN_EMAILS`) **não conta** como liderança;
+ * - unidade **com presidente** (owner que não é super-admin): só opera se a
+ *   própria liderança tiver ligado o consentimento
+ *   (`Tenant.suportePlataforma`). O toggle é do owner, nunca do
  *   super-admin — consentimento que o beneficiário concede a si mesmo não é
  *   consentimento.
  *
@@ -25,7 +28,10 @@ import { db } from '@torcida/db'
  */
 
 export interface EstadoSuportePlataforma {
-  /** A unidade já tem alguém com o cargo de sistema `owner`. */
+  /**
+   * A unidade já tem presidente/liderança da torcida — cargo `owner` em
+   * alguém que **não** é só operador da plataforma (`SUPER_ADMIN_EMAILS`).
+   */
   temLideranca: boolean
   /** Consentimento gravado pela liderança nesta unidade. */
   consentido: boolean
@@ -33,15 +39,19 @@ export interface EstadoSuportePlataforma {
   superAdminPodeOperar: boolean
 }
 
-/** Existe alguém com o cargo de sistema `owner` neste tenant. */
+/**
+ * Existe liderança **da torcida** neste tenant.
+ * Owner técnico do setup (e-mail em `SUPER_ADMIN_EMAILS`) não conta — o
+ * bootstrap não bloqueia o próprio operador da plataforma.
+ */
 export const tenantTemOwner = cache(async function tenantTemOwner(
   tenantId: string,
 ): Promise<boolean> {
-  const owner: { id: string } | null = await db.userRole.findFirst({
+  const owners: Array<{ user: { email: string | null } }> = await db.userRole.findMany({
     where: { tenantId, role: { isSystem: true, nome: 'owner' } },
-    select: { id: true },
+    select: { user: { select: { email: true } } },
   })
-  return owner !== null
+  return owners.some((o) => !isSuperAdminEmail(o.user.email))
 })
 
 /** Estado do suporte da plataforma nesta unidade (nunca ler o campo direto). */

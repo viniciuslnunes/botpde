@@ -1,16 +1,18 @@
-# Módulo — Patrimônio (inventário)
+# Módulo — Patrimônio (inventário + custódia)
 
-> MVP operacional: cadastro de itens físicos da torcida (instrumentos, bandeirões, etc.).
+> Inventário de itens físicos da torcida + empréstimo com evidência fotográfica.
 > Não é ERP de ativos fixos com depreciação.
 
-## Escopo MVP
+## Escopo
 
 | Inclui | Fora (próximas fases) |
 |--------|------------------------|
-| Itens com categoria + status | Fotos / anexos |
-| Quantidade, localização, responsável (user) | Reserva/checkout formal |
-| Baixa via status `BAIXADO` | Vínculo automático com Sedes |
-| Portal (`patrimony:view`) + Admin (`patrimony:manage`) | Etiquetas / QR |
+| Itens com categoria + status | Reserva futura / aprovação humana |
+| Quantidade, localização, responsável | Vínculo automático com Sedes |
+| Empréstimo com foto saída + foto guarda | Etiquetas / QR |
+| Baixa via status `BAIXADO` | |
+| Portal (`patrimony:view`) + Admin (`patrimony:manage`) | |
+| `areaId` opcional → área do depto Patrimônio | UI completa de área no form (parcial) |
 
 ## Modelo
 
@@ -18,13 +20,16 @@
 
 - `tenantId`, `nome`, `categoria`, `status`, `quantidade` (≥ 1)
 - `localizacao`, `valorEstimado` (opcional), `observacao`
+- `areaId?` → `DepartamentoArea`
 - `responsavelId` (opcional → User), `criadoPorId`, timestamps
-- Índices: `(tenantId, status)`, `(tenantId, categoria)`, `(tenantId, nome)`
 
-Enums:
+`PatrimonioEmprestimo` (`saas_patrimonio_emprestimos`):
 
-- `CategoriaPatrimonioItem`: `INSTRUMENTO` | `BANDEIRA` | `UNIFORME` | `MOBILIARIO` | `ELETRONICO` | `ESPACO` | `OUTROS`
-- `StatusPatrimonioItem`: `DISPONIVEL` | `EM_USO` | `MANUTENCAO` | `BAIXADO`
+- `status`: `ABERTO` | `DEVOLVIDO` | `COM_DANO`
+- `fotoSaidaUrl` (obrigatória na retirada), `fotoGuardaUrl` (obrigatória na devolução)
+- Colaborador conclui sozinho (`patrimony:view`); gestor marca dano (`manage`)
+
+Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md) §4.1.
 
 ## Regras de negócio
 

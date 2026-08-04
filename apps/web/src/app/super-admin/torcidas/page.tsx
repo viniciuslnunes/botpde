@@ -141,10 +141,12 @@ export default async function TorcidasPage() {
         open
       >
         <summary className="cursor-pointer text-sm font-medium text-[rgb(var(--foreground))]">
-          Transferir propriedade (presidente)
+          Gerenciar presidente (owner)
         </summary>
         <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-          Quando a diretoria estiver pronta, transfira o cargo owner para o e-mail do presidente.
+          Transfira o cargo para o e-mail do presidente, ou remova a qualquer momento (a unidade
+          fica sem liderança até nova atribuição — e o super-admin volta a operar as configs
+          reservadas).
         </p>
         <TransferirOwnerPainel torcidas={torcidasTransferencia} />
       </details>

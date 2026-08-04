@@ -37,6 +37,7 @@ import {
   type UnidadeBuscaItem,
   type VisibilidadeCanal,
 } from './canais-shared'
+import { deveListarCanalDepartamentoNaComunidade } from '@torcida/types'
 
 /** Canal oficial representa uma unidade da torcida; seu nome é sempre visualizado em caixa alta. */
 function formatNomeCanal(nome: string | null, canalOficial: boolean): string | null {
@@ -164,7 +165,17 @@ export async function assertElegibilidadeMembroCanal(
         where: { tenantId_userId: { tenantId: unidadeDona.tenantId, userId } },
         select: { status: true, tipo: true, desligadoEm: true },
       })
-      if (naUnidade && (!membro || estaAtivo(naUnidade))) {
+      // Este bloco só roda quando o vínculo no tenant hospedeiro NÃO está
+      // ativo — então o da unidade dona nunca é pior, e é o canônico
+      // (`espelhado: false`) do canal em questão. A guarda antiga exigia que
+      // ele estivesse **ativo** para valer, e com isso empatava em
+      // "nenhum dos dois ativo": num Caso B, o espelho PENDENTE na Sede
+      // vencia o canônico PENDENTE da unidade, e a carve-out logo abaixo —
+      // que existe justamente para liberar o SOCIO PENDENTE no canal da
+      // própria unidade — passava a procurar no tenant errado. Resultado:
+      // quem entrava pelo convite da unidade Caso B ficava sem canal nenhum,
+      // enquanto quem entrava pela Sede raiz entrava. Ver ARCHITECTURE §7 19.
+      if (naUnidade) {
         membro = naUnidade
         tenantVinculoId = unidadeDona.tenantId
       }
@@ -738,10 +749,13 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
 
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
   // React.cache, então pares (viewer, tenant) repetidos não repetem query.
-  const [visiveis, fallbackAvatars, sedesPorCanal]: [
+  // Canais de depto/área: só membro ATIVO (não entram na vitrine da Comunidade).
+  const canalIds = rows.map((row) => row.id)
+  const [visiveis, fallbackAvatars, sedesPorCanal, canaisInternos]: [
     boolean[],
     Map<string, string | null>,
     SedeCanalLoc[],
+    Set<string>,
   ] = await Promise.all([
     Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId))),
     resolveFallbackAvatarsCanalOficial(
@@ -750,7 +764,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     rows.length === 0
       ? Promise.resolve([] as SedeCanalLoc[])
       : db.sede.findMany({
-          where: { canalConversaId: { in: rows.map((row) => row.id) } },
+          where: { canalConversaId: { in: canalIds } },
           select: {
             canalConversaId: true,
             tipo: true,
@@ -760,6 +774,23 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
             lng: true,
             fotoUrl: true,
           },
+        }),
+    rows.length === 0
+      ? Promise.resolve(new Set<string>())
+      : Promise.all([
+          db.departamento.findMany({
+            where: { canalConversaId: { in: canalIds } },
+            select: { canalConversaId: true },
+          }),
+          db.departamentoArea.findMany({
+            where: { canalConversaId: { in: canalIds } },
+            select: { canalConversaId: true },
+          }),
+        ]).then(([deptos, areas]) => {
+          const set = new Set<string>()
+          for (const d of deptos) if (d.canalConversaId) set.add(d.canalConversaId)
+          for (const a of areas) if (a.canalConversaId) set.add(a.canalConversaId)
+          return set
         }),
   ])
 
@@ -773,6 +804,15 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
   rows.forEach((row, i) => {
     if (!visiveis[i]) return
     const membro = membershipMap.get(row.id)
+    const souMembroAtivo = membro?.status === 'ATIVO'
+    if (
+      !deveListarCanalDepartamentoNaComunidade({
+        ehCanalDepartamentoOuArea: canaisInternos.has(row.id),
+        souMembroAtivo,
+      })
+    ) {
+      return
+    }
     const sede = sedeMap.get(row.id)
     result.push({
       id: row.id,
@@ -786,10 +826,10 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
       membros: row._count.membros,
-      souMembro: membro?.status === 'ATIVO',
-      souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+      souMembro: souMembroAtivo,
+      souAdmin: souMembroAtivo && membro?.papel === 'ADMIN',
       pedidoPendente: membro?.status === 'PENDENTE',
-      silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
+      silenciada: souMembroAtivo ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
       tipoUnidade: sede?.tipo ?? null,
       cidade: sede?.cidade ?? null,

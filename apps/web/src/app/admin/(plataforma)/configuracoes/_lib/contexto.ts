@@ -13,12 +13,12 @@ export interface ConfigContexto {
   isSuperAdmin: boolean
   /**
    * Pode gravar as seções "Somente owner": o owner, ou o super-admin quando a
-   * unidade autoriza o suporte (ou ainda não tem liderança). Espelha
-   * `assertOwnerOuSuportePlataforma` — a UI esconde exatamente o que a Server
-   * Action recusaria.
+   * unidade autoriza o suporte (ou ainda não tem liderança da torcida — owner
+   * técnico do setup não conta). Espelha `assertOwnerOuSuportePlataforma` —
+   * a UI esconde exatamente o que a Server Action recusaria.
    */
   podeEditarConfigDeOwner: boolean
-  /** Esta unidade já tem alguém com o cargo `owner`. */
+  /** Esta unidade já tem presidente/liderança (owner que não é super-admin). */
   temLideranca: boolean
   /** Consentimento de suporte gravado nesta unidade. */
   suporteConsentido: boolean

@@ -73,6 +73,27 @@ describe('departamentos portal access', () => {
       }),
     ).toBe(false)
   })
+
+  it('super-admin vê todos os departamentos sem virar gestor', () => {
+    const items = resolverDepartamentosHub({
+      todos: [diretoria, financeiro, bateria],
+      membershipIds: [],
+      gestorIds: [],
+      diretoriaId: 'd1',
+      isSuperAdmin: true,
+    })
+    expect(items.map((i) => i.slug)).toEqual(['diretoria', 'financeiro', 'bateria'])
+    expect(items.every((i) => i.isGestor === false)).toBe(true)
+    expect(items.every((i) => i.visaoDiretoria === true)).toBe(true)
+    expect(
+      podeAbrirDepartamentoPortal({
+        departamentoId: 'd3',
+        membershipIds: [],
+        diretoriaId: 'd1',
+        isSuperAdmin: true,
+      }),
+    ).toBe(true)
+  })
 })
 
 describe('resolverAreasDepartamento', () => {
@@ -113,7 +134,7 @@ describe('resolverAreasDepartamento', () => {
     expect(items.every((i) => i.isMembro === false)).toBe(true)
   })
 
-  it('super-admin recebe podeGerir em todas as áreas', () => {
+  it('super-admin NÃO recebe podeGerir só pelo bypass da plataforma', () => {
     const items = resolverAreasDepartamento({
       areas: [agasalho, inclusao],
       membroAreaIds: [],
@@ -121,7 +142,7 @@ describe('resolverAreasDepartamento', () => {
       isGestorDepartamento: false,
       isSuperAdmin: true,
     })
-    expect(items.every((i) => i.podeGerir)).toBe(true)
+    expect(items.every((i) => i.podeGerir === false)).toBe(true)
   })
 
   it('ordenação: minha área inativa antes de área ativa que não é minha', () => {
@@ -164,6 +185,12 @@ describe('rotulos e moduloPortal canonicos', () => {
     expect(rotuloAreaDepartamento('feminino', 'comunidade')).toMatch(/Via/i)
     expect(rotuloAreaDepartamento('social-e-eventos', 'eventos')).toMatch(/Via/i)
     expect(rotuloAreaDepartamento('comunicacao', 'comunidade')).toMatch(/Via/i)
+  })
+
+  it('diretoria e feminino usam moduloPortal próprio no registry', () => {
+    expect(resolverModuloPortalDepartamento('diretoria', 'membros')).toBe('diretoria')
+    expect(resolverModuloPortalDepartamento('feminino', 'comunidade')).toBe('feminino')
+    expect(rotuloAreaDepartamento('diretoria', 'membros')).toMatch(/governança/i)
   })
 
   it('carnaval é plugin de barracão (não thin Compõe)', () => {

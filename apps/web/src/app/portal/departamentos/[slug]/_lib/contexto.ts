@@ -38,16 +38,18 @@ export interface DepartamentoContexto {
   departamento: DeptoRow
   capability: ReturnType<typeof capabilityPorSlug>
   isSuperAdmin: boolean
-  /** DepartamentoGestor desta área (ou SA) — mesma regra que a página já usava. */
+  /** DepartamentoGestor desta área — SA sem cargo real não conta. */
   isGestor: boolean
   /** Tem `UserDepartamento` nesta área (equipe canônica). */
   isAtuacao: boolean
-  /** Enxerga por ser Diretoria (ou SA), sem atuação própria na área. */
+  /** Enxerga por ser Diretoria (ou SA operador), sem atuação própria na área. */
   visaoDiretoria: boolean
   permissoesEfetivas: string[]
   /** Autorização real de gestão (mesma regra de `assertPodeGerirArea`). */
   podeGerirEquipe: boolean
+  /** Aprovar filas desta área — RBAC real; SA só se tiver o cargo no tenant. */
   podeAprovarArea: boolean
+  /** Oversight: SA vê blocos mesmo sem a permissão no tenant. */
   podeVerFinanceiro: boolean
   podeVerPatrimonio: boolean
   podeModerar: boolean
@@ -127,14 +129,18 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     }),
     getUserPermissionsInTenant(session.user.id, tenant.id),
   ])
-  const isGestor = Boolean(gestao) || isSuperAdmin
+  const isGestor = Boolean(gestao)
   const permissoesEfetivas = calculateEffectivePermissions(rolePermissions, overrides)
-  const podeGerirEquipe =
-    isSuperAdmin ||
-    canManageDepartamento(permissoesEfetivas, gestao ? [depto.id] : [], depto.id)
+  // Gestão nunca vem do bypass de plataforma — só RBAC/gestor reais (dual-hat ok).
+  const podeGerirEquipe = canManageDepartamento(
+    permissoesEfetivas,
+    gestao ? [depto.id] : [],
+    depto.id,
+  )
 
-  const podeAprovarArea =
-    isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.MEMBERS_APPROVE)
+  const podeAprovarArea = hasPermission(permissoesEfetivas, PERMISSIONS.MEMBERS_APPROVE)
+  // Leitura: SA operador enxerga os painéis da área (oversight); escrita fica
+  // atrás de isGestor/podeGerirEquipe.
   const podeVerFinanceiro =
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.FINANCE_VIEW)
   const podeVerPatrimonio =
@@ -203,7 +209,6 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     membroAreaIds,
     responsavelAreaIds,
     isGestorDepartamento: podeGerirEquipe,
-    isSuperAdmin,
   })
   const minhasAreas = areas.filter((a) => a.isMembro)
 

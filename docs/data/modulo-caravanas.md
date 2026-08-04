@@ -17,7 +17,9 @@
 | Painel em `/portal/departamentos/caravanas` | |
 
 Rotas `/portal/caravanas*` redirecionam para o hub / detalhe unificado.
-Admin: `/admin/eventos?tipo=CARAVANA`.
+Admin ops: `/admin/caravanas` (thin wrapper sobre `Evento`; detalhe em
+`/admin/eventos/[id]`). Filtro legado `/admin/eventos?tipo=CARAVANA` segue válido.
+Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md).
 
 ## Modelo
 
@@ -57,4 +59,4 @@ evento ou sede).
 
 - **Ver**: membro do depto `caravanas` **ou** `events:create|manage` (painel)
 - **Criar / check-in**: `events:create|manage`
-- Operação admin: `/admin/eventos?tipo=CARAVANA`
+- Operação admin: `/admin/caravanas` (`DEPARTAMENTO_MODULO_ADMIN_ROTA`)

@@ -19,6 +19,7 @@ export type LancamentoState = {
 
 function revalidateFinanceiro() {
   revalidatePath('/admin/financeiro')
+  revalidatePath('/admin/financeiro/lancamentos')
   revalidatePath('/portal/financeiro')
   revalidatePath('/portal/balanco')
   revalidatePath('/portal/departamentos/financeiro')

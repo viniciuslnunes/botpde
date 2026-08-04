@@ -28,7 +28,6 @@ import {
   getUserPermissionsInTenant,
   invalidatePermissionsCache,
 } from '@/lib/tenant'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
 
@@ -54,6 +53,17 @@ interface UserPermissionLite {
   permission: string
   granted: boolean
 }
+
+/**
+ * Mudança de acesso não cabe nos 5s de transação interativa do Prisma: além
+ * dos `UserRole`/`UserPermission`, ela sincroniza a presença do usuário nos
+ * canais de **todos** os departamentos e áreas do tenant
+ * (`sincronizarCanaisDepartamentoUsuario`). Numa torcida com 10 departamentos
+ * e o banco atrás do proxy, o default estoura e a promoção falha inteira, com
+ * "Transaction not found" — mesmo motivo que já obrigou
+ * `TRANSACAO_DECISAO_MEMBRO_OPTS` em `admin/membros/actions.ts`.
+ */
+const TRANSACAO_ACESSO_OPTS = { timeout: 20_000, maxWait: 10_000 }
 
 const IdSchema = z.string().min(1)
 const SalvarAcessoSchema = z.object({
@@ -306,7 +316,7 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
         },
       },
     })
-  })
+  }, TRANSACAO_ACESSO_OPTS)
 
   if (ganhouLideranca) {
     const membro: { sedeId: string | null } | null = await db.saasMembro.findFirst({
@@ -344,7 +354,8 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
  * Se `userId` for enviado, atribui o perfil à pessoa e sincroniza membership.
  */
 export async function salvarPerfilComposto(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const ctx = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const { session, tenant } = ctx
 
   const entrada = PerfilCompostoSchema.safeParse({
     nome: formData.get('nome'),
@@ -366,6 +377,14 @@ export async function salvarPerfilComposto(formData: FormData) {
       ALL_PERMISSIONS_SET.includes(p),
     ),
   )
+
+  // ── Limite de delegação (Achado 6, segunda porta) ─────────────────────────
+  // `salvarAcessoUsuario` ganhou este guard; esta função ficou de fora e
+  // continuava sendo escalada por outro caminho: criar um cargo carregando
+  // `settings:manage` e vesti-lo no mesmo request (`userId` no formulário).
+  // Medido em fluxo por `audit:achados` §7 #6 — um `admin` de
+  // torcida-organizada-coringao-chopp-sp criou e assumiu o cargo.
+  assertPodeDelegar(ctx, extras, `no perfil "${nome}"`)
 
   const departamentoId = departamentoIdRaw || null
   const papelNoDepartamento =
@@ -468,10 +487,7 @@ async function assertPodeGerirDepartamento(departamentoId: string) {
   const tenant = await getActiveTenant(session.user.id, session.user.email)
   if (!tenant) throw new Error('Não autorizado')
 
-  if (isSuperAdminEmail(session.user.email)) {
-    return { session, tenant }
-  }
-
+  // SA operador não gerencia departamentos — só RBAC/gestor reais (dual-hat ok).
   const {
     rolePermissions,
     overrides,
@@ -549,7 +565,7 @@ export async function adicionarMembroDepartamento(
         detalhes: { userId: targetUserId },
       },
     })
-  })
+  }, TRANSACAO_ACESSO_OPTS)
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)
@@ -585,12 +601,12 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
         role: { departamentoId },
       },
     })
-    await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })
-    // Quem sai do departamento perde as áreas deste departamento (só as dele —
-    // outros departamentos/tenants não são afetados).
+    // Quem sai do departamento perde as áreas deste departamento antes do
+    // sync — assim os canais das frentes também removem o usuário.
     await tx.departamentoAreaMembro.deleteMany({
       where: { userId: targetUserId, area: { departamentoId } },
     })
+    await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })
     await tx.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -601,7 +617,7 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
         detalhes: { userId: targetUserId },
       },
     })
-  })
+  }, TRANSACAO_ACESSO_OPTS)
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)

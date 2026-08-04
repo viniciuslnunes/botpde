@@ -14,6 +14,7 @@ import {
   Clock,
   Copy,
   CreditCard,
+  LayoutGrid,
   Loader2,
   Minus,
   NotebookPen,
@@ -264,6 +265,8 @@ export function BarPdv({
   const [comandas, setComandas] = useState(comandasIniciais)
   const [comandasPropRef, setComandasPropRef] = useState(comandasIniciais)
   const [comandaIdAtiva, setComandaIdAtiva] = useState<string | null>(null)
+  /** Preferência visual do painel (Venda rápida | Comanda), independente de haver comanda selecionada. */
+  const [painelModo, setPainelModo] = useState<'venda' | 'comanda'>('venda')
 
   // Sync após router.refresh (nova referência de props) sem useEffect.
   if (comandasIniciais !== comandasPropRef) {
@@ -271,6 +274,7 @@ export function BarPdv({
     setComandas(comandasIniciais)
     if (comandaIdAtiva && !comandasIniciais.some((c) => c.id === comandaIdAtiva)) {
       setComandaIdAtiva(null)
+      setPainelModo('venda')
     }
   }
   const [categoriaId, setCategoriaId] = useState<string | null>(null)
@@ -347,6 +351,22 @@ export function BarPdv({
       return true
     })
   }, [produtos, categoriaId, busca])
+
+  const contagemPorCategoria = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of produtos) {
+      const id = p.categoria?.id
+      if (!id) continue
+      map.set(id, (map.get(id) ?? 0) + 1)
+    }
+    return map
+  }, [produtos])
+
+  const imagemPorProdutoId = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const p of produtos) map.set(p.id, p.imagemUrl)
+    return map
+  }, [produtos])
 
   const estoqueDisponivel = useCallback(
     (produtoId: string, estoqueBase: number) => {
@@ -633,6 +653,7 @@ export function BarPdv({
       }
       setComandas((prev) => [...prev, nova].sort((a, b) => a.codigo.localeCompare(b.codigo)))
       setComandaIdAtiva(result.comandaId)
+      setPainelModo('comanda')
       setModalAbrir(false)
       setAbrirCodigo('')
       setAbrirNome('')
@@ -806,6 +827,7 @@ export function BarPdv({
 
       setComandas((prev) => prev.filter((c) => c.id !== comandaAtiva.id))
       setComandaIdAtiva(null)
+      setPainelModo('venda')
       setUltimoTotal(totalAposDesconto)
       setFase('sucesso')
       toast.success(
@@ -900,6 +922,7 @@ export function BarPdv({
       if (status.status === 'FECHADA_PAGA' || status.status === 'FECHADA_COM_DEBITO') {
         setComandas((prev) => prev.filter((c) => c.id !== pix.comandaId))
         setComandaIdAtiva(null)
+        setPainelModo('venda')
         setFase('sucesso')
         setPix(null)
         toast.success('PIX da comanda confirmado', { description: formatarPreco(pix.total) })
@@ -940,6 +963,7 @@ export function BarPdv({
       }
       setComandas((prev) => prev.filter((c) => c.id !== pix.comandaId))
       setComandaIdAtiva(null)
+      setPainelModo('venda')
       setFase('sucesso')
       setPix(null)
       toast.success('PIX da comanda confirmado (mock)')
@@ -975,39 +999,116 @@ export function BarPdv({
   // `sm:grid-cols-2` valia numa coluna de 21rem e espremia os campos.
   const sidebar = (
     <div className="@container flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-baseline justify-between gap-2 pb-2.5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">
-          Pedido
-          {qtdItens > 0 && (
-            <span className="ml-2 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs font-bold tabular-nums tracking-normal text-[rgb(var(--foreground-muted))]">
-              {qtdItens}
-            </span>
+      {/* Cabeçalho: contexto + toggle Venda rápida | Comanda */}
+      <div className="shrink-0 space-y-3 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
+              {painelModo === 'comanda' ? 'Comanda' : 'Pedido'}
+            </p>
+            <h2 className="truncate text-base font-bold leading-tight text-[rgb(var(--foreground))]">
+              {painelModo === 'comanda' && comandaAtiva
+                ? `${comandaAtiva.codigo} · ${comandaAtiva.titularNome}`
+                : painelModo === 'comanda'
+                  ? 'Selecione ou abra'
+                  : unidadeNome}
+            </h2>
+          </div>
+          {pedido.length > 0 && (
+            <button
+              type="button"
+              onClick={limparPedido}
+              className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-[rgb(var(--color-danger-fg))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.1)]"
+            >
+              Limpar
+            </button>
           )}
-        </h2>
-        {pedido.length > 0 && (
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Modo do pedido"
+          className="grid grid-cols-2 gap-1 rounded-2xl bg-[rgb(var(--background-subtle))] p-1"
+        >
           <button
             type="button"
-            onClick={limparPedido}
-            className="rounded-full px-2 py-1 text-xs font-semibold text-[rgb(var(--color-danger-fg))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.1)]"
+            role="tab"
+            aria-selected={painelModo === 'venda'}
+            onClick={() => {
+              setPainelModo('venda')
+              setComandaIdAtiva(null)
+              setErro(null)
+            }}
+            className={[
+              'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
+              painelModo === 'venda'
+                ? 'bg-[rgb(var(--color-primary)_/_0.16)] text-[rgb(var(--color-primary-fg))] shadow-sm'
+                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+            ].join(' ')}
           >
-            Limpar
+            Venda rápida
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={painelModo === 'comanda'}
+            onClick={() => {
+              setPainelModo('comanda')
+              if (!comandaIdAtiva && comandas[0]) setComandaIdAtiva(comandas[0].id)
+              setErro(null)
+            }}
+            className={[
+              'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
+              painelModo === 'comanda'
+                ? 'bg-[rgb(var(--color-primary)_/_0.16)] text-[rgb(var(--color-primary-fg))] shadow-sm'
+                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+            ].join(' ')}
+          >
+            Comanda
+          </button>
+        </div>
+
+        {painelModo === 'comanda' && (
+          <div className="flex items-center gap-1.5">
+            <label className="sr-only" htmlFor="pdv-comanda-select-sidebar">
+              Comanda ativa
+            </label>
+            <div className="relative min-w-0 flex-1">
+              <NotebookPen className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+              <select
+                id="pdv-comanda-select-sidebar"
+                value={comandaIdAtiva ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setComandaIdAtiva(v === '' ? null : v)
+                  setErro(null)
+                }}
+                className="h-10 w-full truncate rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-0 pl-8 pr-7 text-xs font-semibold text-[rgb(var(--foreground))]"
+              >
+                <option value="">Escolher comanda…</option>
+                {comandas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo} · {c.titularNome}
+                    {c.total > 0 ? ` · ${formatarPreco(c.total)}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={!turnoAberto || pending}
+              onClick={() => setModalAbrir(true)}
+              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-[rgb(var(--border))] px-2.5 text-xs font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Abrir
+            </button>
+          </div>
         )}
       </div>
 
       {modoComanda && comandaAtiva && (
-        <div className="mb-2 shrink-0 space-y-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="truncate text-xs font-bold text-[rgb(var(--foreground))]">
-              {comandaAtiva.codigo}
-              <span className="ml-1.5 font-medium text-[rgb(var(--foreground-muted))]">
-                · {comandaAtiva.titularNome}
-              </span>
-            </p>
-            <span className="shrink-0 text-sm font-bold tabular-nums text-[rgb(var(--foreground))]">
-              {formatarPreco(comandaAtiva.total)}
-            </span>
-          </div>
+        <div className="mb-2 shrink-0 space-y-1.5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-2">
           {comandaAtiva.limiteEfetivo != null && (
             <div>
               <div className="mb-1 flex justify-between text-[10px] font-semibold text-[rgb(var(--foreground-muted))]">
@@ -1049,6 +1150,12 @@ export function BarPdv({
               </div>
             </div>
           )}
+          <div className="flex justify-between text-[11px] text-[rgb(var(--foreground-muted))]">
+            <span>Consumo</span>
+            <span className="font-bold tabular-nums text-[rgb(var(--foreground))]">
+              {formatarPreco(comandaAtiva.total)}
+            </span>
+          </div>
           {comandaAtiva.totalPago > 0 && (
             <p className="text-[10px] text-[rgb(var(--foreground-muted))]">
               Já pago {formatarPreco(comandaAtiva.totalPago)} · saldo{' '}
@@ -1068,7 +1175,7 @@ export function BarPdv({
             </p>
           </div>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             <AnimatePresence mode="popLayout" initial={false}>
               {pedido.map((l) => (
                 <m.li
@@ -1079,8 +1186,16 @@ export function BarPdv({
                   exit="exit"
                   variants={cartItemExit}
                   transition={springSnappy}
-                  className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-2"
+                  className="flex items-center gap-2.5 rounded-2xl bg-[rgb(var(--background-subtle))] px-2.5 py-2"
                 >
+                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[rgb(var(--background))]">
+                    <ProdutoImagem
+                      src={imagemPorProdutoId.get(l.produtoId)}
+                      alt=""
+                      variant="thumb"
+                      className="!h-full !w-full !rounded-xl"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p
                       className="truncate text-[13px] font-semibold leading-tight text-[rgb(var(--foreground))]"
@@ -1125,7 +1240,7 @@ export function BarPdv({
             {comandaAtiva.lancamentos.map((lanc) => (
               <div
                 key={lanc.id}
-                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-2"
+                className="rounded-2xl bg-[rgb(var(--background-subtle))] px-2.5 py-2"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -1170,7 +1285,7 @@ export function BarPdv({
       </div>
 
       <div className="mt-2.5 shrink-0 space-y-2.5 border-t border-[rgb(var(--border))] pt-2.5">
-        {!modoComanda && (
+        {painelModo === 'venda' && (
           <>
             <button
               type="button"
@@ -1225,7 +1340,7 @@ export function BarPdv({
               <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 Pagamento
               </p>
-              <div className="@[19rem]:grid-cols-4 grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
                 {METODOS_PEDIDO.map((m) => (
                   <button
                     key={m}
@@ -1234,9 +1349,9 @@ export function BarPdv({
                     title={METODO_PAGAMENTO_BAR_LABEL[m]}
                     onClick={() => setMetodo(m)}
                     className={[
-                      'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-semibold leading-none transition-colors',
+                      'flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-semibold leading-tight transition-colors',
                       metodo === m
-                        ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
+                        ? 'bg-[rgb(var(--color-primary)_/_0.16)] text-[rgb(var(--color-primary-fg))] ring-1 ring-[rgb(var(--color-primary)_/_0.35)]'
                         : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.4)] hover:bg-[rgb(var(--background-subtle))]',
                     ].join(' ')}
                   >
@@ -1249,20 +1364,20 @@ export function BarPdv({
           </>
         )}
 
-        <div className="rounded-xl bg-[rgb(var(--background-subtle))] px-3 py-2.5">
+        <div className="space-y-1 px-0.5">
           <div className="flex justify-between text-xs text-[rgb(var(--foreground-muted))]">
-            <span>{modoComanda ? 'Pedido' : 'Subtotal'}</span>
+            <span>{painelModo === 'comanda' ? 'Pedido' : 'Subtotal'}</span>
             <span className="tabular-nums">{formatarPreco(resumo.subtotal)}</span>
           </div>
-          {!modoComanda && resumo.desconto > 0 && (
-            <div className="mt-1 flex justify-between text-xs text-[rgb(var(--foreground-muted))]">
+          {painelModo === 'venda' && resumo.desconto > 0 && (
+            <div className="flex justify-between text-xs text-[rgb(var(--foreground-muted))]">
               <span>Desconto</span>
               <span className="tabular-nums">−{formatarPreco(resumo.desconto)}</span>
             </div>
           )}
-          <div className="mt-1.5 flex items-baseline justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              {modoComanda ? 'A lançar' : 'Total'}
+          <div className="flex items-baseline justify-between gap-2 pt-1">
+            <span className="text-sm font-bold text-[rgb(var(--foreground))]">
+              {painelModo === 'comanda' ? 'A lançar' : 'Valor total'}
             </span>
             <span className="text-[1.75rem] font-bold leading-none tabular-nums text-[rgb(var(--foreground))]">
               {formatarPreco(resumo.total)}
@@ -1279,17 +1394,17 @@ export function BarPdv({
           </p>
         )}
 
-        {modoComanda ? (
+        {painelModo === 'comanda' ? (
           <div className="space-y-2">
             <button
               type="button"
-              disabled={pending || pedido.length === 0}
+              disabled={pending || pedido.length === 0 || !comandaAtiva}
               onClick={lancarNaComanda}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100 disabled:shadow-none"
             >
               {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-              Lançar na comanda
-              {pedido.length > 0 && (
+              {!comandaAtiva ? 'Escolha uma comanda' : 'Lançar na comanda'}
+              {pedido.length > 0 && comandaAtiva && (
                 <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
               )}
             </button>
@@ -1297,7 +1412,7 @@ export function BarPdv({
               type="button"
               disabled={pending || !comandaAtiva || comandaAtiva.lancamentos.length === 0}
               onClick={abrirModalFechar}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-3 text-sm font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[rgb(var(--border))] px-4 py-3 text-sm font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Fechar comanda
               {comandaAtiva && comandaAtiva.total > 0 && (
@@ -1312,10 +1427,10 @@ export function BarPdv({
             type="button"
             disabled={pending || pedido.length === 0}
             onClick={cobrar}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--primary))] px-4 py-3.5 text-base font-bold text-[rgb(var(--color-primary-fg))] shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[rgb(var(--background-subtle))] disabled:text-[rgb(var(--foreground-muted))] disabled:opacity-100 disabled:shadow-none"
           >
             {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-            {metodo === 'PIX' ? 'Gerar PIX' : 'Cobrar'}
+            {metodo === 'PIX' ? 'Gerar PIX' : 'Finalizar pedido'}
             {pedido.length > 0 && (
               <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
             )}
@@ -1549,8 +1664,8 @@ export function BarPdv({
     // @container/pdv: o PDV é um frame imersivo com duas colunas laterais. Quem
     // decide o layout é a largura real do frame, não a da viewport — o mesmo
     // painel vive em notebook, TV do balcão e tablet, e `lg:` mentia nos três.
-    <div className="@container/pdv relative flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--background))]">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3">
+    <div className="@container/pdv relative flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--background-subtle))]">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 shadow-sm">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[rgb(var(--foreground-muted))]">
             PDV Bar
@@ -1558,43 +1673,6 @@ export function BarPdv({
           <h1 className="truncate text-sm font-bold leading-tight text-[rgb(var(--foreground))] @[48rem]/pdv:text-base">
             {unidadeNome}
           </h1>
-        </div>
-
-        {/* Contexto de comanda: Sem comanda = venda rápida. */}
-        <div className="flex min-w-0 items-center gap-1.5">
-          <label className="sr-only" htmlFor="pdv-comanda-select">
-            Comanda ativa
-          </label>
-          <div className="relative min-w-0">
-            <NotebookPen className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <select
-              id="pdv-comanda-select"
-              value={comandaIdAtiva ?? ''}
-              onChange={(e) => {
-                const v = e.target.value
-                setComandaIdAtiva(v === '' ? null : v)
-                setErro(null)
-              }}
-              className="h-10 max-w-[11rem] truncate rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-0 pl-8 pr-7 text-xs font-semibold text-[rgb(var(--foreground))] @[42rem]/pdv:max-w-[16rem] @[56rem]/pdv:max-w-[20rem]"
-            >
-              <option value="">Sem comanda</option>
-              {comandas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.codigo} · {c.titularNome}
-                  {c.total > 0 ? ` · ${formatarPreco(c.total)}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            disabled={!turnoAberto || pending}
-            onClick={() => setModalAbrir(true)}
-            className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-[rgb(var(--border))] px-2.5 text-xs font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50 @[42rem]/pdv:px-3"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span className="hidden @[34rem]/pdv:inline">Abrir</span>
-          </button>
         </div>
 
         {comandaAtiva && avisoLimitePct != null && (
@@ -1673,110 +1751,79 @@ export function BarPdv({
             />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 gap-3 p-3">
             {/* Cardápio */}
-            <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-              {pendentes.length > 0 && (
-                <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[rgb(var(--border))] bg-[rgb(var(--color-warning)_/_0.07)] px-3 py-2">
-                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--color-warning-fg))]">
-                    PIX pendente · {pendentesTotal}
-                  </span>
-                  {pendentes.map((v) => {
-                    const qtd = v.itens.reduce((n, i) => n + i.quantidade, 0)
-                    return (
-                      <div
-                        key={v.id}
-                        title={`${qtd} ${qtd === 1 ? 'item' : 'itens'} · criada ${formatarTempoRelativo(v.criadoEm)}`}
-                        className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--surface))] pl-3 pr-1"
-                      >
-                        <span className="text-xs font-bold tabular-nums text-[rgb(var(--foreground))]">
-                          {formatarPreco(v.total)}
-                        </span>
-                        <span className="text-[11px] tabular-nums text-[rgb(var(--foreground-muted))]">
-                          {formatarTempoRelativo(v.criadoEm)}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={pending || !v.pixCopiaCola}
-                          onClick={() => retomarPendente(v)}
-                          className="h-7 rounded-full bg-[rgb(var(--primary))] px-2.5 text-[11px] font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90 disabled:opacity-50"
-                        >
-                          Retomar
-                        </button>
-                        {podeCancelar && (
-                          <button
-                            type="button"
-                            disabled={pending}
-                            aria-label={`Cancelar venda de ${formatarPreco(v.total)}`}
-                            onClick={() => cancelarPendenteDaFaixa(v)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.1)] hover:text-[rgb(var(--color-danger-fg))] disabled:opacity-50"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                  <Link
-                    href="/admin/bar/vendas?status=PENDENTE"
-                    className="ml-auto shrink-0 pl-2 text-[11px] font-semibold text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-                  >
-                    Ver todas
-                  </Link>
-                </div>
-              )}
-
-              <div className="shrink-0 space-y-2 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
+              <div className="shrink-0 space-y-3 px-4 py-3.5">
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
                   <input
                     type="search"
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
-                    placeholder="Buscar no cardápio…"
-                    aria-label="Buscar no cardápio"
-                    className="h-10 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
+                    placeholder="Pesquisar produto aqui…"
+                    aria-label="Pesquisar produto"
+                    className="h-11 w-full rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] pl-10 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
                   />
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-                    <button
-                      type="button"
-                      aria-pressed={categoriaId == null}
-                      onClick={() => setCategoriaId(null)}
-                      className={[
-                        'h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold transition-colors',
-                        categoriaId == null
-                          ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
-                          : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
-                      ].join(' ')}
-                    >
-                      Todos
-                    </button>
-                    {categorias.map((c) => (
+
+                <div className="flex gap-2 overflow-x-auto pb-0.5">
+                  <button
+                    type="button"
+                    aria-pressed={categoriaId == null}
+                    onClick={() => setCategoriaId(null)}
+                    className={[
+                      'flex h-[4.75rem] w-[5.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors',
+                      categoriaId == null
+                        ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-[rgb(var(--color-primary)_/_0.3)]'
+                        : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
+                    ].join(' ')}
+                  >
+                    <LayoutGrid className="h-5 w-5" />
+                    <span className="text-[11px] font-bold leading-tight">Todos</span>
+                    <span className="text-[10px] tabular-nums text-[rgb(var(--foreground-muted))]">
+                      {produtos.length} {produtos.length === 1 ? 'item' : 'itens'}
+                    </span>
+                  </button>
+                  {categorias.map((c) => {
+                    const qtd = contagemPorCategoria.get(c.id) ?? 0
+                    const ativa = categoriaId === c.id
+                    return (
                       <button
                         key={c.id}
                         type="button"
-                        aria-pressed={categoriaId === c.id}
+                        aria-pressed={ativa}
                         onClick={() => setCategoriaId(c.id)}
                         className={[
-                          'h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold transition-colors',
-                          categoriaId === c.id
-                            ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
+                          'flex h-[4.75rem] w-[5.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors',
+                          ativa
+                            ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-[rgb(var(--color-primary)_/_0.3)]'
                             : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
                         ].join(' ')}
                       >
-                        {c.nome}
+                        <span
+                          className={[
+                            'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold',
+                            ativa
+                              ? 'bg-[rgb(var(--color-primary)_/_0.22)]'
+                              : 'bg-[rgb(var(--background-subtle))]',
+                          ].join(' ')}
+                        >
+                          {c.nome.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="line-clamp-1 w-full text-[11px] font-bold leading-tight" title={c.nome}>
+                          {c.nome}
+                        </span>
+                        <span className="text-[10px] tabular-nums text-[rgb(var(--foreground-muted))]">
+                          {qtd} {qtd === 1 ? 'item' : 'itens'}
+                        </span>
                       </button>
-                    ))}
-                  </div>
-                  <span className="hidden shrink-0 text-[11px] tabular-nums text-[rgb(var(--foreground-muted))] @[48rem]/pdv:block">
-                    {filtrados.length} {filtrados.length === 1 ? 'item' : 'itens'}
-                  </span>
+                    )
+                  })}
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-24 @[60rem]/pdv:pb-3">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 @[60rem]/pdv:pb-20">
                 {filtrados.length === 0 ? (
                   <MotionEmptyState
                     icon={<Beer className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
@@ -1789,11 +1836,7 @@ export function BarPdv({
                     className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-16 text-center"
                   />
                 ) : (
-                  // Linhas compactas em auto-fill: o operador precisa varrer o
-                  // cardápio inteiro de relance. Card alto com foto grande cabia
-                  // 3 itens na tela; a linha de 4rem cabe 8 por coluna.
-                  // Zona de ação com largura fixa — a linha não reflui ao lançar.
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15.5rem,100%),1fr))] gap-2">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(10.5rem,100%),1fr))] gap-3">
                     {filtrados.map((p) => {
                       const noPedido = pedido.find((l) => l.produtoId === p.id)?.quantidade ?? 0
                       const disponivel = estoqueDisponivel(p.id, p.estoque)
@@ -1806,8 +1849,6 @@ export function BarPdv({
                         if (!bloqueado) setQtdProduto(p, 1)
                       }
                       return (
-                        // Div (não button): o −/+ aninha <button> real; button dentro
-                        // de button fecha o externo cedo e estilhaça a grade.
                         <m.div
                           key={p.id}
                           role="button"
@@ -1826,38 +1867,47 @@ export function BarPdv({
                             }
                           }}
                           className={[
-                            'flex min-w-0 select-none items-center gap-2.5 rounded-xl border p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.5)]',
+                            'flex min-w-0 select-none flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--background))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.5)]',
                             esgotado
-                              ? 'cursor-not-allowed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-55'
+                              ? 'cursor-not-allowed border-[rgb(var(--border))] opacity-55'
                               : noPedido > 0
-                                ? 'cursor-pointer border-[rgb(var(--color-primary)_/_0.55)] bg-[rgb(var(--color-primary)_/_0.08)]'
-                                : 'cursor-pointer border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.35)] hover:bg-[rgb(var(--surface-raised))]',
+                                ? 'cursor-pointer border-[rgb(var(--color-primary)_/_0.55)] shadow-sm'
+                                : 'cursor-pointer border-[rgb(var(--border))] hover:border-[rgb(var(--color-primary)_/_0.35)] hover:shadow-sm',
                           ].join(' ')}
                         >
-                          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[rgb(var(--background-subtle))]">
+                          <div className="relative aspect-[4/3] w-full overflow-hidden bg-[rgb(var(--background-subtle))]">
                             <ProdutoImagem
                               src={p.imagemUrl}
                               alt=""
-                              variant="thumb"
-                              className="!h-full !w-full !rounded-lg"
+                              variant="card"
+                              className="!h-full !w-full"
                             />
+                            {estoqueBaixo && !esgotado && (
+                              <span className="absolute left-2 top-2 rounded-full bg-[rgb(var(--color-warning)_/_0.92)] px-2 py-0.5 text-[10px] font-bold text-[rgb(var(--color-warning-fg))]">
+                                Estoque baixo
+                              </span>
+                            )}
+                            {esgotado && (
+                              <span className="absolute left-2 top-2 rounded-full bg-[rgb(var(--color-danger)_/_0.92)] px-2 py-0.5 text-[10px] font-bold text-white">
+                                Esgotado
+                              </span>
+                            )}
                           </div>
 
-                          <div className="min-w-0 flex-1">
+                          <div className="flex flex-1 flex-col gap-2 p-2.5">
                             <p
-                              className="truncate text-[13px] font-semibold leading-tight text-[rgb(var(--foreground))]"
+                              className="line-clamp-2 min-h-[2.25rem] text-[13px] font-semibold leading-tight text-[rgb(var(--foreground))]"
                               title={p.nome}
                             >
                               {p.nome}
                             </p>
-                            <p className="mt-1 flex items-baseline gap-1.5 leading-none">
-                              <span className="text-[13px] font-bold tabular-nums text-[rgb(var(--foreground))]">
+                            <div className="flex items-baseline justify-between gap-1">
+                              <span className="text-sm font-bold tabular-nums text-[rgb(var(--color-primary-fg))]">
                                 {formatarPreco(p.preco)}
                               </span>
-                              <span className="text-[rgb(var(--border-strong))]">·</span>
                               <span
                                 className={[
-                                  'truncate text-[11px] font-semibold',
+                                  'text-[10px] font-semibold tabular-nums',
                                   esgotado
                                     ? 'text-[rgb(var(--color-danger-fg))]'
                                     : estoqueBaixo
@@ -1865,53 +1915,61 @@ export function BarPdv({
                                       : 'text-[rgb(var(--foreground-muted))]',
                                 ].join(' ')}
                               >
-                                {esgotado
-                                  ? 'Esgotado'
-                                  : estoqueBaixo
-                                    ? `Baixo · ${p.estoque} un.`
-                                    : `${p.estoque} un.`}
+                                {esgotado ? '0 un.' : `${p.estoque} un.`}
                               </span>
-                            </p>
-                          </div>
+                            </div>
 
-                          <div
-                            className="flex w-[4.25rem] shrink-0 items-center justify-end gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            role="presentation"
-                          >
-                            {esgotado ? null : noPedido > 0 ? (
-                              <>
+                            <div
+                              className="mt-auto"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="presentation"
+                            >
+                              {esgotado ? (
+                                <div className="flex h-9 items-center justify-center rounded-xl bg-[rgb(var(--background-subtle))] text-[11px] font-semibold text-[rgb(var(--foreground-muted))]">
+                                  Indisponível
+                                </div>
+                              ) : noPedido > 0 ? (
+                                <div className="flex items-center justify-between gap-1 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-1 py-0.5">
+                                  <button
+                                    type="button"
+                                    aria-label={`Remover uma unidade de ${p.nome}`}
+                                    disabled={pending}
+                                    onClick={() => setQtdProduto(p, -1)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background))] disabled:opacity-40"
+                                  >
+                                    <Minus className="h-3.5 w-3.5" />
+                                  </button>
+                                  <m.span
+                                    key={noPedido}
+                                    initial={{ scale: 0.7 }}
+                                    animate={{ scale: 1 }}
+                                    transition={springSnappy}
+                                    className="min-w-6 text-center text-sm font-bold tabular-nums text-[rgb(var(--color-primary-fg))]"
+                                  >
+                                    {noPedido}
+                                  </m.span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Adicionar uma unidade de ${p.nome}`}
+                                    disabled={bloqueado}
+                                    onClick={lancar}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background))] disabled:opacity-40"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
                                 <button
                                   type="button"
-                                  aria-label={`Remover uma unidade de ${p.nome}`}
-                                  disabled={pending}
-                                  onClick={() => setQtdProduto(p, -1)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-40"
+                                  disabled={bloqueado}
+                                  onClick={lancar}
+                                  className="flex h-9 w-full items-center justify-center rounded-xl bg-[rgb(var(--background-subtle))] text-[11px] font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.14)] hover:text-[rgb(var(--color-primary-fg))] disabled:opacity-40"
                                 >
-                                  <Minus className="h-3.5 w-3.5" />
+                                  Adicionar
                                 </button>
-                                <m.span
-                                  key={noPedido}
-                                  initial={{ scale: 0.7 }}
-                                  animate={{ scale: 1 }}
-                                  transition={springSnappy}
-                                  className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-xs font-bold tabular-nums text-[rgb(var(--color-primary-fg))]"
-                                >
-                                  {noPedido}
-                                </m.span>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                aria-label={`Adicionar ${p.nome}`}
-                                disabled={bloqueado}
-                                onClick={lancar}
-                                className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary)_/_0.5)] hover:bg-[rgb(var(--primary))] hover:text-[rgb(var(--color-primary-fg))] disabled:opacity-40"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </button>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </m.div>
                       )
@@ -1922,12 +1980,111 @@ export function BarPdv({
             </section>
 
             {/* Pedido: coluna fixa a partir de 60rem de frame. */}
-            <aside className="hidden min-h-0 w-[21rem] shrink-0 flex-col border-l border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 @[60rem]/pdv:flex @[76rem]/pdv:w-[23rem] @[100rem]/pdv:w-[25rem]">
+            <aside className="hidden min-h-0 w-[22rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3.5 shadow-sm @[60rem]/pdv:flex @[76rem]/pdv:w-[24rem] @[100rem]/pdv:w-[26rem]">
               {sidebar}
             </aside>
           </div>
         )}
       </div>
+
+      {/* Barra inferior: comandas abertas + PIX pendentes (estilo mesas da ref). */}
+      {turnoAberto && (comandas.length > 0 || pendentes.length > 0) && (
+        <div
+          className={[
+            'pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3',
+            pedido.length > 0
+              ? 'bottom-[4.75rem] @[60rem]/pdv:bottom-4'
+              : 'bottom-3 @[60rem]/pdv:bottom-4',
+          ].join(' ')}
+        >
+          <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.96)] px-2 py-1.5 shadow-lg backdrop-blur">
+            {comandas.map((c) => {
+              const ativa = c.id === comandaIdAtiva
+              const qtdLanc = c.lancamentos.reduce((n, l) => n + l.itens.length, 0)
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setPainelModo('comanda')
+                    setComandaIdAtiva(c.id)
+                    setErro(null)
+                  }}
+                  className={[
+                    'flex h-11 shrink-0 items-center gap-2 rounded-full px-2.5 transition-colors',
+                    ativa
+                      ? 'bg-[rgb(var(--color-primary)_/_0.16)] text-[rgb(var(--color-primary-fg))]'
+                      : 'hover:bg-[rgb(var(--background-subtle))]',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
+                      ativa
+                        ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))]'
+                        : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]',
+                    ].join(' ')}
+                  >
+                    {c.codigo.slice(0, 3).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block max-w-[7rem] truncate text-xs font-bold text-[rgb(var(--foreground))]">
+                      {c.titularNome}
+                    </span>
+                    <span className="block text-[10px] tabular-nums text-[rgb(var(--foreground-muted))]">
+                      {qtdLanc} {qtdLanc === 1 ? 'item' : 'itens'}
+                      {c.total > 0 ? ` · ${formatarPreco(c.total)}` : ''}
+                    </span>
+                  </span>
+                  <span className="rounded-full bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    Aberta
+                  </span>
+                </button>
+              )
+            })}
+            {pendentes.map((v) => {
+              const qtd = v.itens.reduce((n, i) => n + i.quantidade, 0)
+              return (
+                <div
+                  key={v.id}
+                  className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-[rgb(var(--color-warning)_/_0.12)] px-2.5"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-warning)_/_0.28)] text-[10px] font-bold text-[rgb(var(--color-warning-fg))]">
+                    PIX
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block text-xs font-bold tabular-nums text-[rgb(var(--foreground))]">
+                      {formatarPreco(v.total)}
+                    </span>
+                    <span className="block text-[10px] text-[rgb(var(--foreground-muted))]">
+                      {qtd} {qtd === 1 ? 'item' : 'itens'} · {formatarTempoRelativo(v.criadoEm)}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pending || !v.pixCopiaCola}
+                    onClick={() => retomarPendente(v)}
+                    className="h-7 rounded-full bg-[rgb(var(--primary))] px-2.5 text-[11px] font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
+                  >
+                    Retomar
+                  </button>
+                  {podeCancelar && (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      aria-label={`Cancelar venda de ${formatarPreco(v.total)}`}
+                      onClick={() => cancelarPendenteDaFaixa(v)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--color-danger)_/_0.1)] hover:text-[rgb(var(--color-danger-fg))] disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Frame estreito: barra de resumo + bottom sheet do Pedido. */}
       {turnoAberto && !pedidoMobileAberto && pedido.length > 0 && (
@@ -1936,7 +2093,7 @@ export function BarPdv({
             type="button"
             disabled={pending}
             onClick={() => setPedidoMobileAberto(true)}
-            className="flex w-full items-center justify-between gap-3 rounded-xl bg-[rgb(var(--primary))] px-4 py-3.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
+            className="flex w-full items-center justify-between gap-3 rounded-2xl bg-[rgb(var(--primary))] px-4 py-3.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
           >
             <span className="flex items-center gap-2">
               Ver pedido

@@ -132,6 +132,20 @@ function clienteFake(estado: EstadoDepartamental) {
         escritas.push(`gestoria.remover:${where.departamentoId}`)
       },
     },
+    // Superfície mínima de `syncCanaisDepartamentosDoUsuario` — sem canais no mock.
+    departamentoAreaMembro: {
+      findMany: async (): Promise<Array<{ areaId: string; area: { departamentoId: string } }>> => [],
+    },
+    departamentoArea: {
+      findMany: async (): Promise<Array<{ id: string; canalConversaId: string | null; departamentoId: string }>> => [],
+    },
+    departamento: {
+      findMany: async (): Promise<Array<{ id: string; canalConversaId: string | null }>> => [],
+    },
+    membroConversa: {
+      upsert: async (): Promise<void> => undefined,
+      updateMany: async (): Promise<void> => undefined,
+    },
   }
 
   return { cliente: cliente as unknown as ClienteSync, escritas, modelosLidos }

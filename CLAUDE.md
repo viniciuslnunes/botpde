@@ -14,7 +14,11 @@ overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
 para auditorias novas. Investimento em infra (faixas A–D, ads, 1ª carga):
 `docs/ops/plano-investimento-infra.md` — agentes `performance` +
 `product-strategy`. Seed de dados de teste em volume (Corinthians, e futura
-escala nacional): `docs/ops/plano-teste-volume-dados.md`.
+escala nacional): `docs/ops/plano-teste-volume-dados.md`. Teste de **caminho**
+(as 3 portas de entrada, canais, permissões — não volume):
+`docs/ops/lote-jornadas.md`. **Todo usuário de seed tem a senha `m1k43l3n`**
+(`packages/db/scripts/lib/senha-teste.js`) — dá para entrar como ele em
+`/entrar` e conferir o cenário de dentro.
 
 ## O que é
 
@@ -47,6 +51,7 @@ pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
 pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comunidade
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
+pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 pnpm --filter @torcida/db db:repair-carteirinha-espelho  # carteirinha do sócio Caso B nos dois níveis
@@ -60,6 +65,13 @@ pnpm --filter @torcida/web audit:mensageria  # DM: segregação por rivalidade, 
 pnpm --filter @torcida/web audit:loja        # cupom, estoque (inclui concorrência), pedido, seguir
 pnpm --filter @torcida/web audit:canal-restrito  # R5: semeia unidade Caso B (o seed não tem) e mede o isolamento
 pnpm --filter @torcida/web audit:onboarding  # TORCEDOR / SOCIO PENDENTE / APROVADO → comunidades e mural
+pnpm --filter @torcida/db seed:convites-teste   # links /convite/<slug> em torcidas e unidades Caso B
+pnpm --filter @torcida/db db:senha-teste        # senha padrão nos usuários de seed já criados
+pnpm --filter @torcida/web seed:jornadas        # lote "jornadas": 3 fluxos de entrada + canais, por Server Actions reais
+pnpm --filter @torcida/web audit:jornadas       # canais corretos + matriz de vazamento de permissão do lote
+pnpm --filter @torcida/db reset:jornadas -- --dry-run  # limpa só o lote de jornadas
+pnpm --filter @torcida/web audit:areas-projetos # áreas de atuação e projetos NÃO concedem permissão
+pnpm --filter @torcida/web audit:achados        # status medido dos achados de ARCHITECTURE §7
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.

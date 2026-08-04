@@ -5,6 +5,7 @@ import {
   db,
   bootstrapAcessoTenant,
   syncMembershipFromRoles,
+  ensureCanaisDepartamentosTenant,
 } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
@@ -95,6 +96,7 @@ export async function criarTenantInicial(
         },
       })
       await syncMembershipFromRoles(tx, { userId: session.user.id, tenantId: t.id })
+      await ensureCanaisDepartamentosTenant(tx, t.id, { criadoPorId: session.user.id })
 
       await tx.auditLog.create({
         data: {
@@ -165,6 +167,8 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
       },
     })
   }
+
+  await ensureCanaisDepartamentosTenant(db, tenantId, { criadoPorId: session.user.id })
 
   revalidatePath('/super-admin/setup')
   return { tenantId, tenantSlug: tenant.slug }

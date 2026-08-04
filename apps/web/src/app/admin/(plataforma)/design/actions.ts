@@ -20,7 +20,10 @@ export async function salvarDesignTenant(designRaw: unknown) {
     throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Design inválido')
   }
 
-  const design = parsed.data
+  // Vitrine (`design.loja`) é editada só em `/admin/loja/vitrine` — não zerar
+  // capa/banner ao salvar o estúdio de design.
+  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria)
+  const design = { ...parsed.data, loja: atual.loja }
   const corPrimaria = design.brand.primary
 
   await db.tenant.update({
@@ -56,9 +59,11 @@ export async function salvarDesignTenant(designRaw: unknown) {
 export async function restaurarDesignPadrao() {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
+  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria)
   const design = {
     ...DEFAULT_TENANT_DESIGN,
     brand: { primary: '#7c3aed', secondary: null },
+    loja: atual.loja,
   }
 
   await db.tenant.update({

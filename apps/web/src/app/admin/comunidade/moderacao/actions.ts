@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { db } from '@torcida/db'
@@ -77,7 +78,9 @@ export async function resolverDenuncia(denunciaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/comunidade/moderacao')
+  revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
+  invalidateAdminDirecao(tenant.id)
 }
 
 export async function resolverDenunciaMensagem(denunciaId: string): Promise<void> {
@@ -127,6 +130,8 @@ export async function resolverDenunciaMensagem(denunciaId: string): Promise<void
   })
 
   revalidatePath('/admin/comunidade/moderacao')
+  revalidatePath('/admin/comunidade')
+  invalidateAdminDirecao(tenant.id)
 }
 
 export async function descartarDenunciaMensagem(denunciaId: string): Promise<void> {
@@ -171,6 +176,8 @@ export async function descartarDenunciaMensagem(denunciaId: string): Promise<voi
   })
 
   revalidatePath('/admin/comunidade/moderacao')
+  revalidatePath('/admin/comunidade')
+  invalidateAdminDirecao(tenant.id)
 }
 
 export async function descartarDenuncia(denunciaId: string): Promise<void> {
@@ -215,4 +222,6 @@ export async function descartarDenuncia(denunciaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/comunidade/moderacao')
+  revalidatePath('/admin/comunidade')
+  invalidateAdminDirecao(tenant.id)
 }

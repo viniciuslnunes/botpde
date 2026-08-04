@@ -326,7 +326,8 @@ export function PortalNasUnidadesForm({ lojaVisivel, agendaVisivel }: PortalNasU
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
         Controla o que membros de subsedes e PDEs (sócios e torcedores do convite)
         enxergam da Sede no portal. A unidade sempre vê a própria loja e a própria
-        agenda.
+        agenda. O catálogo de cada unidade continua isolado — produtos e estoque não
+        se misturam.
       </p>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
         <input

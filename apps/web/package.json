@@ -11,6 +11,9 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:login": "playwright codegen --save-storage=e2e/.auth/user.json http://localhost:3000/entrar",
+    "seed:jornadas": "vitest run --config vitest.seed.config.ts src/lib/__seed__/jornadas.seed.ts",
+    "audit:jornadas": "vitest run --config vitest.audit.config.ts src/lib/__audit__/jornadas.audit.ts",
+    "audit:areas-projetos": "vitest run --config vitest.audit.config.ts src/lib/__audit__/areas-projetos.audit.ts",
     "audit:dados": "vitest run --config vitest.audit.config.ts src/lib/__audit__/dados-reais.audit.ts",
     "audit:fluxos": "vitest run --config vitest.audit.config.ts src/lib/__audit__/fluxos.audit.ts",
     "audit:fluxos-avancados": "vitest run --config vitest.audit.config.ts src/lib/__audit__/fluxos-avancados.audit.ts",
@@ -19,7 +22,11 @@
     "audit:mensageria": "vitest run --config vitest.audit.config.ts src/lib/__audit__/mensageria.audit.ts",
     "audit:loja": "vitest run --config vitest.audit.config.ts src/lib/__audit__/loja.audit.ts",
     "audit:canal-restrito": "vitest run --config vitest.audit.config.ts src/lib/__audit__/canal-restrito.audit.ts",
-    "audit:onboarding": "vitest run --config vitest.audit.config.ts src/lib/__audit__/onboarding-comunidade.audit.ts"
+    "audit:onboarding": "vitest run --config vitest.audit.config.ts src/lib/__audit__/onboarding-comunidade.audit.ts",
+    "piloto:cockpit": "vitest run --config vitest.audit.config.ts src/lib/__audit__/piloto-cockpit.audit.ts",
+    "audit:achados": "vitest run --config vitest.audit.config.ts src/lib/__audit__/achados.audit.ts",
+    "audit:carteirinha-patrimonio": "vitest run --config vitest.audit.config.ts src/lib/__audit__/carteirinha-patrimonio.audit.ts",
+    "audit:tudo": "node scripts/audit-tudo.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

@@ -231,6 +231,12 @@ export default async function EditarSedePage({
       />
 
       <div className="space-y-6">
+        {podePromoverUi && (
+          <MotionReveal index={0}>
+            <PromoverSedeButton sedeId={sede.id} sedeNome={sede.nome} />
+          </MotionReveal>
+        )}
+
         {portalProprio && (
           <MotionReveal index={0}>
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
@@ -334,8 +340,6 @@ export default async function EditarSedePage({
             </ul>
           </div>
         )}
-
-        {podePromoverUi && <PromoverSedeButton sedeId={sede.id} sedeNome={sede.nome} />}
 
         {podeGerir ? (
         <MotionReveal index={1}>

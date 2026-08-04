@@ -301,6 +301,10 @@ export function applyPermissionCascade(prevSelected, nextSelected) {
  */
 export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
   { key: 'eventos', label: 'Eventos' },
+  { key: 'social', label: 'Social e eventos' },
+  { key: 'feminino', label: 'Feminino' },
+  { key: 'carnaval', label: 'Carnaval' },
+  { key: 'diretoria', label: 'Diretoria' },
   { key: 'loja', label: 'Loja / Materiais' },
   { key: 'bar', label: 'Bar' },
   { key: 'comunidade', label: 'Comunidade e comunicados' },
@@ -320,12 +324,16 @@ export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
  */
 export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   eventos: { href: '/portal/eventos', disponivel: true },
+  social: { href: '/portal/eventos', disponivel: true },
+  feminino: { href: '/portal/eventos', disponivel: true },
+  carnaval: { href: '/portal/eventos', disponivel: true },
   loja: { href: '/portal/loja', disponivel: true },
   bar: { href: '/portal/bar', disponivel: true },
   comunidade: { href: '/portal/comunidade', disponivel: true },
   sedes: { href: '/portal/sedes', disponivel: true },
   // Diretoria / pessoas: home da área no portal (sem fila admin para membros)
   membros: { href: null, disponivel: false },
+  diretoria: { href: null, disponivel: false },
   financeiro: { href: '/portal/financeiro', disponivel: true },
   patrimonio: { href: '/portal/patrimonio', disponivel: true },
   caravanas: { href: '/portal/eventos?tipo=CARAVANA', disponivel: true },
@@ -338,6 +346,10 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
  */
 export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   eventos: '/admin/eventos',
+  social: '/admin/social',
+  feminino: '/admin/feminino',
+  carnaval: '/admin/carnaval',
+  diretoria: '/admin/diretoria',
   loja: '/admin/loja',
   bar: '/admin/bar',
   comunidade: '/admin/comunidade',
@@ -345,8 +357,8 @@ export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   membros: '/admin/torcedores',
   financeiro: '/admin/financeiro',
   patrimonio: '/admin/patrimonio',
-  caravanas: '/admin/eventos?tipo=CARAVANA',
-  bateria: '/admin/eventos?tipo=ENSAIO',
+  bateria: '/admin/bateria',
+  caravanas: '/admin/caravanas',
 })
 
 /**

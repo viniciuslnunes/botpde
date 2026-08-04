@@ -158,12 +158,27 @@ export function labelVisibilidadeCanal(v: VisibilidadeCanal): string {
 }
 
 /**
+ * Autor sócio APROVADO no tenant do post "Só torcida" — exclude TORCEDOR
+ * (seed legado e regressões de gate) do mural do canal oficial.
+ */
+export type AutorSocioFeedInterno = {
+  membros: {
+    some: {
+      tenantId: string
+      tipo: 'SOCIO'
+      status: 'APROVADO'
+    }
+  }
+}
+
+/**
  * `where.OR` do mural de um canal.
  *
  * - Sempre: posts com `conversaId` (sem filtrar `tenantId` do post — Caso B /
  *   canal emprestado publica com o tenant do viewer).
  * - Com `viewerTenantIdForFeedInterno` (só canal **oficial**): também posts
- *   "Só torcida" do feed aberto (`TENANT` + sem conversa) daquele tenant.
+ *   "Só torcida" do feed aberto (`TENANT` + sem conversa) daquele tenant,
+ *   **só de sócio APROVADO** — torcedor não publica no mural da torcida.
  *
  * Quem monta o `findMany` precisa **AND** este OR com o de `buildCursorWhere`
  * — os dois usam a chave `OR` e um espalhamento no mesmo nível apaga o cursor.
@@ -176,12 +191,14 @@ export function orPostsDoMuralCanal(
   tenantId?: string
   tipo?: 'MEMBRO'
   visibilidade?: 'TENANT'
+  autor?: AutorSocioFeedInterno
 }> {
   const ramos: Array<{
     conversaId: string | null
     tenantId?: string
     tipo?: 'MEMBRO'
     visibilidade?: 'TENANT'
+    autor?: AutorSocioFeedInterno
   }> = [{ conversaId }]
   if (viewerTenantIdForFeedInterno) {
     ramos.push({
@@ -189,6 +206,15 @@ export function orPostsDoMuralCanal(
       tenantId: viewerTenantIdForFeedInterno,
       tipo: 'MEMBRO',
       visibilidade: 'TENANT',
+      autor: {
+        membros: {
+          some: {
+            tenantId: viewerTenantIdForFeedInterno,
+            tipo: 'SOCIO',
+            status: 'APROVADO',
+          },
+        },
+      },
     })
   }
   return ramos

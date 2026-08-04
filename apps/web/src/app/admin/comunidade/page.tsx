@@ -3,7 +3,7 @@ import { db } from '@torcida/db'
 import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { MessagesSquare, Megaphone } from 'lucide-react'
+import { MessagesSquare, Megaphone, Newspaper, ShieldAlert } from 'lucide-react'
 import { PERMISSIONS, hasPermission, primeiraTabPermitida } from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import {
@@ -12,8 +12,16 @@ import {
   type EngajamentoResumo,
   type LeituraComunicadosResumo,
 } from '@/lib/comunidade-insights'
+import { carregarDirecaoComunidade } from '@/lib/comunidade-direcao'
 import { PERIODO_LABEL_CURTO, PERIODO_PADRAO } from '@/lib/admin-insights'
-import { InsightSection, KpiGrid, StatCard } from '@/components/admin/ui'
+import {
+  AdminInboxList,
+  DirecaoInboxSkeleton,
+  DirecaoKpisSkeleton,
+  InsightSection,
+  KpiGrid,
+  StatCard,
+} from '@/components/admin/ui'
 import { MiniBarChart, Sparkline } from '@/components/admin/charts'
 import type { Metadata } from 'next'
 
@@ -85,7 +93,6 @@ async function ComunidadeInsights({
           ) : null}
         </>
       ) : null}
-
       {leitura && temLeituras ? (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -105,77 +112,158 @@ async function ComunidadeInsights({
   )
 }
 
+type Caps = {
+  afiliacaoId: string | null
+  podeModerarPosts: boolean
+  podeModerarMensagens: boolean
+  podeCurarNoticias: boolean
+  podePublicarComunicado: boolean
+  podeGerenciarPosts: boolean
+  podeVer: boolean
+}
+
+async function ComunidadeKpis({ tenantId, caps }: { tenantId: string; caps: Caps }) {
+  const [comunicadosCount, ultimoComunicado, postsCount, ultimoPost, ops] = await Promise.all([
+    caps.podePublicarComunicado || caps.podeVer
+      ? db.announcement.count({ where: { tenantId } })
+      : Promise.resolve(0),
+    caps.podePublicarComunicado || caps.podeVer
+      ? db.announcement.findFirst({
+          where: { tenantId },
+          orderBy: { publicadoEm: 'desc' },
+          select: { titulo: true, publicadoEm: true },
+        })
+      : Promise.resolve(null),
+    caps.podeGerenciarPosts || caps.podeVer
+      ? db.post.count({ where: { tenantId } })
+      : Promise.resolve(0),
+    caps.podeGerenciarPosts || caps.podeVer
+      ? db.post.findFirst({
+          where: { tenantId },
+          orderBy: { criadoEm: 'desc' },
+          select: { titulo: true, conteudo: true, criadoEm: true },
+        })
+      : Promise.resolve(null),
+    carregarDirecaoComunidade(tenantId, caps),
+  ])
+
+  const denunciasTotal = ops.denunciasPost + ops.denunciasMensagem
+
+  return (
+    <KpiGrid cols={4}>
+      {(caps.podeModerarPosts || caps.podeModerarMensagens) && (
+        <StatCard
+          label="Denúncias"
+          value={denunciasTotal}
+          tone={denunciasTotal > 0 ? 'warning' : 'default'}
+          icon={<ShieldAlert className="h-5 w-5" />}
+          href="/admin/comunidade/moderacao"
+        />
+      )}
+      {caps.podeCurarNoticias && (
+        <StatCard
+          label="Notícias rascunho"
+          value={ops.noticiasRascunho}
+          tone={ops.noticiasRascunho > 0 ? 'warning' : 'default'}
+          icon={<Newspaper className="h-5 w-5" />}
+          href="/admin/comunidade/noticias"
+        />
+      )}
+      {(caps.podePublicarComunicado || caps.podeVer) && (
+        <StatCard
+          label="Comunicados"
+          value={comunicadosCount}
+          icon={<Megaphone className="h-5 w-5" />}
+          badge={
+            ultimoComunicado
+              ? `Último: ${ultimoComunicado.titulo} · ${formatarData(ultimoComunicado.publicadoEm)}`
+              : 'Nenhum comunicado publicado ainda.'
+          }
+          badgeTone="default"
+          href="/admin/comunidade/comunicados"
+        />
+      )}
+      {(caps.podeGerenciarPosts || caps.podeVer) && (
+        <StatCard
+          label="Posts no mural"
+          value={postsCount}
+          icon={<MessagesSquare className="h-5 w-5" />}
+          badge={
+            ultimoPost
+              ? `Último: ${ultimoPost.titulo || ultimoPost.conteudo.slice(0, 60)} · ${formatarData(ultimoPost.criadoEm)}`
+              : 'Nenhum post publicado ainda.'
+          }
+          badgeTone="default"
+        />
+      )}
+    </KpiGrid>
+  )
+}
+
+async function ComunidadeInbox({ tenantId, caps }: { tenantId: string; caps: Caps }) {
+  if (
+    !caps.podeModerarPosts &&
+    !caps.podeModerarMensagens &&
+    !caps.podeCurarNoticias &&
+    !caps.podePublicarComunicado
+  ) {
+    return null
+  }
+  const ops = await carregarDirecaoComunidade(tenantId, caps)
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Precisa de você</h2>
+        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          Top denúncias por idade, rascunhos e pulso dos comunicados.
+        </p>
+      </div>
+      <AdminInboxList
+        itens={ops.pendencias}
+        podeAgir={false}
+        emptyTitle="Nada urgente na comunidade."
+      />
+    </section>
+  )
+}
+
 export default async function AdminComunidadePage() {
-  // Mesmo tenant e mesmas permissões do shell — ver `contextoAdmin`.
   const { tenant, permissoes: effective } = await contextoAdmin()
 
   const podePublicarComunicado = hasPermission(effective, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
   const podeGerenciarPosts = hasPermission(effective, PERMISSIONS.COMMUNITY_MANAGE)
   const podeVer = hasPermission(effective, PERMISSIONS.COMMUNITY_VIEW)
+  const podeModerarPosts = hasPermission(effective, PERMISSIONS.COMMUNITY_MODERATE)
+  const podeModerarMensagens = hasPermission(effective, PERMISSIONS.MESSAGES_MODERATE)
+  const podeCurarNoticias = hasPermission(effective, PERMISSIONS.NEWS_CURATE)
 
-  // Quem só modera ou só cura notícias não tem visão geral — entra pela própria
-  // etapa. COMMUNITY_VIEW (Diretoria oversight) abre a visão geral.
   if (!podePublicarComunicado && !podeGerenciarPosts && !podeVer) {
     redirect(primeiraTabPermitida('comunidade', effective) ?? '/admin')
   }
 
-  const [comunicadosCount, ultimoComunicado, postsCount, ultimoPost] = await Promise.all([
-    podePublicarComunicado || podeVer
-      ? db.announcement.count({ where: { tenantId: tenant.id } })
-      : Promise.resolve(0),
-    podePublicarComunicado || podeVer
-      ? db.announcement.findFirst({
-          where: { tenantId: tenant.id },
-          orderBy: { publicadoEm: 'desc' },
-          select: { titulo: true, publicadoEm: true },
-        })
-      : Promise.resolve(null),
-    podeGerenciarPosts || podeVer
-      ? db.post.count({ where: { tenantId: tenant.id } })
-      : Promise.resolve(0),
-    podeGerenciarPosts || podeVer
-      ? db.post.findFirst({
-          where: { tenantId: tenant.id },
-          orderBy: { criadoEm: 'desc' },
-          select: { titulo: true, conteudo: true, criadoEm: true },
-        })
-      : Promise.resolve(null),
-  ])
+  const caps: Caps = {
+    afiliacaoId: tenant.afiliacaoId,
+    podeModerarPosts,
+    podeModerarMensagens,
+    podeCurarNoticias,
+    podePublicarComunicado,
+    podeGerenciarPosts,
+    podeVer,
+  }
 
   return (
     <div className="space-y-6">
       {!podePublicarComunicado && !podeGerenciarPosts && podeVer ? (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">Somente leitura.</p>
       ) : null}
-      {/* Navegação é das tabs: aqui só o pulso do módulo. */}
-      <KpiGrid>
-        {(podePublicarComunicado || podeVer) && (
-          <StatCard
-            label="Comunicados publicados"
-            value={comunicadosCount}
-            icon={<Megaphone className="h-5 w-5" />}
-            badge={
-              ultimoComunicado
-                ? `Último: ${ultimoComunicado.titulo} · ${formatarData(ultimoComunicado.publicadoEm)}`
-                : 'Nenhum comunicado publicado ainda.'
-            }
-            badgeTone="default"
-          />
-        )}
-        {(podeGerenciarPosts || podeVer) && (
-          <StatCard
-            label="Posts no mural"
-            value={postsCount}
-            icon={<MessagesSquare className="h-5 w-5" />}
-            badge={
-              ultimoPost
-                ? `Último: ${ultimoPost.titulo || ultimoPost.conteudo.slice(0, 60)} · ${formatarData(ultimoPost.criadoEm)}`
-                : 'Nenhum post publicado ainda.'
-            }
-            badgeTone="default"
-          />
-        )}
-      </KpiGrid>
+
+      <Suspense fallback={<DirecaoKpisSkeleton cols={4} />}>
+        <ComunidadeKpis tenantId={tenant.id} caps={caps} />
+      </Suspense>
+
+      <Suspense fallback={<DirecaoInboxSkeleton />}>
+        <ComunidadeInbox tenantId={tenant.id} caps={caps} />
+      </Suspense>
 
       <Suspense fallback={null}>
         <ComunidadeInsights

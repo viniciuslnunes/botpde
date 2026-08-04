@@ -96,7 +96,7 @@ describe('orPostsDoMuralCanal', () => {
     expect(orPostsDoMuralCanal(CANAL, null)).toEqual([{ conversaId: CANAL }])
   })
 
-  it('oficial: canal + TENANT sem conversa do tenant da aba', () => {
+  it('oficial: canal + TENANT sem conversa só de sócio APROVADO', () => {
     expect(orPostsDoMuralCanal(CANAL, TENANT)).toEqual([
       { conversaId: CANAL },
       {
@@ -104,6 +104,15 @@ describe('orPostsDoMuralCanal', () => {
         tenantId: TENANT,
         tipo: 'MEMBRO',
         visibilidade: 'TENANT',
+        autor: {
+          membros: {
+            some: {
+              tenantId: TENANT,
+              tipo: 'SOCIO',
+              status: 'APROVADO',
+            },
+          },
+        },
       },
     ])
   })

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { Archive, Package, ShoppingBag, Tags, Ticket, TrendingUp } from 'lucide-react'
+import { Archive, Package, ShoppingBag, Ticket, TrendingUp } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertStoreView } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
@@ -28,7 +28,8 @@ export default async function LojaModuloLayout({ children }: { children: ReactNo
   ])
 
   const tabs = montarTabsModulo('loja', permissoes, {
-    catalogo: { icon: <ShoppingBag className={ICONE} /> },
+    comando: { icon: <ShoppingBag className={ICONE} /> },
+    catalogo: { icon: <Package className={ICONE} /> },
     pedidos: {
       icon: <Package className={ICONE} />,
       count: pedidosPendentes,
@@ -39,7 +40,6 @@ export default async function LojaModuloLayout({ children }: { children: ReactNo
       count: ticketsAbertos > 0 ? ticketsAbertos : undefined,
       countClass: 'bg-[rgb(var(--color-info)_/_0.16)] text-[rgb(var(--color-info-fg))]',
     },
-    categorias: { icon: <Tags className={ICONE} /> },
     cupons: { icon: <Ticket className={ICONE} /> },
     desempenho: { icon: <TrendingUp className={ICONE} /> },
   })

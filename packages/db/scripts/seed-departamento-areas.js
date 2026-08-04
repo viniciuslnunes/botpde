@@ -14,6 +14,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { DEPARTAMENTO_AREAS_CANONICAS } from '../../types/src/departamento-areas-canonicas.js'
+import { ensureCanaisDepartamentosTenant } from '../src/departamento-canais.js'
 
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY) || 6)
 const SEED_CONNECTION_LIMIT = Math.max(CONCURRENCY + 2, 8)
@@ -206,10 +207,15 @@ async function main() {
         await withRetry(
           async () => {
             const result = await upsertAreasDoTenant(db, tenant.id)
+            const canais = await ensureCanaisDepartamentosTenant(db, tenant.id)
             totalCreated += result.created
             totalUpdated += result.updated
             if (verbose) {
               console.log(`  ✓ ${result.created} área(s) criada(s) · ${result.updated} atualizada(s)`)
+              console.log(
+                `  ✓ canais depto +${canais.deptos.criados} · áreas +${canais.areas.criadas}` +
+                  ` (sync ${canais.deptos.sincronizados + canais.areas.sincronizadas})`,
+              )
             }
           },
           { label: tenant.slug },

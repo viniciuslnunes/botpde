@@ -228,3 +228,30 @@ torcida vinculada, 563 tenants fora do lote Corinthians na varredura de
   torcida real fora do lote Corinthians tem `UserRole`, então qualquer seed
   nacional precisa criá-lo (ver Fase 2) — o fallback de autoria
   institucional da Fase 1 não encontra ninguém e o script quebra.
+
+## Fase 3 (concluída) — lote de jornadas: caminho, não volume
+
+Ver `docs/ops/lote-jornadas.md`. Este lote responde a uma limitação
+estrutural das Fases 1 e 2, não a uma falta de volume: seed por
+`createMany` grava o **resultado** de um vínculo, nunca o caminho dele.
+Inscrição em canal oficial, cargo `member` da aprovação, espelho na Sede
+raiz (Caso B), `PerfilTorcedor` concluído, `AuditLog` e notificação só
+existem porque uma Server Action passou por ali — foi o que obrigou o
+`repair-aprovado-canal-membro` na Fase 1.
+
+O lote de jornadas roda pelo runner do Vitest (`vitest.seed.config.ts`),
+porque é o jeito mais barato de ter alias `@/`, `server-only` e
+`next/cache` disponíveis para chamar as actions de `apps/web` de fora do
+Next. Ao contrário das auditorias, ele **persiste**.
+
+Convenções próprias: domínio `@jornada.torcida.app`, marcador `[JORNADA]`,
+reset em `reset:jornadas` — que de propósito **não** reverte os links de
+convite (`seed:convites-teste`), por serem configuração da torcida.
+
+### Senha única em todos os lotes
+
+Todo `User` de seed nasce com `senhaHash` de `m1k43l3n`
+(`packages/db/scripts/lib/senha-teste.js`) e `db:senha-teste` faz o
+backfill nos lotes anteriores. Sem senha, o provider de credenciais recusa
+o login e nenhum cenário semeado podia ser conferido de dentro do produto —
+só pela leitura do banco.

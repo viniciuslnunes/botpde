@@ -94,6 +94,20 @@ export const DEFAULT_BRAND_FG = /** @type {const} */ ({
   secondary: null,
 })
 
+/** Capa / hero da loja no portal (persiste em `Tenant.design.loja`). */
+export const DEFAULT_LOJA_VITRINE = /** @type {const} */ ({
+  bannerUrl: null,
+  /** Quando true e não há banner, usa a imagem do 1º produto em destaque. */
+  usarDestaqueComoCapa: true,
+})
+
+const LojaVitrineSchema = z
+  .object({
+    bannerUrl: z.union([z.string().url(), z.null()]).default(null),
+    usarDestaqueComoCapa: z.boolean().default(true),
+  })
+  .strict()
+
 const ActionsTokensSchema = z
   .object({
     success: hexColor.default(DEFAULT_ACTIONS.success),
@@ -173,10 +187,13 @@ export const TenantDesignSchema = z
     customPalettes: z.array(CustomPaletteSchema).max(20).default([]),
     light: SurfaceTokensSchema.default({}),
     dark: SurfaceTokensSchema.default({}),
+    /** Vitrine do portal `/portal/loja/[tenantId]` — edita em `/admin/loja/vitrine`. */
+    loja: LojaVitrineSchema.default({ ...DEFAULT_LOJA_VITRINE }),
   })
   .strict()
 
 /** @typedef {z.infer<typeof TenantDesignSchema>} TenantDesign */
+/** @typedef {z.infer<typeof LojaVitrineSchema>} LojaVitrine */
 
 /** Defaults alinhados a `:root` / `.dark` em globals.css. */
 export const DEFAULT_SURFACE_LIGHT = /** @type {const} */ ({
@@ -217,6 +234,7 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
   customPalettes: [],
   light: {},
   dark: {},
+  loja: { ...DEFAULT_LOJA_VITRINE },
 })
 
 /**
@@ -239,6 +257,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
       actionsFg: { ...DEFAULT_ACTIONS_FG },
       brandFg: { ...DEFAULT_BRAND_FG },
       customPalettes: [],
+      loja: { ...DEFAULT_LOJA_VITRINE },
     }
   }
 
@@ -258,8 +277,20 @@ export function resolveTenantDesign(raw, corPrimaria) {
         ...(parsed.data.brandFg ?? {}),
       },
       customPalettes: parsed.data.customPalettes ?? [],
+      loja: {
+        ...DEFAULT_LOJA_VITRINE,
+        ...(parsed.data.loja ?? {}),
+      },
     }
   }
+
+  // JSON legado sem `loja` (ou com chaves extras) — tenta recuperar capa da vitrine
+  // sem perder a marca já salva.
+  const loose = /** @type {Record<string, unknown>} */ (raw)
+  const lojaLoose =
+    loose.loja && typeof loose.loja === 'object'
+      ? LojaVitrineSchema.safeParse(loose.loja)
+      : null
 
   return {
     ...DEFAULT_TENANT_DESIGN,
@@ -268,7 +299,20 @@ export function resolveTenantDesign(raw, corPrimaria) {
     actionsFg: { ...DEFAULT_ACTIONS_FG },
     brandFg: { ...DEFAULT_BRAND_FG },
     customPalettes: [],
+    loja: lojaLoose?.success
+      ? { ...DEFAULT_LOJA_VITRINE, ...lojaLoose.data }
+      : { ...DEFAULT_LOJA_VITRINE },
   }
+}
+
+/**
+ * Só a fatia de vitrine da loja (defaults seguros).
+ * @param {unknown} designRaw
+ * @param {string} [corPrimaria]
+ * @returns {LojaVitrine}
+ */
+export function resolveLojaVitrine(designRaw, corPrimaria) {
+  return resolveTenantDesign(designRaw, corPrimaria).loja
 }
 
 /**

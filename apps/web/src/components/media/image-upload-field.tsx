@@ -9,7 +9,7 @@ import {
 } from '@/components/media/image-drop-zone'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede'
+type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede' | 'patrimonio'
 
 type Props = {
   name: string

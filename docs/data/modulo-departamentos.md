@@ -278,7 +278,7 @@ portal (`departamento-thin.js`) e widgets compostos (agenda, comunicados, pedido
 âncora, próxima ação só com urgência real e painel de domínio acima da equipe no
 mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 
-**Onda 4 (MVP):** canal da área (vínculo a `Conversa` CANAL), vaga paga em caravana
+**Onda 4 (MVP):** canal da área (auto-provisionado + sync de roster), vaga paga em caravana
 (`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).
 
 ## Áreas de atuação dentro do departamento (2026-08-03)
@@ -303,12 +303,15 @@ RBAC continua inteiramente em `Departamento.permissions` /
 `permissionsGestor`. Nenhum ponto de `permissionsOfRole` ou
 `fetchUserPermissionsImpl` (`apps/web/src/lib/tenant.ts`) lê área.
 `papel = RESPONSAVEL` é **accountability e filtro**, não delegação: quem gere
-área é `canManageDepartamento` (gestor do departamento, `roles:manage` ou
-super-admin), exatamente como `assertPodeGerirArea` em
-`portal/departamentos/actions.ts`. A regra pura vive em
-`apps/web/src/lib/departamentos-portal-access.ts`
-(`resolverAreasDepartamento` — `podeGerir` nunca deriva de `isResponsavel`),
-travada por teste.
+área é `canManageDepartamento` (gestor do departamento ou `roles:manage`
+real no tenant), exatamente como `assertPodeGerirArea` em
+`portal/departamentos/actions.ts`. Super-admin em modo operador **vê** todos
+os departamentos da unidade selecionada (hub + cockpit + admin), mas **não**
+gerencia — o bypass da plataforma não concede `podeGerir` / `isGestor`
+(dual-hat com cargo real na torcida continua valendo pelo RBAC). A regra pura
+vive em `apps/web/src/lib/departamentos-portal-access.ts`
+(`resolverAreasDepartamento` — `podeGerir` nunca deriva de `isResponsavel`
+nem de SA), travada por teste.
 
 ### Elegibilidade e cascata
 
@@ -362,13 +365,29 @@ O seed de áreas continua sem tocar `meta`. Actions:
 `toggleChecklistItemArea` / `adicionarChecklistItemArea` /
 `removerChecklistItemArea` / `aplicarModeloChecklistArea`.
 
-### Canal por frente (2026-08-03+)
+### Canal por frente (2026-08-04)
 
 Espelha o canal do departamento (`Departamento.canalConversaId`): ponteiro
-opcional `DepartamentoArea.canalConversaId` → `Conversa` tipo `CANAL`, deep-link
-`/portal/mensagens?c=`. **Só vínculo manual** — nunca auto-cria canal (anti-spam).
-Uma conversa não pode ser sede + departamento + área ao mesmo tempo
-(`validarVinculoCanalArea`). Action `vincularCanalDepartamentoArea`.
+`DepartamentoArea.canalConversaId` → `Conversa` tipo `CANAL`, deep-link
+`/portal/mensagens?c=`. **Provisionado automaticamente** no bootstrap do portal
+(`bootstrapAcessoTenant` / `ensureCanaisDepartamentosTenant`), no seed de áreas
+e ao criar departamento/área na UI. Repair em tenants existentes:
+
+```bash
+pnpm --filter @torcida/db db:repair-canais-departamentos
+```
+
+Roster (sync contínuo via `syncMembershipFromRoles` e mutações de área):
+
+| Canal | MEMBRO | ADMIN |
+|---|---|---|
+| Departamento | `UserDepartamento` | `DepartamentoGestor` |
+| Área | `DepartamentoAreaMembro` | Gestores do departamento pai |
+
+Segregação: `publica: false`, fora da vitrine da Comunidade (`listCanaisVisiveis`
+só devolve se o viewer for `MembroConversa` ATIVO). Vínculo manual
+(`vincularCanalDepartamentoArea`) continua válido; uma conversa não pode ser
+sede + departamento + área ao mesmo tempo (`validarVinculoCanalArea`).
 
 ### Anti-padrões (novos)
 
@@ -380,8 +399,7 @@ Uma conversa não pode ser sede + departamento + área ao mesmo tempo
   não devem ser fundidas.
 - Sobrescrever `ativa`/`nome`/`meta` no seed de áreas.
 - Transformar a checklist em task-tracker/ERP (assignees, prazos, subtarefas).
-- Auto-criar canal por área (spam de conversas vazias).
-
+- Expor canal de depto/área na lista pública de canais da Comunidade.
 ## Projetos e campanhas (2026-08-03)
 
 O que a área organiza (gente) ganhou o par: o que ela **executa**. `Projeto` é

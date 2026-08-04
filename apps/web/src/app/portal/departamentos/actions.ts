@@ -2,10 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { db } from '@torcida/db'
+import { db, ensureCanalArea, syncMembrosCanalArea, syncMembrosCanalDepartamento } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   addAreaChecklistItem,
   applyAreaChecklistModelo,
@@ -15,6 +14,7 @@ import {
   isDepartamentoLegado,
   isMembroElegivelDepartamento,
   mergeBarracaoItem,
+  mergeDesfileEm,
   newAreaChecklistItemId,
   removeAreaChecklistItem,
   slugifyArea,
@@ -45,10 +45,8 @@ async function assertPodeGerirArea(departamentoId: string) {
   const tenant = await getTenantFromHost()
   if (!tenant) throw new Error('Não autorizado')
 
-  if (isSuperAdminEmail(session.user.email)) {
-    return { session, tenant }
-  }
-
+  // Super-admin sem cargo no tenant: só leitura (hub/cockpit). Dual-hat
+  // (SA + roles:manage / gestor) passa pelo RBAC abaixo.
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(
     session.user.id,
     tenant.id,
@@ -270,6 +268,10 @@ export async function vincularCanalArea(
       data: { canalConversaId: parsed.data.conversaId },
     })
 
+    if (parsed.data.conversaId) {
+      await syncMembrosCanalDepartamento(db, depto.id)
+    }
+
     await db.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -344,9 +346,73 @@ export async function toggleBarracaoItem(
     })
 
     revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidatePath('/admin/carnaval')
+    const { invalidateAdminDirecao } = await import('@/lib/admin-direcao-cache')
+    invalidateAdminDirecao(tenant.id)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
+  }
+}
+
+const DesfileEmSchema = z.object({
+  departamentoId: z.string().min(1),
+  slug: z.string().min(1),
+  desfileEm: z.string().max(32).optional(),
+})
+
+/** Define a data do desfile (meta.desfileEm) para urgência do barracão. */
+export async function salvarDesfileEm(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = DesfileEmSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    desfileEm: formData.get('desfileEm') || undefined,
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+
+    const iso = parsed.data.desfileEm?.trim() || null
+    if (iso) {
+      const d = new Date(iso)
+      if (!Number.isFinite(d.getTime())) return { error: 'Data inválida' }
+    }
+
+    const depto: { id: string; meta: unknown } | null = await db.departamento.findFirst({
+      where: { id: parsed.data.departamentoId, tenantId: tenant.id },
+      select: { id: true, meta: true },
+    })
+    if (!depto) return { error: 'Departamento não encontrado' }
+
+    const nextMeta = mergeDesfileEm(depto.meta, iso)
+
+    await db.departamento.update({
+      where: { id: depto.id },
+      data: { meta: nextMeta },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_DESFILE_EM',
+        entidade: 'Departamento',
+        entidadeId: depto.id,
+        detalhes: { desfileEm: iso },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidatePath('/admin/carnaval')
+    const { invalidateAdminDirecao } = await import('@/lib/admin-direcao-cache')
+    invalidateAdminDirecao(tenant.id)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível salvar a data' }
   }
 }
 
@@ -502,6 +568,8 @@ export async function criarAreaDepartamento(
         ordem: (ultimaOrdem?.ordem ?? -1) + 1,
       },
     })
+
+    await ensureCanalArea(db, area.id, { criadoPorId: session.user.id })
 
     await db.auditLog.create({
       data: {
@@ -659,6 +727,8 @@ export async function adicionarMembroAreaDepartamento(
       update: {},
     })
 
+    await syncMembrosCanalArea(db, area.id)
+
     await db.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -700,6 +770,8 @@ export async function removerMembroAreaDepartamento(
     await db.departamentoAreaMembro.deleteMany({
       where: { areaId: area.id, userId: parsed.data.targetUserId },
     })
+
+    await syncMembrosCanalArea(db, area.id)
 
     await db.auditLog.create({
       data: {
@@ -1115,6 +1187,10 @@ export async function vincularCanalDepartamentoArea(
       where: { id: area.id },
       data: { canalConversaId: parsed.data.conversaId },
     })
+
+    if (parsed.data.conversaId) {
+      await syncMembrosCanalArea(db, area.id)
+    }
 
     await db.auditLog.create({
       data: {

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
+import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
@@ -379,6 +380,11 @@ export async function assertTenantOwner(userId: string, tenantId: string): Promi
  * Igual a `assertTenantOwner`, mas abre exceção para o super-admin quando a
  * unidade autoriza o suporte da plataforma (ou ainda não tem liderança).
  *
+ * Ordem importa: quem **tem** o cargo `owner` neste tenant passa primeiro —
+ * inclusive o super-admin que ficou owner técnico no setup. Sem isso, o
+ * caminho de SA abaixo tratava o próprio bootstrap como “liderança” e
+ * exigia consentimento à toa (UI liberava via `isOwner`, action estourava).
+ *
  * Use em toda configuração marcada como "Somente owner": `assertPermission`
  * deixa o super-admin passar, mas `assertTenantOwner` não — sem este caminho o
  * super-admin enxerga o formulário e a gravação estoura. Regra e motivação em
@@ -387,15 +393,24 @@ export async function assertTenantOwner(userId: string, tenantId: string): Promi
 export async function assertOwnerOuSuportePlataforma(
   ctx: Pick<AuthzResult, 'isSuperAdmin'> & { session: Session; tenant: Pick<Tenant, 'id'> },
 ): Promise<void> {
+  const souOwner: { id: string } | null = await db.userRole.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      tenantId: ctx.tenant.id,
+      role: { isSystem: true, nome: 'owner' },
+    },
+    select: { id: true },
+  })
+  if (souOwner) return
+
   if (!ctx.isSuperAdmin) {
-    await assertTenantOwner(ctx.session.user.id, ctx.tenant.id)
-    return
+    throw new ExpectedError('Apenas o owner pode alterar esta configuração')
   }
 
   const { getEstadoSuportePlataforma } = await import('@/lib/suporte-plataforma')
   const estado = await getEstadoSuportePlataforma(ctx.tenant.id)
   if (!estado.superAdminPodeOperar) {
-    throw new Error(
+    throw new ExpectedError(
       'Esta unidade tem liderança própria e não autorizou o suporte da plataforma. Peça ao presidente para ligar “Suporte da plataforma” nas configurações desta unidade.',
     )
   }

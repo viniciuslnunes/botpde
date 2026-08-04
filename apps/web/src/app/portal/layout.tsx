@@ -98,7 +98,7 @@ export default async function PortalLayout({
       userName={userName ?? session.user.name ?? null}
       userAvatar={avatarUrl}
       tenant={navbarTenant}
-      temDepartamentos={totalDepartamentos > 0}
+      temDepartamentos={totalDepartamentos > 0 || isSuperAdmin}
       modoNacional={ctx?.modo === 'nacional'}
       // Convite TORCEDOR: torcidaReal/unidade liberam Loja/Sedes/Agenda nas
       // abas de canal (a navbar oculta esses links no escopo nacional).

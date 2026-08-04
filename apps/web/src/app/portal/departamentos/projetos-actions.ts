@@ -3,7 +3,7 @@
 /**
  * Projetos de um departamento (campanhas, projetos contínuos, ações,
  * parcerias). Mesma autorização das áreas — `assertPodeGerirDepartamento`:
- * super-admin ∪ `roles:manage` ∪ gestor daquele departamento.
+ * `roles:manage` ∪ gestor daquele departamento (SA operador = só leitura).
  *
  * Projeto NÃO concede permissão: `responsavelId` e participantes são
  * accountability e organização, nunca RBAC.
@@ -14,7 +14,6 @@ import { z } from 'zod'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   calculateEffectivePermissions,
   canManageDepartamento,
@@ -43,8 +42,7 @@ async function assertPodeGerirDepartamento(departamentoId: string) {
   const tenant = await getTenantFromHost()
   if (!tenant) throw new Error('Não autorizado')
 
-  if (isSuperAdminEmail(session.user.email)) return { session, tenant }
-
+  // SA operador = só leitura; gestão exige RBAC/gestor real (dual-hat ok).
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(
     session.user.id,
     tenant.id,

@@ -3,9 +3,9 @@
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
-import { m } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
 import { toast } from '@torcida/ui'
-import { springSnappy } from '@/lib/motion-presets'
+import { canalTabBarItem, canalTabIconTap, springSnappy } from '@/lib/motion-presets'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { LogoImage } from '@/components/media/logo-image'
 import { useReportNavPending } from '@/components/portal/nav-pending-context'
@@ -23,7 +23,12 @@ import {
   reordenarCanaisTematicosAction,
   type FecharCanalTematicoState,
 } from '@/app/portal/comunidade/socio-canais-actions'
-import { moverItem } from '@/lib/operador-canais-ordem'
+import {
+  moverItem,
+  moverSlugArrastavel,
+  ordemArrastavelSemFixos,
+  slugsHierarquiaFixos,
+} from '@/lib/operador-canais-ordem'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
 
 export type CanalAbertoOperadorTab = {
@@ -93,9 +98,9 @@ const DRAG_THRESHOLD_PX = 6
  * sócio) e Minha unidade (canal da subsede/PDE). As abas são **escudos**,
  * não títulos: nomes longos de PDE/torcida estouravam a barra.
  *
- * Super-admin: além dos escopos, mostra **canais abertos** (cookie) com
- * badge X para fechar e arrastar (segurar + mover) para reposicionar —
- * selecionar **não** muda a ordem.
+ * Super-admin: Nacional + torcida (+ unidade, se houver) ficam **fixos** na
+ * hierarquia; demais canais do cookie vêm depois, com X e drag. Selecionar
+ * **não** muda a ordem.
  *
  * Sócio: após os escopos fixos, **temáticos** visitados (cookie separado)
  * com o mesmo fechamento/drag; clique navega sem trocar tenant.
@@ -190,12 +195,37 @@ export function ComunidadeEscopoTabs({
     void registrarCanalTematicoAbertoAction(canalAtivoId)
   }, [superAdmin, canalAtivoId])
 
+  /** Prefixo hierárquico do operador (após Nacional) — não fecha nem arrasta. */
+  const slugsFixosOperador = useMemo(
+    () =>
+      slugsHierarquiaFixos({
+        slugTorcida,
+        slugUnidade,
+        temTorcida: Boolean(escopos.torcida && slugTorcida),
+        temUnidade: Boolean(escopos.unidade && slugUnidade),
+      }),
+    [escopos.torcida, escopos.unidade, slugTorcida, slugUnidade],
+  )
+  const fixosOperadorSet = useMemo(
+    () => new Set(slugsFixosOperador),
+    [slugsFixosOperador],
+  )
+
   // Sincroniza ordem local quando o cookie/RSC traz conjunto diferente.
+  // Normaliza: fixos da hierarquia no início (ordem canônica), extras depois.
   const canaisKey = canaisAbertos.map((c) => c.slug).join(',')
+  const fixosKey = slugsFixosOperador.join(',')
   useEffect(() => {
-    setOrdemSlugs(canaisAbertos.map((c) => c.slug))
+    const slugs = canaisAbertos.map((c) => c.slug)
+    if (!superAdmin || slugsFixosOperador.length === 0) {
+      setOrdemSlugs(slugs)
+      return
+    }
+    const arrastaveis = ordemArrastavelSemFixos(slugs, slugsFixosOperador)
+    const fixosNoCookie = slugsFixosOperador.filter((s) => slugs.includes(s))
+    setOrdemSlugs([...fixosNoCookie, ...arrastaveis])
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chave agregada evita reset no drag
-  }, [canaisKey])
+  }, [canaisKey, fixosKey, superAdmin])
 
   const tematicosKey = canaisTematicosAbertos.map((c) => c.id).join(',')
   useEffect(() => {
@@ -240,56 +270,59 @@ export function ComunidadeEscopoTabs({
   ]
 
   if (superAdmin) {
-    // Ordem = cookie (ordemSlugs). Canais “garantidos” que ainda não estão
-    // no cookie entram no fim — nunca no início (evita salto ao selecionar).
+    // Hierarquia fixa: torcida → unidade (se distinta), depois extras do cookie.
     const visto = new Set<string>()
-    const extras: CanalAbertoOperadorTab[] = []
 
+    for (const slug of slugsFixosOperador) {
+      if (visto.has(slug)) continue
+      visto.add(slug)
+      const noCookie = canaisPorSlug.get(slug)
+      const ehUnidade = Boolean(slugUnidade && slug === slugUnidade && slug !== slugTorcida)
+      tabs.push({
+        id: ehUnidade ? 'unidade' : 'torcida',
+        escopo: ehUnidade ? 'unidade' : 'torcida',
+        nome: ehUnidade
+          ? (noCookie?.nome ?? nomeUnidade ?? 'Minha unidade')
+          : (noCookie?.nome ?? nomeTorcida ?? 'Minha torcida'),
+        logoUrl: ehUnidade
+          ? (noCookie?.logoUrl ?? logoUnidade ?? null)
+          : (noCookie?.logoUrl ?? logoTorcida ?? null),
+        inicial: (
+          ehUnidade
+            ? (noCookie?.nome ?? nomeUnidade ?? 'U')
+            : (noCookie?.nome ?? nomeTorcida ?? 'T')
+        )
+          .charAt(0)
+          .toUpperCase(),
+        href: hrefPara(ehUnidade ? 'unidade' : 'torcida'),
+        slugAlvo: slug,
+        fechavel: false,
+      })
+    }
+
+    const extras: CanalAbertoOperadorTab[] = []
     for (const slug of ordemSlugs) {
+      if (fixosOperadorSet.has(slug) || visto.has(slug)) continue
       const canal = canaisPorSlug.get(slug)
-      if (!canal || visto.has(slug)) continue
+      if (!canal) continue
       visto.add(slug)
       extras.push(canal)
     }
     for (const canal of canaisAbertos) {
-      if (visto.has(canal.slug)) continue
+      if (fixosOperadorSet.has(canal.slug) || visto.has(canal.slug)) continue
       visto.add(canal.slug)
       extras.push(canal)
     }
 
-    if (slugTorcida && escopos.torcida && !visto.has(slugTorcida)) {
-      visto.add(slugTorcida)
-      extras.push({
-        slug: slugTorcida,
-        nome: nomeTorcida ?? 'Minha torcida',
-        logoUrl: logoTorcida ?? null,
-        ehUnidade: false,
-      })
-    }
-    if (
-      slugUnidade &&
-      escopos.unidade &&
-      slugUnidade !== slugTorcida &&
-      !visto.has(slugUnidade)
-    ) {
-      visto.add(slugUnidade)
-      extras.push({
-        slug: slugUnidade,
-        nome: nomeUnidade ?? 'Minha unidade',
-        logoUrl: logoUnidade ?? null,
-        ehUnidade: true,
-      })
-    }
-
     for (const canal of extras) {
-      const escopo: EscopoComunidade = canal.ehUnidade ? 'unidade' : 'torcida'
+      const escopoCanal: EscopoComunidade = canal.ehUnidade ? 'unidade' : 'torcida'
       tabs.push({
         id: `aberto:${canal.slug}`,
-        escopo,
+        escopo: escopoCanal,
         nome: canal.nome,
         logoUrl: canal.logoUrl,
         inicial: canal.nome.charAt(0).toUpperCase(),
-        href: hrefPara(escopo),
+        href: hrefPara(escopoCanal),
         slugAlvo: canal.slug,
         fechavel: true,
       })
@@ -352,8 +385,8 @@ export function ComunidadeEscopoTabs({
 
   if (tabs.length < 2) return null
 
-  /** Só canais já persistidos no cookie — injetados (ainda sem registrar) não entram no drag. */
-  const slugsArrastaveis = ordemSlugs
+  /** Operador: só extras do cookie (fora da hierarquia). Sócio: ids temáticos. */
+  const slugsArrastaveis = ordemArrastavelSemFixos(ordemSlugs, slugsFixosOperador)
   const idsArrastaveis = ordemIds
 
   function persistirOrdemOperador(next: string[]) {
@@ -398,6 +431,11 @@ export function ComunidadeEscopoTabs({
       active: false,
       suppressClick: false,
     }
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+    } catch {
+      /* ignore */
+    }
   }
 
   function onPointerMoveTab(e: React.PointerEvent) {
@@ -409,7 +447,6 @@ export function ComunidadeEscopoTabs({
       drag.active = true
       drag.suppressClick = true
       setDraggingKey(drag.key)
-      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
     }
 
     const el = document.elementFromPoint(e.clientX, e.clientY)
@@ -421,13 +458,16 @@ export function ComunidadeEscopoTabs({
     const lista = drag.kind === 'operador' ? slugsArrastaveis : idsArrastaveis
     if (!lista.includes(overKey)) return
 
-    const setOrdem = drag.kind === 'operador' ? setOrdemSlugs : setOrdemIds
-    setOrdem((prev) => {
-      const from = prev.indexOf(drag.key)
-      const to = prev.indexOf(overKey)
-      if (from < 0 || to < 0 || from === to) return prev
-      return moverItem(prev, from, to)
-    })
+    if (drag.kind === 'operador') {
+      setOrdemSlugs((prev) => moverSlugArrastavel(prev, drag.key, overKey, slugsFixosOperador))
+    } else {
+      setOrdemIds((prev) => {
+        const from = prev.indexOf(drag.key)
+        const to = prev.indexOf(overKey)
+        if (from < 0 || to < 0 || from === to) return prev
+        return moverItem(prev, from, to)
+      })
+    }
   }
 
   function onPointerUpTab(e: React.PointerEvent) {
@@ -457,6 +497,7 @@ export function ComunidadeEscopoTabs({
       className="relative flex items-center gap-5 border-b border-[rgb(var(--border))]"
       aria-label="Escopos e canais da Comunidade"
     >
+      <AnimatePresence initial={false} mode="popLayout">
       {tabs.map((tab) => {
         const ehTematico = Boolean(tab.canalId)
         const ativoPorEscopo =
@@ -496,7 +537,17 @@ export function ComunidadeEscopoTabs({
         const arrastando = draggingKey === dragKey
 
         const visual = (
-          <>
+          <m.span
+            className="relative flex items-center justify-center"
+            whileHover={
+              arrastando || draggingKey
+                ? undefined
+                : { scale: 1.08, transition: canalTabIconTap }
+            }
+            whileTap={
+              arrastando ? undefined : { scale: 0.94, transition: canalTabIconTap }
+            }
+          >
             {tab.logoUrl ? (
               <LogoImage
                 src={tab.logoUrl}
@@ -526,71 +577,18 @@ export function ComunidadeEscopoTabs({
             {ativo && (
               <m.span
                 layoutId="comunidade-escopo-tab-indicator"
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))]"
+                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))] shadow-[0_0_10px_rgb(var(--primary)/0.55)]"
                 transition={springSnappy}
               />
             )}
-          </>
+          </m.span>
         )
 
         const className = [
-          'group relative -mb-px flex touch-none items-center justify-center pb-2.5 pt-1 transition-opacity',
+          'relative -mb-px flex touch-none items-center justify-center pb-2.5 pt-1',
           ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
-          arrastavel ? 'cursor-grab active:cursor-grabbing' : '',
-          arrastando ? 'opacity-40' : '',
         ].join(' ')
-
-        const fecharBadge = tab.fechavel ? (
-          ehTematico && tab.canalId ? (
-            <form action={fecharTematicoAction} className="contents">
-              <input type="hidden" name="canalId" value={tab.canalId} />
-              <input type="hidden" name="canalAtivoId" value={canalAtivoId ?? ''} />
-              <button
-                type="submit"
-                disabled={busy || Boolean(draggingKey)}
-                aria-label={`Fechar canal ${tab.nome}`}
-                title="Fechar canal"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className={[
-                  'absolute -right-1.5 -top-0.5 z-10 flex h-4 w-4 items-center justify-center',
-                  'rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
-                  'text-[rgb(var(--foreground-muted))] shadow-sm',
-                  'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
-                  'hover:bg-[rgb(var(--danger)_/_0.12)] hover:text-[rgb(var(--danger))]',
-                  ativo ? 'opacity-100' : '',
-                ].join(' ')}
-              >
-                <X className="h-2.5 w-2.5" strokeWidth={2.5} />
-              </button>
-            </form>
-          ) : tab.slugAlvo ? (
-            <form action={fecharAction} className="contents">
-              <input type="hidden" name="slug" value={tab.slugAlvo} />
-              <input type="hidden" name="atualSlug" value={atualSlug ?? ''} />
-              <input type="hidden" name="fallbackSlug" value={slugTorcida ?? ''} />
-              <button
-                type="submit"
-                disabled={busy || Boolean(draggingKey)}
-                aria-label={`Fechar canal ${tab.nome}`}
-                title="Fechar canal"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className={[
-                  'absolute -right-1.5 -top-0.5 z-10 flex h-4 w-4 items-center justify-center',
-                  'rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
-                  'text-[rgb(var(--foreground-muted))] shadow-sm',
-                  'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
-                  'hover:bg-[rgb(var(--danger)_/_0.12)] hover:text-[rgb(var(--danger))]',
-                  ativo ? 'opacity-100' : '',
-                ].join(' ')}
-              >
-                <X className="h-2.5 w-2.5" strokeWidth={2.5} />
-              </button>
-            </form>
-          ) : null
-        ) : null
 
         const dragKind: 'operador' | 'tematico' = ehTematico ? 'tematico' : 'operador'
         const dragHandlers = arrastavel
@@ -600,23 +598,87 @@ export function ComunidadeEscopoTabs({
               onPointerMove: onPointerMoveTab,
               onPointerUp: onPointerUpTab,
               onPointerCancel: onPointerUpTab,
-              ...(ehTematico
-                ? { 'data-canal-id': tab.canalId! }
-                : { 'data-canal-slug': tab.slugAlvo! }),
-              title: `${tab.nome} — arraste para reposicionar`,
             }
           : {}
 
-        const wrapperDataAttr = arrastavel
+        const wrapperAttr = arrastavel
           ? ehTematico
             ? { 'data-canal-id': tab.canalId! }
             : { 'data-canal-slug': tab.slugAlvo! }
           : {}
 
-        if (precisaTrocarSessao && tab.slugAlvo) {
-          return (
-            <div key={tab.id} className="relative" {...wrapperDataAttr}>
-              {fecharBadge}
+        const fecharClass = [
+          'absolute -right-1.5 -top-0.5 z-10 flex h-4 w-4 items-center justify-center',
+          'rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
+          'text-[rgb(var(--foreground-muted))] shadow-sm',
+          'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
+          'hover:bg-[rgb(var(--danger)_/_0.12)] hover:text-[rgb(var(--danger))]',
+          ativo ? 'opacity-100' : '',
+        ].join(' ')
+
+        const fecharBadge = tab.fechavel ? (
+          ehTematico && tab.canalId ? (
+            <form action={fecharTematicoAction} className="contents">
+              <input type="hidden" name="canalId" value={tab.canalId} />
+              <input type="hidden" name="canalAtivoId" value={canalAtivoId ?? ''} />
+              <m.button
+                type="submit"
+                disabled={busy || Boolean(draggingKey)}
+                aria-label={`Fechar canal ${tab.nome}`}
+                title="Fechar canal"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+                transition={canalTabIconTap}
+                className={fecharClass}
+              >
+                <X className="h-2.5 w-2.5" strokeWidth={2.5} />
+              </m.button>
+            </form>
+          ) : tab.slugAlvo ? (
+            <form action={fecharAction} className="contents">
+              <input type="hidden" name="slug" value={tab.slugAlvo} />
+              <input type="hidden" name="atualSlug" value={atualSlug ?? ''} />
+              <input type="hidden" name="fallbackSlug" value={slugTorcida ?? ''} />
+              <m.button
+                type="submit"
+                disabled={busy || Boolean(draggingKey)}
+                aria-label={`Fechar canal ${tab.nome}`}
+                title="Fechar canal"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+                transition={canalTabIconTap}
+                className={fecharClass}
+              >
+                <X className="h-2.5 w-2.5" strokeWidth={2.5} />
+              </m.button>
+            </form>
+          ) : null
+        ) : null
+
+        const shell = (
+          <m.div
+            key={tab.id}
+            layout="position"
+            variants={canalTabBarItem}
+            initial="hidden"
+            animate={arrastando ? 'dragging' : draggingKey ? 'dimmed' : 'show'}
+            exit="exit"
+            transition={{ layout: springSnappy }}
+            className={[
+              'relative group rounded-full',
+              arrastavel ? 'cursor-grab active:cursor-grabbing' : '',
+            ].join(' ')}
+            style={arrastando ? { touchAction: 'none' } : undefined}
+            title={arrastavel ? `${tab.nome} — arraste para reposicionar` : undefined}
+            {...wrapperAttr}
+            {...dragHandlers}
+          >
+            {fecharBadge}
+            {precisaTrocarSessao && tab.slugAlvo ? (
               <form
                 action={action}
                 onSubmit={(e) => {
@@ -637,36 +699,32 @@ export function ComunidadeEscopoTabs({
                   aria-current={ativo ? 'page' : undefined}
                   aria-label={tab.nome}
                   className={className}
-                  {...dragHandlers}
                 >
                   {visual}
                 </button>
               </form>
-            </div>
-          )
-        }
-
-        return (
-          <div key={tab.id} className="relative" {...wrapperDataAttr}>
-            {fecharBadge}
-            <ComunidadePrefetchLink
-              href={tab.href}
-              scroll={false}
-              aria-current={ativo ? 'page' : undefined}
-              aria-label={tab.nome}
-              className={className}
-              onClick={(e) => {
-                if (dragRef.current?.suppressClick || draggingKey) {
-                  e.preventDefault()
-                }
-              }}
-              {...dragHandlers}
-            >
-              {visual}
-            </ComunidadePrefetchLink>
-          </div>
+            ) : (
+              <ComunidadePrefetchLink
+                href={tab.href}
+                scroll={false}
+                aria-current={ativo ? 'page' : undefined}
+                aria-label={tab.nome}
+                className={className}
+                onClick={(e) => {
+                  if (dragRef.current?.suppressClick || draggingKey) {
+                    e.preventDefault()
+                  }
+                }}
+              >
+                {visual}
+              </ComunidadePrefetchLink>
+            )}
+          </m.div>
         )
+
+        return shell
       })}
+      </AnimatePresence>
     </nav>
   )
 }

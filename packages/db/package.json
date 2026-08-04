@@ -10,6 +10,7 @@
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
     "db:repair-system-roles": "node scripts/repair-system-role-permissions.js",
+    "db:senha-teste": "node scripts/repair-senha-teste.js",
     "test:repair-system-roles": "node scripts/test-repair-system-role-permissions.js",
     "db:repair-departamento-orfaos": "node scripts/repair-departamento-orfaos.js",
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
@@ -21,6 +22,7 @@
     "seed:escudos-ogol": "node --use-system-ca scripts/seed-escudos-ogol.js",
     "seed:departamentos": "node scripts/seed-departamentos.js",
     "seed:departamento-areas": "node scripts/seed-departamento-areas.js",
+    "db:repair-canais-departamentos": "node scripts/repair-canais-departamentos.js",
     "seed:recomendacoes-aliancas": "node scripts/seed-recomendacoes-aliancas.js",
     "seed:torcedores-estimados": "node scripts/seed-torcedores-estimados.js",
     "test:torcedores-estimados": "node scripts/test-torcedores-estimados.js",
@@ -58,14 +60,17 @@
     "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js",
     "db:migrate-fiado-comanda": "node scripts/migrate-fiado-para-comanda.js",
     "audit:regras": "node scripts/audit-regras-negocio.js",
+    "seed:convites-teste": "node scripts/seed-convites-teste.js",
     "seed:corinthians-teste": "node scripts/seed-corinthians-teste.js",
     "seed:corinthians-teste-modulos": "node scripts/seed-corinthians-teste-modulos.js",
     "reset:corinthians-teste": "node scripts/reset-corinthians-teste.js",
     "seed:nacional-teste": "node scripts/seed-nacional-teste.js",
-    "reset:nacional-teste": "node scripts/reset-nacional-teste.js"
+    "reset:nacional-teste": "node scripts/reset-nacional-teste.js",
+    "reset:jornadas": "node scripts/reset-jornadas.js"
   },
   "dependencies": {
-    "@prisma/client": "^6.10.1"
+    "@prisma/client": "^6.10.1",
+    "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
     "prisma": "^6.10.1"

@@ -38,6 +38,7 @@
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
+import { senhaHashTeste } from './lib/senha-teste.js'
 import {
   ALIANCAS,
   CLUBE_CORINTHIANS,
@@ -261,6 +262,8 @@ async function seedPessoas(contexto, resumo) {
       email: `presidente.${slugify(t.tenantSlug)}@${DOMINIO_TESTE}`,
       nome: nomePres,
       nickname: `teste_nac_presidente_${nPres}`,
+      // Senha padrão do lote — ver scripts/lib/senha-teste.js.
+      senhaHash: senhaHashTeste(),
       criadoEm: new Date(),
     })
     membrosRows.push({
@@ -297,6 +300,7 @@ async function seedPessoas(contexto, resumo) {
           email: `${slugify(primeiro)}.${slugify(sobrenome)}.${n}@${DOMINIO_TESTE}`,
           nome,
           nickname: `teste_nac_${n}`,
+          senhaHash: senhaHashTeste(),
           criadoEm: new Date(),
         })
         membrosRows.push({
@@ -360,6 +364,7 @@ async function seedTorcedoresGlobais(contexto, resumo) {
         email: `global.${slugify(primeiro)}.${slugify(sobrenome)}.${n}@${DOMINIO_TESTE}`,
         nome,
         nickname: `teste_nac_global_${n}`,
+        senhaHash: senhaHashTeste(),
         criadoEm: new Date(),
       })
       perfisRows.push({
@@ -547,8 +552,11 @@ async function seedPosts(contexto, resumo) {
 
     const mem = templatesMembro(t.afiliacao.nome)
     for (const autorId of t.aprovadosUserIds.filter(() => Math.random() < 0.5)) {
-      const visibilidade = pickPonderado([['PUBLICO', 70], ['TENANT', 25], ['PRIVADO', 5]])
       const ehTorcedor = torcedorIds.has(autorId)
+      // TORCEDOR só PUBLICO — TENANT entra no mural do canal oficial (sócio).
+      const visibilidade = ehTorcedor
+        ? 'PUBLICO'
+        : pickPonderado([['PUBLICO', 70], ['TENANT', 25], ['PRIVADO', 5]])
       // TORCEDOR PUBLICO: maioria com alcance nacional (Descobrir da CN).
       // Sócio: ~30% (peso histórico do lote).
       const alcanceNacional =

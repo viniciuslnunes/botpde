@@ -39,7 +39,6 @@ function ProdutoBarCard({ produto }: { produto: BarProdutoSerializado }) {
         src={produto.imagemUrl}
         alt={produto.nome}
         variant="admin"
-        className={produto.ativo ? undefined : 'h-32'}
       />
       <div className="space-y-3 p-4">
         <div>

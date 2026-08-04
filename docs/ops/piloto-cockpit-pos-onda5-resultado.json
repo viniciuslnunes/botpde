@@ -1,0 +1,113 @@
+{
+  "geradoEm": "2026-08-04T14:12:39.082Z",
+  "p1": [
+    {
+      "papel": "financeiro",
+      "tenantSlug": "camisa-12-corinthians",
+      "tenantNome": "Camisa 12",
+      "userId": "a157c411-e063-4f85-8427-ea7bfff397a4",
+      "email": "aline.andrade.23@teste.corinthians.torcida.app",
+      "nome": "Aline Andrade",
+      "role": "admin",
+      "gestorDepto": true
+    },
+    {
+      "papel": "caravanas",
+      "tenantSlug": "camisa-12-corinthians",
+      "tenantNome": "Camisa 12",
+      "userId": "776662f3-7a5e-46ad-a862-5071d8ed4779",
+      "email": "aline.costa.14@teste.corinthians.torcida.app",
+      "nome": "Aline Costa",
+      "role": "admin",
+      "gestorDepto": true
+    },
+    {
+      "papel": "financeiro",
+      "tenantSlug": "pde-gavioes-fiel",
+      "tenantNome": "Gaviões da Fiel",
+      "userId": "f39b499f-0d8a-449d-a808-d377e65926f8",
+      "email": "adriana.cardoso.727@teste.corinthians.torcida.app",
+      "nome": "Adriana Cardoso",
+      "role": "admin",
+      "gestorDepto": true
+    },
+    {
+      "papel": "caravanas",
+      "tenantSlug": "pde-gavioes-fiel",
+      "tenantNome": "Gaviões da Fiel",
+      "userId": "5ac650bd-87fe-4410-b7dd-67c4d070a3c3",
+      "email": "ana.correia.637@teste.corinthians.torcida.app",
+      "nome": "Ana Correia",
+      "role": "admin",
+      "gestorDepto": true
+    }
+  ],
+  "p3": [
+    {
+      "rota": "/admin/financeiro",
+      "tenantSlug": "pde-gavioes-fiel",
+      "samplesMs": [
+        1461.309000000001,
+        1164.7161000000015,
+        921.9176999999981
+      ],
+      "p95ApproxMs": 1461.309000000001,
+      "pendencias": 1,
+      "comSla": 0
+    },
+    {
+      "rota": "/admin/caravanas",
+      "tenantSlug": "pde-gavioes-fiel",
+      "samplesMs": [
+        1092.2158999999992,
+        547.6469999999972,
+        549.3309999999983
+      ],
+      "p95ApproxMs": 1092.2158999999992,
+      "pendencias": 2,
+      "comSla": 2
+    },
+    {
+      "rota": "/admin/financeiro",
+      "tenantSlug": "camisa-12-corinthians",
+      "samplesMs": [
+        1028.6103000000003,
+        1038.6515999999974,
+        780.9452000000019
+      ],
+      "p95ApproxMs": 1038.6515999999974,
+      "pendencias": 1,
+      "comSla": 0
+    },
+    {
+      "rota": "/admin/caravanas",
+      "tenantSlug": "camisa-12-corinthians",
+      "samplesMs": [
+        565.3489999999983,
+        565.1418000000012,
+        565.4472999999998
+      ],
+      "p95ApproxMs": 565.4472999999998,
+      "pendencias": 2,
+      "comSla": 2
+    }
+  ],
+  "p4": {
+    "ok": [
+      "Baixa inline ok (cobrança piloto 693742d1…)",
+      "Embarque/check-in inline ok (evento 455e49df…)"
+    ],
+    "alerta": [],
+    "erro": []
+  },
+    "fechadoEm": "2026-08-04",
+    "pwaCheckIn": "hold",
+    "canalPorArea": "hold",
+    "decisaoArquitetural": "R8",
+    "motivo": "Smoke Fin/Caravanas concluiu decisão na fila sem exigir offline, home-screen ou segregação por área. Reabrir só com critério documentado no resultado.md §P.5.",
+    "reabertura": {
+      "pwaCheckIn": "≥30% demos/uso pedirem offline ou home-screen no check-in Agenda",
+      "canalPorArea": "Gestores Social/Carnaval pedirem isolamento além do cockpit"
+    }
+  }
+}

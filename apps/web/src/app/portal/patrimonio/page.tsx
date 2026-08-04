@@ -11,6 +11,7 @@ import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   listarCandidatosResponsavelPatrimonio,
+  listarEmprestimosPatrimonio,
   listarPatrimonio,
   resumirPatrimonio,
 } from '@/lib/patrimonio'
@@ -25,6 +26,10 @@ import {
 } from '@/components/patrimonio/patrimonio-itens-lista'
 import { PatrimonioResumoCards } from '@/components/patrimonio/patrimonio-resumo-cards'
 import { PatrimonioFiltros } from '@/components/patrimonio/patrimonio-filtros'
+import {
+  DevolverPatrimonioForm,
+  RetirarPatrimonioForm,
+} from '@/components/patrimonio/patrimonio-emprestimo-forms'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -55,10 +60,19 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
   const sp = await searchParams
   const { filtro, values } = parseFiltroPatrimonio(sp)
 
-  const [resumo, lista, candidatos] = await Promise.all([
+  const [resumo, lista, candidatos, meusEmprestimos, disponiveisRetirada] = await Promise.all([
     resumirPatrimonio(tenant.id),
     listarPatrimonio(tenant.id, { filtro }),
     podeGerir ? listarCandidatosResponsavelPatrimonio(tenant.id) : Promise.resolve([]),
+    listarEmprestimosPatrimonio(tenant.id, {
+      userId: session.user.id!,
+      status: 'ABERTO',
+      limite: 20,
+    }),
+    listarPatrimonio(tenant.id, {
+      filtro: { status: 'DISPONIVEL', page: 1 },
+      pageSize: 8,
+    }),
   ])
 
   const itens: PatrimonioRow[] = lista.itens.map((i) => ({
@@ -106,6 +120,41 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
       </MotionReveal>
 
       <PatrimonioResumoCards resumo={resumo} />
+
+      {(meusEmprestimos.length > 0 || disponiveisRetirada.itens.length > 0) && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Meus empréstimos e retiradas
+            </h2>
+            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Retire com foto na saída e devolva com foto de como ficou guardado.
+            </p>
+          </div>
+
+          {meusEmprestimos.map((e) => (
+            <DevolverPatrimonioForm
+              key={e.id}
+              emprestimoId={e.id}
+              itemNome={e.item.nome}
+              tenantId={tenant.id}
+            />
+          ))}
+
+          {disponiveisRetirada.itens
+            .filter((i) => !meusEmprestimos.some((e) => e.item.id === i.id))
+            .slice(0, 4)
+            .map((i) => (
+              <RetirarPatrimonioForm
+                key={i.id}
+                itemId={i.id}
+                itemNome={i.nome}
+                tenantId={tenant.id}
+              />
+            ))}
+        </section>
+      )}
+
       <PatrimonioFiltros basePath="/portal/patrimonio" values={values} />
       {podeGerir && <PatrimonioItemForm candidatos={candidatos} />}
       <PatrimonioItensLista

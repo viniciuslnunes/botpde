@@ -79,6 +79,13 @@ ganharam bypass de leitura para super admin, sem exigir associação real:
   e bloqueiam com 403 — oversight é só leitura, não equivale a virar membro.
   Criar/moderar mídia/encerrar sala já funcionavam via `assertPermission`
   (RBAC tem bypass próprio) — não mudou.
+- **Departamentos** — após selecionar a unidade (`torcida_ctx`), o super-admin
+  vê todos os departamentos daquele tenant (navbar `temDepartamentos`, hub
+  portal, cockpit, módulo admin). Gestão (equipe, áreas, projetos, cor) exige
+  RBAC/`DepartamentoGestor` real — `assertPodeGerirArea` e pares **não**
+  fazem early-return para SA. Dual-hat (SA + `roles:manage` / gestor na
+  própria torcida) continua gerindo pelo cargo. Ver
+  `lib/departamentos-portal-access.ts` e `docs/data/modulo-departamentos.md`.
 
 ## Suporte da plataforma — configurações “Somente owner” (2026-08-03)
 

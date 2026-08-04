@@ -1,10 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
-import { Loader2, Search, UserCheck, UserX } from 'lucide-react'
-import { transferirOwnerAction, type TransferirOwnerState } from './actions'
+import { Loader2, Search, UserCheck, UserMinus, UserX } from 'lucide-react'
+import {
+  removerOwnerAction,
+  transferirOwnerAction,
+  type TransferirOwnerState,
+} from './actions'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { labelClubeComUf, type TorcidaTransferencia } from '@/lib/torcida-labels'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 
@@ -17,7 +22,7 @@ function SubmitButton() {
       className="btn-primary flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
     >
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
-      {pending ? 'Transferindo…' : 'Transferir propriedade'}
+      {pending ? 'Salvando…' : 'Definir / transferir'}
     </button>
   )
 }
@@ -26,6 +31,8 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
   const [busca, setBusca] = useState('')
   const [tenantId, setTenantId] = useState('')
   const [state, action] = useActionState<TransferirOwnerState, FormData>(transferirOwnerAction, {})
+  const [removendo, startRemover] = useTransition()
+  const confirmAction = useConfirmAction()
 
   const semOwner = useMemo(() => torcidas.filter((t) => !t.temOwner).length, [torcidas])
 
@@ -34,7 +41,7 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
     if (!alvo) return torcidas
     return torcidas.filter((t) => {
       const haystack = normalizarTexto(
-        [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug].join(' '),
+        [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug, t.ownerEmail ?? ''].join(' '),
       )
       return haystack.includes(alvo)
     })
@@ -49,11 +56,29 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
     }
   }, [state.success])
 
+  function removerPresidente() {
+    if (!selecionada) return
+    startRemover(async () => {
+      const ok = await confirmAction({
+        titulo: 'Remover presidente?',
+        descricao: `A torcida ${selecionada.nome} ficará sem owner. Você (super-admin) volta a poder editar as configurações reservadas até haver um novo presidente. Contas e vínculos dos membros não são apagados.`,
+        labelConfirmar: 'Remover presidente',
+        labelCancelar: 'Cancelar',
+        variante: 'destructive',
+        cancelled: false,
+        success: `Presidente removido de ${selecionada.nome}.`,
+        errorFallback: 'Não foi possível remover o presidente.',
+        run: () => removerOwnerAction(selecionada.id),
+      })
+      if (ok) window.location.reload()
+    })
+  }
+
   return (
     <div className="mt-4 space-y-4">
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        {semOwner} torcida(s) sem presidente — selecione abaixo e informe o e-mail (a pessoa precisa
-        ter conta na plataforma).
+        {semOwner} torcida(s) sem presidente. Selecione abaixo para transferir a outro e-mail
+        (a pessoa precisa ter conta) ou remover o owner atual a qualquer momento.
       </p>
 
       <div className="relative">
@@ -62,7 +87,7 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
           type="search"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por torcida, clube, UF ou slug…"
+          placeholder="Buscar por torcida, clube, UF, slug ou e-mail do owner…"
           className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
           aria-label="Buscar torcida"
         />
@@ -122,43 +147,66 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
       </div>
 
       {selecionada && (
-        <form
-          action={action}
-          className="space-y-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4"
-        >
-          <input type="hidden" name="tenantId" value={selecionada.id} />
+        <div className="space-y-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4">
           <p className="text-sm text-[rgb(var(--foreground))]">
-            Transferir{' '}
             <strong>
               {selecionada.nome}
               {selecionadaClube ? ` — ${selecionadaClube}` : ''}
             </strong>
-            {selecionada.temOwner && selecionada.ownerEmail && (
+            {selecionada.temOwner && selecionada.ownerEmail ? (
               <span className="text-[rgb(var(--foreground-muted))]">
                 {' '}
                 (owner atual: {selecionada.ownerEmail})
               </span>
+            ) : (
+              <span className="text-[rgb(var(--foreground-muted))]"> — sem presidente</span>
             )}
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <div className="min-w-0 flex-1">
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="E-mail do presidente"
-                className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
-              />
-              {state.errors?.email?.[0] && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{state.errors.email[0]}</p>
-              )}
-              {state.message && !state.success && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{state.message}</p>
-              )}
+
+          <form action={action} className="space-y-2">
+            <input type="hidden" name="tenantId" value={selecionada.id} />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <div className="min-w-0 flex-1">
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="E-mail do novo presidente"
+                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
+                />
+                {state.errors?.email?.[0] && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{state.errors.email[0]}</p>
+                )}
+                {state.message && !state.success && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{state.message}</p>
+                )}
+              </div>
+              <SubmitButton />
             </div>
-            <SubmitButton />
-          </div>
-        </form>
+          </form>
+
+          {selecionada.temOwner ? (
+            <div className="border-t border-[rgb(var(--border))] pt-3">
+              <button
+                type="button"
+                disabled={removendo}
+                onClick={removerPresidente}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+              >
+                {removendo ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserMinus className="h-4 w-4" />
+                )}
+                Remover presidente
+              </button>
+              <p className="mt-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+                A torcida fica sem owner. Cadastros e vínculos permanecem; só o cargo de presidente
+                é retirado.
+              </p>
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   )

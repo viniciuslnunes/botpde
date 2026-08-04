@@ -1,9 +1,11 @@
 /**
  * Regras do hub `/portal/departamentos`:
  * - Membro vê só áreas em que atua (UserDepartamento).
- * - Membro da Diretoria (ou super-admin) vê todas as áreas do tenant.
- * - Gestão/Operação só se for DepartamentoGestor daquela área (ou SA) —
- *   Diretoria não herda “gestor de tudo” só por ver o hub.
+ * - Membro da Diretoria (ou super-admin em modo operador) vê todas as áreas
+ *   do tenant — SA é oversight de leitura, igual à Diretoria.
+ * - Gestão/Operação só se for DepartamentoGestor daquela área (ou
+ *   `roles:manage` real nas actions). Super-admin **não** vira gestor só pelo
+ *   bypass da plataforma; Diretoria também não herda “gestor de tudo”.
  */
 
 export type DeptoHubBase = {
@@ -52,7 +54,8 @@ export function resolverDepartamentosHub(input: {
     const isAtuacao = membershipIds.has(d.id)
     return {
       ...d,
-      isGestor: isSuperAdmin || gestorIds.has(d.id),
+      // SA vê tudo, mas gestão só com vínculo real de DepartamentoGestor.
+      isGestor: gestorIds.has(d.id),
       isAtuacao,
       visaoDiretoria: isDiretoria && !isAtuacao,
     }
@@ -78,7 +81,7 @@ export type AreaBase = {
 export type AreaAcesso = AreaBase & {
   isMembro: boolean
   isResponsavel: boolean
-  /** Gestão da área = gestão do departamento (ou SA) — NUNCA deriva de isResponsavel. */
+  /** Gestão da área = gestão do departamento — NUNCA deriva de isResponsavel nem de SA. */
   podeGerir: boolean
 }
 
@@ -86,17 +89,21 @@ export type AreaAcesso = AreaBase & {
  * Resolve as áreas de um departamento sob o ponto de vista de quem está
  * olhando: minhas áreas primeiro, depois ativas, depois `ordem`/nome.
  * `RESPONSAVEL` de área é rótulo de accountability — não concede gestão.
+ * Super-admin vê as áreas (via hub/cockpit), mas `podeGerir` só com
+ * `isGestorDepartamento` real — o parâmetro `isSuperAdmin` é ignorado (legado).
  */
 export function resolverAreasDepartamento(input: {
   areas: AreaBase[]
   membroAreaIds: Set<string> | string[]
   responsavelAreaIds: Set<string> | string[]
   isGestorDepartamento: boolean
+  /** @deprecated Não concede gestão — mantido só por compatibilidade de call sites. */
   isSuperAdmin?: boolean
 }): AreaAcesso[] {
   const membroAreaIds = asSet(input.membroAreaIds)
   const responsavelAreaIds = asSet(input.responsavelAreaIds)
-  const podeGerir = Boolean(input.isGestorDepartamento || input.isSuperAdmin)
+  void input.isSuperAdmin
+  const podeGerir = Boolean(input.isGestorDepartamento)
 
   const resolved = input.areas.map((area) => ({
     ...area,

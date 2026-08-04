@@ -183,6 +183,16 @@ export {
   bootstrapAcessoTenant,
 } from './departamentos-canonicos.js'
 
+export {
+  aplicarRosterCanal,
+  syncMembrosCanalDepartamento,
+  syncMembrosCanalArea,
+  ensureCanalDepartamento,
+  ensureCanalArea,
+  ensureCanaisDepartamentosTenant,
+  syncCanaisDepartamentosDoUsuario,
+} from './departamento-canais.js'
+
 export { calcularMenorValorEstimadosConhecido } from './data/torcedores-estimados.js'
 
 export { withDbRetry } from './with-db-retry.js'

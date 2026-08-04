@@ -449,6 +449,8 @@ export async function atualizarStatusPedido(
 
     revalidatePath('/admin/loja/pedidos')
     revalidatePath('/admin/loja/tickets')
+    revalidatePath('/admin/loja')
+    revalidatePath('/admin/loja/produtos')
     revalidatePath('/portal/loja/pedidos')
     revalidatePath('/portal/mensagens')
     revalidatePath('/admin/financeiro')
@@ -533,6 +535,8 @@ export async function fecharTicketPedido(ticketId: string): Promise<TicketAction
 
     revalidatePath('/admin/loja/pedidos')
     revalidatePath('/admin/loja/tickets')
+    revalidatePath('/admin/loja')
+    revalidatePath('/admin/loja/produtos')
     revalidatePath('/portal/loja/pedidos')
     revalidatePath('/portal/mensagens')
     return { success: true, conversaId: ticket.conversaId }
@@ -576,5 +580,87 @@ export async function registrarVisualizacaoTicketArquivo(
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao registrar visualização' }
+  }
+}
+
+// ── Vitrine (capa do portal) ──────────────────────────────────────────────────
+
+const VitrineSchema = z.object({
+  bannerUrl: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null))
+    .pipe(z.union([z.string().url('URL da capa inválida'), z.null()])),
+  usarDestaqueComoCapa: z
+    .union([z.literal('true'), z.literal('false'), z.literal('on'), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === 'true' || v === 'on'),
+})
+
+export type VitrineState = {
+  success?: boolean
+  error?: string
+  fieldErrors?: Partial<Record<string, string[]>>
+}
+
+export async function salvarVitrineLoja(
+  _prev: VitrineState,
+  formData: FormData,
+): Promise<VitrineState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+
+    const parsed = VitrineSchema.safeParse({
+      bannerUrl: formData.get('bannerUrl')?.toString() ?? '',
+      usarDestaqueComoCapa: formData.get('usarDestaqueComoCapa')?.toString() ?? 'false',
+    })
+    if (!parsed.success) {
+      return {
+        error: parsed.error.issues[0]?.message ?? 'Dados inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      }
+    }
+
+    const { resolveTenantDesign } = await import('@torcida/types')
+    const design = resolveTenantDesign(tenant.design, tenant.corPrimaria)
+    const nextDesign = {
+      ...design,
+      loja: {
+        ...design.loja,
+        bannerUrl: parsed.data.bannerUrl,
+        usarDestaqueComoCapa: parsed.data.usarDestaqueComoCapa ?? true,
+      },
+    }
+
+    await db.tenant.update({
+      where: { id: tenant.id },
+      data: { design: nextDesign as unknown as Prisma.InputJsonValue },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'LOJA_VITRINE_ATUALIZADA',
+        entidade: 'Tenant',
+        entidadeId: tenant.id,
+        detalhes: {
+          bannerUrl: parsed.data.bannerUrl,
+          usarDestaqueComoCapa: nextDesign.loja.usarDestaqueComoCapa,
+        },
+      },
+    })
+
+    const { invalidateTenantCache } = await import('@/lib/tenant')
+    invalidateTenantCache(tenant.slug)
+
+    revalidatePath('/admin/loja/vitrine')
+    revalidatePath(`/portal/loja/${tenant.id}`)
+    revalidatePath('/portal/loja')
+
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao salvar vitrine' }
   }
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, ListChecks, Receipt, TrendingUp, Wallet } from 'lucide-react'
+import { Compass, CreditCard, ListChecks, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
@@ -28,6 +28,7 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
   })
 
   const tabs = montarTabsModulo('financeiro', permissoes, {
+    direcao: { icon: <Compass className={ICONE} /> },
     lancamentos: { icon: <ListChecks className={ICONE} /> },
     evolucao: { icon: <TrendingUp className={ICONE} /> },
     cobrancas: {
@@ -44,8 +45,8 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
         title="Financeiro"
         description={
           somenteLeitura
-            ? 'Somente leitura — livro-caixa, evolução, cobranças e planos.'
-            : 'Livro-caixa, evolução, cobranças de associação e planos de sócio.'
+            ? 'Somente leitura — direção do caixa, lançamentos, cobranças e planos.'
+            : 'Direção do caixa, livro-caixa, cobranças de associação e planos de sócio.'
         }
         icon={<Wallet className="h-5 w-5" />}
         actions={

@@ -15,6 +15,7 @@ const purposeSchema = z.enum([
   'cadastro',
   'sede',
   'mensagem',
+  'patrimonio',
 ])
 
 const bodySchema = z.object({
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest) {
       // também pode anexar mídia em conversas das quais participa.
       const { membro } = await assertPodeEnviarNaConversa(conversaId, session.user.id)
       folder = `torcida/${membro.conversa.tenantId}/mensagens/${conversaId}`
+    } else if (purpose === 'patrimonio') {
+      const { tenant } = await assertPermission(PERMISSIONS.PATRIMONY_VIEW)
+      folder = `torcida/${tenant.id}/patrimonio`
     } else if (
       tenantIdCadastro
       && (purpose === 'perfil-banner' || purpose === 'perfil-avatar')

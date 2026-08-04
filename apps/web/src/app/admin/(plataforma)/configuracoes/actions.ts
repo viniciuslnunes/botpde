@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
+import { db, ensureCanalDepartamento, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import {
   assertOwnerOuSuportePlataforma,
   assertPermission,
@@ -683,54 +683,80 @@ export async function alternarConviteTenant(formData: FormData): Promise<void> {
 
 // ── Canal oficial (mural da unidade na Comunidade) ────────────────────────────
 
-export async function salvarCanalOficial(formData: FormData) {
-  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  const { session, tenant } = ctx
-  await assertOwnerOuSuportePlataforma(ctx)
+/**
+ * Retorna `{ success }` / `{ message }` em vez de throw nos erros de negócio —
+ * em produção, throw de Server Action vira HTTP 500 sem corpo (digest RSC).
+ */
+export async function salvarCanalOficial(
+  formData: FormData,
+): Promise<{ success: true } | { message: string }> {
+  try {
+    const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+    const { session, tenant } = ctx
+    await assertOwnerOuSuportePlataforma(ctx)
 
-  const parsed = editarCanalOficialSchema.safeParse({
-    nome: String(formData.get('nome') ?? ''),
-    descricao: String(formData.get('descricao') ?? '').trim() || undefined,
-    visibilidadeCanal: String(formData.get('visibilidadeCanal') ?? 'HIERARQUIA'),
-    somenteAdminPublica: formData.get('somenteAdminPublica') === 'true',
-    publica: formData.get('publica') === 'true',
-    avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || undefined,
-  })
-  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+    const parsed = editarCanalOficialSchema.safeParse({
+      nome: String(formData.get('nome') ?? ''),
+      descricao: String(formData.get('descricao') ?? '').trim() || undefined,
+      visibilidadeCanal: String(formData.get('visibilidadeCanal') ?? 'HIERARQUIA'),
+      somenteAdminPublica: formData.get('somenteAdminPublica') === 'true',
+      publica: formData.get('publica') === 'true',
+      avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || undefined,
+    })
+    if (!parsed.success) {
+      return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+    }
 
-  const { id: canalId } = await getOrCreateCanalOficial(tenant.id, session.user.id)
+    const { id: canalId } = await getOrCreateCanalOficial(tenant.id, session.user.id)
+    const canal: { id: string } | null = await db.conversa.findUnique({
+      where: { id: canalId },
+      select: { id: true },
+    })
+    if (!canal) {
+      return {
+        message:
+          'Canal oficial não encontrado. Tente recarregar a página ou contate o suporte.',
+      }
+    }
 
-  await db.conversa.update({
-    where: { id: canalId },
-    data: {
-      nome: parsed.data.nome,
-      descricao: parsed.data.descricao ?? null,
-      visibilidadeCanal: parsed.data.visibilidadeCanal,
-      somenteAdminPublica: parsed.data.somenteAdminPublica,
-      publica: parsed.data.publica,
-      avatarUrl: parsed.data.avatarUrl ?? null,
-    },
-  })
+    await db.conversa.update({
+      where: { id: canal.id },
+      data: {
+        nome: parsed.data.nome,
+        descricao: parsed.data.descricao ?? null,
+        visibilidadeCanal: parsed.data.visibilidadeCanal,
+        somenteAdminPublica: parsed.data.somenteAdminPublica,
+        publica: parsed.data.publica,
+        avatarUrl: parsed.data.avatarUrl ?? null,
+      },
+    })
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'CANAL_OFICIAL_ATUALIZADO',
-      entidade: 'Conversa',
-      entidadeId: canalId,
-      detalhes: parsed.data,
-    },
-  })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'CANAL_OFICIAL_ATUALIZADO',
+        entidade: 'Conversa',
+        entidadeId: canal.id,
+        detalhes: parsed.data,
+      },
+    })
 
-  revalidatePath('/admin/configuracoes')
-  revalidatePath(`/portal/comunidade/canais/${canalId}`)
-  revalidatePath('/portal/comunidade/canais')
-  // Avatar do canal oficial também alimenta o fallback de logo da topbar
-  // (ver resolverContextoComunidade) quando a unidade não tem Tenant.logoUrl
-  // nem Sede.fotoUrl — sem revalidar o layout, a topbar fica com a foto velha.
-  revalidatePath('/portal', 'layout')
-  invalidarCachesComunidadeFeed(tenant.id)
+    revalidatePath('/admin/configuracoes')
+    revalidatePath(`/portal/comunidade/canais/${canal.id}`)
+    revalidatePath('/portal/comunidade/canais')
+    // Avatar do canal oficial também alimenta o fallback de logo da topbar
+    // (ver resolverContextoComunidade) quando a unidade não tem Tenant.logoUrl
+    // nem Sede.fotoUrl — sem revalidar o layout, a topbar fica com a foto velha.
+    revalidatePath('/portal', 'layout')
+    invalidarCachesComunidadeFeed(tenant.id)
+    return { success: true }
+  } catch (error) {
+    console.error('[salvarCanalOficial]', error)
+    if (error instanceof ExpectedError) return { message: error.message }
+    if (error instanceof Error) return { message: error.message }
+    return { message: 'Não foi possível salvar o canal oficial. Tente novamente.' }
+  }
 }
 
 const afiliacaoSchema = z.object({
@@ -1069,7 +1095,7 @@ export async function criarDepartamento(formData: FormData) {
 
   const slug = await gerarSlugUnico(tenant.id, nome)
 
-  await db.departamento.create({
+  const depto = await db.departamento.create({
     data: {
       tenantId: tenant.id,
       nome,
@@ -1080,6 +1106,8 @@ export async function criarDepartamento(formData: FormData) {
       permissionsGestor,
     },
   })
+
+  await ensureCanalDepartamento(db, depto.id, { criadoPorId: session.user.id })
 
   await db.auditLog.create({
     data: {

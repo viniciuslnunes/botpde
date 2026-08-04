@@ -36,7 +36,7 @@ import { thinCopyPorSlug } from './departamento-thin.js'
 export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
   {
     slug: 'diretoria',
-    moduloPortal: 'membros',
+    moduloPortal: 'diretoria',
     features: ['equipe', 'avisos'],
     portalPanel: 'diretoria',
     kind: 'plugin',
@@ -62,7 +62,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
   },
   {
     slug: 'social-e-eventos',
-    moduloPortal: 'eventos',
+    moduloPortal: 'social',
     features: ['equipe', 'modulo', 'agenda'],
     portalPanel: 'generico',
     kind: 'thin',
@@ -140,7 +140,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
   },
   {
     slug: 'feminino',
-    moduloPortal: 'comunidade',
+    moduloPortal: 'feminino',
     features: ['equipe', 'modulo', 'avisos', 'agenda'],
     portalPanel: 'generico',
     kind: 'thin',
@@ -153,7 +153,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
   },
   {
     slug: 'carnaval',
-    moduloPortal: 'eventos',
+    moduloPortal: 'carnaval',
     features: ['equipe', 'modulo', 'agenda', 'barracao'],
     portalPanel: 'carnaval',
     kind: 'plugin',

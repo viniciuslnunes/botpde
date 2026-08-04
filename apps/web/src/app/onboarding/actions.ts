@@ -57,6 +57,16 @@ import {
   resolverPeriodicidadesOnboarding,
 } from '@torcida/types'
 
+/**
+ * O vínculo de sócio toma o advisory lock do nº de associado da torcida e só
+ * então checa unicidade de nº/CPF/RG/telefone na linhagem inteira. Numa
+ * torcida grande (Gaviões: 700+ membros, 14 unidades) com o banco atrás do
+ * proxy, os 5s de default do Prisma estouram e o solicitante recebe
+ * "Aguarde e tente novamente" numa inscrição perfeitamente válida. Mesmo
+ * remédio de `TRANSACAO_DECISAO_MEMBRO_OPTS` em `admin/membros/actions.ts`.
+ */
+const TRANSACAO_VINCULO_OPTS = { timeout: 20_000, maxWait: 10_000 }
+
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
 export async function buscarAfiliacoes(
@@ -1378,7 +1388,7 @@ export async function solicitarVinculo(
             },
           })
         }
-      })
+      }, TRANSACAO_VINCULO_OPTS)
     } catch (err) {
       if (isExpectedError(err)) {
         const field = err.field ?? 'numeroAssociado'

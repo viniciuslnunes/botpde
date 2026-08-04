@@ -94,6 +94,7 @@ export async function adicionarAoCarrinho(
 
     revalidatePath('/portal/loja')
     revalidatePath('/portal/loja/sacola')
+    revalidatePath(`/portal/loja/${produtoTenantId}`)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao adicionar à sacola.' }

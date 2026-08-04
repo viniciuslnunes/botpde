@@ -344,6 +344,8 @@ model Tenant {
 
   patrimonioItens       PatrimonioItem[]
 
+  patrimonioEmprestimos PatrimonioEmprestimo[]
+
   planosAssociacao      PlanoAssociacao[]
 
   cobrancasAssociacao   CobrancaAssociacao[]
@@ -589,6 +591,8 @@ model User {
 
   patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
 
+  patrimonioEmprestimos        PatrimonioEmprestimo[]
+
   cobrancasAssociacao          CobrancaAssociacao[]
 
   cobrancasAssociacaoCriadas   CobrancaAssociacao[]   @relation("CobrancaAssociacaoCriadoPor")
@@ -804,7 +808,8 @@ model Departamento {
 
   ordem        Int      @default(0)
 
-  /// Canal (Conversa tipo CANAL) oficial da área — deep-link no portal.
+  /// Canal (Conversa tipo CANAL) oficial da área — provisionado automaticamente
+  /// (`ensureCanalDepartamento`) e aberto só à equipe + gestores.
 
   canalConversaId String? @unique @map("canal_conversa_id")
 
@@ -966,9 +971,9 @@ model DepartamentoArea {
   /// Checklist/config leve da área (mesmo padrão de Departamento.meta). Não é RBAC.
   meta      Json?
 
-  /// Canal (Conversa tipo CANAL) da frente — vínculo manual, sem auto-criar.
-  /// Unique: uma conversa não serve a duas áreas nem a sede/depto ao mesmo tempo
-  /// (checagem na action + unique no ponteiro).
+  /// Canal (Conversa tipo CANAL) da frente — provisionado automaticamente
+  /// (`ensureCanalArea`). Unique: uma conversa não serve a duas áreas nem a
+  /// sede/depto ao mesmo tempo (checagem na action + unique no ponteiro).
   canalConversaId String? @unique @map("canal_conversa_id")
 
   canalConversa   Conversa? @relation("DepartamentoAreaCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
@@ -982,6 +987,8 @@ model DepartamentoArea {
   membros  DepartamentoAreaMembro[]
 
   projetos Projeto[]
+
+  patrimonioItens PatrimonioItem[]
 
   @@unique([departamentoId, slug])
 
@@ -4979,6 +4986,11 @@ model PatrimonioItem {
 
   observacao   String?
 
+  /// Frente do departamento Patrimônio (instrumentos / bandeirões / sede).
+  areaId String? @map("area_id")
+
+  area   DepartamentoArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
 
 
   responsavelId String? @map("responsavel_id")
@@ -4995,6 +5007,8 @@ model PatrimonioItem {
 
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
+  emprestimos PatrimonioEmprestimo[]
+
 
 
   @@index([tenantId, status])
@@ -5003,7 +5017,57 @@ model PatrimonioItem {
 
   @@index([tenantId, nome])
 
+  @@index([areaId])
+
   @@map("saas_patrimonio_itens")
+
+}
+
+
+
+/// Empréstimo com evidência fotográfica (saída + guarda na devolução).
+/// Colaborador conclui sozinho; gestor audita e pode marcar dano.
+model PatrimonioEmprestimo {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  itemId String @map("item_id")
+
+  item   PatrimonioItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status StatusPatrimonioEmprestimo @default(ABERTO)
+
+  /// Obrigatória na retirada.
+  fotoSaidaUrl String @map("foto_saida_url")
+
+  /// Obrigatória na devolução (como ficou guardado).
+  fotoGuardaUrl String? @map("foto_guarda_url")
+
+  observacao String?
+
+  danoReportado   Boolean @default(false) @map("dano_reportado")
+
+  danoObservacao  String? @map("dano_observacao")
+
+  abertoEm     DateTime  @default(now()) @map("aberto_em")
+
+  devolvidoEm  DateTime? @map("devolvido_em")
+
+  @@index([tenantId, status, abertoEm])
+
+  @@index([itemId, status])
+
+  @@index([userId, status])
+
+  @@map("saas_patrimonio_emprestimos")
 
 }
 
@@ -5038,6 +5102,18 @@ enum StatusPatrimonioItem {
   MANUTENCAO
 
   BAIXADO
+
+}
+
+
+
+enum StatusPatrimonioEmprestimo {
+
+  ABERTO
+
+  DEVOLVIDO
+
+  COM_DANO
 
 }
 

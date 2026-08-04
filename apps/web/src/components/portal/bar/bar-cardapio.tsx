@@ -104,7 +104,7 @@ export function BarCardapio({
                   esgotado ? 'opacity-60' : '',
                 ].join(' ')}
               >
-                <ProdutoImagem src={p.imagemUrl} alt={p.nome} variant="admin" className="h-36" />
+                <ProdutoImagem src={p.imagemUrl} alt={p.nome} variant="admin" />
                 <div className="space-y-1.5 p-4">
                   {p.destaque && !esgotado && (
                     <span className="text-xs font-medium text-[rgb(var(--color-warning-fg))]">

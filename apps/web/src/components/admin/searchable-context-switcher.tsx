@@ -80,8 +80,13 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     () => items.find((t) => t.id === valueId) ?? null,
     [items, valueId],
   )
+  // Inclui o rótulo: se o `valueId` continua igual mas o item some da lista
+  // filtrada (ex.: mudou o clube-pai), o input precisa limpar — não só
+  // reagindo a troca de id.
+  const atualLabel = atual ? getLabel(atual) : ''
+  const syncKey = `${valueId ?? ''}\0${atualLabel}`
 
-  const [query, setQuery] = useState(() => (atual ? getLabel(atual) : ''))
+  const [query, setQuery] = useState(() => atualLabel)
   const [selectedId, setSelectedId] = useState(valueId ?? '')
   const [aberto, setAberto] = useState(false)
   const [destaque, setDestaque] = useState(0)
@@ -90,13 +95,13 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     atual && getFormFields ? getFormFields(atual) : {},
   )
 
-  const [prevValueId, setPrevValueId] = useState(valueId)
-  if (valueId !== prevValueId) {
-    setPrevValueId(valueId)
-    const next = items.find((t) => t.id === valueId) ?? null
-    setSelectedId(valueId ?? '')
-    setQuery(next ? getLabel(next) : '')
-    setDynamicFields(next && getFormFields ? getFormFields(next) : {})
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey)
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey)
+    setSelectedId(atual ? atual.id : '')
+    setQuery(atualLabel)
+    setDynamicFields(atual && getFormFields ? getFormFields(atual) : {})
+    setAberto(false)
   }
 
   useEffect(() => {

@@ -1,95 +1,96 @@
-import { db } from '@torcida/db'
+import { Suspense } from 'react'
+import Link from 'next/link'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
-import { CriarProdutoForm } from '@/components/admin/produto-forms'
-import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
-import { MotionReveal } from '@/components/motion/motion-reveal'
-import { AdminLojaProdutosGrid, type AdminProdutoItem } from './admin-loja-produtos-grid'
+import { Package, ShoppingBag, Ticket } from 'lucide-react'
+import { carregarDirecaoLoja } from '@/lib/loja-direcao'
+import {
+  AdminInboxList,
+  DirecaoInboxSkeleton,
+  DirecaoKpisSkeleton,
+  KpiGrid,
+  StatCard,
+} from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Loja — Admin' }
+export const metadata: Metadata = { title: 'Comando — Loja' }
 
-function formatarPreco(preco: unknown) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(preco))
+async function LojaKpis({ tenantId }: { tenantId: string }) {
+  const ops = await carregarDirecaoLoja(tenantId)
+  return (
+    <KpiGrid cols={3}>
+      <StatCard
+        label="Pedidos pendentes"
+        value={ops.pedidosPendentes}
+        tone={ops.pedidosPendentes > 0 ? 'warning' : 'default'}
+        icon={<ShoppingBag className="h-5 w-5" />}
+        href="/admin/loja/pedidos?status=PENDENTE"
+      />
+      <StatCard
+        label="Tickets abertos"
+        value={ops.ticketsAbertos}
+        tone={ops.ticketsAbertos > 0 ? 'warning' : 'default'}
+        icon={<Ticket className="h-5 w-5" />}
+        href="/admin/loja/tickets?filtro=abertos"
+      />
+      <StatCard
+        label="Sem estoque"
+        value={ops.rupturas.length}
+        tone={ops.rupturas.length > 0 ? 'danger' : 'default'}
+        icon={<Package className="h-5 w-5" />}
+        href="/admin/loja/produtos"
+      />
+    </KpiGrid>
+  )
 }
 
-function formatarEstoque(estoque: unknown, tamanhos: string[]): string {
-  const e = (estoque ?? {}) as Record<string, number>
-  if (!Object.keys(e).length) return 'Sem estoque cadastrado'
-  if (tamanhos.length === 0) return `${e['UN'] ?? 0} un.`
-  return tamanhos.filter((t) => e[t] !== undefined).map((t) => `${t}: ${e[t]}`).join(' | ')
+async function LojaInbox({ tenantId }: { tenantId: string }) {
+  const ops = await carregarDirecaoLoja(tenantId)
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            Precisa de você
+          </h2>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+            Confirme pedidos na fila — catálogo fica na aba Catálogo.
+          </p>
+        </div>
+        <Link
+          href="/admin/loja/produtos"
+          className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+        >
+          Ir ao catálogo
+        </Link>
+      </div>
+      <AdminInboxList
+        itens={ops.pendencias}
+        podeAgir
+        emptyTitle="Loja em dia."
+        emptyDescription="Sem pedidos pendentes, tickets abertos ou ruptura recente."
+      />
+    </section>
+  )
 }
 
-function serializarProduto(p: {
-  id: string
-  nome: string
-  preco: unknown
-  estoque: unknown
-  tamanhos: string[]
-  destaque: boolean
-  ativo: boolean
-  imagensUrl: unknown
-  _count: { pedidoItens: number }
-  categoria: { nome: string } | null
-}): AdminProdutoItem {
-  return {
-    id: p.id,
-    nome: p.nome,
-    categoriaNome: p.categoria?.nome ?? null,
-    precoLabel: formatarPreco(p.preco),
-    estoqueLabel: formatarEstoque(p.estoque, p.tamanhos),
-    vendidos: p._count.pedidoItens,
-    destaque: p.destaque,
-    ativo: p.ativo,
-    imagemUrl: firstProdutoImagemUrl(p.imagensUrl as string[] | null | undefined),
-  }
-}
-
-export default async function AdminLojaPage() {
-  // O tenant vem do próprio gate (tenant ativo) — reabrir por host mostraria o
-  // catálogo de outra torcida.
+export default async function AdminLojaComandoPage() {
   let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
     ;({ tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE))
   } catch {
-    // Sem gestão de catálogo, a etapa de entrada do módulo é Pedidos.
     redirect('/admin/loja/pedidos')
   }
 
-  const [produtos, categorias] = await Promise.all([
-    db.saasProduto.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ ativo: 'desc' }, { criadoEm: 'desc' }],
-      include: { _count: { select: { pedidoItens: true } }, categoria: { select: { nome: true } } },
-    }),
-    db.saasCategoria.findMany({ where: { tenantId: tenant.id }, orderBy: { ordem: 'asc' } }),
-  ])
-
-  type Produto = (typeof produtos)[number]
-  const ativos = produtos.filter((p: Produto) => p.ativo)
-  const inativos = produtos.filter((p: Produto) => !p.ativo)
-
   return (
-    <>
-      <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        {ativos.length} produto{ativos.length !== 1 ? 's' : ''} ativo
-        {ativos.length !== 1 ? 's' : ''} no catálogo.
-      </p>
-
-      <MotionReveal>
-        <CriarProdutoForm
-          categorias={categorias.map((c: (typeof categorias)[number]) => ({
-            id: c.id,
-            nome: c.nome,
-          }))}
-        />
-      </MotionReveal>
-
-      <AdminLojaProdutosGrid
-        ativos={ativos.map(serializarProduto)}
-        inativos={inativos.map(serializarProduto)}
-      />
-    </>
+    <div className="space-y-6">
+      <Suspense fallback={<DirecaoKpisSkeleton cols={3} />}>
+        <LojaKpis tenantId={tenant.id} />
+      </Suspense>
+      <Suspense fallback={<DirecaoInboxSkeleton />}>
+        <LojaInbox tenantId={tenant.id} />
+      </Suspense>
+    </div>
   )
 }

@@ -53,3 +53,8 @@ apps/web/public/escudos/*.png
 
 # Config pessoal de editor (Cursor)
 .cursor/
+
+# Relatórios das auditorias funcionais (gerados a cada rodada, não versionados)
+apps/web/auditoria-*.txt
+apps/web/audit-*.txt
+apps/web/seed-jornadas.txt

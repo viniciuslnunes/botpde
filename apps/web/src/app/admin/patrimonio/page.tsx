@@ -5,9 +5,11 @@ import { PERMISSIONS } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
 import {
   listarCandidatosResponsavelPatrimonio,
+  listarEmprestimosPatrimonio,
   listarPatrimonio,
   resumirPatrimonio,
 } from '@/lib/patrimonio'
+import { carregarDirecaoPatrimonio } from '@/lib/patrimonio-direcao'
 import {
   parseFiltroPatrimonio,
   type PatrimonioSearchParams,
@@ -19,6 +21,8 @@ import {
 } from '@/components/patrimonio/patrimonio-itens-lista'
 import { PatrimonioResumoCards } from '@/components/patrimonio/patrimonio-resumo-cards'
 import { PatrimonioFiltros } from '@/components/patrimonio/patrimonio-filtros'
+import { MarcarDanoEmprestimoForm } from '@/components/patrimonio/marcar-dano-emprestimo-form'
+import { AdminInboxList } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -41,10 +45,12 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
   const sp = await searchParams
   const { filtro, values } = parseFiltroPatrimonio(sp)
 
-  const [resumo, lista, candidatos] = await Promise.all([
+  const [resumo, lista, candidatos, emprestimosAbertos, ops] = await Promise.all([
     resumirPatrimonio(tenant.id),
     listarPatrimonio(tenant.id, { filtro }),
     listarCandidatosResponsavelPatrimonio(tenant.id),
+    listarEmprestimosPatrimonio(tenant.id, { status: 'ABERTO', limite: 24 }),
+    carregarDirecaoPatrimonio(tenant.id),
   ])
 
   const itens: PatrimonioRow[] = lista.itens.map((i) => ({
@@ -79,7 +85,7 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
               <h1 className="text-xl font-semibold text-[rgb(var(--foreground))]">Patrimônio</h1>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 {podeGerir
-                  ? 'Operação do inventário — cadastro, baixa e responsáveis.'
+                  ? 'Inventário e custódia — audite retiradas com foto e registre dano.'
                   : 'Somente leitura — inventário da unidade.'}
               </p>
             </div>
@@ -94,6 +100,66 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
       </MotionReveal>
 
       <PatrimonioResumoCards resumo={resumo} />
+
+      {ops.pendencias.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Precisa de você
+            </h2>
+            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Empréstimos longos e itens em manutenção.
+            </p>
+          </div>
+          <AdminInboxList itens={ops.pendencias} podeAgir={false} />
+        </section>
+      ) : null}
+
+      {emprestimosAbertos.length > 0 ? (
+        <section id="em-uso" className="scroll-mt-20 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Em uso agora
+            </h2>
+            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Trilha de custódia — confira fotos de saída; marque dano se preciso.
+            </p>
+          </div>
+          <ul className="space-y-2">
+            {emprestimosAbertos.map((e) => (
+              <li
+                key={e.id}
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                      {e.item.nome}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                      Com {e.user.nome ?? 'membro'} · desde{' '}
+                      {new Intl.DateTimeFormat('pt-BR', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(e.abertoEm)}
+                    </p>
+                  </div>
+                  <a
+                    href={e.fotoSaidaUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                  >
+                    Ver foto saída
+                  </a>
+                </div>
+                {podeGerir ? <MarcarDanoEmprestimoForm emprestimoId={e.id} /> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <PatrimonioFiltros basePath="/admin/patrimonio" values={values} />
       {podeGerir ? <PatrimonioItemForm candidatos={candidatos} /> : null}
       <PatrimonioItensLista

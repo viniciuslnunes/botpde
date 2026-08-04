@@ -5,7 +5,7 @@ import { toast } from '@torcida/ui'
 import { ImageCropDialog } from '@/components/media/image-crop-dialog'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede'
+type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede' | 'patrimonio'
 
 type Options = {
   aspect?: number

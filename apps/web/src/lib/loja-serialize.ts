@@ -46,14 +46,18 @@ export type CheckoutItemSerializado = {
   id: string
   quantidade: number
   tamanho: string
-  produto: { nome: string; preco: number }
+  produto: {
+    nome: string
+    preco: number
+    tenantId: string
+  }
 }
 
 export function toCheckoutItem(item: {
   id: string
   quantidade: number
   tamanho: string
-  produto: { nome: string; preco: unknown }
+  produto: { nome: string; preco: unknown; tenantId: string }
 }): CheckoutItemSerializado {
   return {
     id: item.id,
@@ -62,6 +66,7 @@ export function toCheckoutItem(item: {
     produto: {
       nome: item.produto.nome,
       preco: Number(item.produto.preco),
+      tenantId: item.produto.tenantId,
     },
   }
 }

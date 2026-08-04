@@ -16,6 +16,7 @@ type UploadPurpose =
   | 'cadastro'
   | 'sede'
   | 'mensagem'
+  | 'patrimonio'
 
 interface SignResponse {
   cloudName: string

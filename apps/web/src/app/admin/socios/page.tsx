@@ -230,8 +230,11 @@ export default async function SociosPage({
       ? LISTAGEM_SOCIOS_AGUARDANDO
       : LISTAGEM_SOCIOS_EMITIDAS
   const listagem = parseListagemParams(params, SPEC)
+  // Sempre gravar `status` na URL — inclusive `todos` (Emitidas). Omitir
+  // colidia com o default inteligente da página (sem status → Solicitações
+  // quando há pedidos pendentes).
   const extrasDaRota: Record<string, string | undefined> = {
-    status: statusFiltro === 'todos' ? undefined : statusFiltro,
+    status: statusFiltro,
   }
 
   const sedesOpts: { id: string; nome: string; tipo: string }[] =
@@ -555,7 +558,9 @@ export default async function SociosPage({
   const paginacao = resumirPaginacao(totalLista, listagem)
 
   // Trocar de aba volta à página 1 e zera sort inválido entre os dois specs
-  // (aprovadoEm não existe em emitidas e vice-versa).
+  // (aprovadoEm não existe em emitidas e vice-versa). `status` vai sempre
+  // na URL (também `todos`), senão o default da página manda de volta para
+  // Solicitações quando há pedidos pendentes.
   const tabHrefs: Record<string, string> = Object.fromEntries(
     (
       ['solicitacoes', 'aguardando', 'todos', 'ativos', 'vencendo', 'vencidos'] as const
@@ -575,7 +580,7 @@ export default async function SociosPage({
                 Array.isArray(v) ? v[0] : v,
               ]),
             ),
-            status: status === 'todos' ? undefined : status,
+            status,
             pagina: '1',
           },
           specTab,
@@ -584,7 +589,7 @@ export default async function SociosPage({
           status,
           construirHrefListagem(specTab, paramsTab, {
             pagina: 1,
-            extras: { status: status === 'todos' ? undefined : status },
+            extras: { status },
           }),
         ]
       }),

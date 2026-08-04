@@ -127,8 +127,9 @@ export const ADMIN_MENU = /** @type {const} */ ([
     secao: 'operacao',
   },
   // Lançamentos, evolução, cobranças e planos são tabs de `/admin/financeiro`.
-  // `/admin/cobrancas` e `/admin/planos-associacao` seguem como redirect: há
-  // notificações gravadas no banco apontando para a URL antiga.
+  // Home do módulo = Direção (inbox). `/admin/cobrancas` e
+  // `/admin/planos-associacao` seguem como redirect: há notificações gravadas
+  // apontando para a URL antiga.
   {
     id: 'financeiro',
     label: 'Financeiro',
@@ -263,7 +264,14 @@ export const ADMIN_MODULOS = ([
     menuId: 'loja',
     href: '/admin/loja',
     tabs: [
-      { id: 'catalogo', label: 'Catálogo', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
+      { id: 'comando', label: 'Comando', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
+      {
+        id: 'catalogo',
+        label: 'Catálogo',
+        href: '/admin/loja/produtos',
+        permissao: PERMISSIONS.STORE_MANAGE,
+        matchPaths: ['/admin/loja/categorias', '/admin/loja/vitrine'],
+      },
       {
         id: 'pedidos',
         label: 'Pedidos',
@@ -275,12 +283,6 @@ export const ADMIN_MODULOS = ([
         label: 'Arquivo',
         href: '/admin/loja/tickets',
         permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
-      },
-      {
-        id: 'categorias',
-        label: 'Categorias',
-        href: '/admin/loja/categorias',
-        permissao: PERMISSIONS.STORE_MANAGE,
       },
       { id: 'cupons', label: 'Cupons', href: '/admin/loja/cupons', permissao: PERMISSIONS.STORE_MANAGE },
       {
@@ -383,7 +385,13 @@ export const ADMIN_MODULOS = ([
     menuId: 'financeiro',
     href: '/admin/financeiro',
     tabs: [
-      { id: 'lancamentos', label: 'Lançamentos', href: '/admin/financeiro', permissao: null },
+      { id: 'direcao', label: 'Direção', href: '/admin/financeiro', permissao: null },
+      {
+        id: 'lancamentos',
+        label: 'Lançamentos',
+        href: '/admin/financeiro/lancamentos',
+        permissao: null,
+      },
       { id: 'evolucao', label: 'Evolução', href: '/admin/financeiro/evolucao', permissao: null },
       { id: 'cobrancas', label: 'Cobranças', href: '/admin/financeiro/cobrancas', permissao: null },
       { id: 'planos', label: 'Planos de sócio', href: '/admin/financeiro/planos', permissao: null },

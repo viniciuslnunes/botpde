@@ -106,6 +106,21 @@ export function AdminSuperContextSwitchers({
   const wasUnidadePending = useRef(false)
   const handledSemPortal = useRef<string | null>(null)
 
+  /**
+   * Cascata do filtro local (clube → torcida → afiliações):
+   * se o clube selecionado não contém a torcida ativa, os filhos somem do
+   * display até o operador escolher uma torcida daquele clube.
+   */
+  const torcidaCompativelComClube = useMemo(() => {
+    if (!torcidaAtualSlug) return false
+    if (!clubeId) return true
+    return torcidaAtual?.afiliacaoId === clubeId
+  }, [torcidaAtualSlug, clubeId, torcidaAtual?.afiliacaoId])
+
+  const torcidaValueId = torcidaCompativelComClube ? torcidaAtualSlug : null
+  const afiliacoesProntas =
+    torcidaCompativelComClube && !torcidaPending && Boolean(torcidaAtualSlug)
+
   useEffect(() => {
     if (wasTorcidaPending.current && !torcidaPending && torcidaState.message) {
       toast.error(torcidaState.message)
@@ -139,7 +154,7 @@ export function AdminSuperContextSwitchers({
           // Já na ficha: redirect/push para a mesma URL parece “nada acontece”.
           if (pathname === hrefAdmin) {
             toast.message(
-              'Você já está no admin desta unidade. Use “Promover a tenant próprio” se quiser criar o portal.',
+              'Você já está no admin desta unidade. Use “Criar portal próprio” se quiser promover a unidade.',
             )
             return
           }
@@ -258,15 +273,20 @@ export function AdminSuperContextSwitchers({
         recentNamespace="clube"
         variant={variant}
         submitOnSelect={false}
-        onSelect={(c) => setClubeId(c.id)}
+        onSelect={(c) => {
+          // Trocar o filtro-pai limpa filhos no display na hora (mesmo antes
+          // de navegar). Se o clube novo ainda contiver a torcida ativa, ela
+          // permanece — senão some até nova seleção.
+          setClubeId(c.id)
+        }}
       />
 
       <SearchableContextSwitcher<TorcidaItem>
         label="Torcida ativa"
-        placeholder="Buscar torcida…"
+        placeholder={clubeId ? 'Buscar torcida neste clube…' : 'Buscar torcida…'}
         emptyMessage="Nenhuma torcida neste clube."
         items={torcidaItems}
-        valueId={torcidaAtualSlug}
+        valueId={torcidaValueId}
         getLabel={(t) => t.nome}
         getSearchText={(t) =>
           [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug].join(' ')
@@ -278,7 +298,7 @@ export function AdminSuperContextSwitchers({
         valueFieldName="slug"
         hiddenFields={{ destino }}
         footer={
-          isSuper || semTorcida ? (
+          isSuper || semTorcida || !torcidaCompativelComClube ? (
             <p
               className={
                 isSuper
@@ -286,7 +306,9 @@ export function AdminSuperContextSwitchers({
                   : 'text-xs text-[rgb(var(--foreground-muted))]'
               }
             >
-              Ao trocar, você entra no admin da torcida escolhida.
+              {!torcidaCompativelComClube && clubeId
+                ? 'Selecione uma torcida deste clube para continuar.'
+                : 'Ao trocar, você entra no admin da torcida escolhida.'}
             </p>
           ) : null
         }
@@ -297,15 +319,15 @@ export function AdminSuperContextSwitchers({
           <SearchableContextSwitcher<UnidadeItem>
             label="Afiliações"
             placeholder={
-              semTorcida
+              !afiliacoesProntas
                 ? 'Selecione uma torcida primeiro'
                 : unidades.length === 0
                   ? 'Sem unidades cadastradas'
                   : 'Buscar unidade…'
             }
             emptyMessage="Nenhuma unidade na worktree."
-            items={unidadeItems}
-            valueId={unidadeAtualId}
+            items={afiliacoesProntas ? unidadeItems : []}
+            valueId={afiliacoesProntas ? unidadeAtualId : null}
             getLabel={(u) => u.nome}
             getSubLabel={labelUnidadeSub}
             getSearchText={(u) =>
@@ -314,8 +336,8 @@ export function AdminSuperContextSwitchers({
             getIndentRem={(u) => u.depth}
             recentNamespace="unidade"
             variant={variant}
-            disabled={semTorcida || unidades.length === 0}
-            pending={unidadePending}
+            disabled={!afiliacoesProntas || unidades.length === 0}
+            pending={unidadePending || torcidaPending}
             formAction={unidadeAction}
             valueFieldName={null}
             getFormFields={(u): Record<string, string> => {
@@ -333,7 +355,7 @@ export function AdminSuperContextSwitchers({
 
           <button
             type="button"
-            disabled={portalPending || semTorcida}
+            disabled={portalPending || !afiliacoesProntas}
             onClick={irAoPortal}
             className={[
               'flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',

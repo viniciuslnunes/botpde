@@ -23,7 +23,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { assertPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { isSuperAdminEmail, invalidateTorcidasSelecaoCache } from '@/lib/tenant-context'
 import {
   apagarConversasAoExcluirUnidade,
   ensureCanalOficialParaSede,
@@ -988,7 +988,7 @@ export type PromoverSedeActionResult =
     }
   | { ok: false; error: string }
 
-/** Promove SUBSEDE/PDE a tenant próprio (Caso B). Só Presidente da SEDE. */
+/** Promove SUBSEDE/PDE a portal próprio (Caso B). Só Presidente da SEDE. */
 export async function promoverSedeAction(sedeId: string): Promise<PromoverSedeActionResult> {
   const { session, tenant } = await assertPresidenteGlobal()
 
@@ -1001,17 +1001,19 @@ export async function promoverSedeAction(sedeId: string): Promise<PromoverSedeAc
 
   if (!result.ok) return result
 
+  invalidateTorcidasSelecaoCache()
   revalidatePath('/admin/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
   revalidatePath('/admin/torcida')
   revalidatePath('/portal/sedes')
+  revalidatePath('/admin')
 
   return {
     ok: true,
     novoSlug: result.novoSlug,
     membrosMigrados: result.membrosMigrados,
     filhosMovidos: result.filhosMovidos,
-    message: `Unidade promovida ao tenant “${result.novoSlug}” (${result.membrosMigrados} membros, ${result.filhosMovidos} filhos).`,
+    message: `Portal próprio criado (${result.membrosMigrados} membros, ${result.filhosMovidos} unidades filhas).`,
   }
 }
 

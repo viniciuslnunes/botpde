@@ -14,6 +14,7 @@ Inteligência de domínio (rivalidade cromática, P&B, prioridade torcida→club
 | Ações / status | `actions.success`, `danger`, `warning`, `info` — botões e badges de fluxo |
 | Grade | `grid.enabled`, `sizePx` (24–96), `lineOpacity`, `lineColor`, `baseColor` |
 | Superfícies (claro/escuro) | `background`, `backgroundSubtle`, `foreground`, `foregroundMuted`, `border`, `borderStrong`, `surface`, `surfaceRaised` |
+| Vitrine da loja | `loja.bannerUrl`, `loja.usarDestaqueComoCapa` — editados em `/admin/loja/vitrine` (não no estúdio Design); o save do Design **preserva** essa fatia |
 
 Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
 

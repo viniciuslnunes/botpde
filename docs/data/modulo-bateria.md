@@ -13,7 +13,9 @@
 | Painel em `/portal/departamentos/bateria` | |
 
 Rotas `/portal/bateria*` redirecionam para o hub / detalhe unificado.
-Admin: `/admin/eventos?tipo=ENSAIO`.
+Admin ops: `/admin/bateria` (thin wrapper sobre `Evento`; detalhe em
+`/admin/eventos/[id]`). Filtro legado `/admin/eventos?tipo=ENSAIO` segue válido.
+Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md).
 
 ## Modelo
 
@@ -23,4 +25,4 @@ Reusa `Evento` + `EventoRsvp` com `tipo = ENSAIO`. Presença = `checkedInAt`.
 
 - **Ver**: membro do depto `bateria` **ou** `events:create|manage` (painel)
 - **Criar / check-in**: `events:create|manage`
-- Operação admin: `/admin/eventos?tipo=ENSAIO`
+- Operação admin: `/admin/bateria` (`DEPARTAMENTO_MODULO_ADMIN_ROTA`)

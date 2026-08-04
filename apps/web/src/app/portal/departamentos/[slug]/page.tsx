@@ -710,10 +710,10 @@ export default async function DepartamentoHomePage({
                 podeVerPedidos={podeVerPedidos}
                 podeModerar={podeModerar}
                 podeVerFinanceiro={podeVerFinanceiro}
-                podeGerirFinanceiro={
-                  isSuperAdmin ||
-                  hasPermission(permissoesEfetivas, PERMISSIONS.FINANCE_MANAGE)
-                }
+                podeGerirFinanceiro={hasPermission(
+                  permissoesEfetivas,
+                  PERMISSIONS.FINANCE_MANAGE,
+                )}
               />
             </Suspense>
           )}

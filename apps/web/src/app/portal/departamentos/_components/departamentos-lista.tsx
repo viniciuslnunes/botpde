@@ -432,8 +432,8 @@ export async function DepartamentosSection() {
 
   const todosTenant = todosRaw.filter((d) => !isDepartamentoLegado(d))
   const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
-  const podeGerirCoresGlobal =
-    isSuperAdmin || hasPermission(effective, PERMISSIONS.ROLES_MANAGE)
+  // Edição de cor = roles:manage real (dual-hat SA) ou gestor da área — não o bypass.
+  const podeGerirCoresGlobal = hasPermission(effective, PERMISSIONS.ROLES_MANAGE)
 
   const diretoriaId = todosTenant.find((d) => d.slug === 'diretoria')?.id ?? null
   const departamentos = resolverDepartamentosHub({

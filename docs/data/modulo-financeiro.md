@@ -34,7 +34,7 @@
 Enums:
 
 - `TipoFinanceiroLancamento`: `RECEITA` | `DESPESA`
-- `CategoriaFinanceiroLancamento`: `MENSALIDADE` | `LOJA` | `EVENTO` | `CARAVANA` | `PATRIMONIO` | `DOACAO` | `OUTROS`
+- Categorias: `MENSALIDADE` | `LOJA` | `EVENTO` | `CARAVANA` | `PATRIMONIO` | `BAR` | `DOACAO` | `OUTROS`
 
 ## Regras de negócio
 
@@ -55,9 +55,12 @@ Enums:
   `balancoDetalheNivel` TOTAIS/CATEGORIAS/COMPLETO) — totais / categorias /
   lançamentos; filtro de período e unidade (bar); copiar resumo e impressão
 - Backlog operacional: [`docs/product/backlog-caixa-operacional.md`](../product/backlog-caixa-operacional.md)
-- Admin: `/admin/financeiro` (mesma operação, exige manage)
+- Admin: `/admin/financeiro` — **Direção** (inbox: inadimplência, caixa 7/30d,
+  projetos estourados, despesas sem rateio). Lançamentos em
+  `/admin/financeiro/lancamentos`. Gate: manage OU (view + audit).
 - Schemas Zod: `packages/types/src/financeiro.js`
-- Lib: `apps/web/src/lib/financeiro.ts` (`React.cache`)
+- Lib: `apps/web/src/lib/financeiro.ts`, `financeiro-direcao.ts` (`React.cache`)
+- Programa de comando: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md)
 
 ## Seed / sync
 
@@ -70,7 +73,8 @@ pnpm --filter @torcida/db db:push
 
 `lib/financeiro.ts` ganhou `resumirFinanceiroMensal` (série receitas×despesas
 por mês, bucketing JS fuso SP) e `compararFinanceiroPeriodo` (atual vs
-anterior). Superfícies: seção "Evolução financeira" no hub `/admin/financeiro`
+anterior). Superfícies: tab **Evolução** em `/admin/financeiro/evolucao`
 (barras 12m + donut por categoria + saldo com delta) e seção Financeiro em
-`/admin/relatorios` (gate `reports:view`). Padrões e regras:
+`/admin/relatorios` (gate `reports:view`). Home **Direção** em
+`/admin/financeiro` (inbox). Padrões e regras:
 `docs/frontend/admin-ui-kit.md`.

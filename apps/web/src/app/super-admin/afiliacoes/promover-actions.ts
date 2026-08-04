@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { bootstrapAcessoTenant, db } from '@torcida/db'
+import { bootstrapAcessoTenant, db, ensureCanaisDepartamentosTenant } from '@torcida/db'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
@@ -217,6 +217,10 @@ export async function promoverUnidadeAPortal(
         })
       }
     }
+
+    await ensureCanaisDepartamentosTenant(db, novoTenant.id, {
+      criadoPorId: ownerUserId ?? session.user.id,
+    })
 
     await db.auditLog.create({
       data: {

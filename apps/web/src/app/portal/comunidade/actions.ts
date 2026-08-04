@@ -3713,16 +3713,22 @@ export async function publicarPostCanal(
       return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' }
     }
 
-    // Mural do canal: publicação controlada por `somenteAdminPublica` /
+    // Mural do canal: sócio APROVADO + `somenteAdminPublica` /
     // `podePublicarNoCanal` — não exige RBAC `community:post` do feed.
+    // Torcedor lê o mural mas não publica (docs/data/modulo-comunidade.md).
     const session = await auth()
     if (!session?.user?.id) return { message: 'Não autorizado.' }
     const tenant = await getActiveTenant(session.user.id, session.user.email)
     if (!tenant) return { message: 'Não autorizado.' }
     try {
+      await assertNaoOperador()
       await assertMembroAtivo(tenant.id, session.user.id)
     } catch (error) {
       return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+    }
+
+    if (!(await podeVerFeedSocios(session.user.id, tenant.id))) {
+      return { message: 'Apenas sócios aprovados podem publicar neste canal.' }
     }
 
     const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)

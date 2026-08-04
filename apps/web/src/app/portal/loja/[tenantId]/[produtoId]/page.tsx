@@ -45,96 +45,80 @@ export default async function ProdutoDetailPage({
     : []
 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
-
   const off = percentualDesconto(produto.precoOriginal, produto.preco)
-
   const emPromo = off > 0
+  const precoLabel = formatarPreco(produto.preco)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Link
         href={`/portal/loja/${tenantId}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
       >
-        <ArrowLeft className="h-4 w-4" />
-        Voltar à loja
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Voltar
       </Link>
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start">
-        <div className="lg:sticky lg:top-8">
-          <ProdutoGaleria imagensUrl={produto.imagensUrl} nome={produto.nome} />
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)] lg:items-start lg:gap-14">
+        <div className="lg:sticky lg:top-24">
+          <div className="overflow-hidden bg-[rgb(var(--color-primary)_/_0.05)] [clip-path:polygon(0_0,calc(100%-18px)_0,100%_18px,100%_100%,18px_100%,0_calc(100%-18px))]">
+            <ProdutoGaleria imagensUrl={produto.imagensUrl} nome={produto.nome} />
+          </div>
         </div>
 
         <ProdutoDetailCol>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               {produto.categoria && (
-                <span className="rounded-full border border-[rgb(var(--foreground-muted)_/_0.35)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                  {produto.categoria.nome}
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[rgb(var(--foreground-muted))]">
+                  [ {produto.categoria.nome} ]
                 </span>
               )}
               {emPromo && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                <span className="inline-flex items-center gap-1 bg-red-600 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white">
                   <Tag className="h-3 w-3" />
-                  {off}% OFF
+                  −{off}%
                 </span>
               )}
+              {produto.marca ? (
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[rgb(var(--foreground-muted))]">
+                  Series · {produto.marca}
+                </span>
+              ) : null}
             </div>
 
-            <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{produto.nome}</h1>
+            <h1 className="text-balance text-3xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl">
+              {produto.nome}
+            </h1>
 
             {produto.descricao && (
-              <p className="text-[rgb(var(--foreground-muted))] leading-relaxed">{produto.descricao}</p>
+              <p className="max-w-prose text-sm leading-relaxed text-[rgb(var(--foreground-muted))] sm:text-[15px]">
+                {produto.descricao}
+              </p>
             )}
           </div>
 
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {produto.precoOriginal && Number(produto.precoOriginal) > Number(produto.preco) && (
-              <span className="text-lg text-[rgb(var(--foreground-muted))] line-through">
-                {formatarPreco(produto.precoOriginal)}
-              </span>
-            )}
-            <span className="text-3xl font-bold text-[rgb(var(--color-primary-fg))]">
-              {formatarPreco(produto.preco)}
-            </span>
-          </div>
-
-          {produto.tamanhos.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Tamanhos disponíveis
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {produto.tamanhos.map((t: string) => {
-                  const qtd = estoque[t] ?? 0
-                  return (
-                    <div
-                      key={t}
-                      className={[
-                        'rounded-xl border px-4 py-2 text-sm',
-                        qtd > 0
-                          ? 'border-[rgb(var(--foreground-muted)_/_0.35)] bg-[rgb(var(--background-subtle))]'
-                          : 'border-[rgb(var(--foreground-muted)_/_0.2)] opacity-40 line-through',
-                      ].join(' ')}
-                    >
-                      <span className="font-semibold">{t}</span>
-                      <span className="ml-1.5 text-xs text-[rgb(var(--foreground-muted))]">
-                        {qtd > 0 ? `${qtd} un.` : 'Esgotado'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          <AdicionarSacolaForm produto={{ id: produto.id, tamanhos: produto.tamanhos, estoque }} />
+          <AdicionarSacolaForm
+            produto={{
+              id: produto.id,
+              tamanhos: produto.tamanhos,
+              estoque,
+              precoLabel,
+              precoOriginalLabel:
+                produto.precoOriginal && Number(produto.precoOriginal) > Number(produto.preco)
+                  ? formatarPreco(produto.precoOriginal)
+                  : null,
+            }}
+          />
         </ProdutoDetailCol>
       </div>
 
       {relacionados.length > 0 && (
-        <section className="mt-16 border-t border-[rgb(var(--border))] pt-10">
-          <h2 className="mb-5 text-lg font-semibold">Você também pode gostar</h2>
+        <section className="border-t border-[rgb(var(--border)_/_0.65)] pt-10">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[rgb(var(--foreground-muted))]">
+            [ Relacionados ]
+          </p>
+          <h2 className="mt-1 mb-6 text-xl font-black uppercase tracking-tight">Você também pode gostar</h2>
 
           <ProdutoRelacionadosGrid
             produtos={relacionados.map((r: (typeof relacionados)[number]) => ({

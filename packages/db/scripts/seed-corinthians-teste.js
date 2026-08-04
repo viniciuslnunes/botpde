@@ -37,6 +37,7 @@
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
+import { senhaHashTeste } from './lib/senha-teste.js'
 
 const DOMINIO_TESTE = 'teste.corinthians.torcida.app'
 const AFILIACAO_SLUG = 'sport-club-corinthians-paulista-sp'
@@ -622,6 +623,9 @@ async function seedPessoas(contexto, resumo) {
           email,
           nome,
           nickname,
+          // Senha padrão do lote: sem `senhaHash` o provider de credenciais
+          // recusa o login e nenhum cenário pode ser conferido de dentro.
+          senhaHash: senhaHashTeste(),
           criadoEm: solicitadoEm,
         })
 
@@ -938,9 +942,16 @@ async function seedSociosAssociacao(contexto, resumo) {
       const validade = validadeDoCenario(cenario, nSeed, now)
       if (!validade) continue
 
+      // A data da ficha (`fichaSocioCompleta`) e a validade do cenário são
+      // sorteadas de forma independente, então a ficha podia cair DEPOIS da
+      // validade — carteirinha que vence antes de ser expedida, estado que o
+      // produto não consegue produzir. Detectado por `audit:carteirinha-
+      // patrimonio` (5 casos). Na dúvida, a validade manda.
+      const expedicaoDaFicha = dataMembro.dataExpedicaoCarteirinha
       const expedidoEm =
-        dataMembro.dataExpedicaoCarteirinha ??
-        addDays(validade, cenario === 'vencido' ? -365 : -120)
+        expedicaoDaFicha && expedicaoDaFicha <= validade
+          ? expedicaoDaFicha
+          : addDays(validade, cenario === 'vencido' ? -365 : -120)
       const socioId = crypto.randomUUID()
       const qrToken = crypto.randomBytes(24).toString('base64url')
 
@@ -1022,7 +1033,14 @@ async function seedTorcedoresGlobais(afiliacao, resumo) {
     const email = `global.${slugify(primeiro)}.${slugify(sobrenome)}.${n}@${DOMINIO_TESTE}`
     const nickname = `teste_global_${n}`
 
-    usersRows.push({ id: userId, email, nome, nickname, criadoEm: new Date() })
+    usersRows.push({
+      id: userId,
+      email,
+      nome,
+      nickname,
+      senhaHash: senhaHashTeste(),
+      criadoEm: new Date(),
+    })
     perfisRows.push({
       id: crypto.randomUUID(),
       userId,
@@ -1128,13 +1146,14 @@ async function seedPostsEInteracoes(contexto, resumo) {
   for (const tenant of contexto) {
     const membrosAprovados = await db.saasMembro.findMany({
       where: { tenantId: tenant.id, status: 'APROVADO', user: { email: { endsWith: `@${DOMINIO_TESTE}` } } },
-      select: { userId: true },
+      select: { userId: true, tipo: true },
     })
     if (membrosAprovados.length === 0) {
       console.log(`  ↔  ${tenant.slug}: sem membros de teste aprovados — pulando posts`)
       continue
     }
     const userIds = membrosAprovados.map((m) => m.userId)
+    const tipoPorUser = new Map(membrosAprovados.map((m) => [m.userId, m.tipo]))
 
     const postsRows = []
 
@@ -1153,13 +1172,18 @@ async function seedPostsEInteracoes(contexto, resumo) {
       })
     }
 
-    // Membro — ~40% dos aprovados, 1–2 posts cada
+    // Membro — ~40% dos aprovados, 1–2 posts cada.
+    // TORCEDOR só PUBLICO (praça / CN): TENANT entra no mural do canal oficial
+    // via incluirFeedInterno e publicar no canal é privilégio de sócio.
     const autores = userIds.filter(() => Math.random() < 0.4)
     const templatesMem = templatesMembro(tenant.nome)
     for (const autorId of autores) {
       const qtd = Math.random() < 0.5 ? 1 : 2
+      const ehTorcedor = tipoPorUser.get(autorId) === 'TORCEDOR'
       for (let i = 0; i < qtd; i++) {
-        const visibilidade = pickPonderado([['PUBLICO', 60], ['TENANT', 30], ['PRIVADO', 10]])
+        const visibilidade = ehTorcedor
+          ? 'PUBLICO'
+          : pickPonderado([['PUBLICO', 60], ['TENANT', 30], ['PRIVADO', 10]])
         const alcanceNacional = visibilidade === 'PUBLICO' && Math.random() < 0.05
         postsRows.push({
           id: crypto.randomUUID(),

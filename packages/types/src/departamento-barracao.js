@@ -73,3 +73,58 @@ export function barracaoProgress(meta) {
   }
   return { total: BARRACAO_CHECKLIST.length, done }
 }
+
+/**
+ * Data do desfile / concentração principal (ISO yyyy-mm-dd ou ISO datetime).
+ * @param {unknown} meta
+ * @returns {Date | null}
+ */
+export function desfileEmFromMeta(meta) {
+  if (!meta || typeof meta !== 'object') return null
+  const raw = /** @type {{ desfileEm?: unknown }} */ (meta).desfileEm
+  if (typeof raw !== 'string' || !raw.trim()) return null
+  const d = new Date(raw)
+  return Number.isFinite(d.getTime()) ? d : null
+}
+
+/**
+ * @param {unknown} meta
+ * @param {Date | number} [agora]
+ * @returns {number | null} dias restantes (ceil); negativo se passado
+ */
+export function diasAteDesfile(meta, agora = new Date()) {
+  const desfile = desfileEmFromMeta(meta)
+  if (!desfile) return null
+  const agoraMs = agora instanceof Date ? agora.getTime() : agora
+  const DIA_MS = 24 * 60 * 60 * 1000
+  return Math.ceil((desfile.getTime() - agoraMs) / DIA_MS)
+}
+
+/** Janela de urgência do barracão: faltam ≤14 dias para o desfile. */
+export const BARRACAO_URGENCIA_DIAS = 14
+
+/**
+ * @param {unknown} meta
+ * @param {Date | number} [agora]
+ * @returns {boolean}
+ */
+export function barracaoEmUrgencia(meta, agora = new Date()) {
+  const dias = diasAteDesfile(meta, agora)
+  return dias != null && dias >= 0 && dias <= BARRACAO_URGENCIA_DIAS
+}
+
+/**
+ * Grava `desfileEm` (ISO date string ou null para limpar).
+ * @param {unknown} meta
+ * @param {string | null} desfileEmIso
+ * @returns {object}
+ */
+export function mergeDesfileEm(meta, desfileEmIso) {
+  const base =
+    meta && typeof meta === 'object' ? { .../** @type {Record<string, unknown>} */ (meta) } : {}
+  if (!desfileEmIso || !String(desfileEmIso).trim()) {
+    const { desfileEm: _drop, ...rest } = base
+    return rest
+  }
+  return { ...base, desfileEm: String(desfileEmIso).trim() }
+}

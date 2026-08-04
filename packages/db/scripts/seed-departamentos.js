@@ -11,6 +11,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { upsertDepartamentosCanonicos, upsertPerfisDepartamentoCanonicos } from '../src/departamentos-canonicos.js'
+import { ensureCanaisDepartamentosTenant } from '../src/departamento-canais.js'
 
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY) || 6)
 const SEED_CONNECTION_LIMIT = Math.max(CONCURRENCY + 2, 8)
@@ -166,10 +167,15 @@ async function main() {
               incluirVice: sedeTenantIds.has(tenant.id),
               concurrent: true,
             })
+            const canais = await ensureCanaisDepartamentosTenant(db, tenant.id)
             removedLegacy += result.removedLegacy
             if (verbose) {
               console.log(`  ✓ ${result.upserted} departamentos sincronizados`)
               console.log(`  ✓ ${perfis.perfisArea} perfis de área · ${perfis.systemUpserted} sistema`)
+              console.log(
+                `  ✓ canais depto +${canais.deptos.criados}/sync ${canais.deptos.sincronizados}` +
+                  ` · áreas +${canais.areas.criadas}/sync ${canais.areas.sincronizadas}`,
+              )
               if (result.removedLegacy > 0) {
                 console.log(`  · removidos ${result.removedLegacy} legado(s) socio/torcedor`)
               }

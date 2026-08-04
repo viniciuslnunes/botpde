@@ -224,10 +224,10 @@ describe('tabsPermitidasDoModulo', () => {
   it('dá ao gestor o módulo inteiro', () => {
     const tabs = tabsPermitidasDoModulo('loja', [PERMISSIONS.STORE_MANAGE])
     expect(tabs.map((t) => t.id)).toEqual([
+      'comando',
       'catalogo',
       'pedidos',
       'tickets',
-      'categorias',
       'cupons',
       'desempenho',
     ])

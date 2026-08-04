@@ -3,7 +3,7 @@ import { Prisma } from '@torcida/db'
 import { LojaProdutoGridSkeleton } from '@/components/portal/loja-produto-skeleton'
 import { LojaProdutoGridAnimated, type LojaProdutoGridItem } from '@/components/portal/loja-produto-grid-animated'
 import { LojaCarrossel } from '@/components/portal/loja-ui'
-import { LojaCategoriaChips, LojaPaginacao } from '@/components/portal/loja-catalogo-motion'
+import { LojaPaginacao } from '@/components/portal/loja-catalogo-motion'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
 import { toLojaProdutoCard } from '@/lib/loja-serialize'
 import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/types'
@@ -123,11 +123,10 @@ export async function LojaCatalogoSection({
     max: Math.ceil(Number(faixaPrecoAgg._max.preco ?? 0)),
   }
 
-  type CategoriaLite = (typeof categorias)[number]
   type ProdutoLite = (typeof produtos)[number]
   type DestaqueLite = (typeof destaques)[number]
 
-  const gridItems: LojaProdutoGridItem[] = produtos.map((p: ProdutoLite) => {
+  const gridItems: LojaProdutoGridItem[] = produtos.map((p: ProdutoLite, index: number) => {
     const sem = estoqueTotal(p.estoque as Record<string, number>)
     const off = percentualDesconto(p.precoOriginal, p.preco)
     return {
@@ -142,6 +141,7 @@ export async function LojaCatalogoSection({
       imagensUrl: p.imagensUrl,
       esgotado: sem === 0,
       descontoPct: off,
+      featured: index === 0 && p.destaque === true && page === 1 && !sp.categoria && !sp.q,
     }
   })
 
@@ -149,19 +149,7 @@ export async function LojaCatalogoSection({
     <>
       <LojaCarrossel produtos={destaques.map((p: DestaqueLite) => toLojaProdutoCard(p, tenantId))} />
 
-      <LojaCategoriaChips
-        chips={[
-          { slug: 'todos', nome: 'Todos', href: `/portal/loja/${tenantId}`, active: !sp.categoria },
-          ...categorias.map((c: CategoriaLite) => ({
-            slug: c.slug,
-            nome: c.nome,
-            href: `/portal/loja/${tenantId}?categoria=${c.slug}`,
-            active: sp.categoria === c.slug,
-          })),
-        ]}
-      />
-
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+      <div className="grid gap-8 lg:grid-cols-[220px_1fr] lg:gap-10">
         <LojaFiltros
           categorias={categorias}
           tamanhosDisponiveis={tamanhosDisponiveis}
@@ -169,7 +157,21 @@ export async function LojaCatalogoSection({
           searchParams={sp}
         />
 
-        <div className="space-y-4">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[rgb(var(--border)_/_0.6)] pb-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[rgb(var(--foreground-muted))]">
+                [ Catálogo ]
+              </p>
+              <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-[rgb(var(--foreground))] sm:text-3xl">
+                Nova coleção
+              </h2>
+            </div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgb(var(--foreground-muted))]">
+              {totalProdutos} item{totalProdutos !== 1 ? 's' : ''}
+            </p>
+          </div>
+
           <LojaProdutoGridAnimated produtos={gridItems} />
 
           <LojaPaginacao
@@ -187,14 +189,9 @@ export async function LojaCatalogoSection({
 export function LojaCatalogoFallback() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.5)]" />
-      <div className="flex gap-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-8 w-20 rounded-full bg-[rgb(var(--border))]" />
-        ))}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <div className="hidden h-64 rounded-2xl bg-[rgb(var(--border)_/_0.45)] lg:block" />
+      <div className="h-28 bg-[rgb(var(--border)_/_0.45)]" />
+      <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+        <div className="hidden h-64 bg-[rgb(var(--border)_/_0.35)] lg:block" />
         <LojaProdutoGridSkeleton count={6} />
       </div>
     </div>

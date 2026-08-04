@@ -75,13 +75,22 @@ a ponte com `Tenant.lojaVisivelNasUnidades` (default `true`) em
 `/admin/configuracoes/transparencia` — presidente/vice com `SETTINGS_MANAGE`.
 
 - `/portal/loja` lista as lojas (`listLojasDoSocio`), uma por tenant permitido;
-  card marcado `principal: true` quando é a torcida raiz.
+  card marcado `principal: true` quando é a torcida raiz. **Com uma única loja,
+  redireciona** para `/portal/loja/[tenantId]`.
 - `/portal/loja/[tenantId]` é o catálogo de UM tenant — `tenantsPermitidosLoja` valida
-  acesso, senão `notFound()`.
+  acesso, senão `notFound()`. Chrome sticky com **store switcher** (quando ≥2 lojas)
+  e tema visual da **loja visitada** (scoped em `LojaTenantThemeScope` — não altera
+  a navbar do contexto ativo do portal). Identidade vem de `Tenant.design` +
+  `corPrimaria` da unidade dona do catálogo (`/admin/design`).
 - Sacola/checkout: `assertProdutoVisivel(produtoId, userId)` em
   `apps/web/src/app/portal/loja/actions.ts` checa `tenantsPermitidosLoja`.
 - Pedido gravado no **tenant DONO do produto** (quem tem estoque e cumpre)
 - Checkout com itens de tenants diferentes → N pedidos com mesmo `grupoCheckoutId`
+- Sacola global **agrupa por loja** na UI; badge pode mostrar `itens·lojas` quando
+  há mais de um tenant na sacola.
+- **Vitrine** (`/admin/loja/vitrine`, `store:manage`): capa do hero em
+  `Tenant.design.loja` (`bannerUrl`, `usarDestaqueComoCapa`). O estúdio
+  `/admin/design` **preserva** `design.loja` ao salvar/restaurar identidade.
 
 **Limitação conhecida — "loja por unidade" só existe quando a unidade é tenant
 próprio** (Sede/Subsede/PDE com `Tenant` dedicado, Caso B). Unidades Caso A (Sede

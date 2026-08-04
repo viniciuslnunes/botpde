@@ -134,11 +134,105 @@ export async function transferirOwnerAction(
     invalidatePermissionsCache(owner.userId, tenantId)
   }
   invalidatePermissionsCache(novoOwner.id, tenantId)
+  revalidatePath('/super-admin/torcidas')
 
   return {
     success: true,
     tenantSlug: tenant.slug,
     message: `Propriedade de ${tenant.nome} transferida para ${novoOwner.email}.`,
+  }
+}
+
+const removerOwnerSchema = z.object({
+  tenantId: z.string().uuid('Tenant inválido'),
+})
+
+export type RemoverOwnerState = {
+  message?: string
+  success?: boolean
+  tenantSlug?: string
+}
+
+/**
+ * Remove todos os cargos `owner` da torcida. Super-admin opera sem
+ * consentimento — a unidade fica sem presidente até nova transferência.
+ * Com isso o SA volta a poder editar seções “Somente owner” (sem liderança).
+ */
+export async function removerOwnerAction(
+  tenantId: string,
+): Promise<RemoverOwnerState> {
+  const session = await auth()
+
+  if (!session?.user?.id || !session.user.email || !superAdminEmails.includes(session.user.email)) {
+    return negarSuperAdmin()
+  }
+
+  const parsed = removerOwnerSchema.safeParse({ tenantId })
+  if (!parsed.success) {
+    return { message: 'Torcida inválida.' }
+  }
+
+  const [tenant, ownerRole] = await Promise.all([
+    db.tenant.findUnique({
+      where: { id: parsed.data.tenantId },
+      select: { id: true, slug: true, nome: true },
+    }),
+    db.role.findFirst({
+      where: { tenantId: parsed.data.tenantId, nome: SYSTEM_ROLES.OWNER, isSystem: true },
+      select: { id: true },
+    }),
+  ])
+
+  if (!tenant) return { message: 'Torcida não encontrada.' }
+  if (!ownerRole) {
+    return { message: 'Cargo owner não encontrado nesta torcida. Rode o seed de cargos de sistema.' }
+  }
+
+  const ownersAtuais: { id: string; userId: string; user: { email: string | null } }[] =
+    await db.userRole.findMany({
+      where: { tenantId: tenant.id, roleId: ownerRole.id },
+      select: { id: true, userId: true, user: { select: { email: true } } },
+    })
+
+  if (ownersAtuais.length === 0) {
+    return {
+      success: true,
+      tenantSlug: tenant.slug,
+      message: `${tenant.nome} já está sem presidente.`,
+    }
+  }
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.userRole.deleteMany({
+      where: { tenantId: tenant.id, roleId: ownerRole.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'OWNER_REMOVIDO',
+        entidade: 'Tenant',
+        entidadeId: tenant.id,
+        detalhes: {
+          ownersRemovidos: ownersAtuais.map((o) => ({
+            userId: o.userId,
+            email: o.user.email,
+          })),
+        },
+      },
+    })
+  })
+
+  for (const owner of ownersAtuais) {
+    invalidatePermissionsCache(owner.userId, tenant.id)
+  }
+  revalidatePath('/super-admin/torcidas')
+
+  return {
+    success: true,
+    tenantSlug: tenant.slug,
+    message: `Presidente removido de ${tenant.nome}. A torcida ficou sem owner até nova transferência.`,
   }
 }
 

@@ -136,7 +136,10 @@ export default async function CanalDetalhePage({
             <CanalFeedView
               canal={canal}
               currentUser={currentUser}
-              podePublicar={podePublicar || !canal.somenteAdminPublica}
+              // Spec: publicar no canal = sócio (`podeVerFeedSocios`) ∧
+              // `podePublicarNoCanal`. Sem o `|| !somenteAdminPublica` — ele
+              // liberava torcedor/cross-tenant quando o gate já tinha barrado.
+              podePublicar={ehSocio && podePublicar}
               cursor={cursor}
               viewerTenantId={viewerTenantId}
               permissoes={permissoes}

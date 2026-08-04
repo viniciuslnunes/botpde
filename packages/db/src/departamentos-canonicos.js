@@ -28,6 +28,10 @@ import {
 } from '../../types/src/permissions.js'
 import { isDepartamentoLegado } from '../../types/src/departamento-capabilities.js'
 import { isMembroElegivelDepartamento } from '../../types/src/departamento-eligibilidade.js'
+import {
+  ensureCanaisDepartamentosTenant,
+  syncCanaisDepartamentosDoUsuario,
+} from './departamento-canais.js'
 
 /** Slugs legados que não são departamentos (são tipos de membro). */
 export const DEPARTAMENTOS_SLUGS_LEGADOS = ['socio', 'torcedor']
@@ -68,7 +72,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Mutações e decisões ficam no gestor (ou cargos de sistema).
     nome: 'Diretoria',
     cor: '#1f2937',
-    moduloPortal: 'membros',
+    moduloPortal: 'diretoria',
     permissions: [
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.AUDIT_VIEW,
@@ -127,7 +131,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Festas, ações beneficentes, churrascos — membro participa no portal.
     nome: 'Social e eventos',
     cor: '#7c3aed',
-    moduloPortal: 'eventos',
+    moduloPortal: 'social',
     permissions: [
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
@@ -268,7 +272,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Organização das mulheres — membro no portal.
     nome: 'Feminino',
     cor: '#db2777',
-    moduloPortal: 'comunidade',
+    moduloPortal: 'feminino',
     permissions: [
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
@@ -293,7 +297,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Sem loja/financeiro/patrimônio/sedes: missão é eventos e comunicação.
     nome: 'Carnaval',
     cor: '#4d7c0f',
-    moduloPortal: 'eventos',
+    moduloPortal: 'carnaval',
     permissions: [
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
@@ -817,6 +821,9 @@ export async function syncMembershipFromRoles(client, { userId, tenantId }) {
       })
     }
   }
+
+  // Canais internos de depto/área acompanham a projeção (entrar/sair).
+  await syncCanaisDepartamentosDoUsuario(client, { userId, tenantId })
 }
 
 /**
@@ -829,5 +836,10 @@ export async function syncMembershipFromRoles(client, { userId, tenantId }) {
 export async function bootstrapAcessoTenant(client, tenantId, opts = {}) {
   const deptos = await upsertDepartamentosCanonicos(client, tenantId, opts)
   const perfis = await upsertPerfisDepartamentoCanonicos(client, tenantId, opts)
-  return { ...deptos, ...perfis }
+  // Canais internos: só cria se já houver User (criadoPorId). Setup/repair
+  // chamam `ensureCanaisDepartamentosTenant` de novo depois do owner.
+  const canais = await ensureCanaisDepartamentosTenant(client, tenantId, {
+    criadoPorId: opts.criadoPorId ?? null,
+  })
+  return { ...deptos, ...perfis, canais }
 }
