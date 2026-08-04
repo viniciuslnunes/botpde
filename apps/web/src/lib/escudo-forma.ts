@@ -1,53 +1,92 @@
 /**
- * Detecta logo circular em canvas quadrado com fundo branco “assado”.
+ * Detecta logo circular em canvas quadrado com fundo opaco “assado”.
  *
  * Só retorna true quando:
- * 1. Cantos são brancos opacos (há quadrado branco a cortar)
- * 2. O conteúdo (não-branco) cabe no círculo inscrito
- * 3. A área fora do círculo é majoritariamente branca
+ * 1. Cantos são opacos (há quadrado de fundo a cortar — branco, preto ou cor)
+ * 2. O conteúdo (não-fundo) cabe no círculo inscrito
+ * 3. A área fora do círculo é majoritariamente a cor de fundo
  *
- * PNG com alpha (ex.: Gaviões) → false (cantos transparentes, sem máscara).
- * Badge redondo quase full-bleed (Camisa 12) → true (cantos brancos + disco).
+ * PNG com alpha nos cantos (ex.: Gaviões, escudo do Corinthians) → false
+ * (sem máscara — a transparência já resolve o formato).
+ * Badge redondo em fundo branco (Camisa 12) ou preto (logo em square) → true.
  */
 
 const SAMPLE = 64
+/** Tolerância RGB ao comparar pixel com a cor de fundo amostrada nos cantos. */
+const TOL_FUNDO = 36
 
 function isTransparente(data: Uint8ClampedArray, i: number): boolean {
   return data[i + 3]! < 40
 }
 
-/** Fundo branco/cinza-claro opaco. */
-function isBrancoOpaco(data: Uint8ClampedArray, i: number): boolean {
-  const a = data[i + 3]!
-  if (a < 180) return false
-  const r = data[i]!
-  const g = data[i + 1]!
-  const b = data[i + 2]!
-  // Tolerância maior: JPGs comprimidos não são #FFFFFF puro.
-  return r > 230 && g > 230 && b > 230
+function isOpaco(data: Uint8ClampedArray, i: number): boolean {
+  return data[i + 3]! >= 180
+}
+
+function corDe(data: Uint8ClampedArray, i: number): [number, number, number] {
+  return [data[i]!, data[i + 1]!, data[i + 2]!]
+}
+
+function coresProximas(
+  a: [number, number, number],
+  b: [number, number, number],
+  tol = TOL_FUNDO,
+): boolean {
+  return (
+    Math.abs(a[0] - b[0]) <= tol &&
+    Math.abs(a[1] - b[1]) <= tol &&
+    Math.abs(a[2] - b[2]) <= tol
+  )
 }
 
 function idx(x: number, y: number): number {
   return (y * SAMPLE + x) * 4
 }
 
-function amostraBranco(
+type AmostraCanto = { transparente: number; opaco: number; rgb: [number, number, number] }
+
+function amostrarCanto(
   data: Uint8ClampedArray,
   x: number,
   y: number,
   raio = 2,
-): boolean {
-  let ok = 0
-  let total = 0
+): AmostraCanto {
+  let transparente = 0
+  let opaco = 0
+  let r = 0
+  let g = 0
+  let b = 0
   for (let dy = -raio; dy <= raio; dy++) {
     for (let dx = -raio; dx <= raio; dx++) {
       const px = Math.min(SAMPLE - 1, Math.max(0, x + dx))
       const py = Math.min(SAMPLE - 1, Math.max(0, y + dy))
-      total += 1
-      if (isBrancoOpaco(data, idx(px, py))) ok += 1
+      const i = idx(px, py)
+      if (isTransparente(data, i)) {
+        transparente += 1
+        continue
+      }
+      if (!isOpaco(data, i)) continue
+      opaco += 1
+      const [cr, cg, cb] = corDe(data, i)
+      r += cr
+      g += cg
+      b += cb
     }
   }
-  return ok / total >= 0.7
+  return {
+    transparente,
+    opaco,
+    rgb: opaco > 0 ? [r / opaco, g / opaco, b / opaco] : [0, 0, 0],
+  }
+}
+
+function isFundoOpaco(
+  data: Uint8ClampedArray,
+  i: number,
+  fundo: [number, number, number],
+): boolean {
+  if (!isOpaco(data, i)) return false
+  return coresProximas(corDe(data, i), fundo)
 }
 
 /** Analisa pixels já desenhados num canvas SAMPLE×SAMPLE. */
@@ -61,8 +100,19 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
     [SAMPLE - 3, SAMPLE - 3],
   ]
 
-  // Sem cantos brancos → nada a mascarar (alpha já resolve, ex.: Gaviões).
-  if (!cantos.every(([x, y]) => amostraBranco(data, x, y))) return false
+  const amostras = cantos.map(([x, y]) => amostrarCanto(data, x, y))
+
+  // Cantos com alpha → PNG transparente; não mascarar.
+  if (amostras.some((a) => a.transparente > a.opaco)) return false
+  if (amostras.some((a) => a.opaco === 0)) return false
+
+  // Cor de fundo = média dos cantos opacos; todos devem concordar.
+  const fundo: [number, number, number] = [
+    amostras.reduce((s, a) => s + a.rgb[0], 0) / amostras.length,
+    amostras.reduce((s, a) => s + a.rgb[1], 0) / amostras.length,
+    amostras.reduce((s, a) => s + a.rgb[2], 0) / amostras.length,
+  ]
+  if (!amostras.every((a) => coresProximas(a.rgb, fundo))) return false
 
   const cx = (SAMPLE - 1) / 2
   const cy = (SAMPLE - 1) / 2
@@ -72,7 +122,7 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
   let conteudo = 0
   let conteudoDentro = 0
   let fora = 0
-  let brancoFora = 0
+  let fundoFora = 0
 
   for (let y = 0; y < SAMPLE; y++) {
     for (let x = 0; x < SAMPLE; x++) {
@@ -82,10 +132,10 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
       const dist2 = dx * dx + dy * dy
       const foraCirculo = dist2 > r2
 
-      if (isTransparente(data, i) || isBrancoOpaco(data, i)) {
+      if (isTransparente(data, i) || isFundoOpaco(data, i, fundo)) {
         if (foraCirculo) {
           fora += 1
-          if (isBrancoOpaco(data, i)) brancoFora += 1
+          if (isFundoOpaco(data, i, fundo)) fundoFora += 1
         }
         continue
       }
@@ -99,9 +149,9 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
   if (conteudo < 24) return false
   // Quase todo o conteúdo dentro do círculo.
   if (conteudoDentro / conteudo < 0.85) return false
-  // Fora do círculo deve ser majoritariamente o fundo branco do quadrado.
+  // Fora do círculo deve ser majoritariamente o fundo do quadrado.
   if (fora < 12) return false
-  if (brancoFora / fora < 0.75) return false
+  if (fundoFora / fora < 0.75) return false
 
   return true
 }
@@ -163,7 +213,7 @@ export async function detectarEscudoCircular(url: string): Promise<boolean> {
     const img = await carregarImagem(url, 'anonymous')
     const ok = analisarElemento(img)
     if (ok) return true
-    // Se leu pixels e disse false, confiar (não é circular com branco).
+    // Se leu pixels e disse false, confiar (não é circular com fundo).
     // Se canvas tainted, analisarElemento retorna false — tentar proxy.
   } catch {
     // segue

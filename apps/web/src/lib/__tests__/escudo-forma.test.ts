@@ -29,12 +29,43 @@ function pintarCirculoOpaco(
   }
 }
 
-function pintarFundoBranco(data: Uint8ClampedArray) {
+function pintarFundo(data: Uint8ClampedArray, r: number, g: number, b: number) {
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 255
-    data[i + 1] = 255
-    data[i + 2] = 255
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
     data[i + 3] = 255
+  }
+}
+
+function pintarFundoBranco(data: Uint8ClampedArray) {
+  pintarFundo(data, 255, 255, 255)
+}
+
+function pintarFundoPreto(data: Uint8ClampedArray) {
+  pintarFundo(data, 0, 0, 0)
+}
+
+/** Disco colorido (não-preto) — conteúdo visível sobre fundo preto. */
+function pintarCirculoColorido(
+  data: Uint8ClampedArray,
+  cx: number,
+  cy: number,
+  r: number,
+) {
+  const r2 = r * r
+  for (let y = 0; y < SAMPLE; y++) {
+    for (let x = 0; x < SAMPLE; x++) {
+      const dx = x - cx
+      const dy = y - cy
+      if (dx * dx + dy * dy <= r2) {
+        const i = (y * SAMPLE + x) * 4
+        data[i] = 200
+        data[i + 1] = 40
+        data[i + 2] = 40
+        data[i + 3] = 255
+      }
+    }
   }
 }
 
@@ -70,6 +101,13 @@ describe('escudo-forma', () => {
     const data = canvasVazio()
     pintarFundoBranco(data)
     pintarCirculoOpaco(data, 31.5, 31.5, 28)
+    expect(analisarEscudoCircularDeImageData(data)).toBe(true)
+  })
+
+  it('mascara disco em fundo preto (cantos pretos)', () => {
+    const data = canvasVazio()
+    pintarFundoPreto(data)
+    pintarCirculoColorido(data, 31.5, 31.5, 28)
     expect(analisarEscudoCircularDeImageData(data)).toBe(true)
   })
 

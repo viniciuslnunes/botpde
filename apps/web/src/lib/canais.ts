@@ -7,6 +7,7 @@ import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
 import {
+  getAncestorTenantIds,
   getDescendantTenantIds,
   getTenantRelation,
   getTorcidaLineageTenantIds,
@@ -618,14 +619,26 @@ export async function ensureCanaisOficiaisHierarquia(
   )
   let materializou = criadosCasoB.some((c) => c.criadoAgora)
 
-  // Oficiais ainda no default antigo (HIERARQUIA) → ALIADOS, para aliados
-  // descobrirem e pedirem entrada. Temáticos não são tocados.
+  // Oficiais ainda no default antigo (HIERARQUIA) ou TENANT legado → ALIADOS.
+  // TENANT em canal emprestado (Conversa na mãe, Sede no filho) esconde o
+  // mural da própria unidade e das irmãs: relation ≠ self. Default de produto
+  // é ALIADOS (descoberta na worktree + aliados). Temáticos não são tocados.
+  // Usa a linhagem da raiz (não só self+descendentes) para alcançar canais
+  // hospedados no ancestral quando o viewer está numa unidade Caso B.
+  const ancestraisBump = await getAncestorTenantIds(tenantId)
+  const raizBump =
+    ancestraisBump.length > 0 ? ancestraisBump[ancestraisBump.length - 1]! : tenantId
+  const descendentesRaiz = await getDescendantTenantIds(raizBump)
+  const tenantIdsBump = Array.from(
+    new Set([raizBump, ...descendentesRaiz, ...tenantIds]),
+  ).slice(0, MAX_CANAIS_OFICIAIS_PROVISION * 2)
+
   const bumped = await db.conversa.updateMany({
     where: {
-      tenantId: { in: tenantIds },
+      tenantId: { in: tenantIdsBump },
       tipo: 'CANAL',
       canalOficial: true,
-      visibilidadeCanal: 'HIERARQUIA',
+      visibilidadeCanal: { in: ['HIERARQUIA', 'TENANT'] },
     },
     data: { visibilidadeCanal: 'ALIADOS' },
   })
@@ -658,7 +671,9 @@ export async function ensureCanaisOficiaisHierarquia(
 
   // Listagem usa unstable_cache — sem invalidate, canais novos ficam invisíveis ~120s.
   if (materializou) {
-    revalidateTag(tagCanaisVisiveis(tenantId), 'max')
+    for (const id of tenantIdsBump) {
+      revalidateTag(tagCanaisVisiveis(id), 'max')
+    }
   }
 }
 

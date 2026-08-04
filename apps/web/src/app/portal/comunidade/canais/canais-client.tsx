@@ -729,7 +729,7 @@ function CanalCard({
         <div className="flex items-start gap-3">
           <Link
             href={href}
-            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] sm:h-24 sm:w-24"
+            className="flex h-20 w-20 shrink-0 items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] sm:h-24 sm:w-24"
             aria-label={`Abrir canal ${canalNome}`}
           >
             {canal.avatarUrl ? (

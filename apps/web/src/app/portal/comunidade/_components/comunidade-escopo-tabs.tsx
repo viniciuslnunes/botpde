@@ -431,11 +431,8 @@ export function ComunidadeEscopoTabs({
       active: false,
       suppressClick: false,
     }
-    try {
-      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
-    } catch {
-      /* ignore */
-    }
+    // NÃO capturar o pointer aqui: setPointerCapture no down engole o click
+    // do form/link aninhado (abas 4+ do operador). Captura só após o limiar.
   }
 
   function onPointerMoveTab(e: React.PointerEvent) {
@@ -447,6 +444,11 @@ export function ComunidadeEscopoTabs({
       drag.active = true
       drag.suppressClick = true
       setDraggingKey(drag.key)
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+      } catch {
+        /* ignore */
+      }
     }
 
     const el = document.elementFromPoint(e.clientX, e.clientY)
@@ -536,11 +538,11 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Slot fixo 28×28 — evita escudo com alpha (ex.: Corinthians) estourar
-         *  o tamanho ou desalinhando dos badges circulares / iniciais. */
+        /** Slot fixo 28×28; ícone em 24×24 no centro — peso óptico próximo
+         *  entre escudo com alpha (Corinthians) e badges circulares. */
         const visual = (
           <m.span
-            className="relative flex h-7 w-7 shrink-0 items-center justify-center"
+            className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden"
             whileHover={
               arrastando || draggingKey
                 ? undefined
@@ -554,14 +556,14 @@ export function ComunidadeEscopoTabs({
               <LogoImage
                 src={tab.logoUrl}
                 alt=""
-                size={28}
-                className="pointer-events-none h-full w-full object-contain"
+                size={24}
+                className="pointer-events-none block h-6 w-6 max-h-6 max-w-6 object-contain"
               />
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none flex h-full w-full items-center justify-center rounded-full text-[11px] font-bold',
+                  'pointer-events-none flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
@@ -606,9 +608,11 @@ export function ComunidadeEscopoTabs({
           'absolute -right-1.5 -top-0.5 z-10 flex h-4 w-4 items-center justify-center',
           'rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
           'text-[rgb(var(--foreground-muted))] shadow-sm',
-          'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
+          'pointer-events-none opacity-0 transition-opacity',
+          'group-hover:pointer-events-auto group-hover:opacity-100',
+          'group-focus-within:pointer-events-auto group-focus-within:opacity-100',
           'hover:bg-[rgb(var(--danger)_/_0.12)] hover:text-[rgb(var(--danger))]',
-          ativo ? 'opacity-100' : '',
+          ativo ? 'pointer-events-auto opacity-100' : '',
         ].join(' ')
 
         const fecharBadge = tab.fechavel ? (

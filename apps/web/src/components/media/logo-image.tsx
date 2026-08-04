@@ -23,9 +23,9 @@ type Props = {
 
 /**
  * Renderiza um escudo/logo aplicando a mesma detecção do onboarding
- * (`detectarEscudoCircular`): badges redondos com fundo branco "assado"
- * ganham máscara circular; PNG com alpha (fundo transparente) fica natural.
- * Ver `EscudoClube` (onboarding) — mesmo tratamento, para uso fora do wizard.
+ * (`detectarEscudoCircular`): badges redondos com fundo opaco “assado”
+ * (branco, preto ou cor) ganham máscara circular; PNG com alpha nos cantos
+ * (fundo transparente) fica natural. Ver `EscudoClube` (onboarding).
  */
 export function LogoImage({
   src,
@@ -56,7 +56,8 @@ export function LogoImage({
     }
   }, [src])
 
-  const radiusClass = pronto && circular ? 'rounded-full overflow-hidden' : rounded
+  const masked = pronto && circular
+  const radiusClass = masked ? 'rounded-full overflow-hidden' : rounded
   const cls = [className, fill ? 'absolute inset-0 h-full w-full' : '', radiusClass]
     .filter(Boolean)
     .join(' ')
