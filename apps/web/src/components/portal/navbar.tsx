@@ -196,14 +196,16 @@ export function PortalNavbar({
 
           <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
-              <LogoImage
-                src={brandTenant.logoUrl}
-                alt={brandTenant.nome}
-                size={64}
-                quality={95}
-                className="h-8 w-8 shrink-0 object-contain"
-                rounded="rounded-lg"
-              />
+              <span className="relative block h-8 w-8 shrink-0 overflow-hidden rounded-lg">
+                <LogoImage
+                  src={brandTenant.logoUrl}
+                  alt={brandTenant.nome}
+                  fill
+                  sizes="32px"
+                  quality={95}
+                  className="object-contain"
+                />
+              </span>
             ) : (
               <div
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"

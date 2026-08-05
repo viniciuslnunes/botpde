@@ -104,14 +104,16 @@ function AdminTopbar({
 
         <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
           {tenantLogoUrl ? (
-            <LogoImage
-              src={tenantLogoUrl}
-              alt={tenantNome}
-              size={64}
-              quality={95}
-              className="h-8 w-8 shrink-0 object-contain"
-              rounded="rounded-lg"
-            />
+            <span className="relative block h-8 w-8 shrink-0 overflow-hidden rounded-lg">
+              <LogoImage
+                src={tenantLogoUrl}
+                alt={tenantNome}
+                fill
+                sizes="32px"
+                quality={95}
+                className="object-contain"
+              />
+            </span>
           ) : (
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"

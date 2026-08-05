@@ -538,11 +538,11 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Miniatura fixa 32×32 — escudo alto (Gaviões) e badges circulares
-         *  cabem no mesmo box com object-contain; overflow corta qualquer vazamento. */
+        /** Miniatura rígida 32×32 via `fill` — o box do pai dita o tamanho;
+         *  escudo do clube e logos de torcida não podem estourar. */
         const visual = (
           <m.span
-            className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden"
+            className="relative block h-8 w-8 shrink-0 overflow-hidden"
             whileHover={
               arrastando || draggingKey
                 ? undefined
@@ -556,14 +556,15 @@ export function ComunidadeEscopoTabs({
               <LogoImage
                 src={tab.logoUrl}
                 alt=""
-                size={64}
-                className="pointer-events-none block h-8 w-8 max-h-8 max-w-8 object-contain"
+                fill
+                sizes="32px"
+                className="pointer-events-none object-contain"
               />
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
+                  'pointer-events-none flex h-full w-full items-center justify-center rounded-full text-xs font-bold',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
@@ -582,7 +583,7 @@ export function ComunidadeEscopoTabs({
         )
 
         const className = [
-          'relative -mb-px flex h-10 w-8 touch-none items-center justify-center pt-1',
+          'relative -mb-px flex h-10 w-8 touch-none items-center justify-center pb-1.5 pt-0.5',
           ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
