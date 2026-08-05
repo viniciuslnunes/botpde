@@ -109,7 +109,7 @@ export async function prefetchComunidadeFeedPage(params: {
         signal,
       }),
     initialPageParam: null as string | null,
-    getNextPageParam: (last) => {
+    getNextPageParam: (last: ComunidadeFeedPage<unknown>) => {
       if (!last.pageInfo.hasMore || !last.pageInfo.nextCursor) return undefined
       return last.pageInfo.nextCursor
     },
