@@ -538,21 +538,11 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Box 32×32 com style inline + img cru; Motion escala o wrapper externo. */
+        /** 32×32 sem scale no ícone (hover distorce a medida entre abas). */
         const visual = (
-          <m.span
-            className="relative inline-flex shrink-0"
-            whileHover={
-              arrastando || draggingKey
-                ? undefined
-                : { scale: 1.08, transition: canalTabIconTap }
-            }
-            whileTap={
-              arrastando ? undefined : { scale: 0.94, transition: canalTabIconTap }
-            }
-          >
+          <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center">
             {tab.logoUrl ? (
-              <LogoMiniatura src={tab.logoUrl} alt="" shape="circle" />
+              <LogoMiniatura src={tab.logoUrl} alt="" />
             ) : (
               <span
                 aria-hidden
@@ -583,7 +573,7 @@ export function ComunidadeEscopoTabs({
                 aria-hidden
               />
             ) : null}
-          </m.span>
+          </span>
         )
 
         const className = [
