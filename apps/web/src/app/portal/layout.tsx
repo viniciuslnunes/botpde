@@ -2,6 +2,11 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import {
+  resolverBrandPorEscopo,
+  resolverEscopoComunidadePorModo,
+} from '@/lib/comunidade-escopo'
+import { lerEscopoComunidadePersistido } from '@/lib/comunidade-escopo-cookie'
 import { getAvatarAtualDoUsuario, getNomeAtualDoUsuario } from '@/lib/perfil-social'
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { Suspense } from 'react'
@@ -72,6 +77,38 @@ export default async function PortalLayout({
           }
         : { nome: 'Torcida', corPrimaria: COR_PRIMARIA_PLATAFORMA, logoUrl: null }
 
+  // Escopo do canal que a pessoa está lendo (cookie gravado pelas abas-escudo
+  // da Comunidade). Fora de `/portal/comunidade` não existe `?escopo=`, então
+  // é ele que mantém Agenda/Sedes/Loja no canal selecionado em vez de jogar o
+  // header de volta para a Comunidade Nacional. Sempre revalidado contra os
+  // escopos que a pessoa realmente tem — cookie não concede acesso.
+  const escopoCanal = ctx
+    ? resolverEscopoComunidadePorModo(
+        ctx.modo,
+        ctx.escopos,
+        await lerEscopoComunidadePersistido(),
+        { tenantAtivoEhUnidade: ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade) },
+      )
+    : null
+
+  const brandCanal =
+    ctx && escopoCanal
+      ? resolverBrandPorEscopo(escopoCanal, {
+          afiliacao: ctx.afiliacao,
+          torcidaReal:
+            ctx.torcidaReal ??
+            (ctx.modo === 'torcida'
+              ? {
+                  nome: ctx.tenant.nome,
+                  corPrimaria: ctx.tenant.corPrimaria,
+                  logoUrl: ctx.tenant.logoUrl,
+                }
+              : null),
+          unidade: ctx.unidade ? { nome: ctx.unidade.nome, logoUrl: ctx.unidade.logoUrl } : null,
+          corPrimariaNacional: ctx.tenantSintetico?.corPrimaria ?? null,
+        })
+      : null
+
   // Design completo: tenant real no modo torcida, tenant sintético (paleta do
   // clube) no modo nacional.
   const hostTenant = ctx?.modo === 'torcida' ? await getTenantFromHost() : null
@@ -106,6 +143,8 @@ export default async function PortalLayout({
         ctx?.modo === 'nacional' && (ctx.torcidaReal || ctx.unidade),
       )}
       tenantSlugAtual={hostTenant?.slug ?? null}
+      escopoCanal={escopoCanal}
+      brandCanal={brandCanal}
     />
   )
 

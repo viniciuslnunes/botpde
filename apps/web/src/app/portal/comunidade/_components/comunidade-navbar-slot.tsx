@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { lerEscopoComunidadePersistido } from '@/lib/comunidade-escopo-cookie'
 import { ComunidadeEscopoNavbarOverride } from './comunidade-escopo-navbar-override'
 import { ComunidadeNacionalPaletaSync } from './comunidade-nacional-paleta-sync'
 
@@ -45,6 +46,7 @@ export async function ComunidadeNavbarSlot() {
         modoContexto={ctx.modo}
         corPrimariaNacional={corPrimaria}
         tenantAtivoEhUnidade={ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade)}
+        escopoPersistido={await lerEscopoComunidadePersistido()}
       />
       {afiliacao && corPrimaria ? (
         <ComunidadeNacionalPaletaSync

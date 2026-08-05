@@ -747,3 +747,34 @@ mantém **canais abertos** (cookie `operador_canais_abertos`) com badge X
 (`fecharCanalOperadorAction`); cada visita via select/"Ir ao portal"/troca
 registra o slug. Sem portal próprio (Caso A): botão "Ir ao portal" no menu
 admin abre modal e oferece o admin da unidade (`origem === 'sede'`).
+
+## O canal selecionado sobrevive à topbar (2026-08-05)
+
+O escopo só existia como `?escopo=` **dentro** de `/portal/comunidade`. Agenda,
+Sedes e Loja ficam fora dessa rota, então o override client desmontava e o
+header caía no tenant base do layout — um torcedor lendo o canal da PDE (ex.:
+FIEL SÃO VICENTE) clicava em Agenda e via o escudo do clube (CN).
+
+- Cookie `comunidade_escopo` (`lib/comunidade-escopo-cookie.ts`), gravado por
+  `registrarEscopoComunidadeAction` no mesmo efeito que resolve a marca. É
+  **preferência de navegação**, nunca autorização: `portal/layout.tsx` sempre
+  o revalida com `resolverEscopoComunidadePorModo` contra os `EscoposDisponiveis`
+  reais — cookie forjado com `torcida` num torcedor cai em `nacional`.
+  Detalhe de canal temático (`/canais/[id]`) **não** grava: não é aba-escudo.
+- `resolverBrandPorEscopo` (puro, em `lib/comunidade-escopo.ts`) é a **fonte
+  única** da marca do slot esquerdo, usada pelo override client dentro da
+  Comunidade e pelo layout fora dela. Precedência na navbar:
+  `brandOverride` (canal/chrome) → `brandCanal` (cookie) → `tenant` do layout.
+  Como o layout já resolve, some também o flash do escudo do clube antes de o
+  chrome montar.
+- **CN não exibe Agenda/Sedes/Loja em rota nenhuma.** `LINKS_REATIVOS_CANAL`
+  passa a ser filtrado por `escopoEfetivo` (chrome → URL → cookie → modo), não
+  só dentro da Comunidade. O **cadeado do admin** continua preso ao escopo
+  *dentro* da Comunidade: fora dela o canal lido não pode esconder a porta do
+  `/admin` de quem tem acesso.
+- Os links "Comunidade" e a marca voltam para `?escopo=<atual>` — sem isso a
+  volta caía no default do modo e a ida a Agenda virava troca silenciosa de
+  canal.
+
+Testes: `lib/__tests__/comunidade-escopo.test.ts` (`resolverBrandPorEscopo` +
+cookie que não concede aba).

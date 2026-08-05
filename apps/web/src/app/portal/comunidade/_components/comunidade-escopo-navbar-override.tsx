@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavbarBrandOverride, type NavbarBrand } from '@/lib/navbar-brand-override'
 import {
+  resolverBrandPorEscopo,
   resolverEscopoComunidadePorModo,
+  type EscopoComunidade,
   type EscoposDisponiveis,
 } from '@/lib/comunidade-escopo'
-import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
+import { registrarEscopoComunidadeAction } from '@/app/portal/comunidade/escopo-actions'
 
 const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
 
@@ -39,6 +41,7 @@ export function ComunidadeEscopoNavbarOverride({
   modoContexto = 'torcida',
   corPrimariaNacional,
   tenantAtivoEhUnidade = false,
+  escopoPersistido = null,
 }: {
   afiliacao: AfiliacaoBrand | null
   torcidaReal: TorcidaBrand | null
@@ -51,6 +54,8 @@ export function ComunidadeEscopoNavbarOverride({
   corPrimariaNacional: string | null
   /** Unidade Caso B ativa: o default do escopo é ela, não a Sede raiz. */
   tenantAtivoEhUnidade?: boolean
+  /** Cookie `comunidade_escopo` já no servidor — evita regravar o mesmo valor. */
+  escopoPersistido?: EscopoComunidade | null
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -65,6 +70,18 @@ export function ComunidadeEscopoNavbarOverride({
 
   const onCanalDetalhe = CANAL_DETALHE_RE.test(pathname)
 
+  // Agenda/Sedes/Loja não têm `?escopo=` — sem persistir, a topbar voltava ao
+  // clube no primeiro clique. Detalhe de canal temático não escreve: ele não
+  // é uma aba-escudo, e sobrescrever perderia o canal que a pessoa escolheu.
+  // Só grava quando o valor muda: senão seria um POST por navegação no feed.
+  const escopoGravado = useRef<string | null>(escopoPersistido)
+  useEffect(() => {
+    if (onCanalDetalhe) return
+    if (escopoGravado.current === escopo) return
+    escopoGravado.current = escopo
+    void registrarEscopoComunidadeAction(escopo)
+  }, [onCanalDetalhe, escopo])
+
   useEffect(() => {
     // Detalhe de canal tem override próprio — não forçar CN na topbar.
     if (onCanalDetalhe) {
@@ -74,28 +91,16 @@ export function ComunidadeEscopoNavbarOverride({
 
     setEscopoAtivo(escopo)
 
-    let brand: NavbarBrand | null = null
-    if (escopo === 'nacional' && afiliacao) {
-      brand = {
-        nome: afiliacao.apelido ?? afiliacao.nome,
-        corPrimaria: corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
-        logoUrl: afiliacao.escudoUrl,
-      }
-    } else if (escopo === 'torcida' && torcidaReal) {
-      // TORCEDOR: layout do portal já é o clube — precisa override explícito.
-      // Sócio: reforça a marca da torcida (idempotente com o tenant do layout).
-      brand = {
-        nome: torcidaReal.nome,
-        corPrimaria: torcidaReal.corPrimaria,
-        logoUrl: torcidaReal.logoUrl,
-      }
-    } else if (escopo === 'unidade' && unidade) {
-      brand = {
-        nome: unidade.nome,
-        corPrimaria: torcidaReal?.corPrimaria ?? corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
-        logoUrl: unidade.logoUrl,
-      }
-    }
+    // Mesma resolução que o `portal/layout` aplica ao cookie fora da
+    // Comunidade — fonte única, senão as duas marcas divergem.
+    // TORCEDOR: layout do portal já é o clube, então torcida/unidade precisam
+    // de override explícito; sócio recebe um override idempotente.
+    const brand: NavbarBrand | null = resolverBrandPorEscopo(escopo, {
+      afiliacao,
+      torcidaReal,
+      unidade,
+      corPrimariaNacional,
+    })
 
     if (!brand) {
       setOverride(null)

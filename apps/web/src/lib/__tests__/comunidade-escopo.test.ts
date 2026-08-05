@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolverEscopoComunidadePorModo } from '@/lib/comunidade-escopo'
+import {
+  resolverBrandPorEscopo,
+  resolverEscopoComunidadePorModo,
+} from '@/lib/comunidade-escopo'
 import {
   resolverEscopoComunidade,
   type ContextoComunidadePortal,
@@ -168,6 +171,55 @@ describe('resolverEscopoComunidade', () => {
     expect(
       resolverEscopoComunidadePorModo('nacional', { torcida: false, unidade: true }, null, opts),
     ).toBe('nacional')
+  })
+})
+
+describe('resolverBrandPorEscopo', () => {
+  const fontes = {
+    afiliacao: { nome: 'Sport Club Corinthians Paulista', apelido: 'Timão', escudoUrl: '/tim.png' },
+    torcidaReal: { nome: 'Gaviões', corPrimaria: '#111', logoUrl: '/gav.png' },
+    unidade: { nome: 'Fiel São Vicente', logoUrl: '/fsv.png' },
+    corPrimariaNacional: '#000',
+  }
+
+  it('cada escopo devolve a própria marca', () => {
+    expect(resolverBrandPorEscopo('nacional', fontes)).toEqual({
+      nome: 'Timão',
+      corPrimaria: '#000',
+      logoUrl: '/tim.png',
+    })
+    expect(resolverBrandPorEscopo('torcida', fontes)).toEqual({
+      nome: 'Gaviões',
+      corPrimaria: '#111',
+      logoUrl: '/gav.png',
+    })
+    // Unidade herda a cor da torcida — ela não tem paleta própria.
+    expect(resolverBrandPorEscopo('unidade', fontes)).toEqual({
+      nome: 'Fiel São Vicente',
+      corPrimaria: '#111',
+      logoUrl: '/fsv.png',
+    })
+  })
+
+  it('escopo sem fonte devolve null (chamador cai no tenant do layout)', () => {
+    expect(resolverBrandPorEscopo('unidade', { ...fontes, unidade: null })).toBeNull()
+    expect(resolverBrandPorEscopo('torcida', { ...fontes, torcidaReal: null })).toBeNull()
+    expect(resolverBrandPorEscopo('nacional', { ...fontes, afiliacao: null })).toBeNull()
+  })
+
+  it('unidade sem torcida cai na cor nacional em vez de ficar sem marca', () => {
+    expect(
+      resolverBrandPorEscopo('unidade', { ...fontes, torcidaReal: null }),
+    ).toEqual({ nome: 'Fiel São Vicente', corPrimaria: '#000', logoUrl: '/fsv.png' })
+  })
+
+  it('cookie de escopo nunca concede aba: passa pelo resolver antes da marca', () => {
+    // O layout resolve o cookie contra os escopos reais — torcedor com
+    // `comunidade_escopo=torcida` gravado cai em nacional, e a marca segue.
+    const escoposTorcedor = { torcida: false, unidade: true }
+    const escopo = resolverEscopoComunidadePorModo('nacional', escoposTorcedor, 'torcida')
+    expect(escopo).toBe('nacional')
+    expect(resolverBrandPorEscopo(escopo, fontes)?.nome).toBe('Timão')
   })
 })
 

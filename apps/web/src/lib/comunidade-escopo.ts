@@ -3,6 +3,8 @@
  * Seguro para Client Components — não importar `comunidade-contexto` no client.
  */
 
+import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
+
 /**
  * Escopo de leitura/publicação escolhido dentro da Comunidade (query `?escopo=`).
  *
@@ -67,4 +69,62 @@ export function resolverEscopoComunidadePorModo(
   if (escopoParam === 'torcida' && !disponiveis.torcida) return padrao
   if (escopoParam === 'unidade' && !disponiveis.unidade) return padrao
   return escopoParam
+}
+
+/** Marca do slot esquerdo da navbar (nome/escudo/cor). */
+export interface BrandEscopo {
+  nome: string
+  corPrimaria: string
+  logoUrl: string | null
+}
+
+/** Fontes de marca de cada aba-escudo da Comunidade. */
+export interface FontesBrandEscopo {
+  afiliacao: { nome: string; apelido: string | null; escudoUrl: string | null } | null
+  torcidaReal: BrandEscopo | null
+  unidade: { nome: string; logoUrl: string | null } | null
+  /** Cor do tenant sintético da Comunidade Nacional (paleta do clube). */
+  corPrimariaNacional: string | null
+}
+
+/**
+ * Marca correspondente ao escopo selecionado — **fonte única** do slot
+ * esquerdo da navbar, usada tanto pelo override client dentro da Comunidade
+ * quanto pelo `portal/layout` nas demais rotas (Agenda/Sedes/Loja), que só
+ * têm o escopo persistido em cookie. Sem ela, sair da Comunidade jogava o
+ * header de volta ao clube mesmo com a unidade selecionada.
+ *
+ * `null` quando o escopo não tem fonte de marca — o chamador cai no tenant
+ * base do layout.
+ */
+export function resolverBrandPorEscopo(
+  escopo: EscopoComunidade,
+  fontes: FontesBrandEscopo,
+): BrandEscopo | null {
+  const { afiliacao, torcidaReal, unidade, corPrimariaNacional } = fontes
+
+  if (escopo === 'nacional') {
+    if (!afiliacao) return null
+    return {
+      nome: afiliacao.apelido ?? afiliacao.nome,
+      corPrimaria: corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
+      logoUrl: afiliacao.escudoUrl,
+    }
+  }
+
+  if (escopo === 'torcida') {
+    if (!torcidaReal) return null
+    return {
+      nome: torcidaReal.nome,
+      corPrimaria: torcidaReal.corPrimaria,
+      logoUrl: torcidaReal.logoUrl,
+    }
+  }
+
+  if (!unidade) return null
+  return {
+    nome: unidade.nome,
+    corPrimaria: torcidaReal?.corPrimaria ?? corPrimariaNacional ?? COR_PRIMARIA_PLATAFORMA,
+    logoUrl: unidade.logoUrl,
+  }
 }

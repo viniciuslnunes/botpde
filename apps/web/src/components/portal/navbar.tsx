@@ -22,7 +22,8 @@ import {
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { markNavbarNotificationRead, refreshNavbarContext } from '@/lib/use-navbar-context'
 import { useNavbarContext } from '@/lib/use-navbar-context'
-import { useNavbarBrandOverride } from '@/lib/navbar-brand-override'
+import { useNavbarBrandOverride, type NavbarBrand } from '@/lib/navbar-brand-override'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
@@ -89,6 +90,14 @@ interface PortalNavbarProps {
   temVinculoTorcida?: boolean
   /** Slug da torcida ativa — só preenchido no modo torcida. */
   tenantSlugAtual?: string | null
+  /**
+   * Escopo persistido do canal (cookie `comunidade_escopo`, já revalidado no
+   * layout). Fora de `/portal/comunidade` não existe `?escopo=` — é ele que
+   * mantém a topbar no canal selecionado.
+   */
+  escopoCanal?: EscopoComunidade | null
+  /** Marca do `escopoCanal` — slot esquerdo fora da Comunidade. */
+  brandCanal?: NavbarBrand | null
 }
 
 export function PortalNavbar({
@@ -99,6 +108,8 @@ export function PortalNavbar({
   modoNacional = false,
   temVinculoTorcida = false,
   tenantSlugAtual = null,
+  escopoCanal = null,
+  brandCanal = null,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -106,8 +117,10 @@ export function PortalNavbar({
     useNavbarContext()
   const { override: brandOverride, escopoAtivo } = useNavbarBrandOverride()
   // Override cosmético (visão de canal): substitui só o slot esquerdo, sem
-  // afetar sessão/tenant ativo/permissões.
-  const brandTenant = brandOverride ?? tenant
+  // afetar sessão/tenant ativo/permissões. `brandCanal` cobre as rotas fora da
+  // Comunidade, onde nenhum override monta — e evita o flash do escudo do
+  // clube antes do chrome montar dentro dela.
+  const brandTenant = brandOverride ?? brandCanal ?? tenant
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
 
@@ -129,17 +142,24 @@ export function PortalNavbar({
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
 
   // CN: sem cadeado admin e sem módulos do canal (Carteirinha/Departamentos/
-  // Agenda/Sedes/Loja). Fonte de verdade = escopo do chrome da comunidade
-  // (mesmo resolver da marca); URL só como fallback.
+  // Agenda/Sedes/Loja). Dentro da Comunidade a fonte de verdade é o escopo do
+  // chrome (mesmo resolver da marca), com a URL como fallback até ele montar.
+  // Fora dela não existe `?escopo=`: vale o cookie já revalidado no layout —
+  // senão Agenda/Sedes/Loja voltavam à CN a cada clique da topbar.
   const naComunidade = pathname.startsWith('/portal/comunidade')
   const escopoParam = searchParams.get('escopo')
-  const emEscopoNacional =
-    escopoAtivo === 'nacional' ||
-    (escopoAtivo == null &&
-      naComunidade &&
-      (escopoParam === 'nacional' ||
-        (modoNacional && (escopoParam == null || escopoParam === ''))))
-  const mostrarCadeadoAdmin = hasAdminAreaAccess && !emEscopoNacional
+  const escopoDaUrl: EscopoComunidade | null =
+    escopoParam === 'nacional' || escopoParam === 'torcida' || escopoParam === 'unidade'
+      ? escopoParam
+      : null
+  const escopoEfetivo: EscopoComunidade | null =
+    (naComunidade ? (escopoAtivo ?? escopoDaUrl ?? escopoCanal) : escopoCanal) ??
+    (modoNacional ? 'nacional' : null)
+  const emEscopoNacional = escopoEfetivo === 'nacional'
+  // Cadeado segue só o escopo da Comunidade: fora dela (perfil, mensagens) o
+  // canal lido não pode esconder a porta do /admin de quem tem acesso.
+  const mostrarCadeadoAdmin =
+    hasAdminAreaAccess && !(naComunidade && emEscopoNacional)
 
   const ocultosNacional = temVinculoTorcida
     ? LINKS_OCULTOS_TORCEDOR_VINCULO
@@ -157,13 +177,20 @@ export function PortalNavbar({
     ? linksComDepto.filter((link) => !LINKS_REATIVOS_CANAL.has(link.href))
     : linksComDepto
 
-  // Abaixo de xl: ícones de Loja/Sedes/Agenda na faixa de ações (só quando
-  // o canal está ativo — some junto com os labels na CN).
-  const atalhosTopbarMobile = links.filter((link) =>
-    link.href === '/portal/eventos' ||
-    link.href === '/portal/sedes' ||
-    link.href === '/portal/loja',
-  )
+  // Abaixo de xl a faixa de ações fica só com Mensagens, notificações e o
+  // cadeado do admin: os módulos (Agenda/Sedes/Loja/…) já aparecem inteiros no
+  // menu hambúrguer, e repetir cada um como ícone poluía a topbar no celular.
+
+  // Volta para a Comunidade na aba que a pessoa estava lendo. Sem o param, o
+  // resolver cai no default do modo (CN para torcedor) e a ida a Agenda/Loja
+  // viraria uma troca silenciosa de canal.
+  const hrefComunidade = escopoEfetivo
+    ? `/portal/comunidade?escopo=${escopoEfetivo}`
+    : '/portal/comunidade'
+
+  function hrefDoLink(href: string) {
+    return href === '/portal/comunidade' ? hrefComunidade : href
+  }
 
   function isActive(href: string) {
     return pathname.startsWith(href)
@@ -199,7 +226,7 @@ export function PortalNavbar({
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
         <div className="app-container flex h-14 items-center gap-2 sm:gap-4">
 
-          <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
+          <PortalNavLink href={hrefComunidade} className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
               <LogoMiniatura
                 src={brandTenant.logoUrl}
@@ -227,7 +254,7 @@ export function PortalNavbar({
               return (
                 <PortalNavLink
                   key={link.href}
-                  href={link.href}
+                  href={hrefDoLink(link.href)}
                   prefetch={link.prefetch}
                   className={linkClass(active)}
                 >
@@ -238,31 +265,7 @@ export function PortalNavbar({
             })}
           </nav>
 
-          {/* gap menor no base: com 3 atalhos + mensagens + sino + cadeado, a
-              faixa de ações estourava a viewport em 320px (iPhone SE). */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {atalhosTopbarMobile.map((link) => {
-              const Icon = link.icon
-              const active = isActive(link.href)
-              return (
-                <PortalNavLink
-                  key={link.href}
-                  href={link.href}
-                  prefetch={link.prefetch}
-                  aria-label={link.label}
-                  title={link.label}
-                  className={[
-                    'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors xl:hidden',
-                    active
-                      ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-                  ].join(' ')}
-                  showSpinner={false}
-                >
-                  <Icon className="h-4 w-4" />
-                </PortalNavLink>
-              )
-            })}
             <PortalNavLink
               href="/portal/mensagens"
               prefetch="hover"
@@ -423,7 +426,7 @@ export function PortalNavbar({
                 return (
                   <PortalNavLink
                     key={link.href}
-                    href={link.href}
+                    href={hrefDoLink(link.href)}
                     prefetch={link.prefetch}
                     onClick={() => setMenuOpen(false)}
                     className={mobileLinkClass(active)}
