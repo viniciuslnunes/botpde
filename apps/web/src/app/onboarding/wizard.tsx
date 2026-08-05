@@ -144,6 +144,11 @@ export function OnboardingWizard({
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>('escolha')
+  /**
+   * EXISTENTE = já tem nº/carteirinha; NOVO = primeira associação.
+   * Fica null quando o passo Unidade pula direto para `modo=socio` (sem
+   * reoferecer «torcedor») — aí o PassoVinculo exige a escolha antes do form.
+   */
   const [caminhoSocio, setCaminhoSocio] = useState<'EXISTENTE' | 'NOVO' | null>(null)
 
   // Seleções acumuladas
@@ -242,6 +247,7 @@ export function OnboardingWizard({
         const saved = JSON.parse(raw) as Partial<{
           passo: Passo
           vinculoModo: 'escolha' | 'socio'
+          caminhoSocio: 'EXISTENTE' | 'NOVO' | null
           clube: AfiliacaoOnboarding | null
           uf: string
           cidade: string
@@ -271,6 +277,9 @@ export function OnboardingWizard({
         if (saved.torcida) setTorcida(saved.torcida)
         if (typeof saved.unidadeId === 'string' || saved.unidadeId === null) setUnidadeId(saved.unidadeId ?? null)
         if (typeof saved.unidadeNaoListada === 'boolean') setUnidadeNaoListada(saved.unidadeNaoListada)
+        if (saved.caminhoSocio === 'EXISTENTE' || saved.caminhoSocio === 'NOVO') {
+          setCaminhoSocio(saved.caminhoSocio)
+        }
         if (initialPasso === 'vinculo') setVinculoModo(initialVinculoModo)
         setPasso(initialPasso)
       }
@@ -321,6 +330,7 @@ export function OnboardingWizard({
       const draft = {
         passo,
         vinculoModo: passo === 'vinculo' ? vinculoModo : undefined,
+        caminhoSocio: passo === 'vinculo' ? caminhoSocio : undefined,
         clube,
         uf,
         cidade,
@@ -339,7 +349,7 @@ export function OnboardingWizard({
       // Flush ao desmontar (voltar/refresh) para não perder seleções recentes.
       saveDraft()
     }
-  }, [wizardDraftRestored, wizardDraftKey, passo, vinculoModo, clube, uf, cidade, torcida, unidadeId, unidadeNaoListada])
+  }, [wizardDraftRestored, wizardDraftKey, passo, vinculoModo, caminhoSocio, clube, uf, cidade, torcida, unidadeId, unidadeNaoListada])
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
 
@@ -413,6 +423,12 @@ export function OnboardingWizard({
 
   function abrirModoSocio(caminho: 'EXISTENTE' | 'NOVO') {
     setCaminhoSocio(caminho)
+    // Unidade → vínculo já entra em modo=socio sem caminho; aí só falta
+    // EXISTENTE/NOVO. Não empilha outro histórico na mesma URL.
+    if (passo === 'vinculo' && vinculoModo === 'socio') {
+      setErro(null)
+      return
+    }
     avancarPara('vinculo', 'socio')
   }
 
@@ -2069,6 +2085,8 @@ function PassoVinculo({
         complemento: string
         numeroAssociado: string
         anosSocio: string
+        dataExpedicaoCarteirinha: string
+        periodicidadePretendida: string
         departamentoId: string
         departamentoSedeId: string
         imagemProva?: string
@@ -2102,6 +2120,10 @@ function PassoVinculo({
       if (typeof saved.complemento === 'string') setComplemento(saved.complemento)
       if (typeof saved.numeroAssociado === 'string') setNumeroAssociado(saved.numeroAssociado)
       if (typeof saved.anosSocio === 'string') setAnosSocio(saved.anosSocio)
+      if (typeof saved.dataExpedicaoCarteirinha === 'string')
+        setDataExpedicaoCarteirinha(saved.dataExpedicaoCarteirinha)
+      if (typeof saved.periodicidadePretendida === 'string')
+        setPeriodicidadePretendida(saved.periodicidadePretendida)
       if (typeof saved.departamentoId === 'string') setDepartamentoId(saved.departamentoId)
       if (typeof saved.departamentoSedeId === 'string')
         setDepartamentoSedeId(saved.departamentoSedeId)
@@ -2178,6 +2200,8 @@ function PassoVinculo({
         complemento,
         numeroAssociado,
         anosSocio,
+        dataExpedicaoCarteirinha,
+        periodicidadePretendida,
         departamentoId,
         departamentoSedeId,
         imagemProva,
@@ -2223,6 +2247,8 @@ function PassoVinculo({
     complemento,
     numeroAssociado,
     anosSocio,
+    dataExpedicaoCarteirinha,
+    periodicidadePretendida,
     departamentoId,
     departamentoSedeId,
     imagemProva,
@@ -2478,6 +2504,10 @@ function PassoVinculo({
   const abaAnterior = indiceAbaAtiva > 0 ? TABS_FORMULARIO_SOCIO[indiceAbaAtiva - 1] : undefined
   const abaSeguinte = TABS_FORMULARIO_SOCIO[indiceAbaAtiva + 1]
   const formularioCompleto = abasPendentes.length === 0
+  const errosAbaAtiva = filtrarErrosDaAba(errosValidacao, tabAtiva)
+  const pendenciasAbaAtiva = Object.values(errosAbaAtiva)
+    .flat()
+    .filter(Boolean)
 
   function irParaAba(tab: TabFormularioSocio) {
     onErro(null)
@@ -2504,18 +2534,22 @@ function PassoVinculo({
   }
 
   const conteudo =
-    modo === 'escolha' ? (
+    modo === 'escolha' || (modo === 'socio' && !caminhoSocio) ? (
       <div>
         <BotaoVoltar onClick={onVoltar} disabled={pending} />
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))] text-balance">
-          Como você participa da {torcida.nome}?
+          {modo === 'socio'
+            ? `Como é o seu vínculo com a ${torcida.nome}?`
+            : `Como você participa da ${torcida.nome}?`}
         </h1>
         <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
-          {canalRestrito
-            ? `Escolha um dos dois caminhos. Com o canal restrito, sua comunidade fica na ${torcida.nome}.`
-            : torcidaMae
-              ? `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube}, na da ${nomeOrganizada} e na da ${torcida.nome}.`
-              : `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube} e na da ${torcida.nome}.`}
+          {modo === 'socio'
+            ? 'Escolha se você já é sócio ou quer se associar pela primeira vez. Isso define os dados e documentos da ficha.'
+            : canalRestrito
+              ? `Escolha um dos dois caminhos. Com o canal restrito, sua comunidade fica na ${torcida.nome}.`
+              : torcidaMae
+                ? `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube}, na da ${nomeOrganizada} e na da ${torcida.nome}.`
+                : `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube} e na da ${torcida.nome}.`}
         </p>
 
         {!torcida.acessivelNoHost && (
@@ -2532,8 +2566,14 @@ function PassoVinculo({
           className="mt-4"
         />
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {/* Card 1: Torcedor da torcida */}
+        <div
+          className={`mt-6 grid gap-4 ${
+            modo === 'socio' ? 'lg:grid-cols-2' : 'lg:grid-cols-3'
+          }`}
+        >
+          {/* Card 1: Torcedor da torcida — só na escolha completa (não quando
+              o passo Unidade já decidiu que o caminho é de sócio). */}
+          {modo === 'escolha' ? (
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
@@ -2622,6 +2662,7 @@ function PassoVinculo({
               </span>
             </div>
           </button>
+          ) : null}
 
           {/* Card 2: Já sou sócio */}
           <button
@@ -3453,7 +3494,7 @@ function PassoVinculo({
           {abaSeguinte ? (
             <BotaoPrimario
               onClick={avancarAba}
-              disabled={!abasCompletas.has(tabAtiva)}
+              disabled={pending}
               label={`Próximo: ${abaSeguinte.label}`}
             />
           ) : (
@@ -3465,9 +3506,12 @@ function PassoVinculo({
             />
           )}
         </div>
-        {!abasCompletas.has(tabAtiva) ? (
+        {pendenciasAbaAtiva.length > 0 ? (
           <p className="text-right text-xs text-[rgb(var(--foreground-muted))]">
-            Preencha os campos obrigatórios desta aba para continuar.
+            {pendenciasAbaAtiva[0]}
+            {pendenciasAbaAtiva.length > 1
+              ? ` (+${pendenciasAbaAtiva.length - 1})`
+              : ''}
           </p>
         ) : !abaSeguinte && !formularioCompleto ? (
           <p className="text-right text-xs text-[rgb(var(--foreground-muted))]">
