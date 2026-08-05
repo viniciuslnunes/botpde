@@ -6,6 +6,7 @@ import type { Prisma } from '@torcida/db'
 import { tenantsPermitidosLoja } from '@/lib/loja-lojas'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { randomUUID } from 'node:crypto'
 import {
   CarrinhoItemSchema,
@@ -175,6 +176,11 @@ export async function finalizarPedido(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  // Destino pós-sucesso: `redirect()` fora do try/catch (NEXT_REDIRECT não pode
+  // virar `{ error }`). Sem isto, o revalidate re-renderiza o checkout com
+  // sacola vazia e a page RSC manda para /portal/loja/sacola antes do cliente.
+  let redirectTo: string | null = null
+
   try {
     const { userId } = await assertAuth()
 
@@ -383,7 +389,7 @@ export async function finalizarPedido(
     }
 
     // Um ticket → conversa do pedido; vários (multi-loja) ou falha → lista.
-    const redirectTo =
+    redirectTo =
       ticketConversaIds.length === 1
         ? `/portal/mensagens?c=${ticketConversaIds[0]}`
         : '/portal/loja/pedidos'
@@ -392,10 +398,11 @@ export async function finalizarPedido(
     revalidatePath('/portal/loja/sacola')
     revalidatePath('/portal/loja/pedidos')
     revalidatePath('/portal/mensagens')
-    return { success: true, pedidoIds, grupoCheckoutId, ticketConversaIds, redirectTo }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao finalizar pedido.' }
   }
+
+  redirect(redirectTo ?? '/portal/loja/pedidos')
 }
 
 /** @deprecated Use adicionarAoCarrinho + finalizarPedido */

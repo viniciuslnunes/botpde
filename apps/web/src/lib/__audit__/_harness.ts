@@ -74,9 +74,16 @@ export function criarColetor(): Coletor {
 
 export type Resultado<T> = { ok: true; valor: T } | { ok: false; erro: string }
 
+function isRedirectError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const digest = (error as { digest?: string }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
+
 /**
  * Executa e devolve o erro em vez de propagar. O padrão das actions varia:
  * umas lançam, outras devolvem `{ error }` — as duas formas viram `ok: false`.
+ * `redirect()` do Next (digest NEXT_REDIRECT) conta como sucesso.
  */
 export async function tentativa<T>(fn: () => Promise<T>): Promise<Resultado<T>> {
   try {
@@ -88,6 +95,7 @@ export async function tentativa<T>(fn: () => Promise<T>): Promise<Resultado<T>> 
     }
     return { ok: true, valor }
   } catch (e) {
+    if (isRedirectError(e)) return { ok: true, valor: undefined as T }
     return { ok: false, erro: e instanceof Error ? e.message : String(e) }
   }
 }

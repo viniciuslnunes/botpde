@@ -1,13 +1,11 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useActionState, useMemo, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { finalizarPedido } from '../actions'
-import { ArrowRight, CheckCircle2, Store } from 'lucide-react'
+import { ArrowRight, Store } from 'lucide-react'
 import { rotuloTamanho } from '@torcida/types'
 import type { CheckoutItemSerializado } from '@/lib/loja-serialize'
-import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
@@ -32,15 +30,9 @@ export function CheckoutForm({
   cuponsDisponiveis: CupomDisponivel[]
   lojas: CheckoutLojaMeta[]
 }) {
-  const router = useRouter()
   const [state, action, pending] = useActionState(finalizarPedido, {})
   const [modalidade, setModalidade] = useState<'RETIRADA' | 'ENVIO'>('RETIRADA')
   const [cupom, setCupom] = useState('')
-
-  useEffect(() => {
-    if (!state.success || !state.redirectTo) return
-    router.replace(state.redirectTo)
-  }, [state.success, state.redirectTo, router])
 
   const nomes = useMemo(() => new Map(lojas.map((l) => [l.tenantId, l.nome])), [lojas])
 
@@ -73,42 +65,22 @@ export function CheckoutForm({
   useUnsavedChanges({
     id: 'checkout-form',
     title: 'Checkout',
-    isDirty: !state.success && checkoutChanges.length > 0,
+    isDirty: checkoutChanges.length > 0,
     changes: checkoutChanges,
   })
 
   return (
-    <AnimatePresence mode="wait">
-      {state.success ? (
-        <div className="space-y-6">
-          <LojaCheckoutStepper atual="pedido" lojasCount={grupos.length} />
-          <MotionSuccessPanel
-            key="success"
-            icon={<CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-[rgb(var(--color-primary-fg))]" />}
-            title={grupos.length > 1 ? 'Pedidos realizados!' : 'Pedido realizado!'}
-            description={
-              state.ticketConversaIds?.length === 1
-                ? 'Abrindo a conversa do pedido…'
-                : grupos.length > 1
-                  ? `Abrimos ${grupos.length} pedidos (um por loja). Levando você aos seus pedidos…`
-                  : 'Levando você ao atendimento do pedido…'
-            }
-            className="border border-[rgb(var(--border))] bg-[rgb(var(--color-primary)_/_0.06)] p-8 text-center"
-          />
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <LojaCheckoutStepper atual="checkout" lojasCount={grupos.length} />
+    <div className="space-y-6">
+      <LojaCheckoutStepper atual="checkout" lojasCount={grupos.length} />
 
-          <m.form
-            key="form"
-            action={action}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={springSnappy}
-            className="grid gap-8 lg:grid-cols-2"
-          >
+      <m.form
+        key="form"
+        action={action}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSnappy}
+        className="grid gap-8 lg:grid-cols-2"
+      >
             <div className="space-y-6">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[rgb(var(--foreground-muted))]">
@@ -326,9 +298,7 @@ export function CheckoutForm({
                 Pagamento combinado após confirmação
               </p>
             </m.div>
-          </m.form>
-        </div>
-      )}
-    </AnimatePresence>
+      </m.form>
+    </div>
   )
 }

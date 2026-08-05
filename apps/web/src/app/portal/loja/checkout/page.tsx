@@ -24,7 +24,50 @@ export default async function CheckoutPage() {
     include: { produto: { select: { nome: true, preco: true, tenantId: true } } },
   })
 
-  if (rows.length === 0) redirect('/portal/loja/sacola')
+  // Não redirecionar sacola vazia → /sacola: após finalizarPedido a sacola é
+  // limpa e o revalidate re-renderiza esta page; um redirect aqui roubava a
+  // navegação para o ticket. Estado vazio fica na própria tela.
+  if (rows.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/portal/loja"
+          className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Ir à loja
+        </Link>
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[rgb(var(--foreground-muted))]">
+            [ Fluxo de compra ]
+          </p>
+          <h1 className="mt-1 text-2xl font-black uppercase tracking-tight sm:text-3xl">
+            Finalizar pedido
+          </h1>
+        </div>
+        <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-6 py-12 text-center">
+          <p className="font-medium">Sua sacola está vazia</p>
+          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            Adicione produtos na loja ou abra um pedido já feito.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/portal/loja"
+              className="inline-flex bg-[rgb(var(--primary))] px-5 py-2.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
+            >
+              Ir à loja
+            </Link>
+            <Link
+              href="/portal/loja/pedidos"
+              className="inline-flex border border-[rgb(var(--border))] px-5 py-2.5 text-sm font-medium hover:border-[rgb(var(--primary))]"
+            >
+              Meus pedidos
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const itens: CheckoutItemSerializado[] = rows.map(toCheckoutItem)
   const subtotal = itens.reduce((acc, i) => acc + i.produto.preco * i.quantidade, 0)

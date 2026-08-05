@@ -109,6 +109,11 @@ async function tentativa<T>(fn: () => Promise<T>): Promise<{ ok: true; valor: T 
     }
     return { ok: true, valor }
   } catch (e) {
+    // finalizarPedido (e outras) usam redirect() no sucesso — digest NEXT_REDIRECT.
+    if (e && typeof e === 'object' && typeof (e as { digest?: string }).digest === 'string') {
+      const digest = (e as { digest: string }).digest
+      if (digest.startsWith('NEXT_REDIRECT')) return { ok: true, valor: undefined as T }
+    }
     return { ok: false, erro: e instanceof Error ? e.message : String(e) }
   }
 }
