@@ -1,11 +1,14 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
-import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
-import { podeVerFeedSocios } from '@/lib/feed'
+import {
+  getCanalPorId,
+  getPostsDoCanal,
+  podePublicarNoCanal,
+  resolverChromeCanalMural,
+} from '@/lib/canais'
+import { getPostIdsSalvos, podeVerFeedSocios } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { calculateEffectivePermissions } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
@@ -17,9 +20,15 @@ import {
   carregarCanaisAbertosOperador,
   lerSlugsCanaisAbertosOperador,
 } from '@/lib/operador-canais-abertos'
+import { getComposerContext } from '../../_components/composer-context'
 import { ComunidadeFeedShell } from '../../_components/comunidade-feed-shell'
-import { CanalFeedView } from './canal-feed-view'
+import {
+  CanalSoftMuralHost,
+  CanalSoftSwitchProvider,
+  type CanalSoftSwitchSeed,
+} from '../../_components/canal-soft-switch'
 import type { Metadata } from 'next'
+import { db } from '@torcida/db'
 
 export const metadata: Metadata = { title: 'Canal — Comunidade' }
 
@@ -45,33 +54,35 @@ export default async function CanalDetalhePage({
   if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')
 
   const viewerTenantId = torcidaReal.id
-  const { rolePermissions, overrides } = await getUserPermissionsInTenant(
-    session.user.id,
-    viewerTenantId,
-  )
-  const permissoes = calculateEffectivePermissions(rolePermissions, overrides)
+  const superAdmin = isSuperAdminEmail(session.user.email)
 
-  const canal = await getCanalPorId(id, viewerTenantId, session.user.id)
+  const [permsRaw, canal, idsTematicos, slugsOperador] = await Promise.all([
+    getUserPermissionsInTenant(session.user.id, viewerTenantId),
+    getCanalPorId(id, viewerTenantId, session.user.id),
+    superAdmin ? Promise.resolve([] as string[]) : lerIdsCanaisAbertosSocio(),
+    superAdmin ? lerSlugsCanaisAbertosOperador() : Promise.resolve([] as string[]),
+  ])
   if (!canal) notFound()
 
-  const superAdmin = isSuperAdminEmail(session.user.email)
-  const [podePublicar, ehSocio, canaisTematicosAbertos, canaisAbertos] = await Promise.all([
-    podePublicarNoCanal(canal, viewerTenantId, permissoes),
-    podeVerFeedSocios(session.user.id, viewerTenantId),
-    superAdmin
-      ? Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>)
-      : carregarCanaisAbertosSocio(
-          await lerIdsCanaisAbertosSocio(),
-          session.user.id,
-          viewerTenantId,
-        ),
-    superAdmin
-      ? carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
-      : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
-  ])
+  const permissoes = calculateEffectivePermissions(permsRaw.rolePermissions, permsRaw.overrides)
 
-  // Garante o canal atual na lista se ainda não estava no cookie (RSC)
-  // — o client também chama registrar no mount.
+  const [podePublicarGate, ehSocio, canaisTematicosAbertos, canaisAbertos, chromeFlags, composerCtx, tenantRow] =
+    await Promise.all([
+      podePublicarNoCanal(canal, viewerTenantId, permissoes),
+      podeVerFeedSocios(session.user.id, viewerTenantId),
+      superAdmin
+        ? Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>)
+        : carregarCanaisAbertosSocio(idsTematicos, session.user.id, viewerTenantId),
+      superAdmin
+        ? carregarCanaisAbertosOperador(slugsOperador)
+        : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
+      resolverChromeCanalMural(canal, viewerTenantId, permissoes),
+      getComposerContext(viewerTenantId, session.user.id, session.user.name ?? null),
+      db.tenant.findUnique({ where: { id: viewerTenantId }, select: { nome: true } }),
+    ])
+
+  const podePublicar = ehSocio && podePublicarGate
+
   const tematicosNaBarra =
     !superAdmin && !canal.canalOficial
       ? (() => {
@@ -99,56 +110,68 @@ export default async function CanalDetalhePage({
   const slugTorcida = torcidaReal.slug ?? null
   const slugUnidade = ctx.unidade?.tenantSlug ?? null
 
+  const [feed, salvoIds] = canal.souMembro
+    ? await Promise.all([
+        getPostsDoCanal(canal.id, viewerTenantId, session.user.id, {
+          cursor,
+          take: 20,
+          incluirFeedInterno: canal.canalOficial,
+          viewerTenantId,
+        }),
+        getPostIdsSalvos(session.user.id, viewerTenantId),
+      ])
+    : [
+        { posts: [], pageInfo: { hasMore: false, nextCursor: null as string | null } },
+        new Set<string>(),
+      ]
+
+  const softSeed: CanalSoftSwitchSeed = {
+    chrome: {
+      canal,
+      podePublicar,
+      podeCompartilhar: ehSocio,
+      ...chromeFlags,
+    },
+    currentUser,
+    viewerTenantId,
+    tenantNome: tenantRow?.nome ?? torcidaReal.nome,
+    composerNome: composerCtx.nome,
+    composerPerfilPrivado: composerCtx.perfilPrivado,
+    salvoIds: [...salvoIds],
+    initialPosts: feed.posts,
+    initialPageInfo: feed.pageInfo,
+    seedCanalId: canal.id,
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <ComunidadeFeedShell
-        tenant={{
-          id: viewerTenantId,
-          nome: torcidaReal.nome,
-          afiliacaoId: torcidaReal.afiliacaoId,
-          balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
-        }}
-        currentUser={currentUser}
-        filtro="canal"
-        escopo="torcida"
-        escopos={ctx.escopos}
-        nomeUnidade={ctx.unidade?.nome ?? null}
-        logoUnidade={ctx.unidade?.logoUrl ?? null}
-        modoContexto={ctx.modo}
-        afiliacao={ctx.afiliacao}
-        torcidaReal={torcidaReal}
-        slugTorcida={slugTorcida}
-        slugUnidade={slugUnidade}
-        atualSlug={atualSlug}
-        superAdmin={superAdmin}
-        canaisAbertos={canaisAbertos}
-        canaisTematicosAbertos={tematicosNaBarra}
-        canalAtivoId={!canal.canalOficial ? canal.id : null}
-        renderConteudoCanal={({ busca }) => (
-          <div className="space-y-4">
-            <Link
-              href="/portal/comunidade/canais"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar aos canais
-            </Link>
-            <CanalFeedView
-              canal={canal}
-              currentUser={currentUser}
-              // Spec: publicar no canal = sócio (`podeVerFeedSocios`) ∧
-              // `podePublicarNoCanal`. Sem o `|| !somenteAdminPublica` — ele
-              // liberava torcedor/cross-tenant quando o gate já tinha barrado.
-              podePublicar={ehSocio && podePublicar}
-              cursor={cursor}
-              viewerTenantId={viewerTenantId}
-              permissoes={permissoes}
-              podeCompartilhar={ehSocio}
-              buscaChrome={busca}
-            />
-          </div>
-        )}
-      />
-    </div>
+    <CanalSoftSwitchProvider seed={softSeed}>
+      <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+        <ComunidadeFeedShell
+          tenant={{
+            id: viewerTenantId,
+            nome: torcidaReal.nome,
+            afiliacaoId: torcidaReal.afiliacaoId,
+            balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
+          }}
+          currentUser={currentUser}
+          filtro="canal"
+          escopo="torcida"
+          escopos={ctx.escopos}
+          nomeUnidade={ctx.unidade?.nome ?? null}
+          logoUnidade={ctx.unidade?.logoUrl ?? null}
+          modoContexto={ctx.modo}
+          afiliacao={ctx.afiliacao}
+          torcidaReal={torcidaReal}
+          slugTorcida={slugTorcida}
+          slugUnidade={slugUnidade}
+          atualSlug={atualSlug}
+          superAdmin={superAdmin}
+          canaisAbertos={canaisAbertos}
+          canaisTematicosAbertos={tematicosNaBarra}
+          canalAtivoId={!canal.canalOficial ? canal.id : null}
+          renderConteudoCanal={({ busca }) => <CanalSoftMuralHost buscaChrome={busca} />}
+        />
+      </div>
+    </CanalSoftSwitchProvider>
   )
 }

@@ -30,6 +30,7 @@ import {
   slugsHierarquiaFixos,
 } from '@/lib/operador-canais-ordem'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
+import { useCanalSoftSwitch } from './canal-soft-switch'
 
 export type CanalAbertoOperadorTab = {
   slug: string
@@ -122,6 +123,8 @@ export function ComunidadeEscopoTabs({
   canaisTematicosAbertos = [],
   canalAtivoId = null,
 }: Props) {
+  const softSwitch = useCanalSoftSwitch()
+  const canalAtivoEfetivo = softSwitch?.canalAtivoId ?? canalAtivoId
   const params = useSearchParams()
   const [state, action, pending] = useActionState<TrocarTorcidaState, FormData>(
     trocarTorcidaAction,
@@ -189,11 +192,11 @@ export function ComunidadeEscopoTabs({
     void registrarCanalAbertoAction(atualSlug)
   }, [superAdmin, atualSlug])
 
-  // Visita a temático: registra no cookie (só sócio).
+  // Visita a temático: registra no cookie (só sócio). Soft-switch também registra.
   useEffect(() => {
-    if (superAdmin || !canalAtivoId) return
-    void registrarCanalTematicoAbertoAction(canalAtivoId)
-  }, [superAdmin, canalAtivoId])
+    if (superAdmin || !canalAtivoEfetivo) return
+    void registrarCanalTematicoAbertoAction(canalAtivoEfetivo)
+  }, [superAdmin, canalAtivoEfetivo])
 
   /** Prefixo hierárquico do operador (após Nacional) — não fecha nem arrasta. */
   const slugsFixosOperador = useMemo(
@@ -503,7 +506,7 @@ export function ComunidadeEscopoTabs({
       {tabs.map((tab) => {
         const ehTematico = Boolean(tab.canalId)
         const ativoPorEscopo =
-          !canalAtivoId &&
+          !canalAtivoEfetivo &&
           tab.escopo === escopoAtivo &&
           (tab.slugAlvo == null ||
             atualSlug == null ||
@@ -513,9 +516,9 @@ export function ComunidadeEscopoTabs({
               atualSlug === slugTorcida) ||
             (tab.escopo === 'unidade' && tab.slugAlvo === slugUnidade))
         const ativo = ehTematico
-          ? canalAtivoId != null && tab.canalId === canalAtivoId
+          ? canalAtivoEfetivo != null && tab.canalId === canalAtivoEfetivo
           : tab.escopo === 'nacional'
-            ? !canalAtivoId && escopoAtivo === 'nacional'
+            ? !canalAtivoEfetivo && escopoAtivo === 'nacional'
             : superAdmin
               ? atualSlug != null && tab.slugAlvo === atualSlug && escopoAtivo !== 'nacional'
               : ativoPorEscopo
@@ -620,7 +623,7 @@ export function ComunidadeEscopoTabs({
           ehTematico && tab.canalId ? (
             <form action={fecharTematicoAction} className="contents">
               <input type="hidden" name="canalId" value={tab.canalId} />
-              <input type="hidden" name="canalAtivoId" value={canalAtivoId ?? ''} />
+              <input type="hidden" name="canalAtivoId" value={canalAtivoEfetivo ?? ''} />
               <m.button
                 type="submit"
                 disabled={busy || Boolean(draggingKey)}
@@ -725,9 +728,24 @@ export function ComunidadeEscopoTabs({
                 aria-label={tab.nome}
                 className={className}
                 style={tabBtnStyle}
+                onMouseEnter={() => {
+                  if (ehTematico && tab.canalId && softSwitch?.enabled) {
+                    softSwitch.prefetchCanal(tab.canalId)
+                  }
+                }}
+                onFocus={() => {
+                  if (ehTematico && tab.canalId && softSwitch?.enabled) {
+                    softSwitch.prefetchCanal(tab.canalId)
+                  }
+                }}
                 onClick={(e) => {
                   if (dragRef.current?.suppressClick || draggingKey) {
                     e.preventDefault()
+                    return
+                  }
+                  if (ehTematico && tab.canalId && softSwitch?.enabled) {
+                    e.preventDefault()
+                    softSwitch.softSwitchPara(tab.canalId)
                   }
                 }}
               >

@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { revalidateTag, unstable_cache } from 'next/cache'
 import { db, type Prisma } from '@torcida/db'
-import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeTorcida, SYSTEM_ROLES, COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
 import {
@@ -1058,7 +1058,7 @@ export const getSugestoesCanaisPublicosParaAside = cache(async function getSuges
     }))
 })
 
-export async function getCanalPorId(
+export const getCanalPorId = cache(async function getCanalPorId(
   conversaId: string,
   viewerTenantId: string,
   userId: string,
@@ -1070,7 +1070,7 @@ export async function getCanalPorId(
   if (!podeVer) return null
 
   return projetarCanalItem(row)
-}
+})
 
 /**
  * Canal oficial da unidade em que a pessoa tem vínculo APROVADO — a aba
@@ -1167,7 +1167,10 @@ export async function getCanalSeMembroAtivo(
 
 type CanalRow = NonNullable<Awaited<ReturnType<typeof carregarCanalRow>>>
 
-async function carregarCanalRow(conversaId: string, userId: string) {
+const carregarCanalRow = cache(async function carregarCanalRow(
+  conversaId: string,
+  userId: string,
+) {
   return db.conversa.findFirst({
     where: { id: conversaId, tipo: 'CANAL' },
     select: {
@@ -1191,7 +1194,7 @@ async function carregarCanalRow(conversaId: string, userId: string) {
       },
     },
   })
-}
+})
 
 async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
   const fallbackAvatars =
@@ -1432,6 +1435,52 @@ export async function listPedidosCanal(
     avatarUrl: row.user.avatarUrl,
     pedidoEm: row.entrouEm.toISOString(),
   }))
+}
+
+/** Contagem barata para badge do menu — evita `listPedidosCanal` no SSR do mural. */
+export async function countPedidosPendentesCanal(conversaId: string): Promise<number> {
+  return db.membroConversa.count({
+    where: { conversaId, status: 'PENDENTE', saiuEm: null },
+  })
+}
+
+/**
+ * Flags + cor + badge do mural — barato o bastante para soft-switch e SSR.
+ * Sem listas de membros/pedidos (lazy no modal).
+ */
+export async function resolverChromeCanalMural(
+  canal: CanalItem,
+  viewerTenantId: string,
+  permissoes: string[],
+  opts?: { leituraOperador?: boolean },
+): Promise<{
+  podeGerenciarAdmins: boolean
+  podeGerenciarMembros: boolean
+  podeGerenciarPedidos: boolean
+  pedidosPendentesCount: number
+  corPrimaria: string
+}> {
+  const leituraOperador = opts?.leituraOperador ?? false
+  const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial && !leituraOperador
+  const podeGerenciarMembros =
+    !leituraOperador && (await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes))
+  const podeGerenciarPedidos = podeGerenciarMembros && !canal.publica
+
+  const [tenant, pedidosPendentesCount]: [
+    { corPrimaria: string | null } | null,
+    number,
+  ] = await Promise.all([
+    db.tenant.findUnique({ where: { id: canal.tenantId }, select: { corPrimaria: true } }),
+    podeGerenciarPedidos ? countPedidosPendentesCanal(canal.id) : Promise.resolve(0),
+  ])
+
+  return {
+    podeGerenciarAdmins,
+    podeGerenciarMembros,
+    podeGerenciarPedidos,
+    pedidosPendentesCount,
+    corPrimaria: tenant?.corPrimaria ?? COR_PRIMARIA_PLATAFORMA,
+  }
 }
 
 export async function listUnidadesVisiveis(

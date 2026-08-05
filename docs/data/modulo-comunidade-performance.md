@@ -269,6 +269,37 @@ Medir: `e2e/feed-nav-back.measure.ts` (`firstPostMs`, contagens de
 **Próximos quick wins (só após medir de novo):** uma assinatura SSE; defer do
 rail; cortar soft-refetch ~600 ms em posts só-texto.
 
+## Troca de canais (`/canais/[id]`) — 2026-08-05
+
+Cada troca ainda é navegação App Router (page RSC remonta), mas o critical
+path do mural deixou de esperar listas de gestão e o N+1 das abas abertas.
+
+| Técnica | Arquivo(s) | Efeito |
+|---------|------------|--------|
+| Listas membros/pedidos/candidatos só ao abrir modal | `canal-feed-view.tsx`, `canal-feed-composition.tsx`, `carregarPainel*Canal` | Shell + Suspense de posts sem 2–5 queries de admin |
+| Badge de pedidos via `count` barato | `countPedidosPendentesCanal` | Mantém contagem no menu sem `listPedidosCanal` no SSR |
+| Batch das abas temáticas do cookie | `carregarCanaisAbertosSocio` | 1 `findMany` + `podeVerCanal` paralelo (antes N× `getCanalPorId`) |
+| `React.cache` em `getCanalPorId` / `carregarCanalRow` | `canais.ts` | Dedupe no mesmo request |
+| Waterfall paralelo na page | `canais/[id]/page.tsx` | perms + canal + cookies juntos |
+| Prefetch on-hover cards da listagem | `canais-client.tsx` + `ComunidadePrefetchLink` | Aquece RSC antes do clique |
+
+### Soft-switch temático ↔ temático (2026-08-05)
+
+Enquanto já se está em `/portal/comunidade/canais/[id]`, clicar outra aba
+temática **não** remonta o RSC: `history.pushState` + swap de chrome/feed.
+
+| Técnica | Arquivo(s) | Efeito |
+|---------|------------|--------|
+| `CanalSoftSwitchProvider` + `CanalSoftMuralHost` | `canal-soft-switch.tsx`, `canais/[id]/page.tsx` | Shell montado; só banner/composer/posts trocam |
+| Clique interceptado nas escopo-tabs | `comunidade-escopo-tabs.tsx` | Sem `loading.tsx` / sem remount do rail |
+| `carregarCanalMuralAction` | `socio-canais-actions.ts` | Chrome (flags + cor) on-demand, authz no servidor |
+| Prefetch TanStack no hover da aba | `prefetchComunidadeFeedPage` | Cache quente antes do clique |
+| Prune do cookie em batch | `registrarCanalTematicoAbertoAction` | Sem N× `getCanalPorId` no register |
+| Loading frio só no painel central | `canais/[id]/loading.tsx` | Menos flash na 1ª entrada pela listagem |
+
+Abas oficiais (`?escopo=`) e operador (`trocarTorcidaAction`) continuam
+navegação/RSC completa. Deep-link / refresh ainda passam pelo RSC.
+
 ## Pós-deploy (obrigatório em produção)
 
 ```bash

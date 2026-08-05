@@ -56,7 +56,15 @@ import {
   podeVerCanal,
   linkCanalComunidade,
   linkUnidadeComunidade,
+  listMembrosCanal,
+  listCandidatosMembroCanal,
+  listPedidosCanal,
 } from '@/lib/canais'
+import type {
+  CandidatoMembroCanalItem,
+  MembroCanalItem,
+  PedidoCanalItem,
+} from '@/lib/canais-shared'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { listarDestinatariosPorPermissoes } from '@/lib/notificacoes-routing'
 import {
@@ -2983,6 +2991,67 @@ export async function publicarMomentoStory(
 async function permissoesEfetivas(userId: string, tenantId: string): Promise<string[]> {
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
   return calculateEffectivePermissions(rolePermissions, overrides)
+}
+
+/**
+ * Painel "Gerenciar membros" — lazy no client ao abrir o modal (fora do SSR
+ * do mural do canal).
+ */
+export async function carregarPainelMembrosCanal(conversaId: string): Promise<{
+  membros: MembroCanalItem[]
+  candidatos: CandidatoMembroCanalItem[]
+}> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) throw new ExpectedError('Canal não encontrado.')
+
+  const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+  const podeGerenciarMembros = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
+  const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial
+  if (!podeGerenciarMembros && !podeGerenciarAdmins) {
+    throw new ExpectedError('Sem permissão para gerenciar membros deste canal.')
+  }
+
+  const [membros, candidatos]: [MembroCanalItem[], CandidatoMembroCanalItem[]] = await Promise.all([
+    listMembrosCanal(canal.id),
+    podeGerenciarMembros
+      ? listCandidatosMembroCanal(canal.tenantId, canal.id)
+      : Promise.resolve([] as CandidatoMembroCanalItem[]),
+  ])
+  return { membros, candidatos }
+}
+
+/**
+ * Painel "Pedidos pendentes" — lazy no client ao abrir o modal.
+ */
+export async function carregarPainelPedidosCanal(conversaId: string): Promise<{
+  pedidos: PedidoCanalItem[]
+  recusados: PedidoCanalItem[]
+}> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) throw new ExpectedError('Canal não encontrado.')
+  if (canal.publica) throw new ExpectedError('Canal aberto não tem fila de pedidos.')
+
+  const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+  const pode = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
+  if (!pode) throw new ExpectedError('Sem permissão para decidir pedidos deste canal.')
+
+  const [pedidos, recusados]: [PedidoCanalItem[], PedidoCanalItem[]] = await Promise.all([
+    listPedidosCanal(canal.id, 'PENDENTE'),
+    listPedidosCanal(canal.id, 'REJEITADO'),
+  ])
+  return { pedidos, recusados }
 }
 
 /**

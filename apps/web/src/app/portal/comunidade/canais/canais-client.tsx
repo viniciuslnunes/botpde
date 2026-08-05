@@ -7,7 +7,6 @@ import {
   useState,
   useTransition,
 } from 'react'
-import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import {
   Crosshair,
@@ -24,6 +23,7 @@ import { formatNomeTorcida } from '@torcida/types'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { LogoImage } from '@/components/media/logo-image'
 import { Avatar } from '@/components/portal/avatar'
+import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
@@ -727,7 +727,7 @@ function CanalCard({
     >
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start gap-3">
-          <Link
+          <ComunidadePrefetchLink
             href={href}
             className="flex h-20 w-20 shrink-0 items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] sm:h-24 sm:w-24"
             aria-label={`Abrir canal ${canalNome}`}
@@ -743,7 +743,7 @@ function CanalCard({
             ) : (
               <Avatar nome={canalNome} avatarUrl={canal.avatarUrl} size="xl" fit="contain" />
             )}
-          </Link>
+          </ComunidadePrefetchLink>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1">
@@ -770,12 +770,12 @@ function CanalCard({
               ) : null}
             </div>
 
-            <Link
+            <ComunidadePrefetchLink
               href={href}
               className="mt-1.5 line-clamp-2 text-sm font-semibold uppercase leading-snug tracking-wide text-[rgb(var(--foreground))] text-balance hover:underline"
             >
               {canalNome}
-            </Link>
+            </ComunidadePrefetchLink>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[rgb(var(--foreground-muted))]">
               {tipoLabel ? <span>{tipoLabel}</span> : null}
@@ -820,12 +820,12 @@ function CanalCard({
           </div>
 
           {canal.souMembro ? (
-            <Link
+            <ComunidadePrefetchLink
               href={href}
               className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
             >
               Abrir canal
-            </Link>
+            </ComunidadePrefetchLink>
           ) : canal.publica ? (
             <m.button
               type="button"

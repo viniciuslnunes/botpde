@@ -1,10 +1,9 @@
 import { FeedComposerSkeleton, FeedPostSkeletonList, Skeleton } from '@/components/portal/feed-skeletons'
 
 /**
- * O detalhe do canal usa o shell de feed (rail esq. + cabeçalho + publicações).
- * O rail direito (20rem) já é reservado pelo `ComunidadeLayoutChrome` — não
- * repetir aqui. O `loading.tsx` de `canais` desenha a listagem e cobriria
- * esta rota filha sem este arquivo.
+ * Cold path (listagem → canal). Soft-switch temático ↔ temático não passa por
+ * aqui (`history.pushState`). Só o painel central — o rail esquerdo do shell
+ * já está no layout/chrome e o esqueleto de aside gerava flash desnecessário.
  */
 export default function CanalDetalheLoading() {
   return (
@@ -16,10 +15,7 @@ export default function CanalDetalheLoading() {
     >
       <span className="sr-only">Carregando o canal…</span>
 
-      <aside className="hidden space-y-4 lg:block">
-        <Skeleton className="h-20 rounded-2xl" />
-        <Skeleton className="h-32 rounded-2xl" soft />
-      </aside>
+      <aside className="hidden lg:block" aria-hidden />
 
       <div className="min-w-0 space-y-4">
         <Skeleton className="h-9 w-44 rounded-full" soft />

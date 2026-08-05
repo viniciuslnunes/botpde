@@ -70,6 +70,54 @@ async function fetchFeedPage<TPost>(params: {
   return (await res.json()) as ComunidadeFeedPage<TPost>
 }
 
+/** Prefetch da 1ª página — soft-switch / hover de aba temática. */
+export async function prefetchComunidadeFeedPage(params: {
+  queryClient: import('@tanstack/react-query').QueryClient
+  endpoint: string
+  tenantId: string
+  viewerId: string
+  filtro?: string
+  conversaId?: string
+  escopo?: EscopoComunidade
+  afiliacaoId?: string
+  take?: number
+}): Promise<void> {
+  const take = params.take ?? 20
+  const queryKey = comunidadeFeedQueryKey(
+    params.endpoint,
+    params.tenantId,
+    params.viewerId,
+    params.filtro,
+    params.conversaId,
+    params.escopo,
+    params.afiliacaoId,
+  )
+  const cached = params.queryClient.getQueryData(queryKey)
+  if (cached) return
+
+  await params.queryClient.prefetchInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      fetchFeedPage({
+        endpoint: params.endpoint,
+        cursor: (pageParam as string | null) ?? null,
+        take,
+        filtro: params.filtro,
+        conversaId: params.conversaId,
+        escopo: params.escopo,
+        afiliacaoId: params.afiliacaoId,
+        signal,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => {
+      if (!last.pageInfo.hasMore || !last.pageInfo.nextCursor) return undefined
+      return last.pageInfo.nextCursor
+    },
+    staleTime: 30_000,
+    gcTime: COMUNIDADE_FEED_GC_MS,
+  })
+}
+
 /**
  * Infinite scroll do feed/rede via TanStack Query (dedupe, cache, retry).
  * SSR pode seedar a 1ª página; cache quente no layout não é sobrescrito.

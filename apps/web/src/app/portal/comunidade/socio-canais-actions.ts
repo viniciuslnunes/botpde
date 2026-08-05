@@ -4,18 +4,74 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import {
   abrirCanalSocio,
+  carregarCanaisAbertosSocio,
   fecharCanalSocio,
   isCanalTematicoAtivo,
   lerIdsCanaisAbertosSocio,
   podarIdsOrfaosSocio,
   reordenarCanaisSocio,
 } from '@/lib/socio-canais-abertos'
-import { getCanalPorId } from '@/lib/canais'
+import {
+  getCanalPorId,
+  podePublicarNoCanal,
+  resolverChromeCanalMural,
+  type CanalItem,
+} from '@/lib/canais'
 import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { calculateEffectivePermissions } from '@torcida/types'
+import { podeVerFeedSocios } from '@/lib/feed'
+import { ExpectedError } from '@/lib/expected-error'
 
 export type FecharCanalTematicoState = {
   message?: string
+}
+
+export type CanalMuralChrome = {
+  canal: CanalItem
+  podePublicar: boolean
+  podeCompartilhar: boolean
+  podeGerenciarAdmins: boolean
+  podeGerenciarMembros: boolean
+  podeGerenciarPedidos: boolean
+  pedidosPendentesCount: number
+  corPrimaria: string
+}
+
+/**
+ * Chrome do mural para soft-switch (temático ↔ temático sem remount RSC).
+ * Sem listas de membros/pedidos — lazy nos modais.
+ */
+export async function carregarCanalMuralAction(conversaId: string): Promise<CanalMuralChrome> {
+  const session = await auth()
+  if (!session?.user?.id) throw new ExpectedError('Sessão expirada.')
+
+  const limpo = conversaId.trim()
+  if (!limpo) throw new ExpectedError('Canal inválido.')
+
+  const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
+  if (!tenant) throw new ExpectedError('Torcida não encontrada.')
+
+  const [canal, permsRaw, ehSocio] = await Promise.all([
+    getCanalPorId(limpo, tenant.id, session.user.id),
+    getUserPermissionsInTenant(session.user.id, tenant.id),
+    podeVerFeedSocios(session.user.id, tenant.id),
+  ])
+  if (!canal) throw new ExpectedError('Canal não encontrado.')
+
+  const permissoes = calculateEffectivePermissions(permsRaw.rolePermissions, permsRaw.overrides)
+  const [podePublicarGate, chrome] = await Promise.all([
+    podePublicarNoCanal(canal, tenant.id, permissoes),
+    resolverChromeCanalMural(canal, tenant.id, permissoes),
+  ])
+
+  return {
+    canal,
+    podePublicar: ehSocio && podePublicarGate,
+    podeCompartilhar: ehSocio,
+    ...chrome,
+  }
 }
 
 /**
@@ -38,14 +94,10 @@ export async function registrarCanalTematicoAbertoAction(canalId: string): Promi
 
   await abrirCanalSocio(canal.id)
 
-  // Limpa órfãos / oficiais do cookie (só em Server Action).
+  // Limpa órfãos / oficiais do cookie (batch — sem N× getCanalPorId).
   const ids = await lerIdsCanaisAbertosSocio()
-  const validos: string[] = []
-  for (const cid of ids) {
-    const c = await getCanalPorId(cid, tenant.id, session.user.id)
-    if (c && !c.canalOficial) validos.push(c.id)
-  }
-  await podarIdsOrfaosSocio(validos)
+  const validos = await carregarCanaisAbertosSocio(ids, session.user.id, tenant.id)
+  await podarIdsOrfaosSocio(validos.map((c) => c.id))
 }
 
 /**

@@ -9,7 +9,8 @@ import {
   abrirCanalNaOrdem,
   reordenarCanaisOperador as aplicarOrdemCanais,
 } from '@/lib/operador-canais-ordem'
-import { getCanalPorId } from '@/lib/canais'
+import { podeVerCanal } from '@/lib/canais'
+import type { VisibilidadeCanal } from '@/lib/canais-shared'
 
 /**
  * Canais temáticos que o sócio manteve abertos na barra da Comunidade.
@@ -96,6 +97,9 @@ export async function podarIdsOrfaosSocio(
  * Metadados dos temáticos abertos que o viewer ainda pode ver.
  * Oficiais e ids inacessíveis são omitidos da barra (não grava cookie aqui —
  * limpeza lazy em `registrarCanalTematicoAbertoAction`).
+ *
+ * Uma `findMany` + checks de visibilidade em paralelo — sem N× `getCanalPorId`
+ * (cada um trazia membership/sede completos desnecessários para a aba).
  */
 export async function carregarCanaisAbertosSocio(
   ids: string[],
@@ -104,18 +108,53 @@ export async function carregarCanaisAbertosSocio(
 ): Promise<CanalTematicoAberto[]> {
   if (ids.length === 0) return []
 
-  const out: CanalTematicoAberto[] = []
-
-  for (const id of ids) {
-    const canal = await getCanalPorId(id, viewerTenantId, userId)
-    if (!canal || canal.canalOficial) continue
-    out.push({
-      id: canal.id,
-      nome: canal.nome?.trim() || 'Canal',
-      avatarUrl: canal.avatarUrl,
-    })
+  type Row = {
+    id: string
+    nome: string | null
+    avatarUrl: string | null
+    tenantId: string
+    visibilidadeCanal: VisibilidadeCanal
   }
 
+  const rows: Row[] = await db.conversa.findMany({
+    where: {
+      id: { in: ids },
+      tipo: 'CANAL',
+      canalOficial: false,
+    },
+    select: {
+      id: true,
+      nome: true,
+      avatarUrl: true,
+      tenantId: true,
+      visibilidadeCanal: true,
+    },
+  })
+
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const ordered: Row[] = []
+  for (const id of ids) {
+    const row = byId.get(id)
+    if (row) ordered.push(row)
+  }
+  if (ordered.length === 0) return []
+
+  const visiveis: boolean[] = await Promise.all(
+    ordered.map((row) =>
+      podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId),
+    ),
+  )
+
+  const out: CanalTematicoAberto[] = []
+  for (let i = 0; i < ordered.length; i++) {
+    if (!visiveis[i]) continue
+    const row = ordered[i]!
+    out.push({
+      id: row.id,
+      nome: row.nome?.trim() || 'Canal',
+      avatarUrl: row.avatarUrl,
+    })
+  }
   return out
 }
 
