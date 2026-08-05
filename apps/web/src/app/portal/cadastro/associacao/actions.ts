@@ -167,9 +167,9 @@ export async function completarDadosAssociacao(
   let dataExpedicaoCarteirinha = membro.dataExpedicaoCarteirinha
   if (expRaw) {
     const exp = parseDataCompetencia(expRaw)
-    if (!exp) errors.dataExpedicaoCarteirinha = ['Data de expedição inválida.']
+    if (!exp) errors.dataExpedicaoCarteirinha = ['Data da última expedição inválida.']
     else if (exp.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
-      errors.dataExpedicaoCarteirinha = ['A data de expedição não pode ser no futuro.']
+      errors.dataExpedicaoCarteirinha = ['A data da última expedição não pode ser futura.']
     } else dataExpedicaoCarteirinha = exp
   }
 

@@ -22,6 +22,7 @@ import {
   TIPOS_PROJETO,
 } from '@torcida/types'
 import { useActionStateToast, isRedirectError } from '@/lib/toast-action'
+import { DatePicker } from '@/components/ui/date-picker'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { toast } from '@torcida/ui/services/toast'
 
@@ -679,25 +680,25 @@ function ProjetoForm({
           <label className={rotulo} htmlFor="inicio">
             Início
           </label>
-          <input
+          <DatePicker
             id="inicio"
             name="inicio"
-            type="date"
             required
             defaultValue={projeto?.inicioIso ?? ''}
-            className={campo}
+            aria-label="Início do projeto"
+            className="mt-1"
           />
         </div>
         <div>
           <label className={rotulo} htmlFor="fim">
             Término (vazio = contínuo)
           </label>
-          <input
+          <DatePicker
             id="fim"
             name="fim"
-            type="date"
             defaultValue={projeto?.fimIso ?? ''}
-            className={campo}
+            aria-label="Término do projeto"
+            className="mt-1"
           />
         </div>
         <label className="flex items-end gap-2 pb-1.5 text-xs text-[rgb(var(--foreground-muted))]">

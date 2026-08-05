@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react'
 import { TIPO_COBRANCA_LABEL, formatDataCompetenciaInput } from '@torcida/types'
 import { criarCobranca, type CobrancaActionState } from './actions'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useActionStateToast } from '@/lib/toast-action'
 
 const TIPOS = Object.keys(TIPO_COBRANCA_LABEL)
@@ -132,13 +133,14 @@ export function AdminCriarCobrancaForm({
 
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Vencimento
-          <input
-            name="vencimento"
-            type="date"
-            required
-            defaultValue={proximoMesISODate()}
-            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-          />
+          <div className="mt-1">
+            <DatePicker
+              name="vencimento"
+              required
+              defaultValue={proximoMesISODate()}
+              aria-label="Vencimento"
+            />
+          </div>
           <FieldError messages={state.errors?.vencimento} />
         </label>
       </div>

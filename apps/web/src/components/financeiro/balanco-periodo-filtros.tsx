@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   detectarPeriodoChip,
   hrefBalanco,
@@ -58,21 +59,23 @@ export function BalancoPeriodoFiltros({
       <form method="get" action="/portal/balanco" className="flex flex-wrap items-end gap-3">
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           De
-          <input
-            name="dataDe"
-            type="date"
-            defaultValue={values.dataDe ?? ''}
-            className="mt-1 block w-full min-w-[9.5rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          />
+          <div className="mt-1 block w-full min-w-[9.5rem]">
+            <DatePicker
+              name="dataDe"
+              defaultValue={values.dataDe ?? ''}
+              aria-label="Data inicial"
+            />
+          </div>
         </label>
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Até
-          <input
-            name="dataAte"
-            type="date"
-            defaultValue={values.dataAte ?? ''}
-            className="mt-1 block w-full min-w-[9.5rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          />
+          <div className="mt-1 block w-full min-w-[9.5rem]">
+            <DatePicker
+              name="dataAte"
+              defaultValue={values.dataAte ?? ''}
+              aria-label="Data final"
+            />
+          </div>
         </label>
         {unidades && unidades.length > 0 && (
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">

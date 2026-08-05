@@ -522,7 +522,7 @@ const solicitarVinculoSchema = z.object({
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['dataExpedicaoCarteirinha'],
-        message: 'Informe a data de expedição da carteirinha',
+        message: 'Informe a data da última expedição da carteirinha',
       })
     } else {
       const exp = parseDataCompetencia(data.dataExpedicaoCarteirinha)
@@ -530,7 +530,7 @@ const solicitarVinculoSchema = z.object({
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['dataExpedicaoCarteirinha'],
-          message: 'Data de expedição inválida',
+          message: 'A data da última expedição não pode ser futura',
         })
       }
     }

@@ -11,6 +11,7 @@ import {
   editarLancamentoFinanceiro,
   type LancamentoState,
 } from '@/app/admin/financeiro/actions'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useActionStateToast } from '@/lib/toast-action'
 
 const CATEGORIAS = Object.keys(CATEGORIA_FINANCEIRO_LABEL)
@@ -140,13 +141,14 @@ export function FinanceiroLancamentoForm({
 
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Data de competência
-          <input
-            name="data"
-            type="date"
-            required
-            defaultValue={initial?.data ?? hojeISODate()}
-            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          />
+          <div className="mt-1">
+            <DatePicker
+              name="data"
+              required
+              defaultValue={initial?.data ?? hojeISODate()}
+              aria-label="Data de competência"
+            />
+          </div>
           <FieldError messages={state.errors?.data} />
         </label>
       </div>

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   dayKeyInZone,
+  formatDateOnlyIso,
+  formatDateOnlyPt,
   formatMonthYear,
   formatTimeShort,
   formatWeekdayLong,
+  compareCalendarParts,
   parseDateOnly,
   startOfWeekMonday,
   startOfZonedDayUtc,
@@ -22,6 +25,26 @@ describe('format-datetime agenda helpers', () => {
 
   it('parseDateOnly não trata YYYY-MM-DD como UTC midnight', () => {
     expect(parseDateOnly('2026-07-18')).toEqual({ year: 2026, month: 7, day: 18 })
+  })
+
+  it('formatDateOnlyIso e formatDateOnlyPt são estáveis', () => {
+    expect(formatDateOnlyIso({ year: 2026, month: 7, day: 8 })).toBe('2026-07-08')
+    expect(formatDateOnlyPt('2026-07-08')).toBe('08/07/2026')
+  })
+
+  it('compareCalendarParts ordena dias civis', () => {
+    expect(
+      compareCalendarParts(
+        { year: 2026, month: 1, day: 1 },
+        { year: 2026, month: 8, day: 5 },
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareCalendarParts(
+        { year: 2026, month: 8, day: 5 },
+        { year: 2026, month: 8, day: 5 },
+      ),
+    ).toBe(0)
   })
 
   it('formatMonthYear e weekday são determinísticos', () => {

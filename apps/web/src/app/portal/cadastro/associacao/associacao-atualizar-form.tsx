@@ -19,6 +19,7 @@ import {
   validarRg,
 } from '@torcida/types'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
+import { DatePicker } from '@/components/ui/date-picker'
 import { CompletudeChecklist } from '@/components/portal/completude-checklist'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
@@ -659,15 +660,20 @@ export function AssociacaoAtualizarForm({
                     />
                   </div>
                   <div id="campo-nascimento">
-                    <CampoTexto
-                      id="campo-nascimento-input"
-                      name="dataNascimento"
-                      label="Data de nascimento"
-                      type="date"
-                      value={dataNascimento}
-                      onChange={setDataNascimento}
-                      invalid={faltandoIds.has('nascimento')}
-                    />
+                    <label htmlFor="campo-nascimento-input" className="block space-y-1.5">
+                      <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                        Data de nascimento
+                      </span>
+                      <DatePicker
+                        id="campo-nascimento-input"
+                        name="dataNascimento"
+                        value={dataNascimento}
+                        onChange={setDataNascimento}
+                        maxToday
+                        invalid={faltandoIds.has('nascimento')}
+                        aria-label="Data de nascimento"
+                      />
+                    </label>
                   </div>
                   <div>
                     <CampoTexto
@@ -905,16 +911,23 @@ export function AssociacaoAtualizarForm({
                     />
                   </div>
                   <div id="campo-dataExpedicaoCarteirinha">
-                    <CampoTexto
-                      id="campo-expedicao-input"
-                      name="dataExpedicaoCarteirinha"
-                      label="Data de expedição da carteirinha"
-                      hint="Data impressa ou registrada na carteirinha física."
-                      type="date"
-                      value={expedicao}
-                      onChange={setExpedicao}
-                      invalid={faltandoIds.has('dataExpedicaoCarteirinha')}
-                    />
+                    <label htmlFor="campo-expedicao-input" className="block space-y-1.5">
+                      <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                        Data da última expedição da carteirinha
+                      </span>
+                      <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+                        Pagamento mais recente de renovação do seu vínculo associativo vigente.
+                      </span>
+                      <DatePicker
+                        id="campo-expedicao-input"
+                        name="dataExpedicaoCarteirinha"
+                        value={expedicao}
+                        onChange={setExpedicao}
+                        maxToday
+                        invalid={faltandoIds.has('dataExpedicaoCarteirinha')}
+                        aria-label="Data da última expedição da carteirinha"
+                      />
+                    </label>
                   </div>
                   <div id="campo-periodicidadePretendida" className="sm:col-span-2">
                     <label htmlFor="campo-periodicidade-input" className="block space-y-1.5">

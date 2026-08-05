@@ -11,6 +11,7 @@ import {
   desfileEmFromMeta,
   diasAteDesfile,
 } from '@torcida/types'
+import { DatePicker } from '@/components/ui/date-picker'
 import { salvarDesfileEm, toggleBarracaoItem } from '../actions'
 
 export function CarnavalBarracaoAside({
@@ -74,11 +75,11 @@ export function CarnavalBarracaoAside({
           </label>
           {isGestor ? (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <input
-                type="date"
+              <DatePicker
                 value={desfileLocal}
-                onChange={(e) => setDesfileLocal(e.target.value)}
-                className="h-10 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 text-sm text-[rgb(var(--foreground))]"
+                onChange={setDesfileLocal}
+                aria-label="Data do desfile"
+                className="min-w-[11rem] flex-1"
               />
               <button
                 type="button"

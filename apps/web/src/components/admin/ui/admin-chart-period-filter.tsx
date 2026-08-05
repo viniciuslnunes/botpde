@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { CalendarRange } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
 import { buildAdminHref } from '@/lib/admin-href'
 
 export type AdminChartPeriod = '3m' | '6m' | '9m' | 'custom'
@@ -42,7 +43,6 @@ export function AdminChartPeriodFilter({
   const [position, setPosition] = useState({ top: 0, left: 0, width: 352 })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLFormElement>(null)
-  const firstInputRef = useRef<HTMLInputElement>(null)
 
   function openCustom() {
     const rect = triggerRef.current?.getBoundingClientRect()
@@ -59,7 +59,10 @@ export function AdminChartPeriodFilter({
   useEffect(() => {
     if (!customOpen) return
 
-    firstInputRef.current?.focus()
+    const firstControl = menuRef.current?.querySelector<HTMLElement>(
+      'button[type="button"], input, select',
+    )
+    firstControl?.focus()
     function closeOnOutsideClick(event: MouseEvent) {
       const target = event.target as Node
       if (!menuRef.current?.contains(target) && !triggerRef.current?.contains(target)) {
@@ -162,25 +165,22 @@ export function AdminChartPeriodFilter({
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid gap-1 text-xs font-medium text-[rgb(var(--foreground-muted))]">
                   De
-                  <input
-                    ref={firstInputRef}
-                    type="date"
+                  <DatePicker
                     name="de"
                     required
                     defaultValue={customStart}
                     max={maxDate}
-                    className="h-8 min-w-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))] focus:ring-2 focus:ring-[rgb(var(--primary)_/_0.2)]"
+                    aria-label="Data inicial"
                   />
                 </label>
                 <label className="grid gap-1 text-xs font-medium text-[rgb(var(--foreground-muted))]">
                   Até
-                  <input
-                    type="date"
+                  <DatePicker
                     name="ate"
                     required
                     defaultValue={customEnd}
                     max={maxDate}
-                    className="h-8 min-w-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))] focus:ring-2 focus:ring-[rgb(var(--primary)_/_0.2)]"
+                    aria-label="Data final"
                   />
                 </label>
               </div>

@@ -13,6 +13,12 @@ import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboardin
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { Input, Select } from '@torcida/ui'
+import { DatePicker } from '@/components/ui/date-picker'
+import {
+  compareCalendarParts,
+  parseDateOnly,
+  todayPartsInZone,
+} from '@/lib/format-datetime'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { LocationPickerFields } from '@/components/media/location-picker-fields'
@@ -2332,11 +2338,16 @@ function PassoVinculo({
         }
       }
       if (!dataExpedicaoCarteirinha) {
-        erros.dataExpedicaoCarteirinha = ['Informe a data de expedição da carteirinha.']
+        erros.dataExpedicaoCarteirinha = [
+          'Informe a data da última expedição da carteirinha.',
+        ]
       } else {
-        const exp = new Date(`${dataExpedicaoCarteirinha}T12:00:00`)
-        if (Number.isNaN(exp.getTime()) || exp > new Date()) {
-          erros.dataExpedicaoCarteirinha = ['Data de expedição inválida.']
+        const exp = parseDateOnly(dataExpedicaoCarteirinha)
+        const hoje = todayPartsInZone()
+        if (compareCalendarParts(exp, hoje) > 0) {
+          erros.dataExpedicaoCarteirinha = [
+            'A data da última expedição não pode ser futura.',
+          ]
         }
       }
       if (!periodicidadePretendida) {
@@ -2860,10 +2871,11 @@ function PassoVinculo({
               obrigatorio
               erros={errosCampo.dataNascimento}
             >
-              <Input
-                type="date"
+              <DatePicker
                 value={dataNascimento}
-                onChange={(e) => setDataNascimento(e.target.value)}
+                onChange={setDataNascimento}
+                maxToday
+                aria-label="Data de nascimento"
               />
             </Campo>
             <Campo
@@ -3233,15 +3245,16 @@ function PassoVinculo({
               </Campo>
               <Campo
                 name="dataExpedicaoCarteirinha"
-                label="Data de expedição da carteirinha"
+                label="Data da última expedição da carteirinha"
+                hint="Pagamento mais recente de renovação do seu vínculo associativo vigente."
                 obrigatorio
                 erros={errosCampo.dataExpedicaoCarteirinha}
               >
-                <Input
-                  type="date"
+                <DatePicker
                   value={dataExpedicaoCarteirinha}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setDataExpedicaoCarteirinha(e.target.value)}
+                  onChange={setDataExpedicaoCarteirinha}
+                  maxToday
+                  aria-label="Data da última expedição da carteirinha"
                 />
               </Campo>
               <Campo
@@ -3883,6 +3896,7 @@ function BotaoPrimario({
 function Campo({
   name,
   label,
+  hint,
   obrigatorio,
   erros,
   children,
@@ -3890,12 +3904,14 @@ function Campo({
   /** Chave do campo — usada para scroll/foco quando há erro no submit. */
   name?: string
   label: string
+  hint?: string
   obrigatorio?: boolean
   erros?: string[]
   children: React.ReactNode
 }) {
   const hasError = Boolean(erros && erros.length > 0)
   const erroId = useId()
+  const hintId = useId()
   return (
     <div
       data-campo={name}
@@ -3908,6 +3924,11 @@ function Campo({
       <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
         {label} {obrigatorio && <span className="text-red-500">*</span>}
       </label>
+      {hint ? (
+        <p id={hintId} className="mb-1.5 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+          {hint}
+        </p>
+      ) : null}
       {children}
       {hasError && (
         <p

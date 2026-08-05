@@ -170,7 +170,7 @@ export function checklistCompletudeCarteirinha(
   return [
     {
       id: 'dataExpedicaoCarteirinha',
-      label: 'Data de expedição da carteirinha',
+      label: 'Data da última expedição da carteirinha',
       ok: preenchidoCompletude(m.dataExpedicaoCarteirinha),
       obrigatorio: true,
     },

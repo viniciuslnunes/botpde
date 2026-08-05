@@ -67,7 +67,7 @@ const LABELS: Record<CompletudeItemId, string> = {
   'resp-doc': 'Documento do responsável',
   documento: 'Foto do documento',
   residencia: 'Comprovante de residência',
-  dataExpedicaoCarteirinha: 'Data de expedição da carteirinha',
+  dataExpedicaoCarteirinha: 'Data da última expedição da carteirinha',
   periodicidadePretendida: 'Periodicidade / plano',
 }
 

@@ -14,6 +14,7 @@ import {
   desligarMembro,
   type MembroLgeState,
 } from './actions'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useActionStateToast } from '@/lib/toast-action'
 import { formatCpfAdmin } from '@/lib/admin-membro-map'
 
@@ -216,16 +217,18 @@ export function AdminMembroLgeForm({
           </label>
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Data de nascimento
-            <input
-              name="dataNascimento"
-              type="date"
-              defaultValue={
-                initial.dataNascimento
-                  ? formatDataCompetenciaInput(initial.dataNascimento)
-                  : ''
-              }
-              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-            />
+            <div className="mt-1">
+              <DatePicker
+                name="dataNascimento"
+                maxToday
+                defaultValue={
+                  initial.dataNascimento
+                    ? formatDataCompetenciaInput(initial.dataNascimento)
+                    : ''
+                }
+                aria-label="Data de nascimento"
+              />
+            </div>
             <FieldError messages={lgeState.errors?.dataNascimento} />
           </label>
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">

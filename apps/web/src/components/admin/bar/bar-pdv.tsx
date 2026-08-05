@@ -51,6 +51,7 @@ import {
   removerLancamentoComandaBar,
 } from '@/app/admin/bar/comanda-actions'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { DatePicker } from '@/components/ui/date-picker'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { cartItemExit, springSnappy } from '@/lib/motion-presets'
@@ -211,7 +212,7 @@ function setTurnoSidebarStored(value: boolean) {
   turnoSidebarListeners.forEach((l) => l())
 }
 
-/** Data padrão de vencimento do débito: hoje + 7 dias, em `yyyy-mm-dd` para `<input type="date">`. */
+/** Data padrão de vencimento do débito: hoje + 7 dias, em `yyyy-mm-dd`. */
 function vencimentoDebitoPadrao(): string {
   const d = new Date()
   d.setDate(d.getDate() + 7)
@@ -2382,12 +2383,13 @@ export function BarPdv({
               return (
                 <label className="mt-3 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
                   Vencimento do débito *
-                  <input
-                    type="date"
-                    value={fecharVencimento}
-                    onChange={(e) => setFecharVencimento(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-                  />
+                  <div className="mt-1">
+                    <DatePicker
+                      value={fecharVencimento}
+                      onChange={setFecharVencimento}
+                      aria-label="Vencimento do débito"
+                    />
+                  </div>
                 </label>
               )
             })()}

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { Check, Filter, X } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import type { ListagemFiltroTipo } from '@/lib/listagem'
 
@@ -215,21 +216,23 @@ export function ListagemColunaFiltro({
               <>
                 <label className="block text-xs text-[rgb(var(--foreground-muted))]">
                   De
-                  <input
-                    type="date"
-                    name={`${filtroId}De`}
-                    defaultValue={valorDe}
-                    className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-sm text-[rgb(var(--foreground))]"
-                  />
+                  <div className="mt-1">
+                    <DatePicker
+                      name={`${filtroId}De`}
+                      defaultValue={valorDe}
+                      aria-label="Data inicial"
+                    />
+                  </div>
                 </label>
                 <label className="block text-xs text-[rgb(var(--foreground-muted))]">
                   Até
-                  <input
-                    type="date"
-                    name={`${filtroId}Ate`}
-                    defaultValue={valorAte}
-                    className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-sm text-[rgb(var(--foreground))]"
-                  />
+                  <div className="mt-1">
+                    <DatePicker
+                      name={`${filtroId}Ate`}
+                      defaultValue={valorAte}
+                      aria-label="Data final"
+                    />
+                  </div>
                 </label>
               </>
             ) : (

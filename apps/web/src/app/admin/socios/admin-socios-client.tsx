@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { DatePicker } from '@/components/ui/date-picker'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { AdminTabs } from '@/components/admin/ui'
@@ -337,15 +338,15 @@ export function EmitirCarteirinhaModal({
             >
               Válida até
             </label>
-            <input
+            <DatePicker
               id={idValidade}
               name="validade"
-              type="date"
               value={validade}
-              onChange={(e) => setValidade(e.target.value)}
+              onChange={setValidade}
               required
               min={new Date().toISOString().split('T')[0]}
-              className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              aria-label="Válida até"
+              className="mt-1.5"
             />
             <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
               Padrão: 1 ano a partir de hoje.
@@ -466,15 +467,12 @@ function SocioActions({
             : 'flex flex-wrap items-center justify-end gap-2'
         }
       >
-        <input
-          type="date"
+        <DatePicker
           value={novaValidade}
-          onChange={(e) => setNovaValidade(e.target.value)}
+          onChange={setNovaValidade}
           min={new Date().toISOString().split('T')[0]}
-          className={[
-            'app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]',
-            stacked ? 'w-full' : '',
-          ].join(' ')}
+          aria-label="Nova validade"
+          className={stacked ? 'w-full' : undefined}
         />
         <div className={stacked ? 'flex gap-2' : 'contents'}>
           <button

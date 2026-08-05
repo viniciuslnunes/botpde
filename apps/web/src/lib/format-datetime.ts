@@ -133,6 +133,29 @@ export function parseDateOnly(iso: string): CalendarParts {
   }
 }
 
+/** Converte partes de calendário em `YYYY-MM-DD` (valor de formulário / DatePicker). */
+export function formatDateOnlyIso(parts: CalendarParts): string {
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
+/** `YYYY-MM-DD` → `dd/mm/aaaa` para exibição pt-BR. */
+export function formatDateOnlyPt(isoOrParts: string | CalendarParts): string {
+  const parts = typeof isoOrParts === 'string' ? parseDateOnly(isoOrParts) : isoOrParts
+  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year}`
+}
+
+/** Compara dias civis: &lt;0 se a&lt;b, 0 se iguais, &gt;0 se a&gt;b. */
+export function compareCalendarParts(a: CalendarParts, b: CalendarParts): number {
+  if (a.year !== b.year) return a.year - b.year
+  if (a.month !== b.month) return a.month - b.month
+  return a.day - b.day
+}
+
+/** Hoje em America/Sao_Paulo como `YYYY-MM-DD`. */
+export function todayDateOnlyIso(now: Date = new Date()): string {
+  return formatDateOnlyIso(todayPartsInZone(now))
+}
+
 export function sameCalendarDay(a: CalendarParts, b: CalendarParts): boolean {
   return a.year === b.year && a.month === b.month && a.day === b.day
 }
