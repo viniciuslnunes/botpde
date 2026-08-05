@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
-import { detectarEscudoCircular } from '@/lib/escudo-forma'
+import { useLayoutEffect, useState, type CSSProperties } from 'react'
+import { detectarEscudoCircular, lerCacheEscudoCircular } from '@/lib/escudo-forma'
 
 /** Tamanho único da barra de canais / brand do header. */
 export const LOGO_MINIATURA_PX = 32
@@ -21,8 +21,7 @@ type Props = {
 
 /**
  * Miniatura 32×32 com a imagem original (`object-fit: contain`).
- * Sem canvas / sem reprocessar pixels — qualidade intacta.
- * `contain: size` no box impede o tamanho intrínseco do PNG/SVG de vazar.
+ * Só revela o <img> depois da detecção (ou cache). Skeleton no intervalo.
  */
 export function LogoMiniatura({
   src,
@@ -31,24 +30,32 @@ export function LogoMiniatura({
   rounded = '',
   className,
 }: Props) {
-  const [circularDetectado, setCircularDetectado] = useState(shape === 'circle')
+  const [circular, setCircular] = useState(shape === 'circle')
+  const [pronto, setPronto] = useState(shape === 'circle')
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (shape === 'circle') {
-      setCircularDetectado(true)
+      setCircular(true)
+      setPronto(true)
+      return
+    }
+    const hit = lerCacheEscudoCircular(src)
+    if (hit !== null) {
+      setCircular(hit)
+      setPronto(true)
       return
     }
     let ativo = true
-    setCircularDetectado(false)
+    setPronto(false)
     void detectarEscudoCircular(src).then((c) => {
-      if (ativo) setCircularDetectado(c)
+      if (!ativo) return
+      setCircular(c)
+      setPronto(true)
     })
     return () => {
       ativo = false
     }
   }, [src, shape])
-
-  const circular = shape === 'circle' || circularDetectado
 
   const boxStyle: CSSProperties = {
     width: LOGO_MINIATURA_PX,
@@ -86,15 +93,22 @@ export function LogoMiniatura({
       className={[className, !circular && rounded ? rounded : ''].filter(Boolean).join(' ')}
       style={boxStyle}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- tamanho fixo por style, sem next/image */}
-      <img
-        src={src}
-        alt={alt}
-        width={LOGO_MINIATURA_PX}
-        height={LOGO_MINIATURA_PX}
-        decoding="async"
-        style={imgStyle}
-      />
+      {pronto ? (
+        // eslint-disable-next-line @next/next/no-img-element -- tamanho fixo por style, sem next/image
+        <img
+          src={src}
+          alt={alt}
+          width={LOGO_MINIATURA_PX}
+          height={LOGO_MINIATURA_PX}
+          decoding="async"
+          style={imgStyle}
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="skeleton-track absolute inset-0 animate-pulse rounded-full"
+        />
+      )}
     </span>
   )
 }

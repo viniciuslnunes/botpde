@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { analisarEscudoCircularDeImageData } from '@/lib/escudo-forma'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  analisarEscudoCircularDeImageData,
+  gravarCacheEscudoCircular,
+  lerCacheEscudoCircular,
+  limparCacheEscudoCircular,
+} from '@/lib/escudo-forma'
 
 const SAMPLE = 64
 
@@ -138,5 +143,28 @@ describe('escudo-forma', () => {
       }
     }
     expect(analisarEscudoCircularDeImageData(data)).toBe(false)
+  })
+})
+
+describe('cache escudo circular', () => {
+  afterEach(() => {
+    limparCacheEscudoCircular()
+  })
+
+  it('retorna null sem entrada', () => {
+    expect(lerCacheEscudoCircular('https://cdn.example/escudo.png')).toBeNull()
+  })
+
+  it('grava e relê o resultado', () => {
+    gravarCacheEscudoCircular('https://cdn.example/a.png', true)
+    gravarCacheEscudoCircular('https://cdn.example/b.png', false)
+    expect(lerCacheEscudoCircular('https://cdn.example/a.png')).toBe(true)
+    expect(lerCacheEscudoCircular('https://cdn.example/b.png')).toBe(false)
+  })
+
+  it('limpa memória e storage', () => {
+    gravarCacheEscudoCircular('https://cdn.example/a.png', true)
+    limparCacheEscudoCircular()
+    expect(lerCacheEscudoCircular('https://cdn.example/a.png')).toBeNull()
   })
 })

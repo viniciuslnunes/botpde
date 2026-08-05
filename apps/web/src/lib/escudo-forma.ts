@@ -184,13 +184,70 @@ function analisarElemento(img: HTMLImageElement): boolean {
   }
 }
 
-/**
- * Carrega a URL e decide se deve aplicar máscara circular.
- * Tenta: fetch→blob (CORS), URL direta, e proxy `/_next/image` (same-origin).
- */
-export async function detectarEscudoCircular(url: string): Promise<boolean> {
-  if (typeof window === 'undefined' || !url) return false
+const STORAGE_KEY = 'torcida.escudoCircular.v1'
+const MAX_CACHE_ENTRIES = 200
+const cacheMemoria = new Map<string, boolean>()
+const inflight = new Map<string, Promise<boolean>>()
 
+function lerStorage(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed as Record<string, boolean>
+  } catch {
+    return {}
+  }
+}
+
+function gravarStorage(url: string, valor: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    const all = lerStorage()
+    all[url] = valor
+    const keys = Object.keys(all)
+    if (keys.length > MAX_CACHE_ENTRIES) {
+      for (const k of keys.slice(0, keys.length - MAX_CACHE_ENTRIES)) {
+        delete all[k]
+      }
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
+  } catch {
+    // quota / modo privado
+  }
+}
+
+/** Leitura síncrona — memória primeiro, depois localStorage. */
+export function lerCacheEscudoCircular(url: string): boolean | null {
+  if (!url) return null
+  const mem = cacheMemoria.get(url)
+  if (mem !== undefined) return mem
+  const stored = lerStorage()[url]
+  if (typeof stored !== 'boolean') return null
+  cacheMemoria.set(url, stored)
+  return stored
+}
+
+export function gravarCacheEscudoCircular(url: string, valor: boolean) {
+  if (!url) return
+  cacheMemoria.set(url, valor)
+  gravarStorage(url, valor)
+}
+
+export function limparCacheEscudoCircular() {
+  cacheMemoria.clear()
+  inflight.clear()
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+async function detectarEscudoCircularUncached(url: string): Promise<boolean> {
   // 1) Fetch CORS → blob same-origin (melhor chance de ler pixels).
   try {
     const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
@@ -227,4 +284,33 @@ export async function detectarEscudoCircular(url: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Carrega a URL e decide se deve aplicar máscara circular.
+ * Resultado fica em memória + localStorage — reload e troca de canal
+ * não reprocessam a mesma URL.
+ */
+export async function detectarEscudoCircular(url: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !url) return false
+
+  const cached = lerCacheEscudoCircular(url)
+  if (cached !== null) return cached
+
+  const pending = inflight.get(url)
+  if (pending) return pending
+
+  const job = detectarEscudoCircularUncached(url)
+    .then((resultado) => {
+      gravarCacheEscudoCircular(url, resultado)
+      inflight.delete(url)
+      return resultado
+    })
+    .catch((err: unknown) => {
+      inflight.delete(url)
+      throw err
+    })
+
+  inflight.set(url, job)
+  return job
 }
