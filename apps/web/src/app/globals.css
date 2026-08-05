@@ -220,6 +220,21 @@ body {
   cursor: pointer !important;
 }
 
+/* Controle de formulário não empurra o layout no mobile.
+   Item de grid/flex tem `min-width: auto`, e o mínimo automático de um
+   <select> é a largura da opção mais longa — um título de evento ou nome de
+   membro dinâmico passa a definir a largura da coluna e estoura a viewport
+   (era o caso de /portal/comunidade/salas em 390px). Zerar o piso deixa o
+   controle encolher; a largura `auto` continua valendo quando há espaço. */
+input,
+select,
+textarea {
+  min-width: 0;
+}
+select {
+  max-width: 100%;
+}
+
 :is(button, input, select, textarea, .app-action):disabled,
 :is(button, input, select, textarea, .app-action):disabled *,
 [aria-disabled='true'],
@@ -729,4 +744,13 @@ html[data-grid='off'] .app-shell-bg {
 .social-embed-host .tiktok-embed {
   max-width: 100% !important;
   margin: 0 !important;
+}
+/* Fallback pré-hydration do widget: enquanto o script do X/TikTok não troca o
+   <blockquote> pelo iframe, o markup cru é um link com a URL inteira, que não
+   quebra e vaza da coluna no mobile. `!important` porque os widgets injetam
+   folha própria e vencem por especificidade. */
+.social-embed-host blockquote a {
+  display: block !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }

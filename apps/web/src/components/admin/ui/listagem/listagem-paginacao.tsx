@@ -87,7 +87,9 @@ export function ListagemPaginacao({
                 href={opcao.href}
                 aria-current={opcao.ativo ? 'true' : undefined}
                 className={[
-                  'rounded px-1.5 py-0.5 text-xs tabular-nums transition-colors',
+                  // h-8/min-w-8: mesmo alvo de toque dos botões de página — no
+                  // mobile o px-1.5 py-0.5 dava 25×20, pequeno demais pro dedo.
+                  'inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-xs tabular-nums transition-colors',
                   opcao.ativo
                     ? 'bg-[rgb(var(--color-primary)_/_0.16)] font-semibold text-[rgb(var(--color-primary-fg))]'
                     : 'hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',

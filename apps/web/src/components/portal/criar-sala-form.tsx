@@ -66,7 +66,7 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
           data-unsaved-label="Evento vinculado"
           defaultValue=""
           disabled={pending}
-          className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60"
+          className="w-full min-w-0 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60"
         >
           <option value="">Sem evento vinculado</option>
           {eventos.map((evento) => (

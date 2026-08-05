@@ -41,7 +41,13 @@ export function SalasListAnimated({ salas, canHost }: SalasListAnimatedProps) {
       className="grid gap-3 sm:grid-cols-2"
     >
       {salas.map((sala) => (
-        <m.div key={sala.id} variants={staggerItem} whileTap={{ scale: 0.98 }} transition={springSnappy}>
+        <m.div
+          key={sala.id}
+          variants={staggerItem}
+          whileTap={{ scale: 0.98 }}
+          transition={springSnappy}
+          className="min-w-0"
+        >
           <Link
             href={`/portal/comunidade/salas/${sala.id}`}
             className="flex h-full flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
@@ -58,11 +64,11 @@ export function SalasListAnimated({ salas, canHost }: SalasListAnimatedProps) {
               </div>
             </div>
             <div className="mt-auto flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
-              <span className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+              <span className="flex min-w-0 items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
                 <Avatar nome={sala.host.nome} avatarUrl={sala.host.avatarUrl} size="xs" />
-                {sala.host.nome ?? 'Membro'}
+                <span className="truncate">{sala.host.nome ?? 'Membro'}</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
                 <Users className="h-3.5 w-3.5" />
                 {sala._count.participantes}
               </span>

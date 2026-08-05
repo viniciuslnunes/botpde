@@ -141,8 +141,9 @@ export function PatrimonioItensLista({
                       <button
                         type="button"
                         title="Editar"
+                        aria-label={`Editar ${item.nome}`}
                         onClick={() => setEditingId(item.id)}
-                        className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                        className="app-action inline-flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -190,6 +191,7 @@ function BaixarButton({ id, nome }: { id: string; nome: string }) {
     <button
       type="button"
       title="Baixar do inventário"
+      aria-label={`Baixar ${nome} do inventário`}
       onClick={() => {
         void confirmAction({
           titulo: `Baixar “${nome}” do inventário?`,
@@ -200,7 +202,7 @@ function BaixarButton({ id, nome }: { id: string; nome: string }) {
           success: 'Item baixado.',
         })
       }}
-      className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-amber-950"
+      className="app-action inline-flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-amber-950"
     >
       <Archive className="h-4 w-4" />
     </button>
@@ -213,6 +215,7 @@ function ExcluirButton({ id, nome }: { id: string; nome: string }) {
     <button
       type="button"
       title="Excluir permanentemente"
+      aria-label={`Excluir ${nome} permanentemente`}
       onClick={() => {
         void confirmAction({
           titulo: `Excluir permanentemente “${nome}”?`,
@@ -224,7 +227,7 @@ function ExcluirButton({ id, nome }: { id: string; nome: string }) {
           success: 'Item excluído.',
         })
       }}
-      className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950"
+      className="app-action inline-flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950"
     >
       <Trash2 className="h-4 w-4" />
     </button>

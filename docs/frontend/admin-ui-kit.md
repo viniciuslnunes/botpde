@@ -145,6 +145,12 @@ qualquer tema de tenant e em dark mode. Todos com `role="img"` + `aria-label`.
 | `DonutChart` | Distribuição (`{ rotulo, valor, cor? }[]`, `centro?`) | arcos com `pathLength` |
 | `TrendDelta` | % vs período anterior; `invertido` p/ métricas onde subir é ruim (ex.: inadimplência) | — |
 
+**Mobile (obrigatório):** `MiniBarChart` rola de lado (`overflow-x-auto` +
+`min-w` por coluna) — nunca deixa o rótulo `nowrap` definir a largura do
+card. Grades que hospedam chart (`InsightSection`, `AdminExpansionPanel`,
+`KpiGrid`) usam `grid-cols-[minmax(0,1fr)]` + `[&>*]:min-w-0` na base.
+Medição: `e2e/charts.measure.ts`.
+
 **Regras de fronteira RSC→client (obrigatórias):**
 - Props só com primitivas (`number`, `string`) — **nunca** `Prisma.Decimal`/`Date`.
   Conversão (`Number(...)`, rótulo formatado) acontece na lib.

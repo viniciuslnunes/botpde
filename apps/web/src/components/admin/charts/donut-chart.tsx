@@ -45,7 +45,7 @@ export function DonutChart({ data, centro }: DonutChartProps) {
   })
 
   return (
-    <div className="flex flex-wrap items-center gap-5">
+    <div className="flex min-w-0 flex-wrap items-center gap-5">
       <div className="relative h-32 w-32 shrink-0">
         <svg
           viewBox="0 0 100 100"

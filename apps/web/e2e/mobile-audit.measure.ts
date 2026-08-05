@@ -1,8 +1,13 @@
 /**
- * Auditoria mobile: visita rotas chave em 390×844, detecta overflow
- * horizontal e salva screenshots em e2e/screenshots/mobile-audit/.
+ * Auditoria mobile: visita rotas chave em 320×844 (iPhone SE) e 390×844,
+ * detecta overflow horizontal e salva screenshots em
+ * e2e/screenshots/mobile-audit/.
  *
  * pnpm --filter @torcida/web exec playwright test e2e/mobile-audit.measure.ts --project=measure
+ *
+ * O relatório não falha o teste — ele guia os fixes. Overflow real quase
+ * sempre é `min-width: auto` de item flex/grid: a largura vem do conteúdo
+ * dinâmico (opção de <select>, título, fila de abas) e nada pode encolher.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -27,6 +32,18 @@ const ROTAS = [
   { nome: '13-admin-eventos', path: '/admin/eventos' },
   { nome: '14-admin-bar-pdv', path: '/admin/bar/pdv' },
   { nome: '15-entrar', path: '/entrar' },
+  // Rotas onde a largura depende de dado dinâmico (título de evento, nome de
+  // membro, fila de abas) — foi onde a auditoria de 2026-08-05 achou estouro.
+  { nome: '16-comunidade-salas', path: '/portal/comunidade/salas' },
+  { nome: '17-comunidade-grupos', path: '/portal/comunidade/grupos' },
+  { nome: '18-comunidade-rede', path: '/portal/comunidade/rede' },
+  { nome: '19-admin-membros', path: '/admin/membros' },
+  { nome: '20-admin-socios', path: '/admin/socios' },
+  { nome: '21-admin-patrimonio', path: '/admin/patrimonio' },
+  { nome: '22-admin-relatorios', path: '/admin/relatorios' },
+  { nome: '23-admin-acessos', path: '/admin/acessos' },
+  { nome: '24-admin-loja-tickets', path: '/admin/loja/tickets' },
+  { nome: '25-admin-moderacao', path: '/admin/comunidade/moderacao' },
 ] as const
 
 async function medirOverflow(page: Page) {
@@ -91,9 +108,10 @@ test.use({
 })
 
 test('mobile audit screenshots + overflow', async ({ page }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(900_000)
   fs.mkdirSync(OUT, { recursive: true })
   const report: Array<{
+    largura: number
     nome: string
     path: string
     status: number
@@ -101,34 +119,50 @@ test('mobile audit screenshots + overflow', async ({ page }) => {
     offenders: unknown[]
   }> = []
 
-  for (const rota of ROTAS) {
-    const res = await page.goto(rota.path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await page.waitForTimeout(800)
-    const shot = path.join(OUT, `${rota.nome}.png`)
-    await page.screenshot({ path: shot, fullPage: false })
-    const metrics = await medirOverflow(page)
-    report.push({
-      nome: rota.nome,
-      path: rota.path,
-      status: res?.status() ?? 0,
-      pageOverflow: metrics.pageOverflow,
-      offenders: metrics.offenders,
-    })
-    // eslint-disable-next-line no-console
-    console.log(
-      JSON.stringify({
-        rota: rota.nome,
-        status: res?.status(),
+  for (const largura of [320, 390]) {
+    await page.setViewportSize({ width: largura, height: 844 })
+    for (const rota of ROTAS) {
+      const res = await page.goto(rota.path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      await page.waitForTimeout(800)
+      // Screenshot só na largura de referência; 320 é medição.
+      if (largura === 390) {
+        await page.screenshot({ path: path.join(OUT, `${rota.nome}.png`), fullPage: false })
+      }
+      let metrics
+      try {
+        metrics = await medirOverflow(page)
+      } catch {
+        // Redirect tardio (auth/onboarding) derruba o contexto do evaluate.
+        await page.waitForTimeout(1500)
+        metrics = await medirOverflow(page)
+      }
+      report.push({
+        largura,
+        nome: rota.nome,
+        path: rota.path,
+        status: res?.status() ?? 0,
         pageOverflow: metrics.pageOverflow,
-        top: metrics.offenders.slice(0, 5),
-      }),
-    )
+        offenders: metrics.offenders,
+      })
+      // eslint-disable-next-line no-console
+      console.log(
+        JSON.stringify({
+          largura,
+          rota: rota.nome,
+          status: res?.status(),
+          pageOverflow: metrics.pageOverflow,
+          top: metrics.offenders.slice(0, 5),
+        }),
+      )
+    }
   }
 
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2))
   const broken = report.filter((r) => r.pageOverflow > 2)
   // Não falha o teste — o relatório guia os fixes. Só asserta que rodou.
-  expect(report.length).toBe(ROTAS.length)
+  expect(report.length).toBe(ROTAS.length * 2)
   // eslint-disable-next-line no-console
-  console.log(`Overflow pages: ${broken.map((b) => b.nome).join(', ') || 'none'}`)
+  console.log(
+    `Overflow pages: ${broken.map((b) => `${b.largura}:${b.nome}`).join(', ') || 'none'}`,
+  )
 })

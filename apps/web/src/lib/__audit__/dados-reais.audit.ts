@@ -596,12 +596,45 @@ describe('canais e grupos (código real)', () => {
             WHERE m.user_id = mc.user_id AND m.tenant_id = c.tenant_id
           ))
           OR
-          (mc.status = 'ATIVO' AND NOT EXISTS (
+          -- "Sem vinculo" tem de considerar o canal EMPRESTADO: numa unidade
+          -- promovida (Caso B) a Sede e do tenant-filho e a Conversa mora no
+          -- tenant da mae, e e la que assertElegibilidadeMembroCanal vai
+          -- buscar o vinculo. Sem este OR, 88 membros legitimos apareciam
+          -- como roster invalido, e o repair chegou a expulsa-los.
+          (mc.status = 'ATIVO'
+            -- Pendente no canal de uma unidade FILHA e legitimo (§7 22): ele
+            -- acompanha enquanto espera. So o canal da SEDE e reservado a
+            -- aprovado, e isso e medido na assercao propria, logo abaixo.
+            AND NOT EXISTS (
+              SELECT 1 FROM saas_membros mp
+              JOIN saas_sedes sdp ON sdp.canal_conversa_id = c.id AND sdp.tipo <> 'SEDE'
+              WHERE mp.user_id = mc.user_id AND mp.status = 'PENDENTE'
+                AND mp.tenant_id IN (c.tenant_id, sdp.tenant_id)
+            )
+            AND NOT EXISTS (
             SELECT 1 FROM saas_membros m
-            WHERE m.user_id = mc.user_id AND m.tenant_id = c.tenant_id
+            WHERE m.user_id = mc.user_id
               AND m.status = 'APROVADO' AND m.desligado_em IS NULL
+              AND (
+                m.tenant_id = c.tenant_id
+                -- Canal emprestado: vinculo mora na unidade dona.
+                OR m.tenant_id IN (
+                  SELECT sd.tenant_id FROM saas_sedes sd
+                  WHERE sd.canal_conversa_id = c.id AND sd.tenant_id IS NOT NULL
+                )
+                -- Caso B no canal da SEDE: o socio aprovado na unidade entra
+                -- no canal da organizada (vincularMembroCanaisAposAprovacao),
+                -- e o vinculo dele fica no tenant-filho. Sem isto, 51 socios
+                -- legitimos apareciam como roster invalido.
+                OR m.tenant_id IN (
+                  SELECT sf.tenant_id FROM saas_sedes sf
+                  WHERE sf.tenant_id IS NOT NULL
+                    AND sf.sede_id IN (
+                      SELECT sr.id FROM saas_sedes sr WHERE sr.tenant_id = c.tenant_id
+                    )
+                )
+              )
           ))
-          OR (mc.status = 'ATIVO' AND m_local.tipo = 'SOCIO' AND s_local.validade < NOW())
         )
       GROUP BY mc.status`
     const n = forasteiros.reduce((total, item) => total + item.n, 0)
@@ -609,7 +642,29 @@ describe('canais e grupos (código real)', () => {
       const resumo = forasteiros.map((item) => `${item.status}=${item.n}`).join(', ')
       erro('canais', `${n} roster(s) inválido(s) em canal real (${resumo})`)
     } else {
-      ok('canais', 'Todo membro de canal local tem vínculo no tenant do canal')
+      ok('canais', 'Todo membro de canal local tem vínculo no tenant do canal (ou na unidade dona)')
+    }
+
+    // Carteirinha vencida **não** é roster inválido. Vencer é temporário e
+    // reversível; sair do canal não é — a reinscrição só acontece numa nova
+    // aprovação. O gate de leitura já barra quem está vencido, então tratar
+    // isso como erro empurrava o repair a remover 278 sócios que voltariam
+    // sozinhos ao regularizar. Medido como dimensão do §7 15, não como falha.
+    const vencidos = await ctx.db.$queryRaw<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n
+      FROM saas_membros_conversa mc
+      JOIN saas_conversas c ON c.id = mc.conversa_id
+      JOIN saas_membros m ON m.user_id = mc.user_id AND m.tenant_id = c.tenant_id
+      JOIN saas_socios s ON s.user_id = mc.user_id AND s.tenant_id = c.tenant_id
+      WHERE mc.status = 'ATIVO' AND mc.saiu_em IS NULL
+        AND m.tipo = 'SOCIO' AND m.status = 'APROVADO' AND m.desligado_em IS NULL
+        AND s.validade < NOW()`
+    const nVencidos = vencidos[0]?.n ?? 0
+    if (nVencidos > 0) {
+      alerta(
+        'canais',
+        `${nVencidos} sócio(s) com carteirinha vencida em canal — leem bloqueado pelo gate, mas seguem no roster (esperado; ver §7 15)`,
+      )
     }
   })
 

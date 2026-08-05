@@ -62,7 +62,11 @@ export function AdminExpansionPanel({
               transition={springSnappy}
               className="overflow-hidden"
             >
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+              {/* Mesmo contrato do InsightSection: track encolhível + filhos
+                  com min-w-0 — senão MiniBarChart/DonutChart estouram no mobile. */}
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:grid-cols-3">
+                {children}
+              </div>
             </m.div>
           ) : null}
         </AnimatePresence>

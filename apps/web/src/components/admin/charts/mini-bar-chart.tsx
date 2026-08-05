@@ -62,62 +62,74 @@ export function MiniBarChart({
   const corSec = corSecundaria ?? COR_SECUNDARIA_PADRAO
 
   return (
-    <div>
-      <m.div
-        role="img"
-        aria-label={`Gráfico de barras com ${data.length} itens`}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="show"
-        className="flex items-end gap-2"
-      >
-        {data.map((item, i) => {
-          const alturaBarra = Math.max(4, Math.round((item.valor / max) * height))
-          const alturaSecundaria =
-            item.valorSecundario != null
-              ? Math.max(4, Math.round((item.valorSecundario / max) * height))
-              : null
-          const titulo = agrupado
-            ? `${item.rotulo}: ${legenda?.principal ?? 'principal'} ${fmt(item.valor)} · ${legenda?.secundaria ?? 'secundária'} ${fmt(item.valorSecundario ?? 0)}`
-            : `${item.rotulo}: ${fmt(item.valor)}`
-          return (
-            <div
-              key={`${item.rotulo}-${i}`}
-              className="flex min-w-0 flex-1 flex-col items-center gap-1"
-              title={titulo}
-            >
-              {!agrupado && (
-                <span className="text-[10px] font-medium tabular-nums text-[rgb(var(--foreground-muted))]">
-                  {fmt(item.valor)}
-                </span>
-              )}
-              <div className="flex w-full items-end justify-center gap-0.5">
-                <m.div
-                  className={
-                    agrupado ? 'w-full max-w-4 rounded-t-md' : 'w-full max-w-8 rounded-t-md'
-                  }
-                  style={{
-                    height: alturaBarra,
-                    backgroundColor: item.cor ?? COR_PADRAO,
-                    originY: 1,
-                  }}
-                  variants={barVariants}
-                />
-                {alturaSecundaria != null && (
+    <div className="min-w-0">
+      {/* Trilho rolável + `w-0` nas colunas: sem os dois, o rótulo (`truncate`
+          = `white-space: nowrap`) vira o min-content da coluna, que sobe até o
+          card e estoura a grade do InsightSection — em 390px o cartão chegava a
+          657px e o `overflow-x: hidden` do body CORTAVA o excedente, sem rolagem.
+          Com `min-w` por coluna, muitas barras rolam de lado em vez de virarem
+          tiras ilegíveis; o trilho zera a contribuição de largura para fora. */}
+      <div className="app-scrollbar-none -mx-1 overflow-x-auto px-1">
+        <m.div
+          role="img"
+          aria-label={`Gráfico de barras com ${data.length} itens`}
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="flex min-w-full items-end gap-2"
+        >
+          {data.map((item, i) => {
+            const alturaBarra = Math.max(4, Math.round((item.valor / max) * height))
+            const alturaSecundaria =
+              item.valorSecundario != null
+                ? Math.max(4, Math.round((item.valorSecundario / max) * height))
+                : null
+            const titulo = agrupado
+              ? `${item.rotulo}: ${legenda?.principal ?? 'principal'} ${fmt(item.valor)} · ${legenda?.secundaria ?? 'secundária'} ${fmt(item.valorSecundario ?? 0)}`
+              : `${item.rotulo}: ${fmt(item.valor)}`
+            return (
+              <div
+                key={`${item.rotulo}-${i}`}
+                className={[
+                  'flex w-0 flex-1 flex-col items-center gap-1',
+                  // Agrupado tem 2 barras por coluna e valor só no title.
+                  agrupado ? 'min-w-[2.5rem]' : 'min-w-[3.25rem]',
+                ].join(' ')}
+                title={titulo}
+              >
+                {!agrupado && (
+                  <span className="max-w-full truncate text-[10px] font-medium tabular-nums text-[rgb(var(--foreground-muted))]">
+                    {fmt(item.valor)}
+                  </span>
+                )}
+                <div className="flex w-full items-end justify-center gap-0.5">
                   <m.div
-                    className="w-full max-w-4 rounded-t-md"
-                    style={{ height: alturaSecundaria, backgroundColor: corSec, originY: 1 }}
+                    className={
+                      agrupado ? 'w-full max-w-4 rounded-t-md' : 'w-full max-w-8 rounded-t-md'
+                    }
+                    style={{
+                      height: alturaBarra,
+                      backgroundColor: item.cor ?? COR_PADRAO,
+                      originY: 1,
+                    }}
                     variants={barVariants}
                   />
-                )}
+                  {alturaSecundaria != null && (
+                    <m.div
+                      className="w-full max-w-4 rounded-t-md"
+                      style={{ height: alturaSecundaria, backgroundColor: corSec, originY: 1 }}
+                      variants={barVariants}
+                    />
+                  )}
+                </div>
+                <span className="max-w-full truncate text-[10px] text-[rgb(var(--foreground-muted))]">
+                  {item.rotulo}
+                </span>
               </div>
-              <span className="max-w-full truncate text-[10px] text-[rgb(var(--foreground-muted))]">
-                {item.rotulo}
-              </span>
-            </div>
-          )
-        })}
-      </m.div>
+            )
+          })}
+        </m.div>
+      </div>
 
       {agrupado && legenda ? (
         <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-[rgb(var(--foreground-muted))]">

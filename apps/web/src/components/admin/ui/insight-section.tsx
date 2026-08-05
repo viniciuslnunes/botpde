@@ -23,7 +23,14 @@ export function InsightSection({ title, description, children }: InsightSectionP
             <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{description}</p>
           ) : null}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+        {/* Track base `minmax(0,1fr)` + `min-w-0` nos filhos: coluna implícita
+            `auto` faz o chart/tabela definir o track e estourar a viewport;
+            `min-width: auto` no item de grid impede encolher abaixo do
+            min-content. De `sm` em diante `grid-cols-N` já é
+            `repeat(N, minmax(0,1fr))`. */}
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:grid-cols-3">
+          {children}
+        </div>
       </section>
     </MotionRevealOnce>
   )

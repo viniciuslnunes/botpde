@@ -1751,7 +1751,10 @@ export function BarPdv({
             />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 gap-3 p-3">
+          // min-w-0: sem isso o `min-width: auto` do item flex deixa a coluna
+          // do cardápio mais larga que a viewport e o PDV — que é
+          // `overflow-hidden` por ser imersivo — corta a lista no celular.
+          <div className="flex min-h-0 min-w-0 flex-1 gap-3 p-3">
             {/* Cardápio */}
             <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
               <div className="shrink-0 space-y-3 px-4 py-3.5">

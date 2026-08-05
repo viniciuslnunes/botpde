@@ -22,8 +22,12 @@ export function ComunidadeTabBar({
   onTabChange,
   layoutId = 'comunidade-tab-indicator',
 }: ComunidadeTabBarProps) {
+  // Borda no wrapper e rolagem horizontal no trilho: com 4+ abas (Pedidos,
+  // Sobre, Configurações…) a fila estourava a viewport no mobile em vez de
+  // rolar. `pb-px` compensa o `-mb-px` das abas, que o overflow recortaria.
   return (
-    <div className="flex gap-2 border-b border-[rgb(var(--border))]">
+    <div className="border-b border-[rgb(var(--border))]">
+      <div className="app-scrollbar-none flex gap-2 overflow-x-auto pb-px">
       {items.map((item) => {
         const ativo = item.id === activeId
 
@@ -32,7 +36,7 @@ export function ComunidadeTabBar({
             <Link
               key={item.id}
               href={item.href}
-              className="relative inline-flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+              className="relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
               {item.icon}
               {item.label}
@@ -46,7 +50,7 @@ export function ComunidadeTabBar({
             type="button"
             onClick={() => onTabChange?.(item.id)}
             className={[
-              'relative -mb-px border-b-2 px-3 py-2 text-sm transition-colors',
+              'relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors',
               ativo
                 ? 'border-transparent font-semibold text-[rgb(var(--color-primary-fg))]'
                 : 'border-transparent font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -63,6 +67,7 @@ export function ComunidadeTabBar({
           </button>
         )
       })}
+      </div>
     </div>
   )
 }

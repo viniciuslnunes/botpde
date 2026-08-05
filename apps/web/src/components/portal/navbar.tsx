@@ -53,10 +53,13 @@ const LINKS_SOMENTE_TORCIDA = new Set([
 const LINKS_OCULTOS_TORCEDOR_VINCULO = new Set(['/portal/carteirinha'])
 
 /**
- * Agenda/Sedes/Loja são do canal (torcida/unidade). Na CN somem da topbar —
- * sócio e torcedor — e voltam ao abrir a aba do canal.
+ * Módulos do canal (torcida/unidade). Na CN somem da topbar — sócio,
+ * torcedor e super-admin — e voltam ao abrir a aba torcida/unidade.
+ * Na praça do clube fica só Comunidade.
  */
 const LINKS_REATIVOS_CANAL = new Set([
+  '/portal/carteirinha',
+  '/portal/departamentos',
   '/portal/eventos',
   '/portal/sedes',
   '/portal/loja',
@@ -125,8 +128,9 @@ export function PortalNavbar({
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
 
-  // CN: sem cadeado admin e sem Agenda/Sedes/Loja. Fonte de verdade = escopo
-  // do chrome da comunidade (mesmo resolver da marca); URL só como fallback.
+  // CN: sem cadeado admin e sem módulos do canal (Carteirinha/Departamentos/
+  // Agenda/Sedes/Loja). Fonte de verdade = escopo do chrome da comunidade
+  // (mesmo resolver da marca); URL só como fallback.
   const naComunidade = pathname.startsWith('/portal/comunidade')
   const escopoParam = searchParams.get('escopo')
   const emEscopoNacional =
@@ -143,8 +147,9 @@ export function PortalNavbar({
   const baseLinks = modoNacional
     ? navLinks.filter((link) => !ocultosNacional.has(link.href))
     : [...navLinks]
-  // Departamentos: só sócio com área (temDepartamentos). Torcedor do convite
-  // nunca entra — layout já passa 0 no modo nacional.
+  // Departamentos: só sócio com área (temDepartamentos) ou SA no tenant.
+  // Torcedor do convite nunca entra — layout já passa 0 no modo nacional.
+  // Na CN o filtro abaixo remove o atalho mesmo com temDepartamentos=true.
   const linksComDepto = temDepartamentos
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
@@ -192,7 +197,7 @@ export function PortalNavbar({
   return (
     <NavPendingProvider>
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
-        <div className="app-container flex h-14 items-center gap-4">
+        <div className="app-container flex h-14 items-center gap-2 sm:gap-4">
 
           <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
@@ -233,7 +238,9 @@ export function PortalNavbar({
             })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          {/* gap menor no base: com 3 atalhos + mensagens + sino + cadeado, a
+              faixa de ações estourava a viewport em 320px (iPhone SE). */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             {atalhosTopbarMobile.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)

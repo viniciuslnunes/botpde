@@ -79,22 +79,58 @@ let encerrados = 0
 let mantidos = 0
 
 for (const row of registros) {
-  const membro = await db.saasMembro.findUnique({
+  // O vínculo pode não estar no tenant que **hospeda** o canal. Numa unidade
+  // promovida (Caso B), a `Sede` pertence ao tenant-filho e a `Conversa` mora
+  // no tenant da mãe — é o "canal emprestado" que
+  // `assertElegibilidadeMembroCanal` resolve com um fallback.
+  //
+  // A query de candidatos não conhece esse fallback e marcava essa gente como
+  // SEM_VINCULO_LOCAL. Medido antes desta correção: **88 de 197** tinham
+  // vínculo legítimo na unidade dona e teriam sido expulsas. Repair que
+  // remove membro válido é pior que o problema que veio consertar.
+  let tenantVinculoId = row.conversa.tenantId
+  let membro = await db.saasMembro.findUnique({
     where: { tenantId_userId: { userId: row.userId, tenantId: row.conversa.tenantId } },
     select: { sedeId: true, status: true, tipo: true, desligadoEm: true },
   })
+  const ativoAqui =
+    membro?.status === 'APROVADO' && membro.desligadoEm === null
+  if (!ativoAqui) {
+    const unidadeDona = await db.sede.findFirst({
+      where: { canalConversaId: row.conversaId, tenantId: { not: row.conversa.tenantId } },
+      select: { tenantId: true },
+    })
+    if (unidadeDona?.tenantId) {
+      const naUnidade = await db.saasMembro.findUnique({
+        where: { tenantId_userId: { userId: row.userId, tenantId: unidadeDona.tenantId } },
+        select: { sedeId: true, status: true, tipo: true, desligadoEm: true },
+      })
+      if (naUnidade) {
+        membro = naUnidade
+        tenantVinculoId = unidadeDona.tenantId
+      }
+    }
+  }
+
   const socio = membro?.tipo === 'SOCIO'
     ? await db.saasSocio.findUnique({
-        where: {
-          tenantId_userId: { userId: row.userId, tenantId: row.conversa.tenantId },
-        },
+        where: { tenantId_userId: { userId: row.userId, tenantId: tenantVinculoId } },
         select: { validade: true },
       })
     : null
+  const carteirinhaVencida = Boolean(socio && socio.validade < new Date())
+
+  // Carteirinha vencida **não** encerra a inscrição por padrão. Vencer é
+  // estado temporário e reversível; sair do canal não é — a reinscrição só
+  // acontece em `vincularMembroCanaisAposAprovacao`, ou seja, numa nova
+  // aprovação. O gate de leitura já barra quem está vencido, então remover
+  // não protege nada e custa o retorno da pessoa quando ela regulariza.
+  // 278 casos no banco. Use `--encerrar-vencidos` para o comportamento antigo.
+  const ENCERRAR_VENCIDOS = process.argv.includes('--encerrar-vencidos')
   const ativo =
     membro?.status === 'APROVADO' &&
     membro.desligadoEm === null &&
-    (!socio || socio.validade >= new Date())
+    (!carteirinhaVencida || !ENCERRAR_VENCIDOS)
 
   if (row.status === 'PENDENTE' && !membro) {
     if (dryRun) {
