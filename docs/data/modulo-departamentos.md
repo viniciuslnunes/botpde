@@ -261,10 +261,13 @@ Visão-alvo portal × admin (membros no portal, gestores com painel + operação
 ver `docs/data/proposta-departamentos-portal-admin.md`.
 
 **Hub `/portal/departamentos`:** menu único de áreas. Membro vê só onde atua;
-membro da **Diretoria** vê todas as áreas (somente leitura da home), e **Gestão**
-só onde é `DepartamentoGestor` (ou permissão equivalente). Operação admin fica
-no painel do domínio da área. Mensalidades, caravanas, bateria e financeiro
-**não** ficam na topbar — abrem por este hub.
+membro da **Diretoria** vê todas as áreas. **Gestão / visão de administrador**
+em todo departamento quando a pessoa tem `roles:manage` (Presidência,
+Liderança, Admin, Vice) **ou** é `DepartamentoGestor` daquela área — a UI do
+hub e do cockpit espelha `canManageDepartamento`. Super-admin **sem** cargo no
+tenant continua oversight de leitura. Operação admin do domínio fica no painel
+da área. Mensalidades, caravanas, bateria e financeiro **não** ficam na topbar
+— abrem por este hub.
 
 **Diretoria (gestor):** a home `/portal/departamentos/diretoria` lista solicitações
 `PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).

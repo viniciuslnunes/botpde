@@ -105,7 +105,6 @@ export default async function DepartamentoHomePage({
     departamento: depto,
     capability,
     isSuperAdmin,
-    isGestor,
     isAtuacao,
     permissoesEfetivas,
     podeGerirEquipe,
@@ -115,6 +114,10 @@ export default async function DepartamentoHomePage({
     podeModerar,
     areas,
   } = ctx
+
+  // Visão de administrador do cockpit = mesma regra das actions
+  // (`canManageDepartamento`: roles:manage OU DepartamentoGestor).
+  const isGestor = podeGerirEquipe
 
   const podeVerPedidos =
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.STORE_VIEW_ORDERS)
@@ -773,7 +776,7 @@ export default async function DepartamentoHomePage({
               departamentoId={depto.id}
               slug={depto.slug}
               areas={areasResumo}
-              podeGerir={podeGerirEquipe}
+              podeGerir={isGestor}
               canaisDisponiveis={canaisDisponiveis}
             />
           </DepartamentoSectionCard>
@@ -790,7 +793,7 @@ export default async function DepartamentoHomePage({
               slug={depto.slug}
               projetos={projetos}
               areas={areasOpcoes}
-              podeGerir={podeGerirEquipe}
+              podeGerir={isGestor}
               areasSazonaisSemCampanha={areasResumo
                 .filter((a) => a.ativa && a.sazonal && !a.campanhaAnoAberta)
                 .map((a) => ({ id: a.id, nome: a.nome }))}
@@ -804,7 +807,7 @@ export default async function DepartamentoHomePage({
               nome={depto.nome}
               cor={depto.cor}
               membros={membros}
-              isGestor={podeGerirEquipe}
+              isGestor={isGestor}
               currentUserId={userId}
               areas={areasFiltro}
             />
@@ -815,7 +818,7 @@ export default async function DepartamentoHomePage({
       <DepartamentoCanalBlock
         departamentoId={depto.id}
         slug={depto.slug}
-        isGestor={podeGerirEquipe}
+        isGestor={isGestor}
         canal={depto.canalConversa}
         canaisDisponiveis={canaisDisponiveis}
       />

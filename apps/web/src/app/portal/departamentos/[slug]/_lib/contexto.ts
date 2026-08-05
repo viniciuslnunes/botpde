@@ -38,14 +38,20 @@ export interface DepartamentoContexto {
   departamento: DeptoRow
   capability: ReturnType<typeof capabilityPorSlug>
   isSuperAdmin: boolean
-  /** DepartamentoGestor desta área — SA sem cargo real não conta. */
+  /**
+   * Row em `DepartamentoGestor` desta área (delegação pontual).
+   * Preferir `podeGerirEquipe` para UI/autorização de gestão.
+   */
   isGestor: boolean
   /** Tem `UserDepartamento` nesta área (equipe canônica). */
   isAtuacao: boolean
   /** Enxerga por ser Diretoria (ou SA operador), sem atuação própria na área. */
   visaoDiretoria: boolean
   permissoesEfetivas: string[]
-  /** Autorização real de gestão (mesma regra de `assertPodeGerirArea`). */
+  /**
+   * Autorização real de gestão (`canManageDepartamento`: `roles:manage` OU
+   * row de gestor). Use isto para visão de administrador no cockpit.
+   */
   podeGerirEquipe: boolean
   /** Aprovar filas desta área — RBAC real; SA só se tiver o cargo no tenant. */
   podeAprovarArea: boolean

@@ -2,10 +2,11 @@
  * Regras do hub `/portal/departamentos`:
  * - Membro vê só áreas em que atua (UserDepartamento).
  * - Membro da Diretoria (ou super-admin em modo operador) vê todas as áreas
- *   do tenant — SA é oversight de leitura, igual à Diretoria.
- * - Gestão/Operação só se for DepartamentoGestor daquela área (ou
- *   `roles:manage` real nas actions). Super-admin **não** vira gestor só pelo
- *   bypass da plataforma; Diretoria também não herda “gestor de tudo”.
+ *   do tenant.
+ * - Visão de administrador (gestão/operação na UI): `DepartamentoGestor` da
+ *   área **ou** `roles:manage` no tenant (Presidência / Liderança / Admin /
+ *   Vice). Super-admin **sem** cargo no tenant continua oversight de leitura —
+ *   o bypass da plataforma sozinho não concede gestão.
  */
 
 export type DeptoHubBase = {
@@ -20,9 +21,13 @@ export type DeptoHubBase = {
 }
 
 export type DeptoHubItem = DeptoHubBase & {
+  /** Gestor da área (row) ou gestão global via `roles:manage`. */
   isGestor: boolean
   isAtuacao: boolean
-  /** Visível só porque é Diretoria — sem membership na área. */
+  /**
+   * Visível por oversight da Diretoria/SA, sem `UserDepartamento` nesta área.
+   * Não implica só-leitura: com `roles:manage` (`isGestor`) a UI é de admin.
+   */
   visaoDiretoria: boolean
 }
 
@@ -36,10 +41,16 @@ export function resolverDepartamentosHub(input: {
   gestorIds: Set<string> | string[]
   diretoriaId: string | null
   isSuperAdmin?: boolean
+  /**
+   * Presidência / Liderança / Admin / Vice (`roles:manage`): visão de gestor
+   * em todos os departamentos visíveis — espelha `canManageDepartamento`.
+   */
+  podeGerirGlobal?: boolean
 }): DeptoHubItem[] {
   const membershipIds = asSet(input.membershipIds)
   const gestorIds = asSet(input.gestorIds)
   const isSuperAdmin = Boolean(input.isSuperAdmin)
+  const podeGerirGlobal = Boolean(input.podeGerirGlobal)
   const isDiretoria =
     isSuperAdmin ||
     (input.diretoriaId != null && membershipIds.has(input.diretoriaId))
@@ -54,8 +65,8 @@ export function resolverDepartamentosHub(input: {
     const isAtuacao = membershipIds.has(d.id)
     return {
       ...d,
-      // SA vê tudo, mas gestão só com vínculo real de DepartamentoGestor.
-      isGestor: gestorIds.has(d.id),
+      // Gestão: row de DepartamentoGestor OU cargo com roles:manage no tenant.
+      isGestor: podeGerirGlobal || gestorIds.has(d.id),
       isAtuacao,
       visaoDiretoria: isDiretoria && !isAtuacao,
     }
@@ -90,8 +101,9 @@ export type AreaAcesso = AreaBase & {
  * Resolve as áreas de um departamento sob o ponto de vista de quem está
  * olhando: minhas áreas primeiro, depois ativas, depois `ordem`/nome.
  * `RESPONSAVEL` de área é rótulo de accountability — não concede gestão.
- * Super-admin vê as áreas (via hub/cockpit), mas `podeGerir` só com
- * `isGestorDepartamento` real — o parâmetro `isSuperAdmin` é ignorado (legado).
+ * `podeGerir` vem de `isGestorDepartamento` (row **ou** `roles:manage` no
+ * call site). Super-admin sem cargo no tenant não recebe gestão — o parâmetro
+ * `isSuperAdmin` é ignorado (legado).
  */
 export function resolverAreasDepartamento(input: {
   areas: AreaBase[]

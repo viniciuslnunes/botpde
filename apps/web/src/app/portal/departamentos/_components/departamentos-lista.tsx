@@ -47,11 +47,13 @@ type DeptoHubCardItem = DeptoHubItem & {
 
 /** O que cada papel pode fazer — o vocabulário do hub era implícito até aqui. */
 function explicacaoPapel(depto: DeptoHubItem): string {
+  if (depto.isGestor) {
+    return depto.visaoDiretoria
+      ? 'Você gere este departamento pela Presidência/Liderança: pode organizar áreas, equipe e operação, mesmo sem atuar nele no dia a dia.'
+      : 'Você gere este departamento: pode organizar áreas, incluir e remover pessoas da equipe e definir responsáveis.'
+  }
   if (depto.visaoDiretoria) {
     return 'Você enxerga este departamento como Diretoria: leitura da home, sem gestão. Quem gere é o gestor da área.'
-  }
-  if (depto.isGestor) {
-    return 'Você gere este departamento: pode organizar áreas, incluir e remover pessoas da equipe e definir responsáveis.'
   }
   return 'Você atua neste departamento: vê a equipe, as áreas e o painel do domínio. A gestão é do gestor da área.'
 }
@@ -87,18 +89,19 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
   const moduloHref = hrefModuloPortal(moduloKey)
   const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
   const Icon = iconeDepartamento(depto.slug)
-  // Demais departamentos (visão Diretoria): só leitura — não herdar Gestor/Gestão via SA.
-  const mostraModulo = Boolean(moduloHref) && depto.isAtuacao
-  const mostraGestao = depto.isGestor && !depto.visaoDiretoria
+  // Atualhos de módulo/gestão: quem tem isGestor (row ou roles:manage) opera;
+  // visão Diretoria só-leitura fica sem esses CTAs.
+  const mostraModulo = Boolean(moduloHref) && (depto.isAtuacao || depto.isGestor)
+  const mostraGestao = depto.isGestor
   const mission = missionDepartamento(depto.slug)
   const areasVisiveis = depto.minhasAreas.slice(0, 3)
   const areasRestantes = depto.minhasAreas.length - areasVisiveis.length
-  const papelBadge = depto.visaoDiretoria ? (
+  const papelBadge = depto.isGestor ? (
+    <Badge variant="primary">Gestor</Badge>
+  ) : depto.visaoDiretoria ? (
     <Badge variant="neutral" icon={<Eye className="h-3 w-3" aria-hidden />}>
       Só leitura
     </Badge>
-  ) : depto.isGestor ? (
-    <Badge variant="primary">Gestor</Badge>
   ) : (
     <Badge variant="neutral">Membro</Badge>
   )
@@ -444,6 +447,7 @@ export async function DepartamentosSection() {
     gestorIds: gestorDe.map((g) => g.departamentoId),
     diretoriaId,
     isSuperAdmin,
+    podeGerirGlobal: podeGerirCoresGlobal,
   })
 
   const kpiPorSlug = await carregarKpisHub({
@@ -494,14 +498,19 @@ export async function DepartamentosSection() {
   const meusDepartamentos = cards.filter((d) => d.isAtuacao)
   const demaisDepartamentos = cards.filter((d) => d.visaoDiretoria)
   const temSecoes = meusDepartamentos.length > 0 && demaisDepartamentos.length > 0
+  const gereDemais = demaisDepartamentos.some((d) => d.isGestor)
 
   return (
     <div className="space-y-8">
       {demaisDepartamentos.length > 0 && (
         <p className="rounded-xl border border-[rgb(var(--primary)_/_0.2)] bg-[rgb(var(--primary)_/_0.06)] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-          {temSecoes
-            ? 'Como Diretoria, você também vê os demais departamentos em só leitura. Gestão só onde você é gestor.'
-            : 'Você vê todos os departamentos da torcida. Gestão só onde você é gestor.'}
+          {gereDemais
+            ? temSecoes
+              ? 'Como Presidência/Liderança, você também gere os demais departamentos: áreas, equipe e operação.'
+              : 'Você vê e gere todos os departamentos da torcida.'
+            : temSecoes
+              ? 'Como Diretoria, você também vê os demais departamentos em só leitura. Gestão só onde você é gestor.'
+              : 'Você vê todos os departamentos da torcida. Gestão só onde você é gestor.'}
         </p>
       )}
 
@@ -519,7 +528,9 @@ export async function DepartamentosSection() {
                 Demais departamentos
               </h2>
               <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                Visão da Diretoria · só leitura da home
+                {gereDemais
+                  ? 'Visão da Presidência/Liderança · gestão em todos'
+                  : 'Visão da Diretoria · só leitura da home'}
               </p>
             </div>
             <DeptoHubGrid

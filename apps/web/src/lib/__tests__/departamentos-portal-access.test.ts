@@ -41,7 +41,7 @@ describe('departamentos portal access', () => {
     expect(items[0]?.isGestor).toBe(false)
   })
 
-  it('diretoria vê todas; gestão só onde é gestor', () => {
+  it('diretoria vê todas; gestão só onde é gestor (sem roles:manage)', () => {
     const items = resolverDepartamentosHub({
       todos: [diretoria, financeiro, bateria],
       membershipIds: ['d1'],
@@ -55,6 +55,21 @@ describe('departamentos portal access', () => {
     const dir = items.find((i) => i.slug === 'diretoria')
     expect(dir?.isGestor).toBe(true)
     expect(dir?.isAtuacao).toBe(true)
+  })
+
+  it('roles:manage (podeGerirGlobal) → visão de gestor em todos os departamentos', () => {
+    const items = resolverDepartamentosHub({
+      todos: [diretoria, financeiro, bateria],
+      membershipIds: ['d1'],
+      gestorIds: ['d1'],
+      diretoriaId: 'd1',
+      podeGerirGlobal: true,
+    })
+    expect(items.every((i) => i.isGestor)).toBe(true)
+    const fin = items.find((i) => i.slug === 'financeiro')
+    expect(fin?.visaoDiretoria).toBe(true)
+    expect(fin?.isAtuacao).toBe(false)
+    expect(fin?.isGestor).toBe(true)
   })
 
   it('pode abrir: atuação ou diretoria', () => {
@@ -74,7 +89,7 @@ describe('departamentos portal access', () => {
     ).toBe(false)
   })
 
-  it('super-admin vê todos os departamentos sem virar gestor', () => {
+  it('super-admin sem cargo no tenant vê todos sem virar gestor', () => {
     const items = resolverDepartamentosHub({
       todos: [diretoria, financeiro, bateria],
       membershipIds: [],
@@ -93,6 +108,18 @@ describe('departamentos portal access', () => {
         isSuperAdmin: true,
       }),
     ).toBe(true)
+  })
+
+  it('super-admin dual-hat com roles:manage gere todos', () => {
+    const items = resolverDepartamentosHub({
+      todos: [diretoria, financeiro, bateria],
+      membershipIds: [],
+      gestorIds: [],
+      diretoriaId: 'd1',
+      isSuperAdmin: true,
+      podeGerirGlobal: true,
+    })
+    expect(items.every((i) => i.isGestor)).toBe(true)
   })
 })
 
