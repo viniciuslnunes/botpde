@@ -1,101 +1,29 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { detectarEscudoCircular } from '@/lib/escudo-forma'
-import { bboxConteudoOpaco, destinoContain } from '@/lib/logo-miniatura-fit'
-import './logo-miniatura.css'
 
 /** Tamanho único da barra de canais / brand do header. */
-export const LOGO_MINIATURA_PX = 32
-const FIT_PADDING_PX = 2
+export const LOGO_MINIATURA_PX = 28
 
 type Props = {
   src: string
   alt: string
   /**
    * - `auto`: máscara circular só se badge com fundo opaco (header)
-   * - `circle`: sempre disco — tabs (mesmo frame para clube e canais)
+   * - `circle`: sempre disco preenchido — tabs (mesmo tamanho visual para todos)
    */
   shape?: 'auto' | 'circle'
   rounded?: string
   className?: string
 }
 
-function carregarImagem(src: string, crossOrigin?: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image()
-    if (crossOrigin) img.crossOrigin = crossOrigin
-    img.decoding = 'async'
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('img-load'))
-    img.src = src
-  })
-}
-
-async function bitmapSameOrigin(src: string): Promise<HTMLImageElement> {
-  try {
-    const res = await fetch(src, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
-    if (!res.ok) throw new Error('fetch')
-    const blob = await res.blob()
-    const obj = URL.createObjectURL(blob)
-    try {
-      return await carregarImagem(obj)
-    } finally {
-      URL.revokeObjectURL(obj)
-    }
-  } catch {
-    return carregarImagem(src, 'anonymous')
-  }
-}
-
 /**
- * Recorta padding transparente e redesenha contain em `size`×`size`.
- * Null se CORS impedir leitura de pixels — o <img> original ainda cabe no box.
- */
-async function normalizarMiniatura(src: string, size: number): Promise<string | null> {
-  try {
-    const img = await bitmapSameOrigin(src)
-    const w = img.naturalWidth || img.width
-    const h = img.naturalHeight || img.height
-    if (!w || !h) return null
-
-    const tmp = document.createElement('canvas')
-    tmp.width = w
-    tmp.height = h
-    const ctx = tmp.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return null
-    ctx.drawImage(img, 0, 0)
-    let bbox
-    try {
-      bbox = bboxConteudoOpaco(ctx.getImageData(0, 0, w, h).data, w, h)
-    } catch {
-      return null
-    }
-    if (!bbox) return null
-
-    const out = document.createElement('canvas')
-    out.width = size
-    out.height = size
-    const octx = out.getContext('2d')
-    if (!octx) return null
-    const d = destinoContain(bbox.w, bbox.h, size, FIT_PADDING_PX)
-    octx.clearRect(0, 0, size, size)
-    octx.drawImage(img, bbox.x, bbox.y, bbox.w, bbox.h, d.dx, d.dy, d.dw, d.dh)
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      out.toBlob(resolve, 'image/png')
-    })
-    if (!blob) return null
-    return URL.createObjectURL(blob)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Miniatura 32×32 travada por CSS (`contain: size` + !important).
- * Tabs e header compartilham o mesmo box; o fit recorta alpha para o
- * escudo full-bleed do clube não pesar mais que logos altos (Gaviões).
+ * Miniatura de logo com tamanho fixo.
+ *
+ * Tabs (`shape="circle"`): usa `background-size: cover` num disco — o escudo
+ * do clube e o da torcida ocupam exatamente o mesmo círculo (contain fazia o
+ * escudo “cheio” parecer maior que logos altos como Gaviões).
  */
 export function LogoMiniatura({
   src,
@@ -104,26 +32,7 @@ export function LogoMiniatura({
   rounded = '',
   className,
 }: Props) {
-  const [fittedSrc, setFittedSrc] = useState<string | null>(null)
   const [circularDetectado, setCircularDetectado] = useState(shape === 'circle')
-
-  useEffect(() => {
-    let ativo = true
-    let created: string | null = null
-    setFittedSrc(null)
-    void normalizarMiniatura(src, LOGO_MINIATURA_PX).then((url) => {
-      if (!ativo) {
-        if (url) URL.revokeObjectURL(url)
-        return
-      }
-      created = url
-      setFittedSrc(url)
-    })
-    return () => {
-      ativo = false
-      if (created) URL.revokeObjectURL(created)
-    }
-  }, [src])
 
   useEffect(() => {
     if (shape === 'circle') {
@@ -141,24 +50,79 @@ export function LogoMiniatura({
   }, [src, shape])
 
   const circular = shape === 'circle' || circularDetectado
-  const boxClass = [
-    'logo-miniatura',
-    circular ? 'logo-miniatura--circle' : '',
-    !circular && rounded ? rounded : '',
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
+
+  // Tabs: background cover — sem <img>, sem tamanho intrínseco, sem overflow.
+  if (shape === 'circle') {
+    const safeUrl = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    const disco: CSSProperties = {
+      width: LOGO_MINIATURA_PX,
+      height: LOGO_MINIATURA_PX,
+      minWidth: LOGO_MINIATURA_PX,
+      minHeight: LOGO_MINIATURA_PX,
+      maxWidth: LOGO_MINIATURA_PX,
+      maxHeight: LOGO_MINIATURA_PX,
+      display: 'block',
+      flexShrink: 0,
+      boxSizing: 'border-box',
+      borderRadius: '50%',
+      overflow: 'hidden',
+      backgroundImage: `url("${safeUrl}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    }
+    return (
+      <span
+        role="img"
+        aria-label={alt || undefined}
+        className={className}
+        style={disco}
+        title={alt || undefined}
+      />
+    )
+  }
+
+  const boxStyle: CSSProperties = {
+    width: LOGO_MINIATURA_PX,
+    height: LOGO_MINIATURA_PX,
+    minWidth: LOGO_MINIATURA_PX,
+    minHeight: LOGO_MINIATURA_PX,
+    maxWidth: LOGO_MINIATURA_PX,
+    maxHeight: LOGO_MINIATURA_PX,
+    position: 'relative',
+    display: 'block',
+    overflow: 'hidden',
+    flexShrink: 0,
+    boxSizing: 'border-box',
+    lineHeight: 0,
+    fontSize: 0,
+    borderRadius: circular ? '50%' : undefined,
+  }
+
+  const imgStyle: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    objectPosition: 'center',
+    pointerEvents: 'none',
+    display: 'block',
+  }
 
   return (
-    <span className={boxClass} data-logo-miniatura={LOGO_MINIATURA_PX}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- tamanho travado em CSS, sem next/image */}
+    <span
+      className={[className, !circular && rounded ? rounded : ''].filter(Boolean).join(' ')}
+      style={boxStyle}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- header / auto */}
       <img
-        src={fittedSrc ?? src}
+        src={src}
         alt={alt}
         width={LOGO_MINIATURA_PX}
         height={LOGO_MINIATURA_PX}
         decoding="async"
+        style={imgStyle}
       />
     </span>
   )
