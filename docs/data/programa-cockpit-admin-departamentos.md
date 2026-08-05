@@ -4,7 +4,12 @@
 > PWA / canal-por-área **HOLD** (R8). Relatório:
 > `docs/ops/piloto-cockpit-pos-onda5-resultado.md`.
 > Onda 4: Feminino `/admin/feminino`, Diretoria `/admin/diretoria`.
-> Onda 3: Social `/admin/social`, Carnaval `/admin/carnaval`.  
+> Onda 3: Social `/admin/social`, Carnaval `/admin/carnaval`.
+> **Navegação (2026-08-05):** hubs thin no `ADMIN_MENU` com `departamentoSlug` +
+> `filterMenuByPermissionsAndGestoria` (gestor só vê o próprio módulo).
+> **Agenda dia operacional (2026-08-05):** semana como entrada +
+> `agruparDiaOperacional` + vincular partida; hubs thin com `DepartamentoSemanaOps`
+> (critério ≤2 cliques até ops do próximo jogo).  
 
 > **Complementa:** `modulo-departamentos.md`, `proposta-departamentos-portal-admin.md`  
 > (esta virada **revisa** o foco “gestor opera só no portal”: o portal continua  
@@ -211,7 +216,9 @@ UI: kit `components/admin/ui/` + tabs `ADMIN_MODULOS` / `montarTabsModulo`.
 
 - Switch monstro de 10 cases num componente.
 - Duplicar Loja/Comunidade/Eventos dentro do depto.
-- Filtrar sidebar por nome do departamento.
+- Filtrar sidebar de **domínios** por nome do departamento (Financeiro some
+  se você não é do depto Financeiro). Hubs thin usam `departamentoSlug` +
+  gestoria — isso não é o mesmo anti-padrão.
 - Segundo calendário paralelo ao hub Agenda (quebraria decisão **1A** no **modelo**).
 - Dar `roles:manage` ao gestor “só para ver gente”.
 

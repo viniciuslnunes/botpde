@@ -18,8 +18,11 @@
 
 Rotas `/portal/caravanas*` redirecionam para o hub / detalhe unificado.
 Admin ops: `/admin/caravanas` (thin wrapper sobre `Evento`; detalhe em
-`/admin/eventos/[id]`). Filtro legado `/admin/eventos?tipo=CARAVANA` segue válido.
+`/admin/eventos/[id]` via alias). Entrada: **semana operacional**
+(`DepartamentoSemanaOps`) com cluster do dia do jogo + CTA vincular partida +
+atalho “Evento na sede”. Filtro legado `/admin/eventos?tipo=CARAVANA` segue válido.
 Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md).
+Cluster: [`modulo-eventos.md`](./modulo-eventos.md) § Dia operacional.
 
 ## Modelo
 

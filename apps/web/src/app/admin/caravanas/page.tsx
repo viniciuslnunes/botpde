@@ -15,6 +15,7 @@ import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoCaravanas } from '@/lib/caravanas-direcao'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
+import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
@@ -61,20 +62,30 @@ async function CaravanasKpis({ tenantId }: { tenantId: string }) {
 async function CaravanasInboxELista({
   tenantId,
   podeGerir,
+  podeVincular,
 }: {
   tenantId: string
   podeGerir: boolean
+  podeVincular: boolean
 }) {
   const ops = await carregarDirecaoCaravanas(tenantId)
   return (
     <>
+      <DepartamentoSemanaOps
+        itens={ops.semana}
+        partidas={ops.partidasSemana}
+        semanaHref="/admin/eventos?vista=semana&tipo=CARAVANA"
+        podeVincularPartida={podeVincular}
+        titulo="Semana das caravanas"
+      />
+
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
             Precisa de você
           </h2>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Alertas de lotação, pagamento e embarque — ação inline quando possível.
+            Lotação, pagamento, embarque e vínculo com o jogo do dia.
           </p>
         </div>
         <AdminInboxList
@@ -93,6 +104,7 @@ async function CaravanasInboxELista({
           eventos={ops.lista}
           emptyTitle="Nenhuma caravana futura"
           emptyDescription="Crie a próxima viagem para o departamento operar o embarque."
+          detailBasePath="/admin/caravanas"
         />
       </section>
     </>
@@ -114,14 +126,25 @@ async function CaravanasActions({
     listarProjetosParaEvento(tenantId),
   ])
   return (
-    <NovoEventoButton
-      defaultTipo="CARAVANA"
-      sedes={sedes}
-      partidas={partidas}
-      projetos={projetos}
-      temAfiliacao={Boolean(afiliacaoId)}
-      redirectTo="/admin/caravanas"
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      <NovoEventoButton
+        defaultTipo="CARAVANA"
+        sedes={sedes}
+        partidas={partidas}
+        projetos={projetos}
+        temAfiliacao={Boolean(afiliacaoId)}
+        redirectTo="/admin/caravanas"
+      />
+      <NovoEventoButton
+        defaultTipo="GERAL"
+        sedes={sedes}
+        partidas={partidas}
+        projetos={projetos}
+        temAfiliacao={Boolean(afiliacaoId)}
+        redirectTo="/admin/caravanas"
+        label="Evento na sede"
+      />
+    </div>
   )
 }
 
@@ -129,6 +152,7 @@ export default async function AdminCaravanasPage() {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
+  let podeVincular = false
   try {
     const authz = await assertAnyPermission([
       PERMISSIONS.EVENTS_VIEW,
@@ -137,10 +161,13 @@ export default async function AdminCaravanasPage() {
     ])
     session = authz.session
     tenant = authz.tenant
+    const efetivas = authz.permissoesEfetivas ?? []
     podeGerir =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
+      hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.EVENTS_CREATE)
+    podeVincular =
+      Boolean(authz.isSuperAdmin) || hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE)
   } catch {
     redirect('/admin')
   }
@@ -150,16 +177,16 @@ export default async function AdminCaravanasPage() {
     <>
       <AdminPageHeader
         title="Caravanas"
-        description="Operação das viagens — lotação, pagamento e embarque. O calendário completo continua na Agenda."
+        description="Semana operacional — jogo do dia, lotação, pagamento e embarque."
         icon={<Bus className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/admin/eventos?tipo=CARAVANA"
+              href="/admin/eventos?vista=semana&tipo=CARAVANA"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
-              Ver na Agenda
+              Agenda da semana
             </Link>
             <Suspense fallback={null}>
               <CaravanasActions tenantId={tenant.id} podeGerir={podeGerir} />
@@ -171,8 +198,8 @@ export default async function AdminCaravanasPage() {
       <div className="app-container space-y-6 py-6">
         <MotionReveal>
           <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Posto de comando do departamento de Caravanas. Detalhe e check-in abrem na ficha da
-            Agenda.
+            No mesmo dia do jogo pode haver caravana e ação na unidade — vincule à partida e opere
+            o embarque daqui.
           </p>
         </MotionReveal>
 
@@ -188,7 +215,11 @@ export default async function AdminCaravanasPage() {
             </div>
           }
         >
-          <CaravanasInboxELista tenantId={tenant.id} podeGerir={podeGerir} />
+          <CaravanasInboxELista
+            tenantId={tenant.id}
+            podeGerir={podeGerir}
+            podeVincular={podeVincular}
+          />
         </Suspense>
       </div>
     </>

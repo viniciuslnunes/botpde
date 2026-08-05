@@ -51,6 +51,40 @@ export const listPartidasParaEvento = cache(async function listPartidasParaEvent
   return rows
 })
 
+/** Partidas da afiliação numa janela de datas (semana/mês do calendário). */
+export async function listPartidasNaJanela(
+  tenantId: string,
+  gte: Date,
+  lt: Date,
+  limite = 40,
+): Promise<PartidaOption[]> {
+  const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { afiliacaoId: true },
+  })
+  if (!tenant?.afiliacaoId) return []
+
+  const rows: PartidaOption[] = await db.partida.findMany({
+    where: {
+      afiliacaoId: tenant.afiliacaoId,
+      status: { in: ['AGENDADA', 'AO_VIVO', 'ENCERRADA'] },
+      dataHora: { gte, lt },
+    },
+    select: {
+      id: true,
+      adversario: true,
+      competicao: true,
+      dataHora: true,
+      local: true,
+      mando: true,
+      status: true,
+    },
+    orderBy: { dataHora: 'asc' },
+    take: limite,
+  })
+  return rows
+}
+
 export async function getAfiliacaoIdDoTenant(tenantId: string): Promise<string | null> {
   const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
     where: { id: tenantId },

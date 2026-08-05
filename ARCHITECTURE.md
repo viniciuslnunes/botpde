@@ -1166,11 +1166,16 @@ diferente. `DepartamentoArea` + `DepartamentoAreaMembro` modelam isso. Spec:
   permissões e áreas; os blocos só leem booleanos. Blocos sem permissão
   aparecem `blocked` com motivo em vez de sumir — invisibilidade ensina menos
   que uma porta fechada e rotulada.
-- **O admin do módulo é `roles:manage`.** Departamento como área operacional
-  ganhou módulo próprio (`/admin/departamentos`), mas gestor de departamento
-  continua sem rota admin nova: opera pelo portal. Mantém §5.12 e o item 7 de
-  `modulo-departamentos.md` — colaborador não recebe permissão que abre
-  operação admin.
+- **Institucional × comando.** `/admin/departamentos` (visão/áreas/equipes/
+  projetos) continua `roles:manage`. Hubs de **comando** por domínio
+  (`/admin/caravanas`, `/admin/bateria`, `/admin/social`, `/admin/feminino`,
+  `/admin/carnaval`, `/admin/diretoria` + Financeiro/Loja/…) entram no
+  `ADMIN_MENU` com `departamentoSlug`; o layout filtra por gestoria
+  (`filterMenuByPermissionsAndGestoria`) — gestor só vê o módulo do seu
+  depto; `roles:manage` / super-admin vê todos. Colaborador (MEMBRO) não
+  recebe permissão que abre operação admin (item 7 de
+  `modulo-departamentos.md`). Portal = execução; atalho “Operação” e o
+  menu admin apontam para o mesmo hub.
 
 ### 5.16 Projeto do departamento — execução com meta e orçamento (2026-08-03)
 
@@ -1300,6 +1305,50 @@ Mural do operador: `getCanalLeituraDireta` + `getPostsDoCanal({ leituraOperador 
 `trocarTorcidaAction`. Barra multi-canal: cookie `operador_canais_abertos` +
 badge X (`fecharCanalOperadorAction`). Admin: botão "Ir ao portal" sob
 Afiliações; Caso A (`origem === 'sede'`) abre modal em vez do portal.
+
+### 5.20 Responsividade mobile — auditoria medida em 320/390 (2026-08-05)
+
+Comunidade e admin já eram mobile-first (drawer do `AdminShell`, dock da
+Comunidade, colunas escondidas por breakpoint nas tabelas). O que faltava era
+medição: os estouros que sobravam **não** apareciam em grep de classe, porque
+não vinham de largura fixa — vinham de `min-width: auto` de item flex/grid,
+onde a largura é definida por **dado dinâmico** e nada pode encolher.
+
+`e2e/mobile-audit.measure.ts` passou a varrer 25 rotas em **320×844 e 390×844**
+reportando `pageOverflow` e o elemento culpado. Achados corrigidos:
+
+- **`<select>` define a coluna** (`/portal/comunidade/salas`, +111px): a opção
+  mais longa (título de evento) virava o `max-content` da única coluna do grid.
+  Fix global em `globals.css`: `input, select, textarea { min-width: 0 }` e
+  `select { max-width: 100% }` — zera só o **piso**, a largura `auto` segue
+  valendo quando há espaço (verificado: nenhum campo colapsou em 390 nem 1440).
+- **Item de grid sem `min-w-0`** (cards de sala): o `h3.truncate` não trunca se
+  um ancestral pode crescer. `min-w-0` no item + `truncate` no nome do host.
+- **Fila de abas sem trilho** (`ComunidadeTabBar`, `MotionTabBar`, +137px no
+  detalhe de grupo): 4+ abas empurravam a página. Borda foi para o wrapper e o
+  trilho virou `overflow-x-auto` com `pb-px` (compensa o `-mb-px` das abas, que
+  o overflow recortaria) — mesmo padrão do `AdminTabs`.
+- **PDV do bar** (+44px em 390): a coluna do cardápio não encolhia e o PDV é
+  `overflow-hidden` por ser imersivo, então a lista era **cortada**, não rolada.
+- **Faixa de ações da navbar** (+12px em 320): 3 atalhos + mensagens + sino +
+  cadeado. `gap-1.5 sm:gap-2` em vez de esconder atalho.
+- **Alvos de toque**: "por página" da listagem (25×20 → 32×32) e ícones do
+  patrimônio (28px → 36px, com `aria-label`, que faltava).
+- **Charts admin** (`MiniBarChart` em Relatórios/Evolução/Desempenho): o
+  rótulo `truncate` (`white-space: nowrap`) virava o min-content da coluna
+  flex, subia ao card e à grade do `InsightSection` (coluna implícita `auto`)
+  — em 390px o cartão chegava a ~657px e o `overflow-x: hidden` do body
+  **cortava** sem rolagem. Fix em três camadas: (1) trilho `overflow-x-auto`
+  + `w-0 flex-1` com `min-w` por coluna no `MiniBarChart`; (2) track
+  `grid-cols-[minmax(0,1fr)]` + `[&>*]:min-w-0` em `InsightSection`,
+  `AdminExpansionPanel` e `KpiGrid`; (3) `min-w-0` na raiz do Donut.
+
+Estado medido: **zero overflow** nas 25 rotas nas duas larguras. Ao mexer em
+layout de Comunidade/admin, rodar
+`pnpm --filter @torcida/web exec playwright test e2e/mobile-audit.measure.ts --project=measure`
+(precisa do dev server e de `--project=setup` para renovar `e2e/.auth`).
+Charts: `e2e/charts.measure.ts` (mesmas pré-condições) — falha se overflow > 2px
+ou texto vazar da coluna do MiniBarChart.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
@@ -1564,6 +1613,24 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
       do canal da unidade; segue encerrando no canal da SEDE.
     - `ESPERADO_POR_FLUXO` documenta que o lote entra sempre por convite, e
       que pela vitrine o esperado seria `false`.
+
+**Higiene aplicada (2026-08-04/05)**, depois de corrigir as ferramentas — em
+dois casos o repair era mais perigoso que o problema:
+- `db:repair-system-roles --permissions-only`: 4 `Role` (owner/admin em 2
+  torcidas) voltaram ao pacote do código. 571/571 em dia.
+- `db:repair-departamento-orfaos`: 23 `UserDepartamento` e 28 `UserRole` de
+  perfil de departamento em usuário inelegível.
+- `db:repair-aprovado-canal-membro`: 4 pares criados, 51 promovidos.
+- `db:repair-canal-membro-pendente-aprovado`: **de 487 para 121**. O script
+  não conhecia o **canal emprestado** — media o vínculo só no tenant que
+  hospeda a `Conversa` — e teria expulsado **88 membros legítimos** de unidade
+  Caso B. E encerrava por **carteirinha vencida**, que é estado temporário e
+  reversível enquanto sair do canal não é (a reinscrição só acontece numa nova
+  aprovação): 278 sócios que voltariam sozinhos ao regularizar. As duas coisas
+  foram corrigidas; vencer agora só entra atrás de `--encerrar-vencidos`.
+- `dados-reais.audit.ts` foi alinhado às mesmas três regras (canal emprestado,
+  Caso B no canal da Sede, pendente na unidade filha). **8 erros → 0**, com o
+  volume de carteirinhas vencidas virando alerta dimensionado em vez de falha.
 
 Cobertura nova: `audit:areas-projetos` (áreas de atuação e projetos —
 **zero** cobertura antes; o banco também estava sem nenhuma

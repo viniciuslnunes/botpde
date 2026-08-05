@@ -20,6 +20,21 @@
 
 Filtros: `?tipo=CARAVANA\|ENSAIO\|GERAL`, `?vista=lista\|semana\|mes`, `?q=`, `?data=YYYY-MM-DD`.
 
+## Dia operacional / cluster (2026-08-05)
+
+No mesmo dia civil (fuso SP) podem coexistir **partida do clube**, caravana,
+ensaio e evento GERAL na unidade. A Agenda e os hubs thin usam
+`agruparDiaOperacional` (`packages/types/src/eventos-cluster.js`):
+
+- Agrupa por `dayKey` + vínculos fortes (`partidaId`, `projetoId`, `serieId`)
+- Sugere “Vincular à partida do dia” quando há jogo e o evento ainda não tem
+  `partidaId` (mutação: `vincularEventoAPartida`, `events:manage` + AuditLog)
+- Sem tabela de relação entre eventos; sem segundo calendário
+
+Entrada UX: faixa **Esta semana** / **Operação do dia** na lista da Agenda e
+em `/admin/caravanas`, `/admin/bateria`, `/admin/social`, `/admin/feminino`,
+`/admin/carnaval` (`DepartamentoSemanaOps`).
+
 ## Modelo
 
 - `Evento` — `tipo` GERAL \| CARAVANA \| ENSAIO; `sedeId`; `capacidade`; `valorVaga`;

@@ -8,11 +8,12 @@ import { AdminRouteTransition } from '@/components/motion/admin-route-transition
 import {
   ADMIN_MENU,
   calculateEffectivePermissions,
-  filterMenuByPermissions,
+  filterMenuByPermissionsAndGestoria,
   hasAdminAreaAccess,
   hasPermission,
   PERMISSIONS,
 } from '@torcida/types'
+import { listarSlugsGestoriaNoTenant } from '@/lib/departamentos-gestoria'
 import {
   isSuperAdminEmail,
   listarClubesParaSelecao,
@@ -80,7 +81,17 @@ export default async function AdminLayout({
       (hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW) ||
         hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE)))
 
-  const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
+  const podeGerirTodos =
+    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.ROLES_MANAGE)
+  const gestorSlugs = isSuperAdmin
+    ? []
+    : await listarSlugsGestoriaNoTenant(session.user.id, tenant.id)
+  const menuBase = isSuperAdmin
+    ? ADMIN_MENU
+    : filterMenuByPermissionsAndGestoria(ADMIN_MENU, effectivePermissions, {
+        gestorSlugs,
+        podeGerirTodos,
+      })
   const menuItems = menuBase
     .filter((item) => item.id !== 'estrutura' || exibirEstrutura)
     .map((item) => ({

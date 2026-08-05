@@ -351,8 +351,9 @@ renomeado/desativado). É semente, não trava: a torcida cria as próprias área
   gate `roles:manage`. O pacote de permissão segue em `/admin/acessos` e **não**
   vira tab daqui — tab é etapa do próprio módulo (§5.12); o caminho para lá é um
   link na Visão, travado por `admin-modulos.test.ts`. Gestor de departamento
-  **não** ganha rota
-  admin nova: ele opera pelo cockpit do portal (mantém o item 7 das decisões).
+  comanda no admin pelo hub do domínio (`DEPARTAMENTO_MODULO_ADMIN_ROTA` +
+  item em `ADMIN_MENU` com `departamentoSlug`); o cockpit do portal continua
+  a execução do time (item 7: colaborador não abre operação admin).
   Listagens declaradas em `lib/listagem/specs.ts`
   (`LISTAGEM_DEPARTAMENTO_AREAS`, `LISTAGEM_DEPARTAMENTO_EQUIPES`).
 

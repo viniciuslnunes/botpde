@@ -13,9 +13,11 @@
 | Painel em `/portal/departamentos/bateria` | |
 
 Rotas `/portal/bateria*` redirecionam para o hub / detalhe unificado.
-Admin ops: `/admin/bateria` (thin wrapper sobre `Evento`; detalhe em
-`/admin/eventos/[id]`). Filtro legado `/admin/eventos?tipo=ENSAIO` segue válido.
+Admin ops: `/admin/bateria` (thin wrapper; detalhe via alias → Agenda). Entrada:
+**semana da bateria** com partidas da semana + inbox “ensaio na véspera do jogo”.
+Filtro legado `/admin/eventos?tipo=ENSAIO` segue válido.
 Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md).
+Cluster: [`modulo-eventos.md`](./modulo-eventos.md) § Dia operacional.
 
 ## Modelo
 

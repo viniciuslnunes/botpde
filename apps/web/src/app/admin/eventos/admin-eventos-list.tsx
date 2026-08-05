@@ -34,6 +34,8 @@ export interface AdminEventoItem {
   embarcados?: number | null
   /** "Hoje" / "Amanhã" / "Em N dias" — só em próximos. */
   diasLabel?: string | null
+  /** Jogo vinculado (adversário · mando). */
+  partidaLabel?: string | null
 }
 
 function lotacaoTone(confirmados: number, capacidade: number | null | undefined) {
@@ -114,9 +116,15 @@ function LotacaoBar({
   )
 }
 
-function AdminEventoCard({ evento }: { evento: AdminEventoItem }) {
+function AdminEventoCard({
+  evento,
+  detailBasePath,
+}: {
+  evento: AdminEventoItem
+  detailBasePath: string
+}) {
   const tone = lotacaoTone(evento.confirmados, evento.capacidade)
-  const href = `/admin/eventos/${evento.id}`
+  const href = `${detailBasePath}/${evento.id}`
 
   return (
     <m.article
@@ -148,6 +156,11 @@ function AdminEventoCard({ evento }: { evento: AdminEventoItem }) {
             {evento.serieId ? (
               <span className="rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
                 Série
+              </span>
+            ) : null}
+            {evento.partidaLabel ? (
+              <span className="rounded bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-500/25 dark:text-emerald-300">
+                {evento.partidaLabel}
               </span>
             ) : null}
             {evento.diasLabel ? (
@@ -227,10 +240,13 @@ export function AdminEventosList({
   eventos,
   emptyTitle = 'Nenhum evento agendado',
   emptyDescription,
+  detailBasePath = '/admin/eventos',
 }: {
   eventos: AdminEventoItem[]
   emptyTitle?: string
   emptyDescription?: string
+  /** Prefixo do detalhe (ex.: `/admin/caravanas` → alias com redirect). */
+  detailBasePath?: string
 }) {
   if (eventos.length === 0) {
     return (
@@ -247,7 +263,7 @@ export function AdminEventosList({
     <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2.5">
       <AnimatePresence mode="popLayout">
         {eventos.map((e) => (
-          <AdminEventoCard key={e.id} evento={e} />
+          <AdminEventoCard key={e.id} evento={e} detailBasePath={detailBasePath} />
         ))}
       </AnimatePresence>
     </m.div>

@@ -21,6 +21,13 @@ import {
   type AdminEventoListaItem,
   type AdminInboxItem,
 } from '@/lib/admin-inbox'
+import {
+  carregarPartidasSemanaTenant,
+  janelaSemanaCorrente,
+  serializarEventosSemana,
+} from '@/lib/departamento-semana'
+import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
+import { dayKeyInZone } from '@/lib/format-datetime'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -32,11 +39,23 @@ export type CaravanaOpsResumo = {
   pendencias: AdminInboxItem[]
   /** Lista para a home — evita segundo findMany na page. */
   lista: AdminEventoListaItem[]
+  semana: AgendaSemanaCompactItem[]
+  partidasSemana: AgendaSemanaPartidaItem[]
 }
 
-async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResumo> {
+function labelPartida(p: {
+  adversario: string
+  mando: string
+} | null | undefined): string | null {
+  if (!p) return null
+  const mando = p.mando === 'CASA' ? 'Casa' : p.mando === 'FORA' ? 'Fora' : null
+  return mando ? `vs ${p.adversario} · ${mando}` : `vs ${p.adversario}`
+}
+
+async function fetchDirecaoCaravanas(tenantId: string): Promise<Omit<CaravanaOpsResumo, 'partidasSemana'>> {
   const agora = new Date()
   const horizonte = new Date(agora.getTime() + 45 * DIA_MS)
+  const semana = janelaSemanaCorrente(agora)
 
   type Row = {
     id: string
@@ -46,9 +65,11 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
     local: string | null
     fotoUrl: string | null
     serieId: string | null
+    partidaId: string | null
     valorVaga: { toNumber(): number } | number | null
     capacidade: number | null
     sede: { capacidade: number | null } | null
+    partida: { adversario: string; mando: string } | null
     rsvps: Array<{
       status: string
       checkedInAt: Date | null
@@ -56,31 +77,62 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
     }>
   }
 
-  const eventos: Row[] = await db.evento.findMany({
-    where: {
-      tenantId,
-      tipo: 'CARAVANA',
-      data: { gte: agora, lte: horizonte },
-    },
-    orderBy: { data: 'asc' },
-    take: 12,
-    select: {
-      id: true,
-      titulo: true,
-      descricao: true,
-      data: true,
-      local: true,
-      fotoUrl: true,
-      serieId: true,
-      valorVaga: true,
-      capacidade: true,
-      sede: { select: { capacidade: true } },
-      rsvps: {
-        where: { status: { in: ['CONFIRMADO', 'LISTA_ESPERA'] } },
-        select: { status: true, checkedInAt: true, userId: true },
+  const [eventos, eventosSemana]: [Row[], Row[]] = await Promise.all([
+    db.evento.findMany({
+      where: {
+        tenantId,
+        tipo: 'CARAVANA',
+        data: { gte: agora, lte: horizonte },
       },
-    },
-  })
+      orderBy: { data: 'asc' },
+      take: 12,
+      select: {
+        id: true,
+        titulo: true,
+        descricao: true,
+        data: true,
+        local: true,
+        fotoUrl: true,
+        serieId: true,
+        partidaId: true,
+        valorVaga: true,
+        capacidade: true,
+        sede: { select: { capacidade: true } },
+        partida: { select: { adversario: true, mando: true } },
+        rsvps: {
+          where: { status: { in: ['CONFIRMADO', 'LISTA_ESPERA'] } },
+          select: { status: true, checkedInAt: true, userId: true },
+        },
+      },
+    }) as Promise<Row[]>,
+    db.evento.findMany({
+      where: {
+        tenantId,
+        tipo: 'CARAVANA',
+        data: { gte: semana.gte, lt: semana.lt },
+      },
+      orderBy: { data: 'asc' },
+      take: 40,
+      select: {
+        id: true,
+        titulo: true,
+        descricao: true,
+        data: true,
+        local: true,
+        fotoUrl: true,
+        serieId: true,
+        partidaId: true,
+        valorVaga: true,
+        capacidade: true,
+        sede: { select: { capacidade: true } },
+        partida: { select: { adversario: true, mando: true } },
+        rsvps: {
+          where: { status: { in: ['CONFIRMADO', 'LISTA_ESPERA'] } },
+          select: { status: true, checkedInAt: true, userId: true },
+        },
+      },
+    }) as Promise<Row[]>,
+  ])
 
   const ids = eventos.map((e) => e.id)
   const cobrancas: Array<{ eventoId: string | null; userId: string; status: string }> =
@@ -150,9 +202,21 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
       lotacaoLabel:
         cap != null ? `${ocupacao}/${cap} ${unidade}` : `${ocupacao} ${unidade}`,
       diasLabel: diasParaEvento(e.data),
+      partidaLabel: labelPartida(e.partida),
     })
 
     const slaAte = slaLabel(e.data, { agora, modo: 'ate' })
+
+    if (!e.partidaId) {
+      pendencias.push({
+        id: `part-${e.id}`,
+        titulo: `Sem partida · ${e.titulo}`,
+        detalhe: 'Vincule ao jogo do dia para cruzar caravana e operação na sede.',
+        href: `/admin/caravanas/${e.id}?tab=editar`,
+        tom: 'warning',
+        sla: slaAte,
+      })
+    }
 
     if (cap != null && cap > 0 && ocupacao / cap >= 0.9) {
       lotacaoCritica += 1
@@ -160,7 +224,7 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
         id: `lot-${e.id}`,
         titulo: `Lotação crítica · ${e.titulo}`,
         detalhe: `${ocupacao}/${cap} ${unidade} (≥ 90%)`,
-        href: `/admin/eventos/${e.id}?tab=presenca`,
+        href: `/admin/caravanas/${e.id}?tab=presenca`,
         tom: 'danger',
         sla: slaAte,
       })
@@ -176,7 +240,7 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
         id: `emb-${e.id}`,
         titulo: `${resumo.pagosFaltando} pago${resumo.pagosFaltando === 1 ? '' : 's'} sem embarque · ${e.titulo}`,
         detalhe: 'Faltam menos de 72h — confira a lista de embarque.',
-        href: `/admin/eventos/${e.id}?tab=presenca`,
+        href: `/admin/caravanas/${e.id}?tab=presenca`,
         tom: horasPara <= 3 ? 'danger' : 'warning',
         sla: slaAte,
         acao: primeiro
@@ -196,12 +260,15 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
         id: `pag-${e.id}`,
         titulo: `${resumo.pendentesPagamento} confirmado${resumo.pendentesPagamento === 1 ? '' : 's'} sem pagar · ${e.titulo}`,
         detalhe: 'RSVP confirmado com cobrança em aberto — não ocupa vaga paga.',
-        href: `/admin/eventos/${e.id}?tab=presenca`,
+        href: `/admin/caravanas/${e.id}?tab=presenca`,
         tom: 'warning',
         sla: slaAte,
       })
     }
   }
+
+  // Inbox: caravana no dia de jogo sem vínculo (quando há partida no mesmo dayKey).
+  // partidasSemana é anexado fora do cache parcial — aqui só eventos.
 
   return {
     proximas: eventos.length,
@@ -210,19 +277,59 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<CaravanaOpsResum
     confirmadosSemPagar,
     pendencias: pendencias.slice(0, 10),
     lista,
+    semana: serializarEventosSemana(
+      eventosSemana.map((e) => ({
+        id: e.id,
+        titulo: e.titulo,
+        tipo: 'CARAVANA',
+        data: e.data,
+        local: e.local,
+        partidaId: e.partidaId,
+        serieId: e.serieId,
+      })),
+      (e) => `/admin/caravanas/${e.id}`,
+    ),
   }
 }
 
 /**
  * Inbox ops das próximas caravanas — sem segundo domínio; só compõe Evento +
- * cobrança + RSVP. Inclui lista serializada (1 query). Cache TTL ~45s.
+ * cobrança + RSVP. Inclui lista + semana. Cache TTL ~45s (partidas à parte).
  */
 export const carregarDirecaoCaravanas = cache(async function carregarDirecaoCaravanas(
   tenantId: string,
 ): Promise<CaravanaOpsResumo> {
-  return unstable_cache(
-    () => fetchDirecaoCaravanas(tenantId),
-    ['admin-direcao-caravanas', tenantId],
-    { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
-  )()
+  const [ops, partidasSemana] = await Promise.all([
+    unstable_cache(
+      () => fetchDirecaoCaravanas(tenantId),
+      ['admin-direcao-caravanas-v2', tenantId],
+      { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
+    )(),
+    carregarPartidasSemanaTenant(tenantId),
+  ])
+
+  // Enriquecer inbox: caravana sem partida no dia em que há jogo.
+  const pendencias = [...ops.pendencias]
+  const jogosPorDia = new Map(partidasSemana.map((p) => [dayKeyInZone(p.dataIso), p]))
+  for (const ev of ops.semana) {
+    if (ev.partidaId) continue
+    const jogo = jogosPorDia.get(dayKeyInZone(ev.dataIso))
+    if (!jogo) continue
+    if (pendencias.some((p) => p.id === `part-${ev.id}`)) continue
+    pendencias.unshift({
+      id: `jogo-dia-${ev.id}`,
+      titulo: `Jogo no dia · ${ev.titulo}`,
+      detalhe: jogo.adversario
+        ? `Há partida vs ${jogo.adversario} — vincule na operação do dia.`
+        : 'Há partida neste dia — vincule na operação da semana.',
+      href: `/admin/caravanas/${ev.id}?tab=editar`,
+      tom: 'warning',
+    })
+  }
+
+  return {
+    ...ops,
+    pendencias: pendencias.slice(0, 10),
+    partidasSemana,
+  }
 })

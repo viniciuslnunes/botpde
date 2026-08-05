@@ -10,6 +10,7 @@ import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoFeminino } from '@/lib/feminino-direcao'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
+import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
@@ -52,10 +53,24 @@ async function FemininoKpis({ tenantId }: { tenantId: string }) {
   )
 }
 
-async function FemininoInboxELista({ tenantId }: { tenantId: string }) {
+async function FemininoInboxELista({
+  tenantId,
+  podeVincular,
+}: {
+  tenantId: string
+  podeVincular: boolean
+}) {
   const ops = await carregarDirecaoFeminino(tenantId)
   return (
     <>
+      <DepartamentoSemanaOps
+        itens={ops.semana}
+        partidas={ops.partidasSemana}
+        semanaHref="/admin/eventos?vista=semana"
+        podeVincularPartida={podeVincular}
+        titulo="Semana do Feminino"
+      />
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
           Precisa de você
@@ -75,6 +90,7 @@ async function FemininoInboxELista({ tenantId }: { tenantId: string }) {
           eventos={ops.lista}
           emptyTitle="Nenhuma ação com projeto do Feminino"
           emptyDescription="Crie o evento e vincule a um projeto deste departamento."
+          detailBasePath="/admin/feminino"
         />
       </section>
     </>
@@ -124,6 +140,7 @@ export default async function AdminFemininoPage() {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
+  let podeVincular = false
   try {
     const authz = await assertAnyPermission([
       PERMISSIONS.EVENTS_VIEW,
@@ -132,10 +149,13 @@ export default async function AdminFemininoPage() {
     ])
     session = authz.session
     tenant = authz.tenant
+    const efetivas = authz.permissoesEfetivas ?? []
     podeGerir =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
+      hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.EVENTS_CREATE)
+    podeVincular =
+      Boolean(authz.isSuperAdmin) || hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE)
   } catch {
     redirect('/admin')
   }
@@ -145,7 +165,7 @@ export default async function AdminFemininoPage() {
     <>
       <AdminPageHeader
         title="Feminino"
-        description="Equipe da frente e agenda de ações — sem app isolado."
+        description="Semana da frente — ações, projetos e vínculo com o jogo do dia."
         icon={<Venus className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -153,17 +173,11 @@ export default async function AdminFemininoPage() {
               <FemininoHeaderLinks tenantId={tenant.id} />
             </Suspense>
             <Link
-              href="/portal/comunidade"
-              className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              Comunidade
-            </Link>
-            <Link
-              href="/admin/eventos"
+              href="/admin/eventos?vista=semana"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
-              Agenda
+              Agenda da semana
             </Link>
             <Suspense fallback={null}>
               <FemininoActions tenantId={tenant.id} podeGerir={podeGerir} />
@@ -191,7 +205,7 @@ export default async function AdminFemininoPage() {
             </div>
           }
         >
-          <FemininoInboxELista tenantId={tenant.id} />
+          <FemininoInboxELista tenantId={tenant.id} podeVincular={podeVincular} />
         </Suspense>
       </div>
     </>

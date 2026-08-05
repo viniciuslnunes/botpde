@@ -17,6 +17,7 @@ import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoBateria } from '@/lib/bateria-direcao'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
+import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
@@ -78,22 +79,32 @@ async function BateriaKpis({
 async function BateriaInboxELista({
   tenantId,
   podeVerPatrimonio,
+  podeVincular,
 }: {
   tenantId: string
   podeVerPatrimonio: boolean
+  podeVincular: boolean
 }) {
   const ops = await carregarDirecaoBateria(tenantId, {
     incluirInstrumentos: podeVerPatrimonio,
   })
   return (
     <>
+      <DepartamentoSemanaOps
+        itens={ops.semana}
+        partidas={ops.partidasSemana}
+        semanaHref="/admin/eventos?vista=semana&tipo=ENSAIO"
+        podeVincularPartida={podeVincular}
+        titulo="Semana da bateria"
+      />
+
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
             Precisa de você
           </h2>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Faltosos, ensaios sem confirmação e instrumentos emprestados.
+            Faltosos, ensaio na véspera do jogo e instrumentos emprestados.
           </p>
         </div>
         <AdminInboxList
@@ -112,6 +123,7 @@ async function BateriaInboxELista({
           eventos={ops.lista}
           emptyTitle="Nenhum ensaio futuro"
           emptyDescription="Crie o próximo ensaio para a bateria marcar presença."
+          detailBasePath="/admin/bateria"
         />
       </section>
     </>
@@ -149,6 +161,7 @@ export default async function AdminBateriaPage() {
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
   let podeVerPatrimonio = false
+  let podeVincular = false
   try {
     const authz = await assertAnyPermission([
       PERMISSIONS.EVENTS_VIEW,
@@ -157,14 +170,17 @@ export default async function AdminBateriaPage() {
     ])
     session = authz.session
     tenant = authz.tenant
+    const efetivas = authz.permissoesEfetivas ?? []
     podeGerir =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
+      hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.EVENTS_CREATE)
+    podeVincular =
+      Boolean(authz.isSuperAdmin) || hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE)
     podeVerPatrimonio =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.PATRIMONY_VIEW) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.PATRIMONY_MANAGE)
+      hasPermission(efetivas, PERMISSIONS.PATRIMONY_VIEW) ||
+      hasPermission(efetivas, PERMISSIONS.PATRIMONY_MANAGE)
   } catch {
     redirect('/admin')
   }
@@ -174,16 +190,16 @@ export default async function AdminBateriaPage() {
     <>
       <AdminPageHeader
         title="Bateria"
-        description="Operação de ensaios e escala — presença, faltosos e instrumentos. O calendário completo continua na Agenda."
+        description="Semana de ensaios — cruzamento com o jogo e instrumentos."
         icon={<Drum className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/admin/eventos?tipo=ENSAIO"
+              href="/admin/eventos?vista=semana&tipo=ENSAIO"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
-              Ver na Agenda
+              Agenda da semana
             </Link>
             <Suspense fallback={null}>
               <BateriaActions tenantId={tenant.id} podeGerir={podeGerir} />
@@ -212,7 +228,11 @@ export default async function AdminBateriaPage() {
             </div>
           }
         >
-          <BateriaInboxELista tenantId={tenant.id} podeVerPatrimonio={podeVerPatrimonio} />
+          <BateriaInboxELista
+            tenantId={tenant.id}
+            podeVerPatrimonio={podeVerPatrimonio}
+            podeVincular={podeVincular}
+          />
         </Suspense>
       </div>
     </>

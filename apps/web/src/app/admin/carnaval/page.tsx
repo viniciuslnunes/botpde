@@ -19,6 +19,7 @@ import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoCarnaval } from '@/lib/carnaval-direcao'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
+import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
@@ -107,6 +108,14 @@ async function CarnavalInboxListaBarracao({
 
   return (
     <>
+      <DepartamentoSemanaOps
+        itens={ops.semana}
+        partidas={ops.partidasSemana}
+        semanaHref="/admin/eventos?vista=semana"
+        podeVincularPartida={podeGerirEventos}
+        titulo="Semana do Carnaval"
+      />
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
           Precisa de você
@@ -151,6 +160,7 @@ async function CarnavalInboxListaBarracao({
           eventos={ops.lista}
           emptyTitle="Nenhum evento vinculado ao Carnaval"
           emptyDescription="Crie o evento e associe a um projeto deste departamento."
+          detailBasePath="/admin/carnaval"
         />
       </section>
     </>

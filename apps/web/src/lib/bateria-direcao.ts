@@ -16,6 +16,13 @@ import {
   type AdminEventoListaItem,
   type AdminInboxItem,
 } from '@/lib/admin-inbox'
+import {
+  carregarPartidasSemanaTenant,
+  janelaSemanaCorrente,
+  serializarEventosSemana,
+} from '@/lib/departamento-semana'
+import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
+import { addCalendarDays, dayKeyInZone, zonedDateParts } from '@/lib/format-datetime'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -26,6 +33,8 @@ export type BateriaOpsResumo = {
   instrumentosEmUso: number
   pendencias: AdminInboxItem[]
   lista: AdminEventoListaItem[]
+  semana: AgendaSemanaCompactItem[]
+  partidasSemana: AgendaSemanaPartidaItem[]
 }
 
 async function fetchDirecaoBateria(
@@ -208,6 +217,8 @@ async function fetchDirecaoBateria(
     instrumentosEmUso,
     pendencias: pendencias.slice(0, 10),
     lista,
+    semana: [],
+    partidasSemana: [],
   }
 }
 
@@ -219,9 +230,83 @@ export const carregarDirecaoBateria = cache(async function carregarDirecaoBateri
   opts?: { incluirInstrumentos?: boolean },
 ): Promise<BateriaOpsResumo> {
   const incluir = opts?.incluirInstrumentos ?? false
-  return unstable_cache(
-    () => fetchDirecaoBateria(tenantId, { incluirInstrumentos: incluir }),
-    ['admin-direcao-bateria', tenantId, incluir ? '1' : '0'],
-    { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
-  )()
+  const semanaWin = janelaSemanaCorrente()
+  const [ops, partidasSemana, ensaiosSemana] = await Promise.all([
+    unstable_cache(
+      () => fetchDirecaoBateria(tenantId, { incluirInstrumentos: incluir }),
+      ['admin-direcao-bateria', tenantId, incluir ? '1' : '0'],
+      { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
+    )(),
+    carregarPartidasSemanaTenant(tenantId),
+    db.evento.findMany({
+      where: {
+        tenantId,
+        tipo: 'ENSAIO',
+        data: { gte: semanaWin.gte, lt: semanaWin.lt },
+      },
+      orderBy: { data: 'asc' },
+      take: 40,
+      select: {
+        id: true,
+        titulo: true,
+        tipo: true,
+        data: true,
+        local: true,
+        partidaId: true,
+        projetoId: true,
+        serieId: true,
+      },
+    }),
+  ])
+
+  const semana = serializarEventosSemana(
+    ensaiosSemana.map((e: {
+      id: string
+      titulo: string
+      tipo: string
+      data: Date
+      local: string | null
+      partidaId: string | null
+      projetoId: string | null
+      serieId: string | null
+    }) => ({
+      id: e.id,
+      titulo: e.titulo,
+      tipo: e.tipo || 'ENSAIO',
+      data: e.data,
+      local: e.local,
+      partidaId: e.partidaId,
+      projetoId: e.projetoId,
+      serieId: e.serieId,
+    })),
+    (e) => `/admin/bateria/${e.id}`,
+  )
+
+  const pendencias = [...ops.pendencias]
+  // Ensaio na véspera de um jogo da semana.
+  for (const jogo of partidasSemana) {
+    const jogoParts = zonedDateParts(jogo.dataIso)
+    const vespera = addCalendarDays(jogoParts, -1)
+    const vesperaKey = dayKeyInZone(vespera)
+    const ensaios = semana.filter((e) => dayKeyInZone(e.dataIso) === vesperaKey)
+    for (const e of ensaios) {
+      if (pendencias.some((p) => p.id === `vespera-${e.id}`)) continue
+      pendencias.unshift({
+        id: `vespera-${e.id}`,
+        titulo: `Ensaio na véspera · ${e.titulo}`,
+        detalhe: jogo.adversario
+          ? `Jogo vs ${jogo.adversario} no dia seguinte — confirme presença.`
+          : 'Há jogo no dia seguinte — confirme presença no ensaio.',
+        href: `/admin/bateria/${e.id}?tab=presenca`,
+        tom: 'warning',
+      })
+    }
+  }
+
+  return {
+    ...ops,
+    pendencias: pendencias.slice(0, 10),
+    semana,
+    partidasSemana,
+  }
 })

@@ -16,6 +16,12 @@ import {
   type AdminEventoListaItem,
   type AdminInboxItem,
 } from '@/lib/admin-inbox'
+import {
+  carregarPartidasSemanaTenant,
+  janelaSemanaCorrente,
+  serializarEventosSemana,
+} from '@/lib/departamento-semana'
+import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -27,6 +33,8 @@ export type SocialOpsResumo = {
   proximosEventos: number
   pendencias: AdminInboxItem[]
   lista: AdminEventoListaItem[]
+  semana: AgendaSemanaCompactItem[]
+  partidasSemana: AgendaSemanaPartidaItem[]
 }
 
 async function fetchDirecaoSocial(
@@ -60,6 +68,8 @@ async function fetchDirecaoSocial(
         },
       ],
       lista: [],
+      semana: [],
+      partidasSemana: [],
     }
   }
 
@@ -234,6 +244,8 @@ async function fetchDirecaoSocial(
     proximosEventos: proximos.length,
     pendencias: pendencias.slice(0, 10),
     lista,
+    semana: [],
+    partidasSemana: [],
   }
 }
 
@@ -245,9 +257,52 @@ export const carregarDirecaoSocial = cache(async function carregarDirecaoSocial(
   opts?: { incluirOrcamento?: boolean },
 ): Promise<SocialOpsResumo> {
   const incluir = opts?.incluirOrcamento ?? false
-  return unstable_cache(
-    () => fetchDirecaoSocial(tenantId, { incluirOrcamento: incluir }),
-    ['admin-direcao-social', tenantId, incluir ? '1' : '0'],
-    { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
-  )()
+  const semanaWin = janelaSemanaCorrente()
+  const [ops, partidasSemana] = await Promise.all([
+    unstable_cache(
+      () => fetchDirecaoSocial(tenantId, { incluirOrcamento: incluir }),
+      ['admin-direcao-social', tenantId, incluir ? '1' : '0'],
+      { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
+    )(),
+    carregarPartidasSemanaTenant(tenantId),
+  ])
+
+  if (!ops.departamentoId) {
+    return { ...ops, partidasSemana }
+  }
+
+  const projetosIds: { id: string }[] = await db.projeto.findMany({
+    where: { tenantId, departamentoId: ops.departamentoId },
+    select: { id: true },
+    take: 80,
+  })
+  const ids = projetosIds.map((p) => p.id)
+  const eventosSemana =
+    ids.length === 0
+      ? []
+      : await db.evento.findMany({
+          where: {
+            tenantId,
+            projetoId: { in: ids },
+            data: { gte: semanaWin.gte, lt: semanaWin.lt },
+          },
+          orderBy: { data: 'asc' },
+          take: 40,
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            data: true,
+            local: true,
+            partidaId: true,
+            projetoId: true,
+            serieId: true,
+          },
+        })
+
+  return {
+    ...ops,
+    semana: serializarEventosSemana(eventosSemana, (e) => `/admin/social/${e.id}`),
+    partidasSemana,
+  }
 })

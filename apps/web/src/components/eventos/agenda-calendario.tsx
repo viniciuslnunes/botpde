@@ -39,6 +39,14 @@ export type AgendaCalItem = {
   href: string
   fotoUrl?: string | null
   local?: string | null
+  partidaId?: string | null
+}
+
+export type AgendaCalPartida = {
+  id: string
+  dataIso: string
+  adversario?: string | null
+  mando?: string | null
 }
 
 const DIA_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
@@ -404,6 +412,7 @@ function resolveInitialParts(dataRefIso?: string): CalendarParts {
 export function AgendaCalendario({
   vista,
   itens,
+  partidas = [],
   dataRefIso,
   basePath,
   tipoFiltro,
@@ -411,6 +420,8 @@ export function AgendaCalendario({
 }: {
   vista: 'semana' | 'mes'
   itens: AgendaCalItem[]
+  /** Partidas na janela — badge “Jogo” nas células. */
+  partidas?: AgendaCalPartida[]
   dataRefIso?: string
   basePath: string
   tipoFiltro?: string
@@ -460,6 +471,15 @@ export function AgendaCalendario({
     }
     return map
   }, [itens])
+
+  const jogoByDay = useMemo(() => {
+    const map = new Map<string, AgendaCalPartida>()
+    for (const p of partidas) {
+      const key = dayKeyInZone(p.dataIso)
+      if (!map.has(key)) map.set(key, p)
+    }
+    return map
+  }, [partidas])
 
   /** Eventos do mês/semana visível, em ordem — base dos contadores e da lista "restante". */
   const itensNaJanela = useMemo(() => {
@@ -679,6 +699,7 @@ export function AgendaCalendario({
             {weekDays.map((day, i) => {
               const key = dayKeyInZone(day)
               const count = byDay.get(key)?.length ?? 0
+              const jogo = jogoByDay.get(key)
               const ativo = sameCalendarDay(day, diaAtivo)
               const isHoje = sameCalendarDay(day, hoje)
               return (
@@ -688,7 +709,7 @@ export function AgendaCalendario({
                   onClick={() => setDiaSelecionado(day)}
                   aria-pressed={ativo}
                   aria-current={isHoje ? 'date' : undefined}
-                  aria-label={`${DIA_LABEL[i]} ${day.day}${count ? `, ${count} eventos` : ', sem eventos'}`}
+                  aria-label={`${DIA_LABEL[i]} ${day.day}${jogo ? ', jogo' : ''}${count ? `, ${count} eventos` : ', sem eventos'}`}
                   className={cx(
                     'flex flex-col items-center rounded-2xl px-1 py-2.5 transition-colors sm:py-3',
                     ativo
@@ -709,19 +730,32 @@ export function AgendaCalendario({
                   <span className="mt-0.5 text-lg font-bold tabular-nums sm:text-xl">
                     {day.day}
                   </span>
-                  <span
-                    className={cx(
-                      'mt-1 h-1.5 w-1.5 rounded-full',
-                      count === 0
-                        ? 'bg-transparent'
-                        : ativo
-                          ? 'bg-[rgb(var(--color-primary-on))]'
-                          : isHoje
-                            ? 'bg-[rgb(var(--color-primary-fg))]'
-                            : 'bg-[rgb(var(--foreground-muted))]',
-                    )}
-                    aria-hidden
-                  />
+                  {jogo ? (
+                    <span
+                      className={cx(
+                        'mt-1 rounded px-1 text-[8px] font-bold uppercase tracking-wide',
+                        ativo
+                          ? 'bg-[rgb(var(--color-primary-on)_/_0.2)] text-[rgb(var(--color-primary-on))]'
+                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+                      )}
+                    >
+                      Jogo
+                    </span>
+                  ) : (
+                    <span
+                      className={cx(
+                        'mt-1 h-1.5 w-1.5 rounded-full',
+                        count === 0
+                          ? 'bg-transparent'
+                          : ativo
+                            ? 'bg-[rgb(var(--color-primary-on))]'
+                            : isHoje
+                              ? 'bg-[rgb(var(--color-primary-fg))]'
+                              : 'bg-[rgb(var(--foreground-muted))]',
+                      )}
+                      aria-hidden
+                    />
+                  )}
                 </button>
               )
             })}

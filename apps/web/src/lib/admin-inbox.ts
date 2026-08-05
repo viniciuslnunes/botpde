@@ -44,6 +44,8 @@ export type AdminEventoListaItem = {
   lotacaoLabel?: string | null
   embarcados?: number | null
   diasLabel?: string | null
+  /** Ex.: "vs Palmeiras · Casa" quando há partidaId. */
+  partidaLabel?: string | null
 }
 
 export function formatarDataEventoAdmin(data: Date): string {

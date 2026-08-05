@@ -24,8 +24,10 @@ export const ADMIN_MENU_SECOES = /** @type {const} */ ([
  * se o usuário não tiver a permissão listada em `permissao`.
  * `permissao: null` = sempre visível para quem tem acesso à área admin.
  *
- * A visibilidade é **só por permissão efetiva** (cargo/depto/extras/overrides).
- * Departamento não filtra o menu por id — quem tem permissão adicional vê o item.
+ * A visibilidade é **por permissão efetiva** (cargo/depto/extras/overrides).
+ * Hubs thin de departamento (`departamentoSlug`) exigem gestoria adicional —
+ * ver `filterMenuByPermissionsAndGestoria`. Domínios ricos (Financeiro, Loja…)
+ * não filtram por id de departamento.
  */
 export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'dashboard', label: 'Dashboard', href: '/admin', permissao: null, exact: true, secao: 'geral' },
@@ -82,6 +84,65 @@ export const ADMIN_MENU = /** @type {const} */ ([
     // Leitura (Diretoria oversight) × gerir.
     permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
     secao: 'operacao',
+  },
+  // Hubs thin de departamento (comando do gestor). Visibilidade fina por
+  // `departamentoSlug` em `filterMenuByPermissionsAndGestoria` — vários
+  // compartilham `events:*` e o menu só por permissão misturaria Caravanas
+  // com Bateria/Social/etc.
+  {
+    id: 'caravanas',
+    label: 'Caravanas',
+    href: '/admin/caravanas',
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
+    secao: 'operacao',
+    departamentoSlug: 'caravanas',
+  },
+  {
+    id: 'bateria',
+    label: 'Bateria',
+    href: '/admin/bateria',
+    // Patrimônio na página é bloco extra; menu não usa patrimony:view sozinho
+    // (membro Bateria tem view e não deve entrar no admin só por isso).
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
+    secao: 'operacao',
+    departamentoSlug: 'bateria',
+  },
+  {
+    id: 'social',
+    label: 'Social',
+    href: '/admin/social',
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
+    secao: 'operacao',
+    departamentoSlug: 'social-e-eventos',
+  },
+  {
+    id: 'feminino',
+    label: 'Feminino',
+    href: '/admin/feminino',
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
+    secao: 'operacao',
+    departamentoSlug: 'feminino',
+  },
+  {
+    id: 'carnaval',
+    label: 'Carnaval',
+    href: '/admin/carnaval',
+    permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
+    secao: 'operacao',
+    departamentoSlug: 'carnaval',
+  },
+  {
+    id: 'diretoria',
+    label: 'Diretoria',
+    href: '/admin/diretoria',
+    permissao: [
+      PERMISSIONS.MEMBERS_VIEW,
+      PERMISSIONS.MEMBERS_APPROVE,
+      PERMISSIONS.ROLES_MANAGE,
+      PERMISSIONS.AUDIT_VIEW,
+    ],
+    secao: 'operacao',
+    departamentoSlug: 'diretoria',
   },
   // Catálogo, pedidos, categorias, cupons e desempenho são tabs de `/admin/loja`.
   // Quem só tem `store:view-orders` cai direto em Pedidos (ver loja/page.tsx).
@@ -621,11 +682,32 @@ export function resolverMenuIdDeRota(rota) {
  *
  * `permissao` segue `MenuPermissao` (string, OR, AND aninhado, ou `null`).
  *
- * @param {readonly {id: string, label: string, href: string, permissao: MenuPermissao, secao?: string}[]} menu
+ * @param {readonly {id: string, label: string, href: string, permissao: MenuPermissao, secao?: string, departamentoSlug?: string}[]} menu
  * @param {string[]} effectivePermissions
  */
 export function filterMenuByPermissions(menu, effectivePermissions) {
   return menu.filter((item) => permite(item.permissao, effectivePermissions))
+}
+
+/**
+ * Como `filterMenuByPermissions`, mas hubs thin com `departamentoSlug` só
+ * aparecem para quem gerencia aquele departamento (ou `podeGerirTodos`).
+ * Domínios sem slug (Agenda, Financeiro, Loja…) seguem só por permissão.
+ *
+ * @param {readonly {id: string, label: string, href: string, permissao: MenuPermissao, secao?: string, departamentoSlug?: string}[]} menu
+ * @param {string[]} effectivePermissions
+ * @param {{ gestorSlugs?: readonly string[], podeGerirTodos?: boolean }} [gestoria]
+ */
+export function filterMenuByPermissionsAndGestoria(menu, effectivePermissions, gestoria = {}) {
+  const gestorSlugs = new Set(gestoria.gestorSlugs ?? [])
+  const podeGerirTodos = Boolean(gestoria.podeGerirTodos)
+
+  return filterMenuByPermissions(menu, effectivePermissions).filter((item) => {
+    const slug = 'departamentoSlug' in item ? item.departamentoSlug : undefined
+    if (!slug) return true
+    if (podeGerirTodos) return true
+    return gestorSlugs.has(slug)
+  })
 }
 
 /**

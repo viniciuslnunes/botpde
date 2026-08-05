@@ -1,9 +1,27 @@
 import { permanentRedirect } from 'next/navigation'
 
-type Props = { params: Promise<{ id: string }> }
+type Props = {
+  params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+function qsFrom(searchParams: Record<string, string | string[] | undefined>): string {
+  const q = new URLSearchParams()
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value == null) continue
+    if (Array.isArray(value)) {
+      for (const v of value) q.append(key, v)
+    } else {
+      q.set(key, value)
+    }
+  }
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
 
 /** Alias: detalhe canônico permanece em `/admin/eventos/[id]`. */
-export default async function AdminCarnavalAliasPage({ params }: Props) {
+export default async function AdminEventoAliasPage({ params, searchParams }: Props) {
   const { id } = await params
-  permanentRedirect(`/admin/eventos/${id}`)
+  const qs = qsFrom(await searchParams)
+  permanentRedirect(`/admin/eventos/${id}${qs}`)
 }

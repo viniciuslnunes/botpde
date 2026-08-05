@@ -13,6 +13,7 @@ export function NovoEventoButton({
   projetos = [],
   temAfiliacao = true,
   redirectTo = '/admin/eventos',
+  label = 'Novo evento',
 }: {
   defaultTipo?: string
   sedes: SedeOption[]
@@ -20,6 +21,7 @@ export function NovoEventoButton({
   projetos?: Array<{ id: string; titulo: string; departamentoNome: string }>
   temAfiliacao?: boolean
   redirectTo?: string
+  label?: string
 }) {
   const [open, setOpen] = useState(false)
 
@@ -31,9 +33,9 @@ export function NovoEventoButton({
         className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
       >
         <Plus className="h-4 w-4" />
-        Novo evento
+        {label}
       </button>
-      <EventoFormDrawer open={open} onClose={() => setOpen(false)} title="Novo evento">
+      <EventoFormDrawer open={open} onClose={() => setOpen(false)} title={label}>
         <CriarEventoForm
           defaultTipo={defaultTipo ?? 'GERAL'}
           sedes={sedes}

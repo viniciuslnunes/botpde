@@ -23,7 +23,7 @@ import type { TipoEvento } from '@torcida/db'
 import { diasParaEvento } from '@/lib/eventos'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
-import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
+import { getAfiliacaoIdDoTenant, listPartidasNaJanela, listPartidasParaEvento } from '@/lib/partidas'
 import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import {
   listarPresencaPorEvento,
@@ -141,6 +141,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
+  let podeVincularPartida = false
   try {
     const authz = await assertAnyPermission([
       PERMISSIONS.EVENTS_VIEW,
@@ -149,10 +150,13 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     ])
     session = authz.session
     tenant = authz.tenant
+    const efetivas = authz.permissoesEfetivas ?? []
     podeGerir =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
+      hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.EVENTS_CREATE)
+    podeVincularPartida =
+      Boolean(authz.isSuperAdmin) || hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE)
   } catch {
     redirect('/admin')
   }
@@ -194,19 +198,27 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     data: Date
     fotoUrl: string | null
     local: string | null
+    partidaId: string | null
+    projetoId: string | null
+    serieId: string | null
   }
 
   const calJanela = vistaCal ? janelaCalendario(vistaCal, sp.data) : null
-  /** Semana corrente na Lista — strip compacta no aside operacional. */
-  const semanaListaJanela = vista === 'lista' ? janelaCalendario('semana') : null
+  /** Semana corrente — strip operacional (lista) e partidas do cluster. */
+  const semanaListaJanela = vista === 'lista' || vistaCal === 'semana' ? janelaCalendario('semana', sp.data) : null
+  const partidasJanela =
+    vista === 'lista'
+      ? semanaListaJanela
+      : calJanela
 
-  const [proximos, passados, sedes, calEventos, semanaListaEventos, partidas, afiliacaoId, projetos]: [
+  const [proximos, passados, sedes, calEventos, semanaListaEventos, partidas, partidasSemana, afiliacaoId, projetos]: [
     EventoAdminRow[],
     EventoAdminRow[],
     Awaited<ReturnType<typeof listSedesAtivasParaEvento>>,
     CalRow[],
     CalRow[],
     Awaited<ReturnType<typeof listPartidasParaEvento>>,
+    Awaited<ReturnType<typeof listPartidasNaJanela>>,
     string | null,
     Awaited<ReturnType<typeof listarProjetosParaEvento>>,
   ] = await Promise.all([
@@ -261,6 +273,9 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             data: true,
             fotoUrl: true,
             local: true,
+            partidaId: true,
+            projetoId: true,
+            serieId: true,
           },
           orderBy: { data: 'asc' },
           take: 120,
@@ -279,12 +294,18 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             data: true,
             fotoUrl: true,
             local: true,
+            partidaId: true,
+            projetoId: true,
+            serieId: true,
           },
           orderBy: { data: 'asc' },
           take: 60,
         }) as Promise<CalRow[]>)
       : Promise.resolve([] as CalRow[]),
     listPartidasParaEvento(tenant.id),
+    partidasJanela
+      ? listPartidasNaJanela(tenant.id, partidasJanela.gte, partidasJanela.lt)
+      : Promise.resolve([]),
     getAfiliacaoIdDoTenant(tenant.id),
     podeGerir ? listarProjetosParaEvento(tenant.id) : Promise.resolve([]),
   ])
@@ -329,6 +350,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     href: `/admin/eventos/${e.id}`,
     fotoUrl: e.fotoUrl,
     local: e.local,
+    partidaId: e.partidaId,
   }))
 
   const semanaCompactItens = semanaListaEventos.map((e) => ({
@@ -338,6 +360,17 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     dataIso: e.data.toISOString(),
     href: `/admin/eventos/${e.id}`,
     local: e.local,
+    partidaId: e.partidaId,
+    projetoId: e.projetoId,
+    serieId: e.serieId,
+  }))
+
+  const semanaPartidasItens = partidasSemana.map((p) => ({
+    id: p.id,
+    dataIso: p.dataHora.toISOString(),
+    adversario: p.adversario,
+    mando: p.mando,
+    competicao: p.competicao,
   }))
 
   const destaqueRow = !isCal && proximos[0] ? proximos[0] : null
@@ -447,6 +480,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           <AgendaCalendario
             vista={vistaCal}
             itens={calItens}
+            partidas={semanaPartidasItens}
             dataRefIso={sp.data}
             basePath="/admin/eventos"
             tipoFiltro={tipoFiltro}
@@ -470,19 +504,13 @@ export default async function AdminEventosPage({ searchParams }: Props) {
 
         {vista === 'lista' && (
           <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
-            <div className="space-y-3 lg:col-span-8 xl:col-span-9">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                <Calendar className="h-4 w-4" />
-                Próximos ({proximos.length})
-              </h2>
-              <AdminEventosList
-                eventos={listaProximos.map((e) => serializar(e, false))}
-                emptyTitle={emptyHint}
-                emptyDescription="Use Novo evento para abrir o formulário."
+            <aside className="space-y-4 lg:sticky lg:top-24 lg:col-span-4 xl:col-span-3">
+              <AgendaSemanaCompact
+                itens={semanaCompactItens}
+                partidas={semanaPartidasItens}
+                semanaHref={hrefFiltro({ vista: 'semana', data: '' })}
+                podeVincularPartida={podeVincularPartida}
               />
-            </div>
-
-            <aside className="order-first space-y-4 lg:sticky lg:top-24 lg:order-last lg:col-span-4 xl:col-span-3">
               {destaque && destaqueRow ? (
                 <ProximoEventoSpotlight
                   id={destaque.id}
@@ -498,11 +526,19 @@ export default async function AdminEventosPage({ searchParams }: Props) {
                   capacidade={destaque.capacidade}
                 />
               ) : null}
-              <AgendaSemanaCompact
-                itens={semanaCompactItens}
-                semanaHref={hrefFiltro({ vista: 'semana', data: '' })}
-              />
             </aside>
+
+            <div className="space-y-3 lg:col-span-8 xl:col-span-9">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                <Calendar className="h-4 w-4" />
+                Próximos ({proximos.length})
+              </h2>
+              <AdminEventosList
+                eventos={listaProximos.map((e) => serializar(e, false))}
+                emptyTitle={emptyHint}
+                emptyDescription="Use Novo evento para abrir o formulário."
+              />
+            </div>
           </div>
         )}
       </div>

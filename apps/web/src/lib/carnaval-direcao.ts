@@ -24,6 +24,12 @@ import {
   type AdminEventoListaItem,
   type AdminInboxItem,
 } from '@/lib/admin-inbox'
+import {
+  carregarPartidasSemanaTenant,
+  janelaSemanaCorrente,
+  serializarEventosSemana,
+} from '@/lib/departamento-semana'
+import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -42,6 +48,8 @@ export type CarnavalOpsResumo = {
   pendencias: AdminInboxItem[]
   /** Lista para a home — evita segundo findMany na page. */
   lista: AdminEventoListaItem[]
+  semana: AgendaSemanaCompactItem[]
+  partidasSemana: AgendaSemanaPartidaItem[]
 }
 
 async function fetchDirecaoCarnaval(tenantId: string): Promise<CarnavalOpsResumo> {
@@ -91,6 +99,8 @@ async function fetchDirecaoCarnaval(tenantId: string): Promise<CarnavalOpsResumo
         },
       ],
       lista: [],
+      semana: [],
+      partidasSemana: [],
     }
   }
 
@@ -223,6 +233,8 @@ async function fetchDirecaoCarnaval(tenantId: string): Promise<CarnavalOpsResumo
     urgenciaBarracao: urgencia,
     pendencias: pendencias.slice(0, 8),
     lista,
+    semana: [],
+    partidasSemana: [],
   }
 }
 
@@ -232,9 +244,70 @@ async function fetchDirecaoCarnaval(tenantId: string): Promise<CarnavalOpsResumo
 export const carregarDirecaoCarnaval = cache(async function carregarDirecaoCarnaval(
   tenantId: string,
 ): Promise<CarnavalOpsResumo> {
-  return unstable_cache(
-    () => fetchDirecaoCarnaval(tenantId),
-    ['admin-direcao-carnaval', tenantId],
-    { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
-  )()
+  const semanaWin = janelaSemanaCorrente()
+  const [ops, partidasSemana] = await Promise.all([
+    unstable_cache(
+      () => fetchDirecaoCarnaval(tenantId),
+      ['admin-direcao-carnaval', tenantId],
+      { revalidate: ADMIN_DIRECAO_TTL, tags: [tagAdminDirecao(tenantId)] },
+    )(),
+    carregarPartidasSemanaTenant(tenantId),
+  ])
+
+  if (!ops.departamentoId) {
+    return { ...ops, partidasSemana }
+  }
+
+  const projetosIds: { id: string }[] = await db.projeto.findMany({
+    where: { tenantId, departamentoId: ops.departamentoId },
+    select: { id: true },
+    take: 80,
+  })
+  const ids = projetosIds.map((p) => p.id)
+  const eventosSemana =
+    ids.length === 0
+      ? await db.evento.findMany({
+          where: {
+            tenantId,
+            data: { gte: semanaWin.gte, lt: semanaWin.lt },
+            OR: [{ tipo: 'ENSAIO' }, { tipo: 'GERAL' }],
+          },
+          orderBy: { data: 'asc' },
+          take: 40,
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            data: true,
+            local: true,
+            partidaId: true,
+            projetoId: true,
+            serieId: true,
+          },
+        })
+      : await db.evento.findMany({
+          where: {
+            tenantId,
+            OR: [{ projetoId: { in: ids } }, { tipo: 'ENSAIO' }],
+            data: { gte: semanaWin.gte, lt: semanaWin.lt },
+          },
+          orderBy: { data: 'asc' },
+          take: 40,
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            data: true,
+            local: true,
+            partidaId: true,
+            projetoId: true,
+            serieId: true,
+          },
+        })
+
+  return {
+    ...ops,
+    semana: serializarEventosSemana(eventosSemana, (e) => `/admin/carnaval/${e.id}`),
+    partidasSemana,
+  }
 })

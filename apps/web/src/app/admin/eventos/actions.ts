@@ -668,3 +668,73 @@ export async function excluirEvento(
 
   revalidateEventoPaths(eventoId, existing.tipo)
 }
+
+/**
+ * One-click: liga um evento à partida do dia (cluster operacional).
+ * Só ids já existentes — sem criar Partida.
+ */
+export async function vincularEventoAPartida(
+  eventoId: string,
+  partidaId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+  if (!session.user?.id) return { ok: false, message: 'Sessão inválida.' }
+
+  const evento: {
+    id: string
+    tenantId: string
+    tipo: string
+    partidaId: string | null
+  } | null = await db.evento.findUnique({
+    where: { id: eventoId },
+    select: { id: true, tenantId: true, tipo: true, partidaId: true },
+  })
+  if (!evento || evento.tenantId !== tenant.id) {
+    return { ok: false, message: 'Evento não encontrado.' }
+  }
+
+  const tenantRow: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { afiliacaoId: true },
+  })
+  if (!tenantRow?.afiliacaoId) {
+    return { ok: false, message: 'Torcida sem afiliação — não dá para vincular partida.' }
+  }
+
+  const partida: { id: string } | null = await db.partida.findFirst({
+    where: { id: partidaId, afiliacaoId: tenantRow.afiliacaoId },
+    select: { id: true },
+  })
+  if (!partida) return { ok: false, message: 'Partida inválida.' }
+
+  if (evento.partidaId === partidaId) return { ok: true }
+
+  await db.evento.update({
+    where: { id: eventoId },
+    data: { partidaId },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_PARTIDA_VINCULADA',
+      entidade: 'Evento',
+      entidadeId: eventoId,
+      detalhes: {
+        partidaId,
+        partidaIdAnterior: evento.partidaId,
+        tipo: evento.tipo,
+        origem: 'cluster_dia_operacional',
+      },
+    },
+  })
+
+  revalidateEventoPaths(eventoId, evento.tipo)
+  revalidatePath('/admin/caravanas')
+  revalidatePath('/admin/bateria')
+  revalidatePath('/admin/social')
+  revalidatePath('/admin/feminino')
+  revalidatePath('/admin/carnaval')
+  return { ok: true }
+}

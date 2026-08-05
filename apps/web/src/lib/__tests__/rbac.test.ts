@@ -8,6 +8,7 @@ import {
   DEPARTAMENTO_MODULO_ROTA,
   DEPARTAMENTO_MODULOS,
   filterMenuByPermissions,
+  filterMenuByPermissionsAndGestoria,
   groupAdminMenuBySecao,
   hasAdminAreaAccess,
   hasPermission,
@@ -20,6 +21,7 @@ import {
   podeTerVice,
   podeCriarUnidadeTerritorial,
   permissionsOfRole,
+  resolverMenuIdDeRota,
   rotuloCargoMaximo,
   rotuloCargoSistema,
   SYSTEM_ROLE_PERMISSIONS,
@@ -364,25 +366,58 @@ describe('filterMenuByPermissions com OR', () => {
     expect(ids).not.toContain('torcedores')
   })
 
-  it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Eventos', () => {
+  it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Agenda (hubs thin exigem gestoria)', () => {
     expect(
       filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.FINANCE_MANAGE]).map((i) => i.id),
       // Cobranças e planos são tabs de /admin/financeiro — uma entrada só.
     ).toEqual(['dashboard', 'financeiro'])
     expect(
-      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_MANAGE]).map((i) => i.id),
+      filterMenuByPermissionsAndGestoria(ADMIN_MENU, [PERMISSIONS.EVENTS_MANAGE], {
+        gestorSlugs: [],
+      }).map((i) => i.id),
     ).toEqual(['dashboard', 'eventos'])
     expect(
-      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_CREATE]).map((i) => i.id),
-    ).toEqual(['dashboard'])
+      filterMenuByPermissionsAndGestoria(ADMIN_MENU, [PERMISSIONS.EVENTS_CREATE], {
+        gestorSlugs: ['caravanas'],
+      }).map((i) => i.id),
+    ).toEqual(['dashboard', 'caravanas'])
+  })
+
+  it('hubs thin: gestor de caravanas vê Caravanas, não Bateria/Social; roles:manage vê todos', () => {
+    const permsEventos = [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE]
+    const soCaravanas = filterMenuByPermissionsAndGestoria(ADMIN_MENU, permsEventos, {
+      gestorSlugs: ['caravanas'],
+    }).map((i) => i.id)
+    expect(soCaravanas).toEqual(expect.arrayContaining(['dashboard', 'eventos', 'caravanas']))
+    expect(soCaravanas).not.toContain('bateria')
+    expect(soCaravanas).not.toContain('social')
+    expect(soCaravanas).not.toContain('feminino')
+    expect(soCaravanas).not.toContain('carnaval')
+
+    const todos = filterMenuByPermissionsAndGestoria(ADMIN_MENU, permsEventos, {
+      podeGerirTodos: true,
+    }).map((i) => i.id)
+    expect(todos).toEqual(
+      expect.arrayContaining(['caravanas', 'bateria', 'social', 'feminino', 'carnaval']),
+    )
+  })
+
+  it('resolverMenuIdDeRota: hubs thin de departamento', () => {
+    expect(resolverMenuIdDeRota('/admin/caravanas')).toBe('caravanas')
+    expect(resolverMenuIdDeRota('/admin/caravanas/abc')).toBe('caravanas')
+    expect(resolverMenuIdDeRota('/admin/bateria')).toBe('bateria')
+    expect(resolverMenuIdDeRota('/admin/diretoria')).toBe('diretoria')
   })
 
   it('hierarquia exige roles:manage (não members:view)', () => {
-    const soMembers = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MEMBERS_VIEW]).map(
-      (i) => i.id,
-    )
+    const soMembers = filterMenuByPermissionsAndGestoria(
+      ADMIN_MENU,
+      [PERMISSIONS.MEMBERS_VIEW],
+      { gestorSlugs: [] },
+    ).map((i) => i.id)
     expect(soMembers).toContain('torcedores')
     expect(soMembers).toContain('socios')
+    expect(soMembers).not.toContain('diretoria')
     expect(soMembers).not.toContain('hierarquia')
   })
 
@@ -392,13 +427,17 @@ describe('filterMenuByPermissions com OR', () => {
       PERMISSIONS.MEMBERS_VIEW,
     ]).map((i) => ({ id: i.id, label: i.label, href: i.href, secao: i.secao }))
     const groups = groupAdminMenuBySecao(items)
-    expect(groups.map((g) => g.id)).toEqual(['geral', 'pessoas', 'financas'])
+    // members:view também casa o hub Diretoria (departamentoSlug) — ainda na
+    // seção operação; o filtro de gestoria é aplicado no layout.
+    expect(groups.map((g) => g.id)).toEqual(['geral', 'pessoas', 'operacao', 'financas'])
     expect(groups.find((g) => g.id === 'financas')?.label).toBe('Finanças')
   })
 
   it('Fase 2: pacote colaborador de área canônica não abre operação admin (exceto Diretoria, Bar/PDV e Relatórios)', () => {
     for (const area of DEPARTAMENTOS_CANONICOS) {
-      const ids = filterMenuByPermissions(ADMIN_MENU, area.permissions).map((i) => i.id)
+      const ids = filterMenuByPermissionsAndGestoria(ADMIN_MENU, area.permissions, {
+        gestorSlugs: [],
+      }).map((i) => i.id)
       if (area.nome === 'Diretoria') {
         const esperado = new Set([
           'dashboard',
@@ -466,7 +505,22 @@ describe('filterMenuByPermissions com OR', () => {
     for (const area of DEPARTAMENTOS_CANONICOS) {
       const efetivas = [...area.permissions, ...area.permissionsGestor]
       expect(hasAdminAreaAccess(efetivas), area.nome).toBe(true)
-      const ids = filterMenuByPermissions(ADMIN_MENU, efetivas).map((i) => i.id)
+      const slug = area.moduloPortal
+        ? // moduloPortal ≠ slug canônico em alguns casos (social → social-e-eventos)
+          capabilityPorSlug(
+            area.nome === 'Social e eventos'
+              ? 'social-e-eventos'
+              : area.nome === 'Materiais / Loja'
+                ? 'materiais-loja'
+                : area.nome === 'Comunicação'
+                  ? 'comunicacao'
+                  : area.moduloPortal,
+          )?.slug
+        : undefined
+      const gestorSlugs = slug ? [slug] : []
+      const ids = filterMenuByPermissionsAndGestoria(ADMIN_MENU, efetivas, {
+        gestorSlugs,
+      }).map((i) => i.id)
       expect(ids.length, area.nome).toBeGreaterThan(1)
     }
   })

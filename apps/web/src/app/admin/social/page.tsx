@@ -10,6 +10,7 @@ import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoSocial } from '@/lib/social-direcao'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
+import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
@@ -69,13 +70,23 @@ async function SocialKpis({
 async function SocialInboxELista({
   tenantId,
   podeVerFinanceiro,
+  podeVincular,
 }: {
   tenantId: string
   podeVerFinanceiro: boolean
+  podeVincular: boolean
 }) {
   const ops = await carregarDirecaoSocial(tenantId, { incluirOrcamento: podeVerFinanceiro })
   return (
     <>
+      <DepartamentoSemanaOps
+        itens={ops.semana}
+        partidas={ops.partidasSemana}
+        semanaHref="/admin/eventos?vista=semana"
+        podeVincularPartida={podeVincular}
+        titulo="Semana do Social"
+      />
+
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
@@ -100,6 +111,7 @@ async function SocialInboxELista({
           eventos={ops.lista}
           emptyTitle="Nenhuma ação com projeto do Social"
           emptyDescription="Crie o evento e vincule a uma campanha/projeto do departamento."
+          detailBasePath="/admin/social"
         />
       </section>
     </>
@@ -150,6 +162,7 @@ export default async function AdminSocialPage() {
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
   let podeVerFinanceiro = false
+  let podeVincular = false
   try {
     const authz = await assertAnyPermission([
       PERMISSIONS.EVENTS_VIEW,
@@ -158,14 +171,17 @@ export default async function AdminSocialPage() {
     ])
     session = authz.session
     tenant = authz.tenant
+    const efetivas = authz.permissoesEfetivas ?? []
     podeGerir =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_MANAGE) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.EVENTS_CREATE)
+      hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.EVENTS_CREATE)
+    podeVincular =
+      Boolean(authz.isSuperAdmin) || hasPermission(efetivas, PERMISSIONS.EVENTS_MANAGE)
     podeVerFinanceiro =
       Boolean(authz.isSuperAdmin) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.FINANCE_VIEW) ||
-      hasPermission(authz.permissoesEfetivas ?? [], PERMISSIONS.FINANCE_MANAGE)
+      hasPermission(efetivas, PERMISSIONS.FINANCE_VIEW) ||
+      hasPermission(efetivas, PERMISSIONS.FINANCE_MANAGE)
   } catch {
     redirect('/admin')
   }
@@ -175,7 +191,7 @@ export default async function AdminSocialPage() {
     <>
       <AdminPageHeader
         title="Social e eventos"
-        description="Campanhas, ações na sede e agenda vinculada aos projetos do departamento."
+        description="Semana das campanhas — ações na sede e vínculo com o jogo do dia."
         icon={<CalendarHeart className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -183,11 +199,11 @@ export default async function AdminSocialPage() {
               <SocialHeaderLinks tenantId={tenant.id} />
             </Suspense>
             <Link
-              href="/admin/eventos"
+              href="/admin/eventos?vista=semana"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
-              Agenda
+              Agenda da semana
             </Link>
             <Suspense fallback={null}>
               <SocialActions tenantId={tenant.id} podeGerir={podeGerir} />
@@ -216,7 +232,11 @@ export default async function AdminSocialPage() {
             </div>
           }
         >
-          <SocialInboxELista tenantId={tenant.id} podeVerFinanceiro={podeVerFinanceiro} />
+          <SocialInboxELista
+            tenantId={tenant.id}
+            podeVerFinanceiro={podeVerFinanceiro}
+            podeVincular={podeVincular}
+          />
         </Suspense>
       </div>
     </>
