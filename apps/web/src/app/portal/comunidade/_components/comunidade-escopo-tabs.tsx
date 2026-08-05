@@ -535,8 +535,10 @@ export function ComunidadeEscopoTabs({
                 tab.slugAlvo &&
                 slugsArrastaveis.includes(tab.slugAlvo),
             )
-        const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
-        const arrastando = draggingKey === dragKey
+        const dragKey = ehTematico ? (tab.canalId ?? null) : (tab.slugAlvo ?? null)
+        // Nacional tem slugAlvo null — sem esta guarda, `null === null` deixa
+        // a aba presa em `dragging` (scale 1.14) o tempo todo.
+        const arrastando = dragKey != null && draggingKey === dragKey
 
         /** 32×32 sem scale no ícone (hover distorce a medida entre abas). */
         const visual = (
@@ -583,11 +585,11 @@ export function ComunidadeEscopoTabs({
         ].join(' ')
         // Largura do hit-area = logo + folga mínima
         const tabBtnStyle = {
-          width: LOGO_MINIATURA_PX + 4,
+          width: LOGO_MINIATURA_PX,
         } as const
 
         const dragKind: 'operador' | 'tematico' = ehTematico ? 'tematico' : 'operador'
-        const dragHandlers = arrastavel
+        const dragHandlers = arrastavel && dragKey
           ? {
               onPointerDown: (e: React.PointerEvent) =>
                 onPointerDownTab(e, dragKey, dragKind),
@@ -675,10 +677,14 @@ export function ComunidadeEscopoTabs({
             exit="exit"
             transition={{ layout: springSnappy }}
             className={[
-              'relative group rounded-full',
+              'relative group h-8 w-8 shrink-0 rounded-full',
               arrastavel ? 'cursor-grab active:cursor-grabbing' : '',
             ].join(' ')}
-            style={arrastando ? { touchAction: 'none' } : undefined}
+            style={{
+              width: LOGO_MINIATURA_PX,
+              height: LOGO_MINIATURA_PX,
+              ...(arrastando ? { touchAction: 'none' as const } : {}),
+            }}
             title={arrastavel ? `${tab.nome} — arraste para reposicionar` : undefined}
             {...wrapperAttr}
             {...dragHandlers}
