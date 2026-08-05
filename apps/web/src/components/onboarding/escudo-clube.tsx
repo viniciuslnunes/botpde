@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import { Shield } from 'lucide-react'
-import { detectarEscudoCircular } from '@/lib/escudo-forma'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { useEscudoCircular } from '@/lib/use-escudo-circular'
 
 const SIZES = {
   sm: { box: 'h-11 w-11', px: 44, icon: 'h-4 w-4', text: 'text-sm' },
@@ -26,8 +26,8 @@ type Props = {
   /**
    * Forma do frame.
    * - `auto` (default): só aplica máscara circular quando detecta logo redondo
-   *   com cantos brancos opacos (fundo assado). PNG com alpha (ex.: Gaviões)
-   *   permanece natural — o card já aparece pelo transparência.
+   *   com fundo opaco assado (branco, preto ou cor). PNG com alpha (ex.: Gaviões)
+   *   permanece natural — a transparência já resolve o formato.
    * - `circle` / `rounded`: força o placeholder; com imagem, `circle` mascara.
    */
   shape?: EscudoClubeShape
@@ -45,8 +45,9 @@ export function inicialClubeEscudo(nome: string, apelido?: string | null): strin
 
 /**
  * Escudo do clube/torcida no onboarding: frame fixo + object-contain.
- * Máscara circular só quando detecta badge redondo com cantos brancos
- * (Camisa 12 / Pavilhão Nove). PNG com alpha (Gaviões) fica natural.
+ * Máscara circular via `useEscudoCircular` — mesmo critério do portal
+ * (Camisa 12, logo em square preto, crop JPEG #0a0a0a). PNG com alpha
+ * (Gaviões) fica natural.
  */
 export function EscudoClube({
   nome,
@@ -58,39 +59,13 @@ export function EscudoClube({
   className,
 }: Props) {
   const [imagemFalhou, setImagemFalhou] = useState(false)
-  const [circularDetectado, setCircularDetectado] = useState(shape === 'circle')
-  const [deteccaoPronta, setDeteccaoPronta] = useState(shape !== 'auto')
+  const { circular: circularDetectado, pronto: deteccaoPronta } = useEscudoCircular(
+    escudoUrl && !imagemFalhou ? escudoUrl : null,
+    shape,
+  )
   const s = SIZES[size]
   const label = apelido || nome
   const mostrarImagem = Boolean(escudoUrl && !imagemFalhou)
-
-  useEffect(() => {
-    if (!escudoUrl || imagemFalhou) {
-      setDeteccaoPronta(true)
-      return
-    }
-    if (shape === 'circle') {
-      setCircularDetectado(true)
-      setDeteccaoPronta(true)
-      return
-    }
-    if (shape === 'rounded') {
-      setCircularDetectado(false)
-      setDeteccaoPronta(true)
-      return
-    }
-    let ativo = true
-    setDeteccaoPronta(false)
-    setCircularDetectado(false)
-    void detectarEscudoCircular(escudoUrl).then((circular) => {
-      if (!ativo) return
-      setCircularDetectado(circular)
-      setDeteccaoPronta(true)
-    })
-    return () => {
-      ativo = false
-    }
-  }, [escudoUrl, imagemFalhou, shape])
 
   const aplicarMascara = circularDetectado && mostrarImagem && deteccaoPronta
   const boxClass = [

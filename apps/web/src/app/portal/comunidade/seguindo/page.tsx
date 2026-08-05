@@ -5,7 +5,7 @@ import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { db } from '@torcida/db'
 import { getPodeSeguirDeVoltaPorSeguidor } from '@/lib/social'
 import { SeguimentoPendentesList } from '../_components/seguimento-pendentes-list'
-import { aprovarSeguimento, rejeitarSeguimento, solicitarSeguir } from '@/app/portal/comunidade/actions'
+import { aprovarSeguimento, rejeitarSeguimento } from '@/app/portal/comunidade/actions'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -72,11 +72,6 @@ export default async function SeguindoPage() {
         itensIniciais={itens}
         onAprovar={aprovarSeguimento}
         onRejeitar={rejeitarSeguimento}
-        onSeguirDeVolta={async (userId) => {
-          const r = await solicitarSeguir(userId)
-          if (!r.ok) throw new Error(r.message)
-          return r.status
-        }}
       />
     </div>
   )

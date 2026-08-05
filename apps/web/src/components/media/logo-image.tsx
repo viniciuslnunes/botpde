@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
-import { detectarEscudoCircular } from '@/lib/escudo-forma'
+import { useEscudoCircular } from '@/lib/use-escudo-circular'
 
 type Props = {
   src: string
@@ -22,10 +21,9 @@ type Props = {
 }
 
 /**
- * Renderiza um escudo/logo aplicando a mesma detecção do onboarding
- * (`detectarEscudoCircular`): badges redondos com fundo opaco “assado”
- * (branco, preto ou cor) ganham máscara circular; PNG com alpha nos cantos
- * (fundo transparente) fica natural. Ver `EscudoClube` (onboarding).
+ * Renderiza um escudo/logo com a detecção compartilhada (`useEscudoCircular`):
+ * badges redondos com fundo opaco “assado” (branco, preto ou cor) ganham
+ * máscara circular; PNG com alpha nos cantos fica natural.
  *
  * `size` é resolução da fonte (Next Image / attrs); o tamanho visual vem de
  * `className` (ex.: `h-7 w-7`) — não aplicar style width/height com `size`.
@@ -42,22 +40,7 @@ export function LogoImage({
   unoptimized,
   priority,
 }: Props) {
-  const [circular, setCircular] = useState(false)
-  const [pronto, setPronto] = useState(false)
-
-  useEffect(() => {
-    let ativo = true
-    setPronto(false)
-    setCircular(false)
-    void detectarEscudoCircular(src).then((c) => {
-      if (!ativo) return
-      setCircular(c)
-      setPronto(true)
-    })
-    return () => {
-      ativo = false
-    }
-  }, [src])
+  const { circular, pronto } = useEscudoCircular(src)
 
   const masked = pronto && circular
   const radiusClass = masked ? 'rounded-full overflow-hidden' : rounded

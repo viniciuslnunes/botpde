@@ -82,7 +82,12 @@ export function FeedPostCard({
       >
       <header className="flex items-center gap-3">
         <ComunidadePrefetchLink href={headerHref}>
-          <Avatar nome={headerNome} avatarUrl={headerAvatar} size="md" />
+          <Avatar
+            nome={headerNome}
+            avatarUrl={headerAvatar}
+            size="md"
+            fit={isComunicadoOficial ? 'contain' : 'cover'}
+          />
         </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2">

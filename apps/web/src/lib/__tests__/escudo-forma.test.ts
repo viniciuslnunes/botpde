@@ -4,6 +4,7 @@ import {
   gravarCacheEscudoCircular,
   lerCacheEscudoCircular,
   limparCacheEscudoCircular,
+  subscribeEscudoCircular,
 } from '@/lib/escudo-forma'
 
 const SAMPLE = 64
@@ -116,6 +117,13 @@ describe('escudo-forma', () => {
     expect(analisarEscudoCircularDeImageData(data)).toBe(true)
   })
 
+  it('mascara disco em fundo #0a0a0a (JPEG do crop sem alpha)', () => {
+    const data = canvasVazio()
+    pintarFundo(data, 10, 10, 10)
+    pintarCirculoColorido(data, 31.5, 31.5, 28)
+    expect(analisarEscudoCircularDeImageData(data)).toBe(true)
+  })
+
   it('mascara badge quase full-bleed em fundo branco (Camisa 12)', () => {
     const data = canvasVazio()
     pintarFundoBranco(data)
@@ -166,5 +174,20 @@ describe('cache escudo circular', () => {
     gravarCacheEscudoCircular('https://cdn.example/a.png', true)
     limparCacheEscudoCircular()
     expect(lerCacheEscudoCircular('https://cdn.example/a.png')).toBeNull()
+  })
+
+  it('notifica assinantes quando o cache é gravado', () => {
+    const seen: Array<{ url: string; valor: boolean }> = []
+    const unsub = subscribeEscudoCircular((url, valor) => {
+      seen.push({ url, valor })
+    })
+    gravarCacheEscudoCircular('https://cdn.example/a.png', true)
+    gravarCacheEscudoCircular('https://cdn.example/b.png', false)
+    unsub()
+    gravarCacheEscudoCircular('https://cdn.example/c.png', true)
+    expect(seen).toEqual([
+      { url: 'https://cdn.example/a.png', valor: true },
+      { url: 'https://cdn.example/b.png', valor: false },
+    ])
   })
 })

@@ -189,6 +189,17 @@ const MAX_CACHE_ENTRIES = 200
 const cacheMemoria = new Map<string, boolean>()
 const inflight = new Map<string, Promise<boolean>>()
 
+type EscudoCircularListener = (url: string, valor: boolean) => void
+const listeners = new Set<EscudoCircularListener>()
+
+/** Notifica todos os consumidores quando o cache de uma URL muda. */
+export function subscribeEscudoCircular(listener: EscudoCircularListener): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
 function lerStorage(): Record<string, boolean> {
   if (typeof window === 'undefined') return {}
   try {
@@ -234,6 +245,7 @@ export function gravarCacheEscudoCircular(url: string, valor: boolean) {
   if (!url) return
   cacheMemoria.set(url, valor)
   gravarStorage(url, valor)
+  for (const listener of listeners) listener(url, valor)
 }
 
 export function limparCacheEscudoCircular() {

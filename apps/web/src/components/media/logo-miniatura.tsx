@@ -1,7 +1,7 @@
 'use client'
 
-import { useLayoutEffect, useState, type CSSProperties } from 'react'
-import { detectarEscudoCircular, lerCacheEscudoCircular } from '@/lib/escudo-forma'
+import type { CSSProperties } from 'react'
+import { useEscudoCircular } from '@/lib/use-escudo-circular'
 
 /** Tamanho único da barra de canais / brand do header. */
 export const LOGO_MINIATURA_PX = 32
@@ -11,7 +11,8 @@ type Props = {
   alt: string
   /**
    * - `auto` (default): máscara circular só se badge com fundo opaco
-   *   (Camisa 12, etc.). PNG com alpha (Gaviões, escudo do clube) fica natural.
+   *   (Camisa 12, logo em square preto, etc.). PNG com alpha (Gaviões,
+   *   escudo do clube) fica natural.
    * - `circle`: força disco — só quando o caller já sabe que é badge redondo.
    */
   shape?: 'auto' | 'circle'
@@ -30,32 +31,7 @@ export function LogoMiniatura({
   rounded = '',
   className,
 }: Props) {
-  const [circular, setCircular] = useState(shape === 'circle')
-  const [pronto, setPronto] = useState(shape === 'circle')
-
-  useLayoutEffect(() => {
-    if (shape === 'circle') {
-      setCircular(true)
-      setPronto(true)
-      return
-    }
-    const hit = lerCacheEscudoCircular(src)
-    if (hit !== null) {
-      setCircular(hit)
-      setPronto(true)
-      return
-    }
-    let ativo = true
-    setPronto(false)
-    void detectarEscudoCircular(src).then((c) => {
-      if (!ativo) return
-      setCircular(c)
-      setPronto(true)
-    })
-    return () => {
-      ativo = false
-    }
-  }, [src, shape])
+  const { circular, pronto } = useEscudoCircular(src, shape)
 
   const boxStyle: CSSProperties = {
     width: LOGO_MINIATURA_PX,

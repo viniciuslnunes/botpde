@@ -151,7 +151,6 @@ interface SeguimentoReviewButtonsProps {
   podeSeguirDeVolta: boolean
   onAprovar: (id: string) => Promise<void>
   onRejeitar: (id: string) => Promise<void>
-  onSeguirDeVolta: (userId: string) => Promise<'APROVADO' | 'PENDENTE'>
   onResolved: () => void
 }
 
@@ -161,7 +160,6 @@ export function SeguimentoReviewButtons({
   podeSeguirDeVolta,
   onAprovar,
   onRejeitar,
-  onSeguirDeVolta,
   onResolved,
 }: SeguimentoReviewButtonsProps) {
   const [pending, startTransition] = useTransition()
@@ -191,8 +189,14 @@ export function SeguimentoReviewButtons({
                 onClick={() =>
                   startTransition(async () => {
                     try {
-                      const status = await onSeguirDeVolta(seguidorId)
-                      if (status === 'APROVADO') {
+                      // Chama a Server Action no client — não via prop de
+                      // função anônima do Server Component (quebra o RSC).
+                      const resultado = await solicitarSeguir(seguidorId)
+                      if (!resultado.ok) {
+                        toast.error(resultado.message)
+                        return
+                      }
+                      if (resultado.status === 'APROVADO') {
                         setResolved('seguindo')
                         toast.success('Você começou a seguir este membro.')
                       } else {

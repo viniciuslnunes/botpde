@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { canOptimizeImageUrl, durableImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 
 const SIZES = {
   xs: 'h-7 w-7 text-[10px]',
@@ -33,16 +34,27 @@ function inicial(nome: string | null): string {
 }
 
 /**
- * Avatar circular consistente da comunidade: foto quando existe, senão a inicial
- * sobre a cor primária do tenant. Sem hooks — usável em Server e Client Components.
+ * Avatar da comunidade: foto circular quando existe, senão a inicial.
+ * Logos (`fit="contain"`) passam por `LogoImage` — mesma detecção reativa
+ * de badge circular com fundo opaco assado em todo o sistema.
  */
 export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' }: AvatarProps) {
-  const base = `inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold ${SIZES[size]}`
+  const sizeClass = `inline-flex shrink-0 items-center justify-center font-semibold ${SIZES[size]}`
   const px = PIXELS[size]
-  // contain (logos PNG): sem fundo — transparência deve aparecer como no header.
-  const objectFit = fit === 'contain' ? 'object-contain' : 'object-cover'
-  // Não pedir anexo Discord expirado — cai na inicial sem 404 no console.
   const src = durableImageUrl(avatarUrl)
+
+  if (fit === 'contain' && src) {
+    return (
+      <LogoImage
+        src={src}
+        alt={nome ?? 'Membro'}
+        size={px}
+        className={[sizeClass, 'object-contain', className ?? ''].join(' ')}
+      />
+    )
+  }
+
+  const base = `${sizeClass} overflow-hidden rounded-full`
 
   if (src && canOptimizeImageUrl(src)) {
     return (
@@ -52,7 +64,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' 
         width={px}
         height={px}
         quality={90}
-        className={[base, objectFit, className ?? ''].join(' ')}
+        className={[base, 'object-cover', className ?? ''].join(' ')}
       />
     )
   }
@@ -67,7 +79,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' 
         height={px}
         loading="lazy"
         decoding="async"
-        className={[base, objectFit, className ?? ''].join(' ')}
+        className={[base, 'object-cover', className ?? ''].join(' ')}
       />
     )
   }

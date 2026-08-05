@@ -1,11 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
-import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
@@ -2769,13 +2768,12 @@ function PassoVinculo({
 
                 {fotoUnidade ? (
                   <span className="relative block h-20 w-20 shrink-0">
-                    <Image
+                    <LogoImage
                       src={fotoUnidade}
                       alt={`Foto da unidade ${nomeUnidade}`}
                       fill
                       sizes="80px"
                       className="object-contain"
-                      unoptimized={!canOptimizeImageUrl(fotoUnidade)}
                     />
                   </span>
                 ) : null}

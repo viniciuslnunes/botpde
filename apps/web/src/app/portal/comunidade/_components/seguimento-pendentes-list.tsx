@@ -24,7 +24,6 @@ interface SeguimentoPendentesListProps {
   itensIniciais: SeguimentoPendenteItem[]
   onAprovar: (id: string) => Promise<void>
   onRejeitar: (id: string) => Promise<void>
-  onSeguirDeVolta: (userId: string) => Promise<'APROVADO' | 'PENDENTE'>
 }
 
 function formatarData(iso: string): string {
@@ -37,7 +36,6 @@ export function SeguimentoPendentesList({
   itensIniciais,
   onAprovar,
   onRejeitar,
-  onSeguirDeVolta,
 }: SeguimentoPendentesListProps) {
   const [itens, setItens] = useState(itensIniciais)
 
@@ -51,10 +49,6 @@ export function SeguimentoPendentesList({
 
   function rejeitar(id: string): Promise<void> {
     return onRejeitar(id)
-  }
-
-  function seguirDeVolta(userId: string): Promise<'APROVADO' | 'PENDENTE'> {
-    return onSeguirDeVolta(userId)
   }
 
   if (itens.length === 0) {
@@ -106,7 +100,6 @@ export function SeguimentoPendentesList({
               podeSeguirDeVolta={item.podeSeguirDeVolta}
               onAprovar={aprovar}
               onRejeitar={rejeitar}
-              onSeguirDeVolta={seguirDeVolta}
               onResolved={() => {
                 remover(item.id)
                 // Aprovar/rejeitar limpa a notificação SEGUIMENTO_PENDENTE no servidor.
