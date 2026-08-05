@@ -61,15 +61,16 @@ function formatarPct(valor: number | null): string {
 /** Etapas da Agenda: as três vistas do calendário + histórico + comparecimento. */
 type VistaAgenda = 'lista' | 'semana' | 'mes' | 'historico' | 'comparecimento'
 
+/** Sem `?vista=`, a Agenda abre no calendário do mês. */
 function parseVista(valor: string | undefined): VistaAgenda {
   switch (valor) {
+    case 'lista':
     case 'semana':
-    case 'mes':
     case 'historico':
     case 'comparecimento':
       return valor
     default:
-      return 'lista'
+      return 'mes'
   }
 }
 
@@ -395,7 +396,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
   function hrefFiltro(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams()
     const tipo = extra.tipo !== undefined ? extra.tipo : tipoFiltro
-    const v = extra.vista !== undefined ? extra.vista : vista !== 'lista' ? vista : undefined
+    const v = extra.vista !== undefined ? extra.vista : vista !== 'mes' ? vista : undefined
     const data = extra.data !== undefined ? extra.data : sp.data
     const query = extra.q !== undefined ? extra.q : sp.q
     if (tipo) p.set('tipo', tipo)
@@ -503,32 +504,31 @@ export default async function AdminEventosPage({ searchParams }: Props) {
         )}
 
         {vista === 'lista' && (
-          <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
-            <aside className="space-y-4 lg:sticky lg:top-24 lg:col-span-4 xl:col-span-3">
-              <AgendaSemanaCompact
-                itens={semanaCompactItens}
-                partidas={semanaPartidasItens}
-                semanaHref={hrefFiltro({ vista: 'semana', data: '' })}
-                podeVincularPartida={podeVincularPartida}
-              />
-              {destaque && destaqueRow ? (
-                <ProximoEventoSpotlight
-                  id={destaque.id}
-                  titulo={destaque.titulo}
-                  tipo={destaque.tipo}
-                  dataLabel={destaque.dataLabel}
-                  local={destaque.local}
-                  href={`/admin/eventos/${destaque.id}`}
-                  lotacaoLabel={destaque.lotacaoLabel}
-                  fotoUrl={destaqueRow.fotoUrl}
-                  diasLabel={diasParaEvento(destaqueRow.data)}
-                  confirmados={destaque.confirmados}
-                  capacidade={destaque.capacidade}
-                />
-              ) : null}
-            </aside>
+          <div className="space-y-5">
+            <AgendaSemanaCompact
+              itens={semanaCompactItens}
+              partidas={semanaPartidasItens}
+              semanaHref={hrefFiltro({ vista: 'semana', data: '' })}
+              podeVincularPartida={podeVincularPartida}
+            />
 
-            <div className="space-y-3 lg:col-span-8 xl:col-span-9">
+            {destaque && destaqueRow ? (
+              <ProximoEventoSpotlight
+                id={destaque.id}
+                titulo={destaque.titulo}
+                tipo={destaque.tipo}
+                dataLabel={destaque.dataLabel}
+                local={destaque.local}
+                href={`/admin/eventos/${destaque.id}`}
+                lotacaoLabel={destaque.lotacaoLabel}
+                fotoUrl={destaqueRow.fotoUrl}
+                diasLabel={diasParaEvento(destaqueRow.data)}
+                confirmados={destaque.confirmados}
+                capacidade={destaque.capacidade}
+              />
+            ) : null}
+
+            <div className="space-y-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 <Calendar className="h-4 w-4" />
                 Próximos ({proximos.length})
