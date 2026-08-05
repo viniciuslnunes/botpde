@@ -567,7 +567,11 @@ export function ComunidadeEscopoTabs({
                   height: LOGO_MINIATURA_PX,
                   minWidth: LOGO_MINIATURA_PX,
                   minHeight: LOGO_MINIATURA_PX,
+                  maxWidth: LOGO_MINIATURA_PX,
+                  maxHeight: LOGO_MINIATURA_PX,
+                  borderRadius: '50%',
                   flexShrink: 0,
+                  boxSizing: 'border-box',
                 }}
               >
                 {tab.inicial}
@@ -583,10 +587,14 @@ export function ComunidadeEscopoTabs({
         )
 
         const className = [
-          'relative -mb-px flex h-11 w-8 touch-none items-center justify-center pb-2 pt-0.5',
+          'relative -mb-px flex h-11 touch-none items-center justify-center pb-2 pt-0.5',
           ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
+        // Largura do hit-area = logo + folga mínima
+        const tabBtnStyle = {
+          width: LOGO_MINIATURA_PX + 4,
+        } as const
 
         const dragKind: 'operador' | 'tematico' = ehTematico ? 'tematico' : 'operador'
         const dragHandlers = arrastavel
@@ -707,6 +715,7 @@ export function ComunidadeEscopoTabs({
                   aria-current={ativo ? 'page' : undefined}
                   aria-label={tab.nome}
                   className={className}
+                  style={tabBtnStyle}
                 >
                   {visual}
                   {indicator}
@@ -719,6 +728,7 @@ export function ComunidadeEscopoTabs({
                 aria-current={ativo ? 'page' : undefined}
                 aria-label={tab.nome}
                 className={className}
+                style={tabBtnStyle}
                 onClick={(e) => {
                   if (dragRef.current?.suppressClick || draggingKey) {
                     e.preventDefault()
