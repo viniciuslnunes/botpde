@@ -27,7 +27,7 @@ import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
-import { LogoImage } from '@/components/media/logo-image'
+import { LogoMiniatura } from '@/components/media/logo-miniatura'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
@@ -196,16 +196,11 @@ export function PortalNavbar({
 
           <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
-              <span className="relative block h-8 w-8 shrink-0 overflow-hidden rounded-lg">
-                <LogoImage
-                  src={brandTenant.logoUrl}
-                  alt={brandTenant.nome}
-                  fill
-                  sizes="32px"
-                  quality={95}
-                  className="object-contain"
-                />
-              </span>
+              <LogoMiniatura
+                src={brandTenant.logoUrl}
+                alt={brandTenant.nome}
+                className="rounded-lg"
+              />
             ) : (
               <div
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"

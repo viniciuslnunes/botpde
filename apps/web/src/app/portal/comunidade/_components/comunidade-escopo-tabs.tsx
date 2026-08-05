@@ -7,7 +7,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { toast } from '@torcida/ui'
 import { canalTabBarItem, canalTabIconTap, springSnappy } from '@/lib/motion-presets'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
-import { LogoImage } from '@/components/media/logo-image'
+import { LogoMiniatura, LOGO_MINIATURA_PX } from '@/components/media/logo-miniatura'
 import { useReportNavPending } from '@/components/portal/nav-pending-context'
 import {
   fecharCanalOperadorAction,
@@ -538,11 +538,10 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Miniatura rígida 32×32 via `fill` — o box do pai dita o tamanho;
-         *  escudo do clube e logos de torcida não podem estourar. */
+        /** Box 32×32 com style inline + img cru; Motion escala o wrapper externo. */
         const visual = (
           <m.span
-            className="relative block h-8 w-8 shrink-0 overflow-hidden"
+            className="relative inline-flex shrink-0"
             whileHover={
               arrastando || draggingKey
                 ? undefined
@@ -553,29 +552,30 @@ export function ComunidadeEscopoTabs({
             }
           >
             {tab.logoUrl ? (
-              <LogoImage
-                src={tab.logoUrl}
-                alt=""
-                fill
-                sizes="32px"
-                className="pointer-events-none object-contain"
-              />
+              <LogoMiniatura src={tab.logoUrl} alt="" />
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'pointer-events-none flex h-full w-full items-center justify-center rounded-full text-xs font-bold',
+                  'flex items-center justify-center rounded-full text-xs font-bold',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
+                style={{
+                  width: LOGO_MINIATURA_PX,
+                  height: LOGO_MINIATURA_PX,
+                  minWidth: LOGO_MINIATURA_PX,
+                  minHeight: LOGO_MINIATURA_PX,
+                  flexShrink: 0,
+                }}
               >
                 {tab.inicial}
               </span>
             )}
             {carregandoEsta ? (
               <Loader2
-                className="absolute -right-1 -top-1 h-3.5 w-3.5 animate-spin text-[rgb(var(--foreground-muted))]"
+                className="absolute -right-1 -top-1 z-10 h-3.5 w-3.5 animate-spin text-[rgb(var(--foreground-muted))]"
                 aria-hidden
               />
             ) : null}
@@ -583,7 +583,7 @@ export function ComunidadeEscopoTabs({
         )
 
         const className = [
-          'relative -mb-px flex h-10 w-8 touch-none items-center justify-center pb-1.5 pt-0.5',
+          'relative -mb-px flex h-11 w-8 touch-none items-center justify-center pb-2 pt-0.5',
           ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
