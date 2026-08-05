@@ -373,9 +373,13 @@ describe('B1) canal oficial: quem entra na unidade e quem entra na Sede', () => 
         // o espaço que `vincularMembroCanaisAposAprovacao` documenta como
         // "de sócio". A regra é burlada pela geometria, não pelo código.
         if (!esperado.noCanalDaSede && (await estaAtivo(sede))) {
+          // §7 17 fechado com `recusarCanalDaSede`: um lote semeado depois da
+          // correção não produz mais isto. Aparecendo, é **dado legado** —
+          // inscrição feita antes do fix, que o repair
+          // `db:repair-canal-membro-pendente-aprovado` encerra.
           alerta(
             AREA,
-            `${rotulo}: está no canal oficial da SEDE porque a unidade do convite É a Sede raiz — ver ARCHITECTURE §7 17`,
+            `${rotulo}: no canal oficial da SEDE — dado anterior ao fix do §7 17; limpar com db:repair-canal-membro-pendente-aprovado`,
           )
         }
       } else if (sede) {

@@ -7,12 +7,21 @@
  *
  * Copia a carteirinha entre o par origem↔espelho, no sentido em que ela
  * existe, preservando nº, validade e data de expedição. Idempotente: par que
- * já tem carteirinha dos dois lados é ignorado; divergência de validade é
- * apenas reportada (resolver é decisão humana, não do script).
+ * já tem carteirinha dos dois lados é ignorado.
+ *
+ * **Validade divergente** (ARCHITECTURE.md §7 20): antes só era reportada, e
+ * por isso sobrevivia a quantas execuções fossem. Importa porque o gate de
+ * canal resolve pelo `tenantVinculoId` — a mesma pessoa fica vigente num
+ * nível e vencida no outro, e a resposta muda conforme o canal que ela abre.
+ * Com `--reconciliar` o script alinha o espelho **pela origem**, que é a
+ * mesma fonte de verdade de `garantirCarteirinhaNoPar`. Fica atrás de flag
+ * porque mudar validade altera até quando o sócio passa na catraca — emitir o
+ * que faltava é aditivo, isto não é.
  *
  * Uso:
- *   pnpm --filter @torcida/db db:repair-carteirinha-espelho
  *   pnpm --filter @torcida/db db:repair-carteirinha-espelho -- --dry-run
+ *   pnpm --filter @torcida/db db:repair-carteirinha-espelho
+ *   pnpm --filter @torcida/db db:repair-carteirinha-espelho -- --reconciliar
  */
 import { randomBytes } from 'node:crypto'
 import { db } from '../src/index.js'
@@ -80,6 +89,8 @@ for (const c of carteirinhas) {
 }
 
 const paraCriar = []
+/** Espelhos cuja validade ficou diferente da origem — ver ARCHITECTURE §7 20. */
+const paraReconciliar = []
 let jaOk = 0
 let semNenhuma = 0
 let origemInvalida = 0
@@ -105,6 +116,25 @@ for (const espelho of espelhos) {
           .toISOString()
           .slice(0, 10)} × sede ${doEspelho.validade.toISOString().slice(0, 10)}`,
       )
+      // Reconciliar não era feito aqui: o script contava a divergência como
+      // "já ok" e seguia, então ela sobrevivia a quantas execuções fossem.
+      // Importa porque o gate de canal (`assertElegibilidadeMembroCanal`)
+      // resolve pelo `tenantVinculoId`: a mesma pessoa fica vigente num nível
+      // e vencida no outro, e a resposta muda conforme o canal que ela abre.
+      //
+      // A **origem manda** — é a mesma fonte de verdade de
+      // `garantirCarteirinhaNoPar` (`apps/web/src/lib/carteirinha-espelho.ts`),
+      // que copia validade e expedição da unidade para o espelho. Ver
+      // ARCHITECTURE.md §7 20.
+      paraReconciliar.push({
+        id: doEspelho.id,
+        nome: origem.nome,
+        de: doEspelho.validade,
+        para: daOrigem.validade,
+        expedidoEm: daOrigem.expedidoEm,
+        tenantId: espelho.tenantId,
+        userId: espelho.userId,
+      })
     }
     continue
   }
@@ -147,6 +177,9 @@ console.log(
 )
 for (const c of conflitos) {
   console.warn(`  ⚠ nº ${c.numeroSocio} já ocupado no tenant ${c.tenantId} · ${c.nome}`)
+}
+if (paraReconciliar.length > 0) {
+  console.log(`  → ${paraReconciliar.length} espelho(s) com validade a reconciliar pela origem`)
 }
 
 if (dryRun) {
@@ -195,5 +228,52 @@ for (const row of paraCriar) {
   }
 }
 
-console.log(`\n✅ carteirinhas emitidas=${criadas} · falhas=${falhas}`)
+// Reconciliação da validade divergente fica atrás de `--reconciliar`: emitir
+// uma carteirinha que faltava é aditivo, mas **mudar a validade** de uma que
+// já está na mão do sócio altera até quando ele passa na catraca. Quem roda
+// tem de pedir isso de propósito.
+let reconciliadas = 0
+if (paraReconciliar.length > 0) {
+  if (!process.argv.includes('--reconciliar')) {
+    console.log(
+      `\n⚠️  ${paraReconciliar.length} espelho(s) com validade divergente NÃO foram tocados.` +
+        `\n   Rode com --reconciliar para alinhar pela origem (regra de garantirCarteirinhaNoPar):`,
+    )
+    for (const r of paraReconciliar) {
+      console.log(
+        `     ${r.nome}: sede ${r.de.toISOString().slice(0, 10)} → ${r.para.toISOString().slice(0, 10)}`,
+      )
+    }
+  } else {
+    for (const r of paraReconciliar) {
+      await db.saasSocio.update({
+        where: { id: r.id },
+        data: { validade: r.para, expedidoEm: r.expedidoEm },
+      })
+      await db.auditLog.create({
+        data: {
+          tenantId: r.tenantId,
+          acao: 'SOCIO_CARTEIRINHA_VALIDADE_RECONCILIADA',
+          entidade: 'SaasSocio',
+          entidadeId: r.id,
+          detalhes: {
+            nome: r.nome,
+            validadeAnterior: r.de.toISOString().slice(0, 10),
+            novaValidade: r.para.toISOString().slice(0, 10),
+            fonte: 'origem',
+            repair: 'repair-carteirinha-espelho',
+          },
+        },
+      })
+      reconciliadas++
+      console.log(
+        `  ✅ ${r.nome}: validade ${r.de.toISOString().slice(0, 10)} → ${r.para.toISOString().slice(0, 10)}`,
+      )
+    }
+  }
+}
+
+console.log(
+  `\n✅ carteirinhas emitidas=${criadas} · falhas=${falhas} · validades reconciliadas=${reconciliadas}`,
+)
 await db.$disconnect()

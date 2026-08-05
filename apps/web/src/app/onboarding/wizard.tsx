@@ -591,6 +591,7 @@ export function OnboardingWizard({
                 unidadeNaoListada={unidadeNaoListada}
                 canalRestrito={convite?.canalRestrito ?? false}
                 torcidaMae={convite?.torcidaMae ?? null}
+                conviteSlug={conviteSlug}
                 modo={vinculoModo}
                 caminhoSocio={caminhoSocio}
                 onAbrirSocio={abrirModoSocio}
@@ -1738,6 +1739,7 @@ function PassoVinculo({
   unidadeNaoListada,
   canalRestrito,
   torcidaMae,
+  conviteSlug,
   userId,
   modo,
   caminhoSocio,
@@ -1758,6 +1760,13 @@ function PassoVinculo({
   unidadeNaoListada: boolean
   /** Convite de unidade com canal fechado — copy e benefícios mudam. */
   canalRestrito: boolean
+  /**
+   * Slug do link que trouxe a pessoa. Vai ao servidor porque decide se o sócio
+   * pendente acompanha o canal da unidade enquanto espera aprovação
+   * (ARCHITECTURE.md §7 22) — e lá é conferido contra a linhagem, já que
+   * procedência declarada pelo cliente não vale sozinha.
+   */
+  conviteSlug: string | null
   /** Sede/mãe quando o convite é de unidade Caso B. */
   torcidaMae: TorcidaMaeConvite | null
   userId: string
@@ -2369,6 +2378,10 @@ function PassoVinculo({
         const res = await solicitarVinculo({
           tenantId: torcida.id,
           tipo,
+          // Procedência: decide se o sócio pendente acompanha o canal da
+          // unidade enquanto espera aprovação (§7 22). O servidor confere o
+          // slug contra a linhagem — mandar isto não basta para ganhar acesso.
+          conviteSlug: conviteSlug ?? undefined,
           nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
           idade: idadeCalculada !== null ? String(idadeCalculada) : undefined,
           telefone: telefone || undefined,

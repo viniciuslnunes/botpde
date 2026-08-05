@@ -2,6 +2,7 @@ import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { CriarProdutoForm } from '@/components/admin/produto-forms'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -72,12 +73,12 @@ export default async function AdminLojaProdutosPage() {
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
         {ativos.length} produto{ativos.length !== 1 ? 's' : ''} ativo
         {ativos.length !== 1 ? 's' : ''} no catálogo.{' '}
-        <a
+        <Link
           href="/admin/loja/categorias"
           className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Categorias
-        </a>
+        </Link>
       </p>
 
       <MotionReveal>

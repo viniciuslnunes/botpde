@@ -99,14 +99,13 @@ export const ESPERADO_POR_FLUXO: Record<
       statusMembro: 'PENDENTE',
       abreTenant: false,
       veMuralSocios: false,
-      // Regra explícita do onboarding: "sócio pendente: mesma experiência de
-      // torcedor (CN + PDE) até a aprovação". Ele **entra** no canal da
-      // unidade do convite — o que não pode é o canal da Sede.
+      // Regra decidida (ARCHITECTURE.md §7 22): pendente que chegou por
+      // **link de convite** acompanha o canal da própria unidade enquanto
+      // espera — de leitura, com permissões de torcedor. Quem chegou pela
+      // vitrine pública fica só na Comunidade Nacional do clube.
       //
-      // ⚠️ `dados-reais.audit.ts` afirma o CONTRÁRIO e um repair expulsa essa
-      // gente. Enquanto o item 22 de `ARCHITECTURE.md` §7 não for decidido,
-      // esta linha segue o que o produto faz — e trocar a decisão começa
-      // aqui. Ver §7 22.
+      // O lote entra sempre por convite (`resolverConvite`), então aqui é
+      // `true`. Num teste que exercitasse a vitrine, seria `false`.
       noCanalDaUnidade: true,
       noCanalDaSede: false,
     },

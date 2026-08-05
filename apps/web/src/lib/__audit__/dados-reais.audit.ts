@@ -613,19 +613,49 @@ describe('canais e grupos (código real)', () => {
     }
   })
 
-  it('membro PENDENTE não está em canal oficial da unidade', async () => {
-    const pendentesEmCanal = await ctx.db.$queryRaw<{ n: number }[]>`
+  /**
+   * Regra decidida em 2026-08-04 (ARCHITECTURE.md §7 22): sócio PENDENTE que
+   * chegou por **link de convite** acompanha o canal da própria unidade
+   * enquanto espera — de leitura, com permissões de torcedor. O que ele nunca
+   * vê antes da aprovação é a comunidade da **torcida** (canal da SEDE).
+   *
+   * Esta asserção afirmava o contrário e apontava para um repair que expulsava
+   * quem o onboarding acabava de inscrever: o roster oscilava conforme o que
+   * rodasse por último. Agora ela mede a regra de verdade — não-aprovado em
+   * canal de SEDE é erro; em canal de unidade filha, é o comportamento.
+   */
+  it('membro não aprovado não está no canal da SEDE (comunidade da torcida)', async () => {
+    const naSede = await ctx.db.$queryRaw<{ n: number }[]>`
       SELECT COUNT(*)::int AS n FROM saas_membros_conversa mc
       JOIN saas_conversas c ON c.id = mc.conversa_id
       JOIN saas_membros m ON m.user_id = mc.user_id AND m.tenant_id = c.tenant_id
-      WHERE m.status <> 'APROVADO' AND mc.status = 'ATIVO'
-        AND EXISTS (SELECT 1 FROM saas_sedes s WHERE s.canal_conversa_id = c.id)`
-    const n = pendentesEmCanal[0]?.n ?? 0
+      WHERE m.status <> 'APROVADO' AND mc.status = 'ATIVO' AND mc.saiu_em IS NULL
+        AND EXISTS (
+          SELECT 1 FROM saas_sedes s
+          WHERE s.canal_conversa_id = c.id AND s.tipo = 'SEDE'
+        )`
+    const n = naSede[0]?.n ?? 0
     if (n > 0) {
-      erro('canais', `${n} membro(s) não aprovado(s) ATIVO(s) em canal oficial de unidade (repair-canal-membro-pendente-aprovado)`)
+      erro(
+        'canais',
+        `${n} membro(s) não aprovado(s) ATIVO(s) no canal da SEDE — comunidade da torcida só após aprovação (§7 22)`,
+      )
     } else {
-      ok('canais', 'Nenhum membro não aprovado ativo em canal oficial')
+      ok('canais', 'Nenhum não aprovado no canal da SEDE')
     }
+
+    // Em canal de unidade filha é esperado — contado para dar dimensão, não
+    // para reprovar.
+    const naUnidade = await ctx.db.$queryRaw<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM saas_membros_conversa mc
+      JOIN saas_conversas c ON c.id = mc.conversa_id
+      JOIN saas_membros m ON m.user_id = mc.user_id AND m.tenant_id = c.tenant_id
+      WHERE m.status = 'PENDENTE' AND mc.status = 'ATIVO' AND mc.saiu_em IS NULL
+        AND EXISTS (
+          SELECT 1 FROM saas_sedes s
+          WHERE s.canal_conversa_id = c.id AND s.tipo <> 'SEDE'
+        )`
+    ok('canais', `${naUnidade[0]?.n ?? 0} pendente(s) acompanhando o canal da própria unidade (§7 22)`)
   })
 
   it('aprovado está no canal da unidade e no da SEDE', async () => {

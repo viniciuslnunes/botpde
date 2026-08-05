@@ -528,20 +528,38 @@ export async function vincularMembroCanaisAposAprovacao(opts: {
    * espaço de sócio. Sem `tipo`, mantém o comportamento de sócio.
    */
   tipo?: 'SOCIO' | 'TORCEDOR'
+  /**
+   * Barra o canal da **Sede** mesmo quando ele chega disfarçado de "canal da
+   * unidade". O convite da Sede raiz pré-seleciona a própria SEDE como
+   * unidade (`decidirPassoInicialConvite`), e aí as duas coisas são a mesma
+   * `Conversa`: a regra "TORCEDOR nunca no canal da Sede" era burlada pela
+   * geometria, não por falha de lógica. Ver ARCHITECTURE.md §7 17 e §7 22.
+   *
+   * Quem passa isto aceita o custo: numa torcida de unidade única, o torcedor
+   * / pendente fica sem canal e só na Comunidade Nacional do clube — que é
+   * exatamente a regra de negócio ("ver a da torcida apenas após a aprovação").
+   */
+  recusarCanalDaSede?: boolean
 }): Promise<void> {
   const canalIds = new Set<string>()
   let canalDaUnidade: string | null = null
 
   if (opts.sedeId) {
-    const sedeUnidade: { canalConversaId: string | null } | null = await db.sede.findFirst({
-      where: { id: opts.sedeId, tenantId: opts.tenantId },
-      select: { canalConversaId: true },
-    })
-    if (sedeUnidade?.canalConversaId) {
+    const sedeUnidade: { canalConversaId: string | null; tipo: string } | null =
+      await db.sede.findFirst({
+        where: { id: opts.sedeId, tenantId: opts.tenantId },
+        select: { canalConversaId: true, tipo: true },
+      })
+    const ehCanalDaSede = sedeUnidade?.tipo === 'SEDE'
+    if (sedeUnidade?.canalConversaId && !(opts.recusarCanalDaSede && ehCanalDaSede)) {
       canalDaUnidade = sedeUnidade.canalConversaId
       canalIds.add(sedeUnidade.canalConversaId)
     }
   }
+
+  // Com o canal da Sede recusado não há para onde escalar: acrescentar o canal
+  // principal abaixo devolveria exatamente o que se acabou de barrar.
+  if (opts.recusarCanalDaSede && canalIds.size === 0) return
 
   // Torcedor com canal de unidade resolvido para por aqui. Sem canal de
   // unidade (vínculo direto na Sede), o canal principal é o dele mesmo.
@@ -1645,4 +1663,44 @@ export async function apagarConversasAoExcluirUnidade(
     where: { id: { in: conversaIds } },
   })
   return result.count
+}
+
+/**
+ * Tira a pessoa dos canais **oficiais** da torcida (e da sua linhagem).
+ *
+ * Usado quando o vínculo deixa de existir — hoje, na reprovação: a inscrição
+ * é feita na solicitação, para o pendente acompanhar a unidade enquanto
+ * espera (ARCHITECTURE.md §7 22), e sem esta limpeza quem foi recusado
+ * continuava lendo o canal indefinidamente (§7 18).
+ *
+ * Marca `saiuEm` em vez de apagar a linha: preserva o histórico de leitura e
+ * é o mesmo estado que `sairCanal` produz. Canais **temáticos** não entram —
+ * eles não derivam do vínculo de sócio, e sair deles é decisão da pessoa.
+ *
+ * `status` vai para `REJEITADO` (o enum tem ATIVO | PENDENTE | REJEITADO):
+ * junto com `saiuEm`, é o que tira a pessoa de toda leitura de roster, e
+ * distingue "foi removida" de "pediu e ainda não decidiram".
+ */
+export async function removerMembroDosCanaisDaTorcida(
+  tenantId: string,
+  userId: string,
+): Promise<number> {
+  const { getTorcidaLineageTenantIds } = await import('@/lib/hierarquia')
+  const lineage = await getTorcidaLineageTenantIds(tenantId)
+
+  const oficiais: { id: string }[] = await db.conversa.findMany({
+    where: { tenantId: { in: lineage }, tipo: 'CANAL', canalOficial: true },
+    select: { id: true },
+  })
+  if (oficiais.length === 0) return 0
+
+  const { count }: { count: number } = await db.membroConversa.updateMany({
+    where: {
+      userId,
+      conversaId: { in: oficiais.map((c) => c.id) },
+      saiuEm: null,
+    },
+    data: { saiuEm: new Date(), status: 'REJEITADO' },
+  })
+  return count
 }

@@ -55,6 +55,8 @@ export type PromoverSedeResult =
       novoTenantId: string
       novoSlug: string
       membrosMigrados: number
+      /** Carteirinhas que acompanharam os membros. Ver ARCHITECTURE §7 21. */
+      carteirinhasMigradas: number
       filhosMovidos: number
       ownerUserId: string
     }
@@ -242,6 +244,61 @@ export async function promoverSedeParaTenant(params: {
       membrosMigrados += 1
     }
 
+    // Carteirinha vai junto com o membro. Sem isto o `SaasSocio` fica no
+    // tenant da mãe apontando para quem já não tem vínculo lá: o sócio some
+    // das abas Ativos/Vencendo do tenant novo (volta a "Aguardando emissão")
+    // e — o que importa de verdade — a carteirinha órfã mantém `numeroSocio`
+    // ocupado na Sede e um `qrToken` **válido**, que segue validando no
+    // portão de uma torcida da qual a pessoa saiu. 45 casos já no banco antes
+    // desta correção; ver ARCHITECTURE.md §7 21 e
+    // `repair-carteirinha-orfa-promocao.js`.
+    const userIdsMigrados = membros.map((m) => m.userId)
+    let carteirinhasMigradas = 0
+    if (userIdsMigrados.length > 0) {
+      const socios: { id: string; userId: string; numeroSocio: number }[] =
+        await tx.saasSocio.findMany({
+          where: { tenantId: tenantMaeId, userId: { in: userIdsMigrados } },
+          select: { id: true, userId: true, numeroSocio: true },
+        })
+
+      // `@@unique([tenantId, numeroSocio])` no destino: o tenant novo nasce
+      // vazio, mas o owner pode já ter carteirinha criada acima, e a promoção
+      // pode ser reexecutada. Reserva os números já ocupados antes de mover.
+      const ocupados = new Set(
+        (
+          await tx.saasSocio.findMany({
+            where: { tenantId: novoTenant.id },
+            select: { numeroSocio: true },
+          })
+        ).map((s: { numeroSocio: number }) => s.numeroSocio),
+      )
+
+      for (const s of socios) {
+        const jaTem = await tx.saasSocio.findUnique({
+          where: { tenantId_userId: { tenantId: novoTenant.id, userId: s.userId } },
+          select: { id: true },
+        })
+        if (jaTem) {
+          // Já emitida no filho — a da mãe é resíduo e não pode continuar
+          // validando no portão da torcida antiga.
+          await tx.saasSocio.delete({ where: { id: s.id } })
+          continue
+        }
+        if (ocupados.has(s.numeroSocio)) {
+          // Colisão de número no destino: mantém a carteirinha na mãe e
+          // reporta, em vez de renumerar o sócio por conta própria — número
+          // de associado é identidade, não detalhe técnico.
+          continue
+        }
+        ocupados.add(s.numeroSocio)
+        await tx.saasSocio.update({
+          where: { id: s.id },
+          data: { tenantId: novoTenant.id },
+        })
+        carteirinhasMigradas += 1
+      }
+    }
+
     // Garante SaasMembro APROVADO do owner no novo tenant
     const ownerMembroMae = await tx.saasMembro.findUnique({
       where: {
@@ -294,6 +351,7 @@ export async function promoverSedeParaTenant(params: {
           novoTenantId: novoTenant.id,
           novoSlug: novoTenant.slug,
           membrosMigrados,
+          carteirinhasMigradas,
           filhosMovidos: filhos.length,
           ownerUserId,
         },
@@ -305,6 +363,7 @@ export async function promoverSedeParaTenant(params: {
       novoTenantId: novoTenant.id,
       novoSlug: novoTenant.slug,
       membrosMigrados,
+      carteirinhasMigradas,
       filhosMovidos: filhos.length,
       ownerUserId,
     }

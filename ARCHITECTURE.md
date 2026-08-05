@@ -1449,7 +1449,7 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     gate precisa de um nível novo) ou remover o ramo, que hoje só engana quem
     lê o código. Medido em `seed:jornadas` §canais/nacional.
 
-17. ⏳ **EM ABERTO** — **Convite da Sede raiz coloca torcedor e sócio pendente
+17. ✅ **FECHADO** (recusarCanalDaSede) — **Convite da Sede raiz coloca torcedor e sócio pendente
     dentro do canal oficial da Sede.** A regra está escrita duas vezes no
     código: `vincularMembroCanaisAposAprovacao` diz *"TORCEDOR entra só no
     canal da unidade que o convidou — nunca no da Sede; o canal da Sede é
@@ -1467,7 +1467,7 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     unidade única o torcedor fica sem canal; (b) manter e reescrever a regra,
     que hoje descreve algo que não acontece; (c) separar o canal da organizada
     do canal da sede territorial.
-18. ⏳ **EM ABERTO** — **Reprovado continua no canal da unidade.** A inscrição
+18. ✅ **FECHADO** (removerMembroDosCanaisDaTorcida) — **Reprovado continua no canal da unidade.** A inscrição
     acontece na **solicitação** (sócio pendente = experiência de torcedor), e
     `reprovarMembro` não a desfaz. Quem foi recusado — inclusive por
     `DUPLICIDADE`, com `permiteReenvio: false` — segue lendo o canal da
@@ -1495,7 +1495,7 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     `subsede-rio-claro` passaram de 0 para 1 canal, e os outros 8 pendentes do
     lote não mudaram.
 
-20. ⏳ **EM ABERTO** — **Carteirinha do Caso B diverge entre os dois níveis.**
+20. ✅ **FECHADO** (--reconciliar aplicado) — **Carteirinha do Caso B diverge entre os dois níveis.**
     `garantirCarteirinhaNoPar` sincroniza a validade (compara e faz `update`
     quando difere), mas há sócios **reais** com o mesmo `numeroSocio` e
     validades diferentes na unidade e na Sede — 2 casos em
@@ -1509,7 +1509,7 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     confirmação) e depois fechar a porta que permitiu a emissão independente.
     Detectado por `audit:carteirinha-patrimonio`, primeira execução.
 
-21. ⏳ **EM ABERTO** — **Promover unidade a tenant deixa as carteirinhas para
+21. ✅ **FECHADO** (migração na promoção + repair aplicado) — **Promover unidade a tenant deixa as carteirinhas para
     trás.** `promoverSedeParaTenant` migra os `SaasMembro` da unidade para o
     tenant novo (`findMany` → `update` do `tenantId`), mas **não toca em
     `SaasSocio`**. A carteirinha fica no tenant da mãe, apontando para uma
@@ -1525,7 +1525,7 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     destino), e um repair para os 45 já existentes. Detectado por
     `audit:carteirinha-patrimonio`, primeira execução.
 
-22. ⏳ **EM ABERTO — o mais estrutural desta rodada.** **Três lugares do
+22. ✅ **DECIDIDO E ALINHADO (2026-08-04).** **Três lugares do
     código discordam sobre se SOCIO PENDENTE pode estar no canal da unidade**,
     e um deles desfaz ativamente o que outro cria:
     - `solicitarVinculo` **inscreve** o pendente no canal da unidade, com
@@ -1543,10 +1543,27 @@ Server Actions reais, pelos três fluxos de entrada, e depois criarem canais,
     Também é o motivo de a correção do item 19 *aumentar* a contagem do
     `audit:dados` — ela faz o Caso B se comportar como o Caso A já se
     comportava, o que está certo pelas regras (1) e (2) e errado pela (3).
-    **Decisão em aberto, e é uma só**: pendente entra no canal da unidade,
-    sim ou não? Escolhida a resposta, as outras duas fontes têm de mudar
-    junto — inclusive `ESPERADO_POR_FLUXO`
-    (`apps/web/src/lib/__seed__/_jornadas.ts`), que hoje segue (1) e (2).
+    **Regra decidida (2026-08-04)** — pendente **entra, mas só lê**, com
+    permissões de torcedor, e **apenas se chegou por link de convite**. Quem
+    chegou pela vitrine pública fica só na Comunidade Nacional do clube. E a
+    comunidade da **torcida** (canal da SEDE) só se abre **depois da
+    aprovação**, em qualquer dos caminhos.
+
+    Implementação, com as quatro fontes agora dizendo a mesma coisa:
+    - `solicitarVinculo` só inscreve o pendente quando `conviteSlug` resolve
+      para a linhagem do tenant do vínculo — procedência é declarada pelo
+      cliente e por isso **conferida** no servidor; e passa
+      `recusarCanalDaSede`, que fecha o §7 17.
+    - "Só lê" não precisou de papel novo: publicar no mural exige
+      `assertMembroAtivo` (status APROVADO), então o pendente já lia sem
+      escrever. Evitou-se mexer no enum de `MembroConversa`.
+    - `dados-reais.audit.ts` passou a medir a regra real — não-aprovado no
+      canal da **SEDE** é erro; no canal da unidade filha é o comportamento, e
+      só é contado para dar dimensão.
+    - `repair-canal-membro-pendente-aprovado.js` deixou de expulsar o pendente
+      do canal da unidade; segue encerrando no canal da SEDE.
+    - `ESPERADO_POR_FLUXO` documenta que o lote entra sempre por convite, e
+      que pela vitrine o esperado seria `false`.
 
 Cobertura nova: `audit:areas-projetos` (áreas de atuação e projetos —
 **zero** cobertura antes; o banco também estava sem nenhuma

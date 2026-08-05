@@ -108,6 +108,7 @@ function AdminTopbar({
               src={tenantLogoUrl}
               alt={tenantNome}
               className="rounded-lg"
+              rounded="rounded-lg"
             />
           ) : (
             <div

@@ -35,8 +35,21 @@ const candidatos = await db.$queryRaw`
       (mc.status = 'PENDENTE' AND (c.canal_oficial = true OR m.id IS NULL))
       OR
       (mc.status = 'ATIVO' AND (
-        m.id IS NULL OR m.status <> 'APROVADO' OR m.desligado_em IS NOT NULL
+        m.id IS NULL OR m.desligado_em IS NOT NULL
         OR (m.tipo = 'SOCIO' AND s.validade < NOW())
+        OR (
+          m.status <> 'APROVADO'
+          -- §7 22: socio PENDENTE que entrou por convite acompanha o canal da
+          -- propria unidade enquanto espera, de leitura. Expulsa-lo aqui
+          -- desfazia o que solicitarVinculo acabara de fazer, e o roster
+          -- passava a oscilar conforme o que rodasse por ultimo. Continua
+          -- sendo encerrado no canal da SEDE, que e a comunidade da torcida e
+          -- so se abre depois da aprovacao.
+          AND EXISTS (
+            SELECT 1 FROM saas_sedes sd
+            WHERE sd.canal_conversa_id = c.id AND sd.tipo = 'SEDE'
+          )
+        )
       ))
     )`
 

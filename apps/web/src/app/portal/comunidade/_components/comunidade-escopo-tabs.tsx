@@ -552,7 +552,7 @@ export function ComunidadeEscopoTabs({
             }
           >
             {tab.logoUrl ? (
-              <LogoMiniatura src={tab.logoUrl} alt="" />
+              <LogoMiniatura src={tab.logoUrl} alt="" shape="circle" />
             ) : (
               <span
                 aria-hidden

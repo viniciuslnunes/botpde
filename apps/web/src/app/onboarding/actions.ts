@@ -14,7 +14,7 @@ import {
   type DepartamentoOnboarding,
   type SedeOnboarding,
 } from '@/lib/onboarding'
-import { getDescendantTenantIds } from '@/lib/hierarquia'
+import { getDescendantTenantIds, getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import {
   listarMunicipiosPorUf,
   cidadePertenceUf,
@@ -22,7 +22,7 @@ import {
   type MunicipioBrasil,
 } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug, setTenantContextSlug } from '@/lib/tenant-context'
-import { limparSlugConviteCookie } from '@/lib/convite-cookie-server'
+import { lerSlugConviteDoCookie, limparSlugConviteCookie } from '@/lib/convite-cookie-server'
 import { resolverAfiliacaoIdEfetiva } from '@/lib/convite'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
@@ -359,6 +359,23 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   unidadeNaoListada: z.boolean().optional(),
+  /**
+   * Slug do link `/convite/<slug>` que trouxe a pessoa, quando houve um.
+   * Decide se o SOCIO PENDENTE entra no canal da unidade enquanto espera a
+   * aprovação (ARCHITECTURE.md §7 22): quem chegou pela vitrine pública fica
+   * só na Comunidade Nacional do clube até a diretoria decidir.
+   *
+   * É **procedência declarada pelo cliente**, então nunca vale sozinha — o
+   * servidor confere abaixo que o slug resolve para a linhagem do tenant do
+   * vínculo. Sem essa checagem, bastaria mandar qualquer string para ganhar
+   * acesso antecipado ao canal.
+   */
+  conviteSlug: z
+    .string()
+    .trim()
+    .max(64)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   // ─── LGE / cadastro completo (2026-07): coletado direto no onboarding ────────
   // Obrigatória só para SOCIO (checado no `.superRefine` abaixo).
   dataNascimento: z
@@ -919,12 +936,48 @@ async function concluirPerfilTorcedor(
  * emprestado no tenant da mãe) deixava o usuário preso na etapa de vínculo,
  * inclusive nas tentativas seguintes. `repair-*-canal-membro` cobre a sobra.
  */
+/**
+ * O link de convite realmente leva a esta torcida?
+ *
+ * Procedência é declarada pelo cliente, então precisa ser conferida contra o
+ * banco: o slug tem de resolver para um tenant da **linhagem** do vínculo (a
+ * própria unidade, a Sede, ou uma irmã do worktree — o convite da Sede raiz
+ * leva a uma unidade filha, e isso é legítimo). Sem a checagem, mandar
+ * qualquer string daria acesso antecipado ao canal.
+ *
+ * Cai no cookie (`lerSlugConviteDoCookie`) quando o wizard não repassou o
+ * slug — ele o consome ao montar com o convite na URL.
+ */
+async function conviteAutorizaAcessoAntecipado(
+  slugInformado: string | undefined,
+  tenantVinculoId: string,
+): Promise<boolean> {
+  const slug = slugInformado ?? (await lerSlugConviteDoCookie())
+  if (!slug) return false
+
+  const tenantDoConvite: { id: string } | null = await db.tenant.findFirst({
+    where: { conviteSlug: slug, conviteAtivo: true, ativo: true },
+    select: { id: true },
+  })
+  if (!tenantDoConvite) return false
+  if (tenantDoConvite.id === tenantVinculoId) return true
+
+  const linhagem = await getTorcidaLineageTenantIds(tenantVinculoId)
+  return linhagem.includes(tenantDoConvite.id)
+}
+
 async function vincularCanaisBestEffort(opts: {
   tenantId: string
   userId: string
   sedeId: string | null
   /** TORCEDOR entra só no canal da unidade — o da Sede é espaço de sócio. */
   tipo?: 'SOCIO' | 'TORCEDOR'
+  /**
+   * Barra o canal da Sede mesmo quando a unidade do convite **é** a Sede raiz
+   * — caso em que "canal da unidade" e "canal da torcida" são a mesma
+   * `Conversa` e a regra do tipo era burlada pela geometria (§7 17).
+   */
+  recusarCanalDaSede?: boolean
 }): Promise<void> {
   try {
     await vincularMembroCanaisAposAprovacao({
@@ -933,6 +986,7 @@ async function vincularCanaisBestEffort(opts: {
       sedeId: opts.sedeId,
       fallbackCriadoPorId: opts.userId,
       tipo: opts.tipo,
+      recusarCanalDaSede: opts.recusarCanalDaSede,
     })
   } catch (err) {
     if (isExpectedError(err)) {
@@ -1607,17 +1661,28 @@ export async function solicitarVinculo(
       return { ok: true, redirectTo: '/portal/comunidade?escopo=nacional' }
     }
 
-    // Sócio pendente: mesma experiência de torcedor (CN + PDE) até a aprovação.
-    // Não grava torcida_ctx — senão o portal abria a Sede (Gaviões) sem vínculo.
+    // Sócio pendente: mesma experiência de torcedor (CN + unidade) até a
+    // aprovação. Não grava torcida_ctx — senão o portal abria a Sede (Gaviões)
+    // sem vínculo.
     await clearTenantContextSlug()
-    // Com unidade no convite: canal da PDE (regra TORCEDOR). Sem sedeId não
-    // chama — vincular sem unidade cairia no canal da Sede, que é de sócio.
-    if (dadosMembro.sedeId) {
+
+    // ARCHITECTURE.md §7 22 — quem espera aprovação só acompanha o canal da
+    // unidade se **chegou por um link de convite**. Pela vitrine pública, fica
+    // na Comunidade Nacional do clube até a diretoria decidir. E em nenhum dos
+    // dois casos vê a comunidade da torcida (canal da Sede) antes de aprovado —
+    // é o que `vincularCanaisBestEffort` garante com `tipo: 'TORCEDOR'` +
+    // `recusarCanalDaSede`.
+    //
+    // A entrada é de leitura: publicar no mural exige `assertMembroAtivo`
+    // (status APROVADO), então o pendente lê e não escreve sem nenhum gate
+    // extra.
+    if (dadosMembro.sedeId && (await conviteAutorizaAcessoAntecipado(data.conviteSlug, tenantDestino.id))) {
       await vincularCanaisBestEffort({
         tenantId: tenantDestino.id,
         userId,
         sedeId: dadosMembro.sedeId,
         tipo: 'TORCEDOR',
+        recusarCanalDaSede: true,
       })
     }
     return {

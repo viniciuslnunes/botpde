@@ -200,6 +200,7 @@ export function PortalNavbar({
                 src={brandTenant.logoUrl}
                 alt={brandTenant.nome}
                 className="rounded-lg"
+                rounded="rounded-lg"
               />
             ) : (
               <div
