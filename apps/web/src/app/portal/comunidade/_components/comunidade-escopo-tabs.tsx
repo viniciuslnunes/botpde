@@ -496,7 +496,7 @@ export function ComunidadeEscopoTabs({
 
   return (
     <nav
-      className="relative flex items-center gap-5 border-b border-[rgb(var(--border))]"
+      className="relative flex items-center gap-5 border-b border-[rgb(var(--border))] pb-[15px]"
       aria-label="Escopos e canais da Comunidade"
     >
       <AnimatePresence initial={false} mode="popLayout">
