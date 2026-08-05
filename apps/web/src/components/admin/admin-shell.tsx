@@ -112,7 +112,7 @@ function AdminTopbar({
             />
           ) : (
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
               style={{ backgroundColor: tenantCor }}
             >
               {tenantNome.charAt(0).toUpperCase()}

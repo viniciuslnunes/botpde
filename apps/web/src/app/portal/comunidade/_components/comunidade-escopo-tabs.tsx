@@ -6,6 +6,7 @@ import { Loader2, X } from 'lucide-react'
 import { AnimatePresence, m } from 'motion/react'
 import { toast } from '@torcida/ui'
 import { canalTabBarItem, canalTabIconTap, springSnappy } from '@/lib/motion-presets'
+import '@/components/media/logo-miniatura.css'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { LogoMiniatura, LOGO_MINIATURA_PX } from '@/components/media/logo-miniatura'
 import { useReportNavPending } from '@/components/portal/nav-pending-context'
@@ -538,41 +539,20 @@ export function ComunidadeEscopoTabs({
         const dragKey = ehTematico ? tab.canalId! : tab.slugAlvo!
         const arrastando = draggingKey === dragKey
 
-        /** Box 32×32 com style inline + img cru; Motion escala o wrapper externo. */
+        /** Frame 32×32 — sem scale no ícone (distorce o tamanho entre abas). */
         const visual = (
-          <m.span
-            className="relative inline-flex shrink-0"
-            whileHover={
-              arrastando || draggingKey
-                ? undefined
-                : { scale: 1.08, transition: canalTabIconTap }
-            }
-            whileTap={
-              arrastando ? undefined : { scale: 0.94, transition: canalTabIconTap }
-            }
-          >
+          <span className="relative block h-8 w-8 shrink-0 overflow-hidden">
             {tab.logoUrl ? (
               <LogoMiniatura src={tab.logoUrl} alt="" shape="circle" />
             ) : (
               <span
                 aria-hidden
                 className={[
-                  'flex items-center justify-center rounded-full text-xs font-bold',
+                  'logo-miniatura logo-miniatura--circle logo-miniatura--fallback',
                   ativo
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
-                style={{
-                  width: LOGO_MINIATURA_PX,
-                  height: LOGO_MINIATURA_PX,
-                  minWidth: LOGO_MINIATURA_PX,
-                  minHeight: LOGO_MINIATURA_PX,
-                  maxWidth: LOGO_MINIATURA_PX,
-                  maxHeight: LOGO_MINIATURA_PX,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                }}
               >
                 {tab.inicial}
               </span>
@@ -583,7 +563,7 @@ export function ComunidadeEscopoTabs({
                 aria-hidden
               />
             ) : null}
-          </m.span>
+          </span>
         )
 
         const className = [
