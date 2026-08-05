@@ -1,9 +1,9 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
+import { useActionState, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { finalizarPedido } from '../actions'
-import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Store } from 'lucide-react'
 import { rotuloTamanho } from '@torcida/types'
 import type { CheckoutItemSerializado } from '@/lib/loja-serialize'
@@ -11,7 +11,7 @@ import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
-import { ContinuarComprandoLink, LojaCheckoutStepper } from '../_components/loja-fluxo'
+import { LojaCheckoutStepper } from '../_components/loja-fluxo'
 
 function formatarPreco(preco: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(preco)
@@ -32,9 +32,15 @@ export function CheckoutForm({
   cuponsDisponiveis: CupomDisponivel[]
   lojas: CheckoutLojaMeta[]
 }) {
+  const router = useRouter()
   const [state, action, pending] = useActionState(finalizarPedido, {})
   const [modalidade, setModalidade] = useState<'RETIRADA' | 'ENVIO'>('RETIRADA')
   const [cupom, setCupom] = useState('')
+
+  useEffect(() => {
+    if (!state.success || !state.redirectTo) return
+    router.replace(state.redirectTo)
+  }, [state.success, state.redirectTo, router])
 
   const nomes = useMemo(() => new Map(lojas.map((l) => [l.tenantId, l.nome])), [lojas])
 
@@ -81,25 +87,14 @@ export function CheckoutForm({
             icon={<CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-[rgb(var(--color-primary-fg))]" />}
             title={grupos.length > 1 ? 'Pedidos realizados!' : 'Pedido realizado!'}
             description={
-              grupos.length > 1
-                ? `Abrimos ${grupos.length} pedidos (um por loja). A administração processará em breve.`
-                : 'A administração irá processar seu pedido em breve.'
+              state.ticketConversaIds?.length === 1
+                ? 'Abrindo a conversa do pedido…'
+                : grupos.length > 1
+                  ? `Abrimos ${grupos.length} pedidos (um por loja). Levando você aos seus pedidos…`
+                  : 'Levando você ao atendimento do pedido…'
             }
             className="border border-[rgb(var(--border))] bg-[rgb(var(--color-primary)_/_0.06)] p-8 text-center"
-          >
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/portal/loja/pedidos"
-                className="inline-flex items-center gap-2 bg-[rgb(var(--primary))] px-5 py-2.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
-              >
-                Ver meus pedidos
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <ContinuarComprandoLink className="inline-flex items-center border border-[rgb(var(--border))] px-5 py-2.5 text-sm font-medium hover:border-[rgb(var(--primary))]">
-                Continuar comprando
-              </ContinuarComprandoLink>
-            </div>
-          </MotionSuccessPanel>
+          />
         </div>
       ) : (
         <div className="space-y-6">

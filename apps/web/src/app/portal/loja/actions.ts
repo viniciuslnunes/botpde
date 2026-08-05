@@ -25,6 +25,10 @@ export type ActionState = {
   pedidoIds?: string[]
   grupoCheckoutId?: string
   desconto?: number
+  /** Conversas dos tickets abertos (uma por loja no checkout). */
+  ticketConversaIds?: string[]
+  /** Destino pós-compra — preferir navegação no cliente (ver onboarding). */
+  redirectTo?: string
 }
 
 async function assertAuth() {
@@ -325,6 +329,7 @@ export async function finalizarPedido(
     })
 
     const session = await auth()
+    const ticketConversaIds: string[] = []
     for (const pedidoId of pedidoIds) {
       const p = await db.saasPedido.findUnique({
         where: { id: pedidoId },
@@ -345,6 +350,7 @@ export async function finalizarPedido(
         try {
           const ticket = await abrirTicketPedido(pedidoId)
           ticketConversaId = ticket.conversaId
+          ticketConversaIds.push(ticket.conversaId)
           await db.auditLog.create({
             data: {
               tenantId: p.tenantId,
@@ -376,10 +382,17 @@ export async function finalizarPedido(
       }
     }
 
+    // Um ticket → conversa do pedido; vários (multi-loja) ou falha → lista.
+    const redirectTo =
+      ticketConversaIds.length === 1
+        ? `/portal/mensagens?c=${ticketConversaIds[0]}`
+        : '/portal/loja/pedidos'
+
     revalidatePath('/portal/loja')
     revalidatePath('/portal/loja/sacola')
     revalidatePath('/portal/loja/pedidos')
-    return { success: true, pedidoIds, grupoCheckoutId }
+    revalidatePath('/portal/mensagens')
+    return { success: true, pedidoIds, grupoCheckoutId, ticketConversaIds, redirectTo }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao finalizar pedido.' }
   }
