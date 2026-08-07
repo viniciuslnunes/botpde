@@ -33,7 +33,7 @@ export function MotionEmptyState({
         <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{title}</p>
       )}
       {description && (
-        <div className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
+        <div className="mx-auto mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
           {description}
         </div>
       )}

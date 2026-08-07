@@ -36,6 +36,14 @@ import {
   sincronizarOrdemBarraMovel,
 } from '@/lib/comunidade-barra-movel'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
+import {
+  chaveAtividadeCanal,
+  chaveAtividadeNacional,
+} from '@/lib/comunidade-canal-atividade'
+import {
+  montarAlvosAtividadeBarra,
+  useComunidadeCanalAtividade,
+} from '@/lib/use-comunidade-canal-atividade'
 import { useCanalSoftSwitch } from './canal-soft-switch'
 
 export type CanalAbertoOperadorTab = {
@@ -52,7 +60,12 @@ export type CanalTematicoAbertoTab = {
 }
 
 type Props = {
-  afiliacao: { nome: string; apelido: string | null; escudoUrl: string | null } | null
+  afiliacao: {
+    id: string
+    nome: string
+    apelido: string | null
+    escudoUrl: string | null
+  } | null
   escopos: EscoposDisponiveis
   escopoAtivo: EscopoComunidade
   /** Nome da unidade de vínculo — acessibilidade da aba. */
@@ -301,6 +314,40 @@ export function ComunidadeEscopoTabs({
     const map = new Map(canaisTematicosAbertos.map((c) => [c.id, c]))
     return map
   }, [canaisTematicosAbertos])
+
+  const afiliacaoId = afiliacao?.id ?? null
+  const alvosAtividade = useMemo(
+    () =>
+      montarAlvosAtividadeBarra({
+        afiliacaoId,
+        canalIds: [
+          canalIdTorcida,
+          canalIdUnidade,
+          ...canaisTematicosAbertos.map((c) => c.id),
+        ],
+      }),
+    [afiliacaoId, canalIdTorcida, canalIdUnidade, canaisTematicosAbertos],
+  )
+
+  const activeAtividadeKey = useMemo(() => {
+    if (!afiliacaoId) return null
+    if (idCanalVisto) return chaveAtividadeCanal(idCanalVisto)
+    if (escopoAtivo === 'nacional') return chaveAtividadeNacional(afiliacaoId)
+    if (escopoAtivo === 'unidade' && canalIdUnidade) {
+      return chaveAtividadeCanal(canalIdUnidade)
+    }
+    if (escopoAtivo === 'torcida' && canalIdTorcida) {
+      return chaveAtividadeCanal(canalIdTorcida)
+    }
+    return null
+  }, [afiliacaoId, idCanalVisto, escopoAtivo, canalIdTorcida, canalIdUnidade])
+
+  const { unreadKeys } = useComunidadeCanalAtividade({
+    alvos: alvosAtividade,
+    activeKey: activeAtividadeKey,
+    afiliacaoId,
+    enabled: Boolean(afiliacaoId),
+  })
 
   if (!afiliacao) return null
 
@@ -570,6 +617,15 @@ export function ComunidadeEscopoTabs({
         const dragKey = chaveMovel
         const arrastando = dragKey != null && draggingKey === dragKey
 
+        const chaveAtividade =
+          tab.escopo === 'nacional'
+            ? chaveAtividadeNacional(afiliacao.id)
+            : tab.canalId
+              ? chaveAtividadeCanal(tab.canalId)
+              : null
+        const temNovidade =
+          Boolean(chaveAtividade) && !ativo && unreadKeys.has(chaveAtividade!)
+
         /** 32×32 sem scale no ícone (hover distorce a medida entre abas). */
         const visual = (
           <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center">
@@ -608,9 +664,35 @@ export function ComunidadeEscopoTabs({
           </span>
         )
 
+        /**
+         * Fora do botão com opacity — usa primary-fg (legível com marca preta)
+         * + halo suave. Sem vermelho do sino.
+         */
+        const novidadeBadge =
+          !carregandoEsta && temNovidade ? (
+            <span
+              aria-hidden
+              className={[
+                'pointer-events-none absolute z-[6] flex h-2.5 w-2.5 items-center justify-center',
+                tab.fechavel ? '-bottom-0.5 -right-0.5' : '-right-0.5 -top-0.5',
+              ].join(' ')}
+            >
+              <span className="escopo-novidade-halo absolute inset-0 rounded-full bg-[rgb(var(--color-primary-fg))]" />
+              <span
+                className={[
+                  'escopo-novidade-dot relative h-2.5 w-2.5 rounded-full',
+                  'bg-[rgb(var(--color-primary-fg))]',
+                  'ring-2 ring-[rgb(var(--surface))]',
+                  'shadow-[0_0_8px_rgb(var(--color-primary-fg)/0.55)]',
+                ].join(' ')}
+              />
+            </span>
+          ) : null
+
         const className = [
           'relative -mb-px flex h-11 touch-none items-center justify-center pb-2 pt-0.5',
-          ativo ? 'opacity-100' : 'opacity-55 hover:opacity-90',
+          // Com novidade: menos fade — o escudo “acende” junto com o ponto.
+          ativo ? 'opacity-100' : temNovidade ? 'opacity-95 hover:opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
         // Largura do hit-area = logo + folga mínima
@@ -685,8 +767,15 @@ export function ComunidadeEscopoTabs({
         ) : null
 
         const tipContent = arrastavel
-          ? { title: tab.nome, hint: 'Arraste para reposicionar' }
-          : tab.nome
+          ? {
+              title: tab.nome,
+              hint: temNovidade ? 'Novidades · arraste para reposicionar' : 'Arraste para reposicionar',
+            }
+          : temNovidade
+            ? { title: tab.nome, hint: 'Há publicações novas' }
+            : tab.nome
+
+        const ariaLabel = temNovidade ? `${tab.nome} (novidades)` : tab.nome
 
         const shell = (
           <m.div
@@ -732,6 +821,7 @@ export function ComunidadeEscopoTabs({
                 })}
           >
             {fecharBadge}
+            {novidadeBadge}
             {precisaTrocarSessao && tab.slugAlvo ? (
               <form
                 action={action}
@@ -751,7 +841,7 @@ export function ComunidadeEscopoTabs({
                   type="submit"
                   disabled={busy}
                   aria-current={ativo ? 'page' : undefined}
-                  aria-label={tab.nome}
+                  aria-label={ariaLabel}
                   className={className}
                   style={tabBtnStyle}
                   draggable={false}
@@ -767,7 +857,7 @@ export function ComunidadeEscopoTabs({
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
                 aria-current={ativo ? 'page' : undefined}
-                aria-label={tab.nome}
+                aria-label={ariaLabel}
                 className={className}
                 style={tabBtnStyle}
                 onMouseEnter={() => {

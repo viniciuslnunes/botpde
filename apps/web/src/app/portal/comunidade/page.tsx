@@ -96,6 +96,29 @@ export default async function ComunidadePage({
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
     const afiliacao = ctx.afiliacao
     const superAdminNacional = isSuperAdminEmail(session.user.email)
+    const oficialSedeNacional = torcidaReal
+      ? await getCanalOficialDaSede(torcidaReal.id, session.user.id, {
+          leituraOperador: superAdminNacional,
+        })
+      : null
+    const canalIdTorcidaNacional = oficialSedeNacional?.id ?? null
+    const canalIdUnidadeNacional = temUnidadeFixaOperador({
+      superAdmin: superAdminNacional,
+      temEscopoUnidade: Boolean(ctx.escopos.unidade),
+      slugUnidade,
+      atualSlug,
+    })
+      ? (ctx.unidade?.canalId ?? null)
+      : null
+    const idsHierarquiaFixosNacional = idsCanaisHierarquiaFixosNaBarra({
+      canalIdTorcida: canalIdTorcidaNacional,
+      canalIdUnidade: canalIdUnidadeNacional,
+      superAdmin: superAdminNacional,
+      temEscopoUnidade: Boolean(ctx.escopos.unidade),
+      slugUnidade,
+      atualSlug,
+    })
+
     const [salasAtivas, solicitacaoPendente, tenantIdsClube, canaisAbertosNacional, canaisTematicosNacional] =
       await Promise.all([
         listSalasNacionais(afiliacao.id),
@@ -109,7 +132,7 @@ export default async function ComunidadePage({
               await lerIdsCanaisAbertosSocio(),
               session.user.id,
               torcidaReal?.id ?? ctx.tenantSintetico.id,
-              [...(ctx.unidade?.canalId ? [ctx.unidade.canalId] : [])],
+              idsHierarquiaFixosNacional,
               { leituraOperador: superAdminNacional },
             )
           : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>),
@@ -159,6 +182,8 @@ export default async function ComunidadePage({
           slugTorcida={slugTorcida}
           slugUnidade={slugUnidade}
           atualSlug={atualSlug}
+          canalIdTorcida={canalIdTorcidaNacional}
+          canalIdUnidade={canalIdUnidadeNacional}
           solicitacaoPendente={solicitacaoPendente}
           superAdmin={superAdminNacional}
           canaisAbertos={canaisAbertosNacional}

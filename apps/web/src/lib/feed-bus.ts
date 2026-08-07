@@ -27,3 +27,19 @@ export function emitFeedNacionalPing(afiliacaoId: string): void {
 export function subscribeFeedNacionalPing(afiliacaoId: string, onPing: () => void): () => void {
   return subscribeRealtime(feedNacionalBusKey(afiliacaoId), onPing)
 }
+
+/**
+ * Acorda SSE em toda a worktree (Sede + unidades). Post no PDE deve
+ * notificar quem escuta o stream da Sede (torcedor/sócio na raiz) e vice-versa.
+ */
+export async function emitirFeedPingLinhaDaTorcida(tenantId: string): Promise<void> {
+  if (!tenantId) return
+  try {
+    const { getTorcidaLineageTenantIds } = await import('@/lib/hierarquia')
+    const lineage = await getTorcidaLineageTenantIds(tenantId)
+    const ids = lineage.length > 0 ? lineage : [tenantId]
+    for (const id of ids) emitFeedPing(id)
+  } catch {
+    emitFeedPing(tenantId)
+  }
+}

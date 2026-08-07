@@ -531,6 +531,46 @@ button,
   }
 }
 
+/** Ponto de novidade na barra de escudos — pulso suave (não o ping agressivo). */
+@keyframes escopo-novidade-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+@keyframes escopo-novidade-halo {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+.escopo-novidade-dot {
+  animation: escopo-novidade-pulse 2.4s ease-in-out infinite;
+}
+
+.escopo-novidade-halo {
+  animation: escopo-novidade-halo 2.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escopo-novidade-dot,
+  .escopo-novidade-halo {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   @keyframes hover-tip-in {
     from {

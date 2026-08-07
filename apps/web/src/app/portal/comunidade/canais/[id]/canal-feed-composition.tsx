@@ -454,7 +454,16 @@ export function CanalFeedComposition({
       {!verMural ? (
         <MotionEmptyState
           key="canal-empty"
-          className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+          className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-12 text-center"
+          icon={
+            <Avatar
+              nome={canalNome}
+              avatarUrl={canal.avatarUrl}
+              size="lg"
+              fit="contain"
+              className="mb-3"
+            />
+          }
           title={
             canal.ehCanalDepartamento
               ? 'Canal interno do departamento'

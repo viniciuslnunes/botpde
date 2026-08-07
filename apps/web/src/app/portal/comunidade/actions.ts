@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed, invalidarFeedNacional } from '@/lib/comunidade-cache'
-import { emitFeedNacionalPing } from '@/lib/feed-bus'
+import { emitFeedNacionalPing, emitFeedPing, emitirFeedPingLinhaDaTorcida } from '@/lib/feed-bus'
 import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertNaoOperador, assertPermission, assertPodePublicarNoFeed, ehOperadorPlataforma, ERRO_MODO_OPERADOR } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -620,6 +620,10 @@ export async function publicarPost(
         visibilidade === 'PUBLICO' ? tenant.afiliacaoId : null,
       )
     })
+    // Ping CN imediato só com alcance nacional (evita badge fantasma em PUBLICO local).
+    if (alcanceNacional && tenant.afiliacaoId) {
+      emitFeedNacionalPing(tenant.afiliacaoId)
+    }
     return {
       success: true,
       token: post.id,
@@ -710,6 +714,9 @@ export async function publicarPostNacional(
       conteudo: parsed.data.conteudo,
     })
 
+    // Ping na hora — `after(invalidar…)` pode atrasar o SSE e o outro
+    // usuário perde o ciclo do long-poll.
+    emitFeedNacionalPing(afiliacaoId)
     after(() => {
       invalidarLeituraComunidade(tenant.id, afiliacaoId)
     })
@@ -3894,6 +3901,9 @@ export async function publicarPostCanal(
     })
 
     invalidarLeituraComunidade(tenant.id)
+    // Mural de canal não passa pela fila de fan-out do feed aberto — ping
+    // na worktree inteira (Sede↔unidade) para sócio/torcedor em qualquer nível.
+    void emitirFeedPingLinhaDaTorcida(tenant.id)
     revalidatePath(linkCanalComunidade(parsed.data.conversaId))
     if (canal.canalOficial) {
       revalidatePath(linkUnidadeComunidade(tenant.id))
