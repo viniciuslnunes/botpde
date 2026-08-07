@@ -1,8 +1,16 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { flushSync, useFormStatus } from 'react-dom'
 import { Clock, Loader2, Search } from 'lucide-react'
+import { HoverTip, hoverTipFromElement, type HoverTipAnchor } from '@/components/ui/hover-tip'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { lerRecentes, registrarRecente } from '@/lib/context-switcher-recentes'
 
@@ -94,6 +102,15 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   const [dynamicFields, setDynamicFields] = useState<Record<string, string>>(() =>
     atual && getFormFields ? getFormFields(atual) : {},
   )
+  const [tip, setTip] = useState<HoverTipAnchor | null>(null)
+
+  function limparTip() {
+    setTip(null)
+  }
+
+  function mostrarTip(text: string, el: HTMLElement) {
+    setTip(hoverTipFromElement(text, el))
+  }
 
   const [prevSyncKey, setPrevSyncKey] = useState(syncKey)
   if (syncKey !== prevSyncKey) {
@@ -222,6 +239,7 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   function renderItem(item: T, i: number) {
     const ativa = item.id === selectedId
     const destaqueItem = i === destaque
+    const rótulo = getLabel(item)
     const subtítulo = getSubLabel?.(item) ?? null
     const indent = getIndentRem?.(item) ?? 0
     return (
@@ -229,17 +247,24 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
         <button
           type="button"
           disabled={disabled || pending}
+          onPointerEnter={(e) => {
+            setDestaque(i)
+            mostrarTip(rótulo, e.currentTarget)
+          }}
+          onPointerLeave={limparTip}
           onMouseDown={(e) => {
             e.preventDefault()
+            limparTip()
             selecionar(item)
           }}
-          onMouseEnter={() => setDestaque(i)}
-          className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors ${
+          className={`flex w-full min-w-0 flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors ${
             destaqueItem || ativa ? itemActive : itemIdle
           }`}
           style={indent > 0 ? { paddingLeft: `${0.75 + indent * 0.75}rem` } : undefined}
         >
-          <span className="truncate font-medium">{getLabel(item)}</span>
+          <span data-switcher-label className="min-w-0 truncate font-medium">
+            {rótulo}
+          </span>
           {subtítulo ? (
             <span className={`truncate text-xs ${mutedClass}`}>{subtítulo}</span>
           ) : null}
@@ -281,16 +306,27 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
             autoComplete="off"
             placeholder={placeholder}
             className={inputClass}
+            onPointerEnter={(e) => {
+              if (!query.trim()) {
+                limparTip()
+                return
+              }
+              mostrarTip(query, e.currentTarget)
+            }}
+            onPointerLeave={limparTip}
             onChange={(e) => {
               setQuery(e.target.value)
               setAberto(true)
+              limparTip()
             }}
             onFocus={(e) => {
               setAberto(true)
+              limparTip()
               e.target.select()
             }}
             onBlur={() => {
               setAberto(false)
+              limparTip()
               const sel = porId.get(selectedId)
               setQuery(sel ? getLabel(sel) : '')
             }}
@@ -307,14 +343,21 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
                 setDestaque((i) => Math.max(i - 1, 0))
               } else if (e.key === 'Enter' && aberto && sugestoes[destaque]) {
                 e.preventDefault()
+                limparTip()
                 selecionar(sugestoes[destaque])
               } else if (e.key === 'Escape') {
                 setAberto(false)
+                limparTip()
               }
             }}
           />
           {aberto && !disabled && (
-            <ul id={listId} role="listbox" className={listClass}>
+            <ul
+              id={listId}
+              role="listbox"
+              className={listClass}
+              onScroll={limparTip}
+            >
               {sugestoes.length === 0 ? (
                 <li className={`px-3 py-2 text-sm ${mutedClass}`}>{emptyMessage}</li>
               ) : (
@@ -341,6 +384,7 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
               )}
             </ul>
           )}
+          <HoverTip tip={tip} variant={variant === 'super-admin' ? 'super-admin' : 'default'} />
         </div>
         {formAction ? <SubmitSpinner pending={pending} /> : null}
       </div>

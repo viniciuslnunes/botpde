@@ -2,13 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
-import { AnimatePresence, m } from 'motion/react'
+import { AnimatePresence, m, type Variants } from 'motion/react'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { useInboxStream } from '@/lib/use-mensagem-stream'
-import { collapsePanel, springGentle, springSnappy } from '@/lib/motion-presets'
+import { springGentle, springSnappy } from '@/lib/motion-presets'
 import { MensagensShell } from './mensagens-shell'
+
+/** Só altura — opacity no collapse multiplicava e podia deixar a thread “em branco”. */
+const collapsePanelHeight: Variants = {
+  hidden: { height: 0 },
+  show: { height: 'auto' },
+  exit: { height: 0 },
+}
 
 const STORAGE_KEY = 'comunidade-chat-expanded'
 const listeners = new Set<() => void>()
@@ -199,7 +206,7 @@ export function ComunidadeChatPanel({
       <m.div
         initial={false}
         animate={expanded ? 'show' : 'hidden'}
-        variants={collapsePanel}
+        variants={collapsePanelHeight}
         transition={springGentle}
         className="overflow-hidden"
         aria-hidden={!expanded}

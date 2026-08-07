@@ -19,6 +19,12 @@ packages/db/node_modules/
 .env.local
 .env.production
 .env.*.local
+.env.team
+*.secrets.env
+torcida-dev.secrets.env
+
+# Dumps do banco (cópia local da Railway — ver docs/ops/postgres-local-dev.md)
+.dumps/
 
 # Logs
 *.log
@@ -51,13 +57,12 @@ apps/bot/fonts/
 # Escudos de clubes — hospedados no Cloudinary (ver seed:migrate-escudos-cloudinary)
 apps/web/public/escudos/*.png
 
-# Config pessoal de editor (Cursor)
-.cursor/
+# Config pessoal de editor (Cursor) — skills do time são versionadas
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 
 # Relatórios das auditorias funcionais (gerados a cada rodada, não versionados)
 apps/web/auditoria-*.txt
 apps/web/audit-*.txt
 apps/web/seed-jornadas.txt
-
-# Dumps do banco (cópia local da Railway — ver docs/ops/postgres-local-dev.md)
-.dumps/

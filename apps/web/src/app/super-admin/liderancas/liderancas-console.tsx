@@ -1,30 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { Crown, Loader2, Search, UserCheck, UserMinus, UserX } from 'lucide-react'
+import { Crown, Loader2, UserCheck, UserMinus, UserX } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
-import { normalizarTexto } from '@/lib/onboarding-unidade'
-import type { GrupoLideranca, LinhaLideranca } from '@/lib/liderancas-console'
+import type {
+  GrupoLideranca,
+  LiderancasResumo,
+  LinhaLideranca,
+} from '@/lib/liderancas-console'
 import {
   removerLiderancaSuperAdmin,
   transferirLiderancaSuperAdmin,
   type LiderancaState,
 } from './actions'
-
-function textoBusca(linha: LinhaLideranca, grupo: GrupoLideranca): string {
-  return normalizarTexto(
-    [
-      linha.nome,
-      linha.tipoLabel,
-      linha.slug ?? '',
-      grupo.nome,
-      grupo.clubeLabel ?? '',
-      ...linha.lideres.map((l) => `${l.nome ?? ''} ${l.email ?? ''}`),
-    ].join(' '),
-  )
-}
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -40,84 +30,53 @@ function SubmitButton() {
   )
 }
 
-export function LiderancasConsole({ grupos }: { grupos: GrupoLideranca[] }) {
-  const [busca, setBusca] = useState('')
-  const [soMinhas, setSoMinhas] = useState(false)
+export function LiderancasConsole({
+  grupos,
+  resumo,
+}: {
+  grupos: GrupoLideranca[]
+  resumo: LiderancasResumo
+}) {
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
   const [state, action] = useActionState<LiderancaState, FormData>(
     transferirLiderancaSuperAdmin,
     {},
   )
-  const [removendo, startRemover] = useTransition()
   const confirmAction = useConfirmAction()
 
-  const totalMinhas = useMemo(
-    () =>
-      grupos.reduce(
-        (acc, g) => acc + (g.raiz.souEu ? 1 : 0) + g.filhas.filter((f) => f.souEu).length,
-        0,
-      ),
-    [grupos],
-  )
-  const totalSemLider = useMemo(
-    () =>
-      grupos.reduce(
-        (acc, g) =>
-          acc +
-          (g.raiz.lideres.length === 0 ? 1 : 0) +
-          g.filhas.filter((f) => f.lideres.length === 0).length,
-        0,
-      ),
-    [grupos],
-  )
-
-  const gruposFiltrados = useMemo(() => {
-    const alvo = normalizarTexto(busca)
-    return grupos
-      .map((g) => {
-        const passa = (linha: LinhaLideranca) =>
-          (!soMinhas || linha.souEu) && (!alvo || textoBusca(linha, g).includes(alvo))
-        const raizPassa = passa(g.raiz)
-        const filhas = g.filhas.filter(passa)
-        if (!raizPassa && filhas.length === 0) return null
-        return { grupo: g, mostrarRaiz: raizPassa, filhas }
-      })
-      .filter((x): x is { grupo: GrupoLideranca; mostrarRaiz: boolean; filhas: LinhaLideranca[] } =>
-        Boolean(x),
-      )
-  }, [grupos, busca, soMinhas])
-
-  const todasLinhas = useMemo(
-    () => grupos.flatMap((g) => [g.raiz, ...g.filhas]),
-    [grupos],
-  )
+  const todasLinhas = grupos.flatMap((g) => [g.raiz, ...g.filhas])
   const selecionada = todasLinhas.find((l) => l.id === selecionadaId) ?? null
 
   useEffect(() => {
     if (state.success) window.location.reload()
   }, [state.success])
 
+  /**
+   * Confirmação fora de `startTransition`: esperar o modal dentro da transição
+   * trava o botão em pending para sempre (o modal só monta quando a transição
+   * termina, e a transição só termina depois do clique no modal).
+   * `useConfirmAction` roda a mutação com loading no botão Confirmar do modal.
+   */
   function removerLider(linha: LinhaLideranca) {
-    startRemover(async () => {
-      const ok = await confirmAction({
-        titulo: linha.caso === 'B' ? 'Remover presidente?' : 'Remover liderança?',
-        descricao:
-          linha.caso === 'B'
-            ? `${linha.nome} fica sem presidente. Cadastros e vínculos dos membros não são apagados — só o cargo sai, e o super-admin volta a operar as configurações reservadas até haver nova presidência.`
-            : `${linha.nome} fica sem liderança vinculada. O canal oficial da unidade continua como está.`,
-        labelConfirmar: 'Remover',
-        labelCancelar: 'Cancelar',
-        variante: 'destructive',
-        cancelled: false,
-        success: 'Liderança removida.',
-        errorFallback: 'Não foi possível remover.',
-        run: () =>
-          removerLiderancaSuperAdmin({
-            caso: linha.caso,
-            tenantId: linha.tenantId,
-            sedeId: linha.sedeId,
-          }),
-      })
+    void confirmAction({
+      titulo: linha.caso === 'B' ? 'Remover presidente?' : 'Remover liderança?',
+      descricao:
+        linha.caso === 'B'
+          ? `${linha.nome} fica sem presidente. Cadastros e vínculos dos membros não são apagados — só o cargo sai, e o super-admin volta a operar as configurações reservadas até haver nova presidência.`
+          : `${linha.nome} fica sem liderança vinculada. O canal oficial da unidade continua como está.`,
+      labelConfirmar: 'Remover',
+      labelCancelar: 'Cancelar',
+      variante: 'destructive',
+      cancelled: false,
+      success: 'Liderança removida.',
+      errorFallback: 'Não foi possível remover.',
+      run: () =>
+        removerLiderancaSuperAdmin({
+          caso: linha.caso,
+          tenantId: linha.tenantId,
+          sedeId: linha.sedeId,
+        }),
+    }).then((ok) => {
       if (ok) window.location.reload()
     })
   }
@@ -125,43 +84,14 @@ export function LiderancasConsole({ grupos }: { grupos: GrupoLideranca[] }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Kpi label="Torcidas" valor={grupos.length} />
-        <Kpi label="Sem liderança" valor={totalSemLider} destaque={totalSemLider > 0} />
-        <Kpi label="Sob sua posse" valor={totalMinhas} destaque={totalMinhas > 0} />
+        <Kpi label="Torcidas" valor={resumo.torcidas} />
+        <Kpi label="Sem liderança" valor={resumo.semLider} destaque={resumo.semLider > 0} />
+        <Kpi label="Sob sua posse" valor={resumo.sobMinhaPosse} destaque={resumo.sobMinhaPosse > 0} />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar torcida, unidade, clube ou e-mail de quem lidera…"
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
-            aria-label="Buscar liderança"
-          />
-        </div>
-        <label className="flex shrink-0 items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
-          <input
-            type="checkbox"
-            checked={soMinhas}
-            onChange={(e) => setSoMinhas(e.target.checked)}
-            className="h-4 w-4 accent-[rgb(var(--color-primary))]"
-          />
-          Só onde eu lidero
-        </label>
-      </div>
-
-      {gruposFiltrados.length === 0 ? (
-        <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          {soMinhas
-            ? 'Você não é presidente nem liderança de nenhuma unidade.'
-            : 'Nenhuma torcida ou unidade encontrada.'}
-        </p>
-      ) : (
+      {grupos.length === 0 ? null : (
         <ul className="space-y-4">
-          {gruposFiltrados.map(({ grupo, mostrarRaiz, filhas }) => (
+          {grupos.map((grupo) => (
             <li
               key={grupo.tenantId}
               className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
@@ -186,16 +116,13 @@ export function LiderancasConsole({ grupos }: { grupos: GrupoLideranca[] }) {
               </div>
 
               <ul className="divide-y divide-[rgb(var(--border))]">
-                {mostrarRaiz && (
-                  <LinhaItem
-                    linha={grupo.raiz}
-                    selecionada={selecionadaId === grupo.raiz.id}
-                    onSelecionar={setSelecionadaId}
-                    onRemover={removerLider}
-                    removendo={removendo}
-                  />
-                )}
-                {filhas.map((f) => (
+                <LinhaItem
+                  linha={grupo.raiz}
+                  selecionada={selecionadaId === grupo.raiz.id}
+                  onSelecionar={setSelecionadaId}
+                  onRemover={removerLider}
+                />
+                {grupo.filhas.map((f) => (
                   <LinhaItem
                     key={f.id}
                     linha={f}
@@ -203,7 +130,6 @@ export function LiderancasConsole({ grupos }: { grupos: GrupoLideranca[] }) {
                     selecionada={selecionadaId === f.id}
                     onSelecionar={setSelecionadaId}
                     onRemover={removerLider}
-                    removendo={removendo}
                   />
                 ))}
               </ul>
@@ -283,14 +209,12 @@ function LinhaItem({
   selecionada,
   onSelecionar,
   onRemover,
-  removendo,
 }: {
   linha: LinhaLideranca
   recuada?: boolean
   selecionada: boolean
   onSelecionar: (id: string | null) => void
   onRemover: (linha: LinhaLideranca) => void
-  removendo: boolean
 }) {
   return (
     <li
@@ -334,11 +258,10 @@ function LinhaItem({
         {linha.lideres.length > 0 && (
           <button
             type="button"
-            disabled={removendo}
             onClick={() => onRemover(linha)}
-            className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+            className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
           >
-            {removendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserMinus className="h-3 w-3" />}
+            <UserMinus className="h-3 w-3" />
             Remover
           </button>
         )}

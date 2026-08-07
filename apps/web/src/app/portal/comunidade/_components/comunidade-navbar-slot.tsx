@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { lerEscopoComunidadePersistido } from '@/lib/comunidade-escopo-cookie'
+import { lerMarcaCanalFoco } from '@/lib/comunidade-canal-foco-cookie'
 import { ComunidadeEscopoNavbarOverride } from './comunidade-escopo-navbar-override'
 import { ComunidadeNacionalPaletaSync } from './comunidade-nacional-paleta-sync'
 
@@ -47,6 +48,7 @@ export async function ComunidadeNavbarSlot() {
         corPrimariaNacional={corPrimaria}
         tenantAtivoEhUnidade={ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade)}
         escopoPersistido={await lerEscopoComunidadePersistido()}
+        marcaCanalFoco={await lerMarcaCanalFoco()}
       />
       {afiliacao && corPrimaria ? (
         <ComunidadeNacionalPaletaSync

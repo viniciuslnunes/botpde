@@ -386,14 +386,45 @@ Roster (sync contínuo via `syncMembershipFromRoles` e mutações de área):
 
 | Canal | MEMBRO | ADMIN |
 |---|---|---|
-| Departamento | `UserDepartamento` | `DepartamentoGestor` |
-| Área | `DepartamentoAreaMembro` | Gestores do departamento pai |
+| Departamento | `UserDepartamento` | `DepartamentoGestor` **+** liderança do tenant (`owner` / `admin` / `vice`) |
+| Área | `DepartamentoAreaMembro` | Gestores do departamento pai **+** mesma liderança |
 
-Segregação: `publica: false`, fora da vitrine da Comunidade (`listCanaisVisiveis`
-só devolve se o viewer for `MembroConversa` ATIVO). Vínculo manual
-(`vincularCanalDepartamentoArea`) continua válido; uma conversa não pode ser
-sede + departamento + área ao mesmo tempo (`validarVinculoCanalArea`).
+**Liderança em todos os canais (2026-08-07):** presidente, vice, admin e owner
+de unidade Caso B entram como `ADMIN` em **todos** os canais de depto/área do
+**próprio** tenant (`idsLiderancaTenant` + `lideranca` em
+`rosterCanalDepartamento` / `rosterCanalArea`). Espelha o oversight do hub
+(`roles:manage`) — não cria `UserDepartamento` fictício em cada área. Não cruza
+para a mãe: liderança da unidade Caso B vê os canais **da unidade**, não os da
+Sede. Membro · Diretoria (sem cargo de sistema) continua só no canal da
+Diretoria.
 
+**Super-admin (2026-08-07):** `listCanaisVisiveis({ leituraSuperAdmin })` lista
+**todos** os canais do tenant ativo (oficiais, temáticos, depto/área) sem gravar
+`MembroConversa` — vale com dual-hat (SA + presidente em outra torcida). Hub de
+departamentos já usava `isSuperAdmin`. Feed/API alinhados a
+`isSuperAdminEmail`, não só `ctx.operador`. Escrita continua barrada sem voz
+local (`assertVozComunidade` / modo operador).
+
+**Roster × modo operador (2026-08-07):** `idsLiderancaTenant` exclui SA sem
+`SaasMembro` APROVADO não-espelhado no tenant (`filtrarLiderancaOperadorPlataforma`).
+Cargo `owner`/`admin`/`vice` de setup ou herança **não** coloca o operador no
+inbox de Mensagens. Dual-hat (presidente na própria torcida) continua no roster
+local. `listConversas` ainda faz soft-leave passivo desses canais de depto/área
+fora dos tenants com voz.
+
+Repair / re-sync:
+
+```bash
+pnpm --filter @torcida/db db:repair-canais-departamentos
+```
+
+Segregação: `publica: false`; na listagem da Comunidade aparecem só para
+`MembroConversa` ATIVO no **tenant dono**, com categoria **Departamento** (nunca
+Temático) e **sem** pedido de entrada — roster automático pelo cargo. Com canal
+Caso A em foco na barra, a listagem `/canais` esconde depto (são da Sede).
+Vínculo manual (`vincularCanalDepartamentoArea`) continua válido; uma conversa
+não pode ser sede + departamento + área ao mesmo tempo
+(`validarVinculoCanalArea`).
 Foto (`Conversa.avatarUrl`): gestor do departamento (ou ADMIN do canal) define
 no cockpit do portal e no painel de participantes em Mensagens —
 `atualizarAvatarCanalDepartamento`. Aparece na lista de Conversas e no header
@@ -409,7 +440,9 @@ do thread.
   não devem ser fundidas.
 - Sobrescrever `ativa`/`nome`/`meta` no seed de áreas.
 - Transformar a checklist em task-tracker/ERP (assignees, prazos, subtarefas).
-- Expor canal de depto/área na lista pública de canais da Comunidade.
+- Expor canal de depto/área como **Temático** ou aceitar pedido de entrada —
+  roster é automático (equipe + liderança); categoria na Comunidade é
+  Departamento.
 ## Projetos e campanhas (2026-08-03)
 
 O que a área organiza (gente) ganhou o par: o que ela **executa**. `Projeto` é

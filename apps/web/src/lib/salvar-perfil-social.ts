@@ -5,7 +5,7 @@ import { assertMembroAtivo } from '@/lib/authz'
 import { ExpectedError } from './expected-error'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { isCloudinaryUrl } from '@/lib/social-embed'
-import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
+import { invalidarCachesComunidadeFeed, invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { tagAvatarUsuario } from '@/lib/avatar-cache'
 
 export interface PerfilSocialSalvo {
@@ -74,6 +74,9 @@ export async function salvarPerfilSocial(
       exibirCidade: apenasMidia ? false : (parsed.data.exibirCidade ?? false),
       exibirSede: apenasMidia ? false : (parsed.data.exibirSede ?? false),
       exibirDesde: apenasMidia ? true : (parsed.data.exibirDesde ?? true),
+      exibirNumeroSocioNoFeed: apenasMidia
+        ? true
+        : (parsed.data.exibirNumeroSocioNoFeed ?? true),
       bannerUrl,
       bannerPos,
     },
@@ -88,6 +91,7 @@ export async function salvarPerfilSocial(
           exibirCidade: parsed.data.exibirCidade ?? false,
           exibirSede: parsed.data.exibirSede ?? false,
           exibirDesde: parsed.data.exibirDesde ?? true,
+          exibirNumeroSocioNoFeed: parsed.data.exibirNumeroSocioNoFeed ?? true,
           bannerUrl,
           bannerPos,
         },
@@ -130,6 +134,8 @@ export async function salvarPerfilSocial(
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
+  // Preferência de nº no badge invalida o cache de autor-badges (TTL 120s).
+  if (!apenasMidia) invalidarBadgesAutorTenant(tenant.id)
 
   return { ...saved, avatarUrl: avatarSalvo }
 }

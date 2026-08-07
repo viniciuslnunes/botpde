@@ -192,6 +192,7 @@ export {
 
 export {
   aplicarRosterCanal,
+  idsLiderancaTenant,
   syncMembrosCanalDepartamento,
   syncMembrosCanalArea,
   ensureCanalDepartamento,

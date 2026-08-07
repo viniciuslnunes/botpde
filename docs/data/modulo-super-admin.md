@@ -131,6 +131,14 @@ por `apps/web/src/lib/suporte-plataforma.ts` — nunca o campo direto):
   `ARCHITECTURE.md` §5.18. Invariantes:
   `apps/web/src/lib/__tests__/suporte-plataforma.test.ts`.
 
+## Moderação vs criptografia (2026-08-07)
+
+O super-admin lê conteúdo denunciado (posts em claro; DMs com minimização)
+porque a plataforma ainda opera na **Fase A**: plaintext + ACL + filas. Não há
+E2EE; “SA lê” e “servidor cego” são mutuamente excludentes. Evolução futura
+(envelope com escrow, depois E2EE só em DM com moderação sem plaintext):
+`docs/data/plano-criptografia-e-moderacao.md` e `ARCHITECTURE.md` §5.23.
+
 ## Pendências conhecidas
 
 - **LGPD — exclusão/anonimização de conta (fase 2)**: só existe exportação

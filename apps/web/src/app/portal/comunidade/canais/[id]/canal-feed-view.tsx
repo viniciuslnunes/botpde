@@ -72,7 +72,7 @@ export async function CanalFeedView({
       leituraOperador={leituraOperador}
       buscaChrome={buscaChrome}
       composer={
-        <Suspense fallback={<ComposerFallback />}>
+        <Suspense key="canal-composer" fallback={<ComposerFallback />}>
           <CanalComposerSection
             tenantId={viewerTenantId}
             userId={currentUser.id}
@@ -85,7 +85,7 @@ export async function CanalFeedView({
       }
     >
       {canal.souMembro || leituraOperador ? (
-        <Suspense fallback={<CanalFeedFallback />}>
+        <Suspense key="canal-posts" fallback={<CanalFeedFallback />}>
           <ComunidadePostsSection
             tenantId={viewerTenantId}
             currentUser={currentUser}

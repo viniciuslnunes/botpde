@@ -82,11 +82,18 @@ export async function reordenarCanaisOperador(novaOrdem: string[]): Promise<stri
 /**
  * Metadados dos canais abertos (escudo + se é unidade) para a barra.
  * Ignora slugs inexistentes/inativos sem falhar.
+ *
+ * `excluirTenantIds`: tenants da worktree atual — unidades abertas pela
+ * listagem Canais vivem no cookie de conversa (4+ com escudo real); não
+ * repetir como slug (que caía no fallback "S" sem logo).
  */
 export async function carregarCanaisAbertosOperador(
   slugs: string[],
+  opts?: { excluirTenantIds?: string[] },
 ): Promise<CanalAbertoOperador[]> {
   if (slugs.length === 0) return []
+
+  const excluir = new Set(opts?.excluirTenantIds ?? [])
 
   const tenants: {
     id: string
@@ -103,6 +110,7 @@ export async function carregarCanaisAbertosOperador(
   for (const slug of slugs) {
     const t = bySlug.get(slug)
     if (!t) continue
+    if (excluir.has(t.id)) continue
     const [raizId, logoUrl] = await Promise.all([
       resolverTenantRaizId(t.id),
       resolveTenantLogoUrl(t.id, t.logoUrl),

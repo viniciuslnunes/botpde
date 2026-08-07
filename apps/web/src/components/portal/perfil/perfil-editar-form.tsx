@@ -18,6 +18,10 @@ interface PerfilEditarFormProps {
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
+  /** Sócio com carteirinha: controla "Sócio/Membro - Nº N" no feed. */
+  exibirNumeroSocioNoFeed?: boolean
+  /** Só mostra o toggle de nº quando há carteirinha. */
+  temNumeroSocio?: boolean
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
@@ -32,6 +36,7 @@ type PerfilPersistPayload = {
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
+  exibirNumeroSocioNoFeed: boolean
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
@@ -56,6 +61,8 @@ export function PerfilEditarForm({
   exibirCidade: cidadeInicial,
   exibirSede: sedeInicial,
   exibirDesde: desdeInicial,
+  exibirNumeroSocioNoFeed: numeroFeedInicial = true,
+  temNumeroSocio = false,
   bannerUrl: bannerInicial,
   bannerPos: bannerPosInicial,
   avatarUrl: avatarInicial,
@@ -67,6 +74,7 @@ export function PerfilEditarForm({
   const [exibirCidade, setExibirCidade] = useState(cidadeInicial)
   const [exibirSede, setExibirSede] = useState(sedeInicial)
   const [exibirDesde, setExibirDesde] = useState(desdeInicial)
+  const [exibirNumeroSocioNoFeed, setExibirNumeroSocioNoFeed] = useState(numeroFeedInicial)
   const [bannerUrl, setBannerUrl] = useState(bannerInicial)
   const [bannerPos, setBannerPos] = useState(bannerPosInicial ?? 50)
   const [avatarUrl, setAvatarUrl] = useState(avatarInicial)
@@ -101,6 +109,9 @@ export function PerfilEditarForm({
     if (exibirCidade !== cidadeInicial) list.push('Exibir cidade')
     if (exibirSede !== sedeInicial) list.push('Exibir sede')
     if (exibirDesde !== desdeInicial) list.push('Exibir since')
+    if (temNumeroSocio && exibirNumeroSocioNoFeed !== numeroFeedInicial) {
+      list.push('Nº de sócio no feed')
+    }
     return list
   }, [
     bio,
@@ -113,6 +124,9 @@ export function PerfilEditarForm({
     sedeInicial,
     exibirDesde,
     desdeInicial,
+    exibirNumeroSocioNoFeed,
+    numeroFeedInicial,
+    temNumeroSocio,
   ])
 
   useUnsavedChanges({
@@ -130,6 +144,7 @@ export function PerfilEditarForm({
       setExibirCidade(cidadeInicial)
       setExibirSede(sedeInicial)
       setExibirDesde(desdeInicial)
+      setExibirNumeroSocioNoFeed(numeroFeedInicial)
       setBannerUrl(bannerInicial)
       setBannerPos(bannerPosInicial ?? 50)
       setAvatarUrl(avatarInicial)
@@ -140,6 +155,7 @@ export function PerfilEditarForm({
     cidadeInicial,
     sedeInicial,
     desdeInicial,
+    numeroFeedInicial,
     bannerInicial,
     bannerPosInicial,
     avatarInicial,
@@ -160,6 +176,7 @@ export function PerfilEditarForm({
         exibirCidade,
         exibirSede,
         exibirDesde,
+        exibirNumeroSocioNoFeed,
         bannerUrl: nextBanner,
         bannerPos: nextBanner ? nextPos : null,
         avatarUrl: overrides?.avatarUrl !== undefined ? overrides.avatarUrl : avatarUrl,
@@ -173,6 +190,7 @@ export function PerfilEditarForm({
       exibirCidade,
       exibirSede,
       exibirDesde,
+      exibirNumeroSocioNoFeed,
       bannerUrl,
       bannerPos,
       avatarUrl,
@@ -371,7 +389,7 @@ export function PerfilEditarForm({
             </button>
 
             {avatarMenu && displayAvatar && (
-              <div className="absolute left-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg">
+              <div className="absolute left-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
@@ -521,6 +539,17 @@ export function PerfilEditarForm({
           <input type="checkbox" checked={exibirDesde} onChange={(e) => setExibirDesde(e.target.checked)} />
           Membro desde
         </label>
+        {temNumeroSocio && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={exibirNumeroSocioNoFeed}
+              onChange={(e) => setExibirNumeroSocioNoFeed(e.target.checked)}
+            />
+            Número de sócio no feed
+            <span className="text-xs text-[rgb(var(--foreground-muted))]">(Sócio/Membro - Nº …)</span>
+          </label>
+        )}
       </div>
 
       <button

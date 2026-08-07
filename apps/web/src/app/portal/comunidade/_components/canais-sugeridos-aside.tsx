@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { m } from 'motion/react'
 import { Radio, Users } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -11,9 +10,12 @@ import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
 import {
+  labelCategoriaCanal,
   linkCanalComunidade,
   type SugestaoCanalAside,
 } from '@/lib/canais-shared'
+import { AbrirCanalNaBarraLink } from '../canais/abrir-canal-na-barra-link'
+import { CanaisListLink } from '../canais/canais-list-link'
 
 type CanalEstado = SugestaoCanalAside & {
   /** Após pedir entrada com sucesso — some o botão de ação. */
@@ -74,15 +76,25 @@ export function CanaisSugeridosAside({
             : (canal.nome ?? 'Canal')
           return (
             <div key={canal.id} className="flex items-center gap-2">
-              <Link href={href} className="shrink-0">
+              <AbrirCanalNaBarraLink
+                canalId={canal.id}
+                href={href}
+                className="shrink-0"
+                aria-label={`Abrir canal ${canalNome}`}
+              >
                 <Avatar
                   nome={canalNome}
                   avatarUrl={canal.avatarUrl}
                   size="sm"
                   fit="contain"
                 />
-              </Link>
-              <Link href={href} className="min-w-0 flex-1">
+              </AbrirCanalNaBarraLink>
+              <AbrirCanalNaBarraLink
+                canalId={canal.id}
+                href={href}
+                className="min-w-0 flex-1 text-left"
+                aria-label={`Abrir canal ${canalNome}`}
+              >
                 <p className="truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline">
                   {canalNome}
                 </p>
@@ -92,12 +104,12 @@ export function CanaisSugeridosAside({
                     {canal.membros}
                   </span>
                   {' · '}
-                  {canal.canalOficial ? 'Oficial' : 'Temático'}
+                  {labelCategoriaCanal(canal)}
                   {canal.tenantId !== tenantAtualId && !nomesEquivalentes(canalNome, tenantNome)
                     ? ` · ${tenantNome}`
                     : null}
                 </p>
-              </Link>
+              </AbrirCanalNaBarraLink>
               {canal.pedidoEnviado ? (
                 <span className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
                   Pedido enviado
@@ -129,12 +141,12 @@ export function CanaisSugeridosAside({
           )
         })}
       </div>
-      <Link
+      <CanaisListLink
         href="/portal/comunidade/canais"
         className="mt-3 flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
       >
         Ver canais
-      </Link>
+      </CanaisListLink>
     </div>
   )
 }

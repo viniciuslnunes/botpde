@@ -25,6 +25,12 @@ interface AnchoredPopoverProps {
   matchAnchorWidth?: boolean
   /** Largura máxima (px). Evita painel largo demais no composer. */
   maxWidth?: number
+  /**
+   * Limita a altura ao espaço do viewport e só então habilita scroll.
+   * Menus curtos (3 pontos, extras) deixam `false` — `max-height` + overflow
+   * cria scrollbar fantasma no Windows mesmo com 1 item.
+   */
+  constrainHeight?: boolean
   className?: string
   style?: CSSProperties
   children: ReactNode
@@ -43,7 +49,12 @@ function medir(
   anchor: HTMLElement,
   placement: AnchoredPlacement,
   offset: number,
-  opts: { minWidth?: number; matchAnchorWidth?: boolean; maxWidth?: number },
+  opts: {
+    minWidth?: number
+    matchAnchorWidth?: boolean
+    maxWidth?: number
+    constrainHeight: boolean
+  },
 ): Coords {
   const rect = anchor.getBoundingClientRect()
   let width = opts.matchAnchorWidth
@@ -67,9 +78,6 @@ function medir(
     preferBottom = true
   }
 
-  const available = preferBottom ? spaceBelow : spaceAbove
-  const maxHeight = Math.max(120, Math.min(available, Math.floor(window.innerHeight * 0.5), 288))
-
   if (preferBottom) {
     top = rect.bottom + offset
     transform = placement.endsWith('end') ? 'translateX(-100%)' : undefined
@@ -89,6 +97,11 @@ function medir(
     if (estimatedLeft < 8) left = 8 + paneWidth
     if (left > window.innerWidth - 8) left = window.innerWidth - 8
   }
+
+  const available = preferBottom ? spaceBelow : spaceAbove
+  const maxHeight = opts.constrainHeight
+    ? Math.max(80, Math.min(available, Math.floor(window.innerHeight * 0.5), 288))
+    : undefined
 
   return { top, left, width, maxHeight, transform }
 }
@@ -118,6 +131,7 @@ export function AnchoredPopover({
   minWidth,
   matchAnchorWidth = false,
   maxWidth,
+  constrainHeight = false,
   className,
   style,
   children,
@@ -125,6 +139,7 @@ export function AnchoredPopover({
 }: AnchoredPopoverProps) {
   const [mounted, setMounted] = useState(false)
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [needsScroll, setNeedsScroll] = useState(false)
   const portalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -134,13 +149,19 @@ export function AnchoredPopover({
   const atualizar = useCallback(() => {
     const anchor = anchorRef.current
     if (!anchor) return
-    const next = medir(anchor, placement, offset, { minWidth, matchAnchorWidth, maxWidth })
+    const next = medir(anchor, placement, offset, {
+      minWidth,
+      matchAnchorWidth,
+      maxWidth,
+      constrainHeight,
+    })
     setCoords((prev) => (coordsIguais(prev, next) ? prev : next))
-  }, [anchorRef, placement, offset, minWidth, matchAnchorWidth, maxWidth])
+  }, [anchorRef, placement, offset, minWidth, matchAnchorWidth, maxWidth, constrainHeight])
 
   useLayoutEffect(() => {
     if (!open) {
       setCoords(null)
+      setNeedsScroll(false)
       return
     }
     atualizar()
@@ -167,12 +188,24 @@ export function AnchoredPopover({
     }
   }, [open, atualizar])
 
+  // Só liga overflow-y quando o conteúdo de fato passa do teto — evita
+  // scrollbar fantasma (Windows “sempre mostrar barras” + max-height).
+  useLayoutEffect(() => {
+    if (!open || !constrainHeight || !coords?.maxHeight) {
+      setNeedsScroll(false)
+      return
+    }
+    const el = portalRef.current
+    if (!el) return
+    setNeedsScroll(el.scrollHeight > el.clientHeight + 1)
+  }, [open, constrainHeight, coords, children])
+
   if (!open || !mounted || !coords) return null
 
   return createPortal(
     <div
       ref={portalRef}
-      className={['min-w-0 overflow-x-hidden', className].filter(Boolean).join(' ')}
+      className={['min-w-0', className].filter(Boolean).join(' ')}
       data-anchored-popover=""
       style={{
         position: 'fixed',
@@ -182,8 +215,9 @@ export function AnchoredPopover({
         maxHeight: coords.maxHeight,
         transform: coords.transform,
         zIndex,
-        // Garante que overflow-y do className não reabra eixo X no Chrome.
-        overflowX: 'hidden',
+        // `clip` (não `hidden`) no eixo X: não força overflow-y:auto.
+        overflowX: 'clip',
+        overflowY: needsScroll ? 'auto' : 'visible',
         ...style,
       }}
     >

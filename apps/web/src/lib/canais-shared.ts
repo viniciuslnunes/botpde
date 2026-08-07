@@ -49,6 +49,11 @@ export interface CanalItem {
   avatarUrl: string | null
   institucional: boolean
   canalOficial: boolean
+  /**
+   * Canal interno de departamento ou área (`Departamento`/`DepartamentoArea`
+   * → `canalConversaId`). Não é temático da Comunidade — roster via cargo.
+   */
+  ehCanalDepartamento: boolean
   visibilidadeCanal: VisibilidadeCanal
   somenteAdminPublica: boolean
   publica: boolean
@@ -60,6 +65,8 @@ export interface CanalItem {
   /** Membro silenciou o canal no feed/notificações (`MembroConversa.silenciada`). */
   silenciada: boolean
   tenantNome: string
+  /** Logo do tenant dono — navbar em canal de departamento usa a unidade, não o avatar da frente. */
+  tenantLogoUrl: string | null
   /**
    * Localização da unidade (`Sede` via `canalConversaId`).
    * Null em canais temáticos ou oficiais ainda sem sede ligada.
@@ -79,6 +86,7 @@ export interface SugestaoCanalAside {
   avatarUrl: string | null
   membros: number
   canalOficial: boolean
+  ehCanalDepartamento?: boolean
   publica: boolean
   tenantNome: string
 }
@@ -140,6 +148,16 @@ export function labelTipoUnidade(tipo: string): string {
     default:
       return 'Unidade'
   }
+}
+
+/** Badge da listagem: Oficial / Departamento / Temático. */
+export function labelCategoriaCanal(canal: {
+  canalOficial: boolean
+  ehCanalDepartamento?: boolean
+}): 'Oficial' | 'Departamento' | 'Temático' {
+  if (canal.canalOficial) return 'Oficial'
+  if (canal.ehCanalDepartamento) return 'Departamento'
+  return 'Temático'
 }
 
 export function labelVisibilidadeCanal(v: VisibilidadeCanal): string {
@@ -218,4 +236,34 @@ export function orPostsDoMuralCanal(
     })
   }
   return ramos
+}
+
+export function canalOficialTemPortalProprio(opts: {
+  /** Tipo da `Sede` dona do canal (`SEDE` / `SUBSEDE` / `PONTO_ENCONTRO`). */
+  tipoSede: string | null
+  /** Tenant da unidade dona. */
+  tenantIdUnidade: string | null
+  /** Tenant raiz da worktree (`resolverTenantRaizId`). */
+  tenantIdRaiz: string | null
+}): boolean {
+  if (!opts.tenantIdUnidade) return false
+  if (opts.tipoSede === 'SEDE') return true
+  // Caso B: unidade com tenant próprio ≠ Sede raiz.
+  if (opts.tenantIdRaiz && opts.tenantIdUnidade !== opts.tenantIdRaiz) return true
+  // Caso A: PDE/subsede no tenant da mãe.
+  return false
+}
+
+/**
+ * Oficial com portal próprio (slug ≠ atual) → troca sessão.
+ * Temático, mesmo tenant ou Caso A (slug null) → soft / cosmético.
+ */
+export function deveTrocarTenantAoAbrirCanal(opts: {
+  canalOficial: boolean
+  slugAlvo: string | null
+  slugAtual: string | null
+}): boolean {
+  if (!opts.canalOficial) return false
+  if (!opts.slugAlvo) return false
+  return opts.slugAlvo !== opts.slugAtual
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AnimatePresence, m } from 'motion/react'
+import { m } from 'motion/react'
 import {
   Bell,
   BellOff,
@@ -35,14 +35,16 @@ import {
   carregarPainelPedidosCanal,
 } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
+import { FloatingMenu } from '@/components/portal/floating-menu'
 import { CanalNavbarOverride } from '@/components/canal-navbar-override'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
+import { CanaisListLink } from '../canais-list-link'
 import {
+  labelCategoriaCanal,
   labelTipoUnidade,
   linkTorcidaComunidadePublica,
-  linkUnidadeComunidade,
   type CandidatoMembroCanalItem,
   type CanalItem,
   type MembroCanalItem,
@@ -102,6 +104,7 @@ export function CanalFeedComposition({
   const [pending, startTransition] = useTransition()
   const [silenciada, setSilenciada] = useState(canal.silenciada)
   const [souMembro, setSouMembro] = useState(canal.souMembro)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const verMural = souMembro || leituraOperador
 
   useEffect(() => {
@@ -165,19 +168,31 @@ export function CanalFeedComposition({
       ? `${canal.cidade} · ${canal.estado}`
       : canal.cidade ?? canal.estado
   const tipoLabel = canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null
+  const categoria = labelCategoriaCanal(canal)
   const tenantNome = formatNomeTorcida(canal.tenantNome)
   const canalNome = canal.canalOficial
     ? formatNomeTorcida(canal.nome ?? tenantNome)
     : (canal.nome ?? 'Canal')
+  const podeInscreverOuPedir =
+    !leituraOperador && !souMembro && !canal.ehCanalDepartamento
+  // Depto/área: chrome da navbar = unidade dona (não o título da frente).
+  const navbarBrand = canal.ehCanalDepartamento
+    ? {
+        nome: tenantNome,
+        corPrimaria,
+        logoUrl: canal.tenantLogoUrl,
+      }
+    : {
+        nome: canalNome,
+        corPrimaria,
+        logoUrl: canal.avatarUrl,
+      }
 
   return (
     <div className="space-y-4">
       <CanalNavbarOverride
-        brand={{
-          nome: canalNome,
-          corPrimaria,
-          logoUrl: canal.avatarUrl,
-        }}
+        brand={navbarBrand}
+        canalOficial={canal.canalOficial || canal.ehCanalDepartamento}
       />
 
       <header className="card-soft flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
@@ -189,7 +204,7 @@ export function CanalFeedComposition({
               {canalNome}
             </h1>
             <span className="inline-flex shrink-0 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
-              {canal.canalOficial ? 'Oficial' : 'Temático'}
+              {categoria}
             </span>
             {silenciada && souMembro ? (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
@@ -201,7 +216,14 @@ export function CanalFeedComposition({
           <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
             <span className="inline-flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {canal.membros} inscrito{canal.membros === 1 ? '' : 's'}
+              {canal.membros}{' '}
+              {canal.ehCanalDepartamento
+                ? canal.membros === 1
+                  ? 'membro'
+                  : 'membros'
+                : canal.membros === 1
+                  ? 'inscrito'
+                  : 'inscritos'}
             </span>
             {tipoLabel ? (
               <>
@@ -236,7 +258,7 @@ export function CanalFeedComposition({
           </Link>
         )}
 
-        {!leituraOperador && !souMembro && canal.publica && (
+        {podeInscreverOuPedir && canal.publica && (
           <m.button
             type="button"
             disabled={pending}
@@ -249,13 +271,13 @@ export function CanalFeedComposition({
           </m.button>
         )}
 
-        {!leituraOperador && !souMembro && !canal.publica && canal.pedidoPendente && (
+        {podeInscreverOuPedir && !canal.publica && canal.pedidoPendente && (
           <span className="shrink-0 rounded-full border border-[rgb(var(--border))] px-3.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Pedido enviado
           </span>
         )}
 
-        {!leituraOperador && !souMembro && !canal.publica && !canal.pedidoPendente && (
+        {podeInscreverOuPedir && !canal.publica && !canal.pedidoPendente && (
           <m.button
             type="button"
             disabled={pending}
@@ -268,44 +290,38 @@ export function CanalFeedComposition({
           </m.button>
         )}
 
-        {canal.canalOficial && (
+        {canal.canalOficial && canal.tipoUnidade === 'SEDE' && (
           <Link
-            href={
-              canal.tipoUnidade === 'SEDE'
-                ? linkTorcidaComunidadePublica(canal.tenantId)
-                : linkUnidadeComunidade(canal.tenantId)
-            }
+            href={linkTorcidaComunidadePublica(canal.tenantId)}
             className="hidden shrink-0 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline sm:block"
           >
-            {canal.tipoUnidade === 'SEDE' ? 'Perfil da torcida' : 'Perfil da unidade'}
+            Perfil da torcida
           </Link>
         )}
 
         <div className="relative shrink-0">
           <button
+            ref={menuTriggerRef}
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Mais opções do canal"
+            aria-expanded={menuOpen}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
 
-          <AnimatePresence>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <m.div
-                  variants={popoverPanel}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  transition={springSnappy}
-                  className="absolute right-0 top-10 z-20 w-56 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
-                >
+          <FloatingMenu
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={menuTriggerRef}
+            minWidth={224}
+            className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+          >
                   {podeGerenciarAdmins && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         setConfigOpen(true)
                         setMenuOpen(false)
@@ -319,6 +335,7 @@ export function CanalFeedComposition({
                   {canal.canalOficial && podeGerenciarMembros && (
                     <Link
                       href="/admin/configuracoes?secao=canal-oficial"
+                      role="menuitem"
                       onClick={() => setMenuOpen(false)}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
@@ -329,6 +346,7 @@ export function CanalFeedComposition({
                   {(podeGerenciarAdmins || podeGerenciarMembros) && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         setGerenciarOpen(true)
                         setMenuOpen(false)
@@ -342,6 +360,7 @@ export function CanalFeedComposition({
                   {podeGerenciarPedidos && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         setPedidosOpen(true)
                         setMenuOpen(false)
@@ -363,6 +382,7 @@ export function CanalFeedComposition({
                     <>
                       <button
                         type="button"
+                        role="menuitem"
                         disabled={pending}
                         onClick={silenciar}
                         className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
@@ -379,29 +399,29 @@ export function CanalFeedComposition({
                           </>
                         )}
                       </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={sair}
-                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--color-danger))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Sair do canal
-                      </button>
+                      {!canal.ehCanalDepartamento ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={pending}
+                          onClick={sair}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--color-danger))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Sair do canal
+                        </button>
+                      ) : null}
                     </>
                   )}
-                  <Link
+                  <CanaisListLink
                     href="/portal/comunidade/canais"
                     onClick={() => setMenuOpen(false)}
                     className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >
                     <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                     Ver todos os canais
-                  </Link>
-                </m.div>
-              </>
-            )}
-          </AnimatePresence>
+                  </CanaisListLink>
+          </FloatingMenu>
         </div>
       </header>
 
@@ -425,16 +445,31 @@ export function CanalFeedComposition({
         <PedidosCanalModal canalId={canal.id} onClose={() => setPedidosOpen(false)} />
       )}
 
-      {souMembro && podePublicar && composer}
+      {souMembro && podePublicar ? (
+        <div key="canal-composer" className="contents">
+          {composer}
+        </div>
+      ) : null}
 
       {!verMural ? (
         <MotionEmptyState
+          key="canal-empty"
           className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
-          title="Inscreva-se no canal"
-          description="Para ver o mural completo e participar do chat."
+          title={
+            canal.ehCanalDepartamento
+              ? 'Canal interno do departamento'
+              : 'Inscreva-se no canal'
+          }
+          description={
+            canal.ehCanalDepartamento
+              ? 'A entrada é automática pelo cargo na equipe — não há inscrição nem pedido.'
+              : 'Para ver o mural completo e participar do chat.'
+          }
         />
       ) : (
-        children
+        <div key="canal-mural" className="contents">
+          {children}
+        </div>
       )}
     </div>
   )

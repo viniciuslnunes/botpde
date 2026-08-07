@@ -25,6 +25,7 @@ export function comunidadeFeedQueryKey(
   conversaId?: string,
   escopo?: string,
   afiliacaoId?: string,
+  feedInterno?: boolean,
 ) {
   return [
     'comunidade-feed',
@@ -35,6 +36,9 @@ export function comunidadeFeedQueryKey(
     conversaId ?? '',
     escopo ?? '',
     afiliacaoId ?? '',
+    // Separar mural puro (soft-switch) do mural próprio (Minha torcida) e
+    // invalidar cache antigo que misturava TENANT da Sede em PDE Caso A.
+    feedInterno ? 'fi1' : 'fi0',
   ] as const
 }
 
@@ -46,6 +50,7 @@ async function fetchFeedPage<TPost>(params: {
   conversaId?: string
   escopo?: EscopoComunidade
   afiliacaoId?: string
+  feedInterno?: boolean
   signal: AbortSignal
 }): Promise<ComunidadeFeedPage<TPost>> {
   const url = new URL(params.endpoint, window.location.origin)
@@ -55,6 +60,7 @@ async function fetchFeedPage<TPost>(params: {
   if (params.conversaId) url.searchParams.set('conversaId', params.conversaId)
   if (params.escopo) url.searchParams.set('escopo', params.escopo)
   if (params.afiliacaoId) url.searchParams.set('afiliacaoId', params.afiliacaoId)
+  if (params.feedInterno) url.searchParams.set('feedInterno', '1')
 
   const res = await fetch(url.toString(), {
     method: 'GET',
@@ -80,6 +86,7 @@ export async function prefetchComunidadeFeedPage(params: {
   conversaId?: string
   escopo?: EscopoComunidade
   afiliacaoId?: string
+  feedInterno?: boolean
   take?: number
 }): Promise<void> {
   const take = params.take ?? 20
@@ -91,6 +98,7 @@ export async function prefetchComunidadeFeedPage(params: {
     params.conversaId,
     params.escopo,
     params.afiliacaoId,
+    params.feedInterno,
   )
   const cached = params.queryClient.getQueryData(queryKey)
   if (cached) return
@@ -106,6 +114,7 @@ export async function prefetchComunidadeFeedPage(params: {
         conversaId: params.conversaId,
         escopo: params.escopo,
         afiliacaoId: params.afiliacaoId,
+        feedInterno: params.feedInterno,
         signal,
       }),
     initialPageParam: null as string | null,
@@ -132,6 +141,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   /** Feed da Comunidade Nacional — passa `afiliacaoId` junto. */
   escopo?: EscopoComunidade
   afiliacaoId?: string
+  /** Minha torcida/unidade: mistura "Só torcida" no mural oficial. */
+  feedInterno?: boolean
   initialPosts: TPost[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -147,6 +158,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     conversaId,
     escopo,
     afiliacaoId,
+    feedInterno = false,
     initialPosts,
     initialPageInfo,
     initialCursor,
@@ -166,8 +178,9 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         conversaId,
         escopo,
         afiliacaoId,
+        feedInterno,
       ),
-    [endpoint, tenantId, viewerId, filtro, conversaId, escopo, afiliacaoId],
+    [endpoint, tenantId, viewerId, filtro, conversaId, escopo, afiliacaoId, feedInterno],
   )
 
   const cached = queryClient.getQueryData<{
@@ -189,6 +202,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         conversaId,
         escopo,
         afiliacaoId,
+        feedInterno,
         signal,
       }),
     initialPageParam: (shouldSeed ? initialCursor : null) as string | null,

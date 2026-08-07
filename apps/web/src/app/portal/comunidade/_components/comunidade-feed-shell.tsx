@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered, Scale, Clock } from 'lucide-react'
+import { CanalFocoNavLink } from '../canais/canais-list-link'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeFeedBootstrap } from './comunidade-feed-bootstrap'
@@ -75,14 +75,20 @@ interface ComunidadeFeedShellProps {
   slugUnidade?: string | null
   /** Cookie / tenant ativo da sessão. */
   atualSlug?: string | null
+  /** Conversa id do mural oficial da Sede. */
+  canalIdTorcida?: string | null
+  /** Conversa id do mural da unidade fixa. */
+  canalIdUnidade?: string | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
   /** Super-admin: barra multi-canal com X. */
   superAdmin?: boolean
   canaisAbertos?: CanalAbertoOperador[]
-  /** Sócio: temáticos abertos na barra (cookie separado). */
+  /** Sócio / visitados: canais abertos na barra 4+ (cookie separado). */
   canaisTematicosAbertos?: CanalTematicoAberto[]
-  /** Página `/canais/[id]` — destaca a aba temática. */
+  /** Ordem unificada da zona móvel (`o:slug` / `t:id`). */
+  ordemBarraMovelInicial?: string[]
+  /** Página `/canais/[id]` — destaca a aba por conversa id. */
   canalAtivoId?: string | null
 }
 
@@ -112,10 +118,13 @@ export function ComunidadeFeedShell({
   slugTorcida = null,
   slugUnidade = null,
   atualSlug = null,
+  canalIdTorcida = null,
+  canalIdUnidade = null,
   solicitacaoPendente = null,
   superAdmin = false,
   canaisAbertos = [],
   canaisTematicosAbertos = [],
+  ordemBarraMovelInicial = [],
   canalAtivoId = null,
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
@@ -150,15 +159,15 @@ export function ComunidadeFeedShell({
               { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
               { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
             ]),
-      ].map(({ href, label, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <Icon className="h-4 w-4" /> {label}
-        </Link>
-      ))}
+      ].map(({ href, label, icon: Icon }) => {
+        const className =
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]'
+        return (
+          <CanalFocoNavLink key={href} href={href} className={className}>
+            <Icon className="h-4 w-4" /> {label}
+          </CanalFocoNavLink>
+        )
+      })}
     </nav>
   )
 
@@ -198,10 +207,13 @@ export function ComunidadeFeedShell({
           slugTorcida={slugTorcida ?? torcidaReal?.slug ?? null}
           slugUnidade={slugUnidade}
           atualSlug={atualSlug}
+          canalIdTorcida={canalIdTorcida}
+          canalIdUnidade={canalIdUnidade}
           modoContexto={modoContexto}
           superAdmin={superAdmin}
           canaisAbertos={canaisAbertos}
           canaisTematicosAbertos={canaisTematicosAbertos}
+          ordemBarraMovelInicial={ordemBarraMovelInicial}
           canalAtivoId={canalAtivoId}
         />
 

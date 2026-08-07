@@ -690,10 +690,9 @@ export function MensagemThread({
   const titulo = tituloConversa(conversa)
 
   return (
-    <m.div
-      initial={{ opacity: 0, x: 12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={springSnappy}
+    // `div` estável: no embutido a lista some ao abrir — animar opacity na
+    // montagem deixava a thread invisível se o collapse do painel interferisse.
+    <div
       className="relative flex h-full min-h-0 flex-col"
       onDragEnter={fileDrag.onDragEnter}
       onDragOver={fileDrag.onDragOver}
@@ -952,7 +951,6 @@ export function MensagemThread({
               {medias.map((media) => (
                 <m.div
                   key={media.id}
-                  layout
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.85 }}
@@ -1151,7 +1149,7 @@ export function MensagemThread({
           Ticket fechado — histórico preservado, sem novas mensagens.
         </div>
       )}
-    </m.div>
+    </div>
   )
 }
 
@@ -1195,9 +1193,9 @@ function MensagemBubble({
   const conteudoVisivel = stripEmbeddedSocialUrls(msg.conteudo, midias)
   const editando = editandoId === msg.id
   const Wrapper = animate ? m.div : 'div'
+  // Sem `layout`: LazyMotion do portal usa `domAnimation` (sem layout animations).
   const motionProps = animate
     ? {
-        layout: true,
         variants: fadeUp,
         initial: 'hidden' as const,
         animate: 'show' as const,
@@ -1534,7 +1532,6 @@ function PainelMembros({
           {membros.map((membro, i) => (
             <m.div
               key={membro.userId}
-              layout
               custom={i}
               variants={menuItemStagger}
               exit={{ opacity: 0, x: -8, transition: { duration: 0.15 } }}

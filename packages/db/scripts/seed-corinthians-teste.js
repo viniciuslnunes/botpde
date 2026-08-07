@@ -225,10 +225,11 @@ function validadeDoCenario(cenario, n, now = new Date()) {
 
 function camposMembroDoCenario(cenario, { n, solicitadoEm, numeroAssociado }) {
   if (cenario === 'aguardando') {
-    // «Quero me associar»: aprovado sem nº → fica em Aguardando emissão.
+    // «Quero me associar»: aprovado com nº na ficha, sem carteirinha →
+    // fila Aguardando emissão. O nº na ficha alimenta o badge do feed.
     return {
       ...fichaSocioIncompleta(n),
-      numeroAssociado: null,
+      numeroAssociado: String(numeroAssociado),
       anosSocio: null,
       adimplente: true,
       pendenciasCadastroDispensadas: [],
@@ -1172,18 +1173,18 @@ async function seedPostsEInteracoes(contexto, resumo) {
       })
     }
 
-    // Membro — ~40% dos aprovados, 1–2 posts cada.
-    // TORCEDOR só PUBLICO (praça / CN): TENANT entra no mural do canal oficial
-    // via incluirFeedInterno e publicar no canal é privilégio de sócio.
-    const autores = userIds.filter(() => Math.random() < 0.4)
+    // Membro — ~40% dos sócios, 1–2 posts cada.
+    // TORCEDOR posta só no sintético da CN (bloco acima); na TO real o autor
+    // de MEMBRO é sócio — senão o Descobrir nacional mostra a torcida do
+    // convite com pill "Torcedor" em vez de "TIMÃO — COMUNIDADE NACIONAL".
+    const socioAutores = userIds.filter(
+      (id) => tipoPorUser.get(id) === 'SOCIO' && Math.random() < 0.4,
+    )
     const templatesMem = templatesMembro(tenant.nome)
-    for (const autorId of autores) {
+    for (const autorId of socioAutores) {
       const qtd = Math.random() < 0.5 ? 1 : 2
-      const ehTorcedor = tipoPorUser.get(autorId) === 'TORCEDOR'
       for (let i = 0; i < qtd; i++) {
-        const visibilidade = ehTorcedor
-          ? 'PUBLICO'
-          : pickPonderado([['PUBLICO', 60], ['TENANT', 30], ['PRIVADO', 10]])
+        const visibilidade = pickPonderado([['PUBLICO', 60], ['TENANT', 30], ['PRIVADO', 10]])
         const alcanceNacional = visibilidade === 'PUBLICO' && Math.random() < 0.05
         postsRows.push({
           id: crypto.randomUUID(),

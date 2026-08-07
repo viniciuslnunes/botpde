@@ -113,7 +113,8 @@ export function MentionPicker({
         minWidth={256}
         maxWidth={360}
         zIndex={60}
-        className="overflow-y-auto overscroll-contain rounded-xl"
+        constrainHeight
+        className="overscroll-contain rounded-xl"
       >
         <m.div
           ref={panelRef}

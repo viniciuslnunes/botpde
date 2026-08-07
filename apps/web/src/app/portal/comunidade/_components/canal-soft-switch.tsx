@@ -10,10 +10,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
+import { CanaisListLink } from '../canais/canais-list-link'
 import { FeedComposer } from '@/components/portal/feed-composer'
 import { FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
 import { linkCanalComunidade } from '@/lib/canais-shared'
@@ -23,7 +23,7 @@ import {
 import type { PostSocialItem } from '@/lib/feed'
 import {
   carregarCanalMuralAction,
-  registrarCanalTematicoAbertoAction,
+  registrarCanalVisitadoAction,
   type CanalMuralChrome,
 } from '@/app/portal/comunidade/socio-canais-actions'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
@@ -122,20 +122,28 @@ export function CanalSoftSwitchProvider({
       const limpo = id.trim()
       if (!limpo || limpo === activeCanalId) return
 
-      const gen = ++switchGen.current
-      setActiveCanalId(limpo)
-      window.history.pushState(null, '', linkCanalComunidade(limpo))
-      void registrarCanalTematicoAbertoAction(limpo)
-      prefetchCanal(limpo)
+      void (async () => {
+        const { trocouTenant } = await registrarCanalVisitadoAction(limpo)
+        // Oficial de outra unidade: remount RSC com cookie de tenant novo.
+        if (trocouTenant) {
+          router.push(linkCanalComunidade(limpo))
+          return
+        }
 
-      const cached = chromeCache.current.get(limpo)
-      if (cached) {
-        setChrome(cached)
-      } else {
-        void carregarChrome(limpo, gen)
-      }
+        const gen = ++switchGen.current
+        setActiveCanalId(limpo)
+        window.history.pushState(null, '', linkCanalComunidade(limpo))
+        prefetchCanal(limpo)
+
+        const cached = chromeCache.current.get(limpo)
+        if (cached) {
+          setChrome(cached)
+        } else {
+          void carregarChrome(limpo, gen)
+        }
+      })()
     },
-    [activeCanalId, carregarChrome, prefetchCanal],
+    [activeCanalId, carregarChrome, prefetchCanal, router],
   )
 
   useEffect(() => {
@@ -221,13 +229,13 @@ export function CanalSoftMuralHost({ buscaChrome }: { buscaChrome?: ReactNode })
 
   return (
     <div className="space-y-4">
-      <Link
+      <CanaisListLink
         href="/portal/comunidade/canais"
         className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
       >
         <ArrowLeft className="h-4 w-4" />
         Voltar aos canais
-      </Link>
+      </CanaisListLink>
 
       <CanalFeedComposition
         key={chrome.canal.id}
@@ -264,6 +272,7 @@ export function CanalSoftMuralHost({ buscaChrome }: { buscaChrome?: ReactNode })
           </div>
         ) : verMural ? (
           <ComunidadeFeedInfinite
+            key={chrome.canal.id}
             tenantId={seed.viewerTenantId}
             currentUser={seed.currentUser}
             filtro="canal"

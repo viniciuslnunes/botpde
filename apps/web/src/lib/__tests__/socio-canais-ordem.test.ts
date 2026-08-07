@@ -30,9 +30,9 @@ describe('ordem cookie sócio (helpers compartilhados)', () => {
     expect(reordenarCanaisOperador([a, b, c], [c, a, b])).toEqual([c, a, b])
   })
 
-  it('reordenar rejeita ordem inválida', () => {
-    expect(reordenarCanaisOperador([a, b], [a])).toBeNull()
-    expect(reordenarCanaisOperador([a, b], [a, b, c])).toBeNull()
+  it('reordenar ignora id efêmero e rejeita duplicata', () => {
+    expect(reordenarCanaisOperador([a, b], [b, a, c])).toEqual([b, a])
+    expect(reordenarCanaisOperador([a, b], [a, a])).toBeNull()
   })
 
   it('fechar é filtro (ordem dos restantes preservada)', () => {

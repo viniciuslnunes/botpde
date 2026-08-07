@@ -3,6 +3,7 @@ import { assertComunidadeNacional } from '@/lib/authz'
 import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { subscribeFeedNacionalPing, subscribeFeedPing } from '@/lib/feed-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,13 @@ export async function GET(request: Request) {
     const afiliacaoParam = url.searchParams.get('afiliacaoId')
 
     if (escopo === 'nacional') {
+      // Super-admin: ping do clube pedido na query (CN do tenant em foco).
+      if (isSuperAdminEmail(session.user.email) && afiliacaoParam) {
+        return createSsePingResponse(
+          (onPing) => subscribeFeedNacionalPing(afiliacaoParam, onPing),
+          request.signal,
+        )
+      }
       const { afiliacaoId } = await assertComunidadeNacional()
       if (afiliacaoParam && afiliacaoParam !== afiliacaoId) {
         return new Response('Afiliação inválida', { status: 403 })

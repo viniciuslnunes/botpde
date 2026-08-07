@@ -27,6 +27,7 @@ Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
 
 | Agente | Quando usar |
 |---|---|
+| `setup` | Onboarding de máquina: Node/pnpm, Docker, Postgres local, sync, `.env` e secrets do time (`/setup` no Cursor; script `scripts/dev-setup.*`) |
 | `research-dominio` | Entender o nicho, benchmarks, riscos — antes de decidir |
 | `aliancas-torcidas` | Estudar alianças/rivalidades; recomendar aliados na config |
 | `product-strategy` | Decidir o quê construir e em que ordem |
@@ -187,6 +188,7 @@ mantém o knowledge; `product-strategy` prioriza pelo plano; `data-model` /
 ## Princípios
 
 - Preferir **Sonnet** ou o **modelo Auto** da sessão; não fixar Opus para planejamento.
+- Novo clone / máquina nova → agente `setup` (`/setup`) antes de codar.
 - Não implementar antes de o plano estar fechado e aprovado.
 - Escopo mínimo e seguro; reutilizar o que já existe.
 - Autorização sempre no servidor; auditar toda mutação.

@@ -48,6 +48,7 @@ const perfilSelect = {
   exibirCidade: true,
   exibirSede: true,
   exibirDesde: true,
+  exibirNumeroSocioNoFeed: true,
 } as const
 
 export default async function PerfilComunidadePage({
@@ -130,6 +131,7 @@ export default async function PerfilComunidadePage({
     exibirCidade: false,
     exibirSede: false,
     exibirDesde: true,
+    exibirNumeroSocioNoFeed: true,
   }
   const perfilPrivadoEfetivo = resolverPerfilPrivadoEfetivo(perfilBase.perfilPrivado, vinculo)
   const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(vinculo)
@@ -278,6 +280,8 @@ export default async function PerfilComunidadePage({
                   exibirCidade={perfil.exibirCidade}
                   exibirSede={perfil.exibirSede}
                   exibirDesde={perfil.exibirDesde}
+                  exibirNumeroSocioNoFeed={perfil.exibirNumeroSocioNoFeed}
+                  temNumeroSocio={socio?.numeroSocio != null}
                   bannerUrl={perfil.bannerUrl}
                   bannerPos={perfil.bannerPos}
                   avatarUrl={null}

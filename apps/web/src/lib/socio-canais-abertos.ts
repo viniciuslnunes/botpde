@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { isProd } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
@@ -13,8 +14,10 @@ import { podeVerCanal } from '@/lib/canais'
 import type { VisibilidadeCanal } from '@/lib/canais-shared'
 
 /**
- * Canais temáticos que o sócio manteve abertos na barra da Comunidade.
- * Cookie separado do operador (`operador_canais_abertos` = slugs de tenant).
+ * Canais visitados na barra 4+ da Comunidade (temáticos e oficiais de outras
+ * unidades) — sócio, torcedor e super-admin. Cookie separado do operador
+ * (`operador_canais_abertos` = slugs de troca de tenant).
+ * Hierarquia fixa (torcida / unidade do vínculo) NÃO entra aqui.
  */
 export const SOCIO_CANAIS_COOKIE = 'socio_canais_abertos'
 
@@ -94,25 +97,83 @@ export async function podarIdsOrfaosSocio(
 }
 
 /**
- * Metadados dos temáticos abertos que o viewer ainda pode ver.
- * Oficiais e ids inacessíveis são omitidos da barra (não grava cookie aqui —
- * limpeza lazy em `registrarCanalTematicoAbertoAction`).
- *
- * Uma `findMany` + checks de visibilidade em paralelo — sem N× `getCanalPorId`
- * (cada um trazia membership/sede completos desnecessários para a aba).
+ * Avatar efetivo do canal na barra — mesma cascata da listagem:
+ * Conversa.avatarUrl → Sede.fotoUrl (unidade do canal) → Tenant.logoUrl.
+ */
+async function resolverAvataresBarra(
+  rows: Array<{
+    id: string
+    tenantId: string
+    avatarUrl: string | null
+    canalOficial: boolean
+  }>,
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>()
+  if (rows.length === 0) return out
+
+  const precisaFallback = rows.filter((r) => !r.avatarUrl)
+  const sedePorCanal = new Map<string, string | null>()
+  const tenantIds = [...new Set(precisaFallback.map((r) => r.tenantId))]
+
+  if (precisaFallback.length > 0) {
+    const sedes: { canalConversaId: string | null; fotoUrl: string | null }[] =
+      await db.sede.findMany({
+        where: {
+          canalConversaId: { in: precisaFallback.map((r) => r.id) },
+          fotoUrl: { not: null },
+        },
+        select: { canalConversaId: true, fotoUrl: true },
+      })
+    for (const s of sedes) {
+      if (s.canalConversaId) sedePorCanal.set(s.canalConversaId, s.fotoUrl)
+    }
+  }
+
+  const tenantLogo = new Map<string, string | null>()
+  if (tenantIds.length > 0) {
+    const tenants: { id: string; logoUrl: string | null }[] = await db.tenant.findMany({
+      where: { id: { in: tenantIds } },
+      select: { id: true, logoUrl: true },
+    })
+    for (const t of tenants) tenantLogo.set(t.id, t.logoUrl)
+  }
+
+  for (const row of rows) {
+    if (row.avatarUrl) {
+      out.set(row.id, row.avatarUrl)
+      continue
+    }
+    if (!row.canalOficial) {
+      out.set(row.id, null)
+      continue
+    }
+    out.set(row.id, sedePorCanal.get(row.id) ?? tenantLogo.get(row.tenantId) ?? null)
+  }
+  return out
+}
+
+/**
+ * Metadados dos canais visitados (temáticos e oficiais) para a barra 4+.
+ * `leituraOperador`: super-admin sem vínculo — não aplica `podeVerCanal`.
  */
 export async function carregarCanaisAbertosSocio(
   ids: string[],
   userId: string,
   viewerTenantId: string,
+  /** Canais da hierarquia fixa (torcida/unidade) — não listar como 4+. */
+  idsHierarquiaFixos: string[] = [],
+  opts?: { leituraOperador?: boolean },
 ): Promise<CanalTematicoAberto[]> {
   if (ids.length === 0) return []
+
+  const fixos = new Set(idsHierarquiaFixos.filter(Boolean))
 
   type Row = {
     id: string
     nome: string | null
     avatarUrl: string | null
     tenantId: string
+    canalOficial: boolean
     visibilidadeCanal: VisibilidadeCanal
   }
 
@@ -120,13 +181,13 @@ export async function carregarCanaisAbertosSocio(
     where: {
       id: { in: ids },
       tipo: 'CANAL',
-      canalOficial: false,
     },
     select: {
       id: true,
       nome: true,
       avatarUrl: true,
       tenantId: true,
+      canalOficial: true,
       visibilidadeCanal: true,
     },
   })
@@ -134,35 +195,47 @@ export async function carregarCanaisAbertosSocio(
   const byId = new Map(rows.map((row) => [row.id, row]))
   const ordered: Row[] = []
   for (const id of ids) {
+    if (fixos.has(id)) continue
     const row = byId.get(id)
     if (row) ordered.push(row)
   }
   if (ordered.length === 0) return []
 
-  const visiveis: boolean[] = await Promise.all(
-    ordered.map((row) =>
-      podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId),
-    ),
-  )
+  const leituraOperador = Boolean(opts?.leituraOperador)
+  const visiveis: boolean[] = leituraOperador
+    ? ordered.map(() => true)
+    : await Promise.all(
+        ordered.map((row) =>
+          podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId),
+        ),
+      )
+
+  const avatares = await resolverAvataresBarra(ordered)
 
   const out: CanalTematicoAberto[] = []
   for (let i = 0; i < ordered.length; i++) {
     if (!visiveis[i]) continue
     const row = ordered[i]!
+    const nomeBruto = row.nome?.trim() || 'Canal'
     out.push({
       id: row.id,
-      nome: row.nome?.trim() || 'Canal',
-      avatarUrl: row.avatarUrl,
+      nome: row.canalOficial ? formatNomeTorcida(nomeBruto) : nomeBruto,
+      avatarUrl: avatares.get(row.id) ?? null,
     })
   }
   return out
 }
 
-/** Confere se a conversa é canal temático (CANAL + não oficial) antes de abrir. */
-export async function isCanalTematicoAtivo(canalId: string): Promise<boolean> {
-  const row: { tipo: string; canalOficial: boolean } | null = await db.conversa.findUnique({
+/** Confere se a conversa é um canal (temático ou oficial) elegível à barra 4+. */
+export async function isCanalBarraVisitavel(canalId: string): Promise<boolean> {
+  const row: { tipo: string } | null = await db.conversa.findUnique({
     where: { id: canalId },
-    select: { tipo: true, canalOficial: true },
+    select: { tipo: true },
   })
-  return Boolean(row && row.tipo === 'CANAL' && !row.canalOficial)
+  return Boolean(row && row.tipo === 'CANAL')
+}
+
+/** @deprecated Use `isCanalBarraVisitavel` — oficiais também entram na barra 4+. */
+export async function isCanalTematicoAtivo(canalId: string): Promise<boolean> {
+  return isCanalBarraVisitavel(canalId)
 }

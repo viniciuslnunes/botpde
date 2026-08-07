@@ -19,6 +19,12 @@ interface NavbarBrandOverrideContextValue {
    */
   escopoAtivo: EscopoComunidade | null
   setEscopoAtivo: (escopo: EscopoComunidade | null) => void
+  /**
+   * Canal temático/público em detalhe: esconde módulos reativos do canal
+   * (Departamentos/Carteirinha/Agenda/Sedes/Loja). Oficial não seta.
+   */
+  ocultarModulosReativos: boolean
+  setOcultarModulosReativos: (ocultar: boolean) => void
 }
 
 const NavbarBrandOverrideContext = createContext<NavbarBrandOverrideContextValue | null>(null)
@@ -32,15 +38,27 @@ const NavbarBrandOverrideContext = createContext<NavbarBrandOverrideContextValue
 export function NavbarBrandOverrideProvider({ children }: { children: ReactNode }) {
   const [override, setOverrideState] = useState<NavbarBrand | null>(null)
   const [escopoAtivo, setEscopoAtivoState] = useState<EscopoComunidade | null>(null)
+  const [ocultarModulosReativos, setOcultarModulosReativosState] = useState(false)
   const setOverride = useCallback((brand: NavbarBrand | null) => setOverrideState(brand), [])
   const setEscopoAtivo = useCallback(
     (escopo: EscopoComunidade | null) => setEscopoAtivoState(escopo),
     [],
   )
+  const setOcultarModulosReativos = useCallback(
+    (ocultar: boolean) => setOcultarModulosReativosState(ocultar),
+    [],
+  )
 
   return (
     <NavbarBrandOverrideContext.Provider
-      value={{ override, setOverride, escopoAtivo, setEscopoAtivo }}
+      value={{
+        override,
+        setOverride,
+        escopoAtivo,
+        setEscopoAtivo,
+        ocultarModulosReativos,
+        setOcultarModulosReativos,
+      }}
     >
       {children}
     </NavbarBrandOverrideContext.Provider>

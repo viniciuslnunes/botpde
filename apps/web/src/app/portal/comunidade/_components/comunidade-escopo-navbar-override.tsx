@@ -42,6 +42,7 @@ export function ComunidadeEscopoNavbarOverride({
   corPrimariaNacional,
   tenantAtivoEhUnidade = false,
   escopoPersistido = null,
+  marcaCanalFoco = null,
 }: {
   afiliacao: AfiliacaoBrand | null
   torcidaReal: TorcidaBrand | null
@@ -56,6 +57,11 @@ export function ComunidadeEscopoNavbarOverride({
   tenantAtivoEhUnidade?: boolean
   /** Cookie `comunidade_escopo` já no servidor — evita regravar o mesmo valor. */
   escopoPersistido?: EscopoComunidade | null
+  /**
+   * Canal oficial Caso A selecionado (sem portal próprio). Tem prioridade
+   * sobre a marca do escopo/tenant — senão a listagem Canais caía na Sede.
+   */
+  marcaCanalFoco?: NavbarBrand | null
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -91,16 +97,18 @@ export function ComunidadeEscopoNavbarOverride({
 
     setEscopoAtivo(escopo)
 
-    // Mesma resolução que o `portal/layout` aplica ao cookie fora da
-    // Comunidade — fonte única, senão as duas marcas divergem.
-    // TORCEDOR: layout do portal já é o clube, então torcida/unidade precisam
-    // de override explícito; sócio recebe um override idempotente.
-    const brand: NavbarBrand | null = resolverBrandPorEscopo(escopo, {
-      afiliacao,
-      torcidaReal,
-      unidade,
-      corPrimariaNacional,
-    })
+    // Caso A (canal oficial sem portal): marca do canal selecionado vence o
+    // escopo/tenant — senão /canais caía em "Gaviões" ao sair de Taubaté.
+    // CN continua com a marca do clube.
+    const brand: NavbarBrand | null =
+      marcaCanalFoco && escopo !== 'nacional'
+        ? marcaCanalFoco
+        : resolverBrandPorEscopo(escopo, {
+            afiliacao,
+            torcidaReal,
+            unidade,
+            corPrimariaNacional,
+          })
 
     if (!brand) {
       setOverride(null)
@@ -130,6 +138,10 @@ export function ComunidadeEscopoNavbarOverride({
     unidade?.nome,
     unidade?.logoUrl,
     corPrimariaNacional,
+    marcaCanalFoco,
+    marcaCanalFoco?.nome,
+    marcaCanalFoco?.corPrimaria,
+    marcaCanalFoco?.logoUrl,
     setOverride,
     setEscopoAtivo,
   ])

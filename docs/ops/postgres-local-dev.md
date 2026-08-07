@@ -1,6 +1,10 @@
 # Postgres local em desenvolvimento
 
 > Por que o app parece lento em `localhost:3000` e como devolver a paridade com produção.
+>
+> **Atalho:** no Cursor digite `/setup` (agente + skill). Ou na raiz:
+> `powershell -File scripts/dev-setup.ps1` / `bash scripts/dev-setup.sh`.
+> Secrets do time: [`dev-secrets.md`](./dev-secrets.md).
 
 ## O diagnóstico
 
@@ -90,7 +94,7 @@ recria o schema `public` local antes de restaurar.
 
 ### Apontar o app para o banco local
 
-Em `apps/web/.env.local`:
+Em `apps/web/.env.local` **e** em `packages/db/.env` (Prisma/scripts leem daí):
 
 ```env
 DATABASE_URL=postgresql://torcida:torcida@localhost:5432/torcida
@@ -98,12 +102,17 @@ DATABASE_URL=postgresql://torcida:torcida@localhost:5432/torcida
 DATABASE_URL_RAILWAY=postgresql://...@turntable.proxy.rlwy.net:43067/railway
 ```
 
+O sync procura `DATABASE_URL_RAILWAY` / `DATABASE_URL` nesses dois arquivos.
 Reinicie o `pnpm --filter @torcida/web dev`.
 
 > **Cuidado:** com `DATABASE_URL` apontando para o local, os scripts de
 > `packages/db` (`db:push`, `seed:*`, `reset:*`, `db:repair-*`) passam a agir no
 > banco **local** — que é exatamente o que se quer. Confira a variável antes de
 > rodar qualquer `reset:*`.
+
+> **Nota `postgres:18`:** o volume do compose monta em `/var/lib/postgresql`
+> (não `.../data`). A imagem 18+ mudou o layout; montar no path antigo faz o
+> container reiniciar em loop.
 
 ### Alternativa sem Docker
 

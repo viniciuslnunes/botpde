@@ -83,8 +83,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 Prisma atravessa o proxy público da Railway (RTT medido: 125ms; ~131ms por
 query), então uma página com 30 queries gasta ~4s só de rede — contra ~40ms em
 produção, onde app e banco dividem datacenter. Antes de "otimizar" uma rota
-lenta em dev, suba o banco local: `docs/ops/postgres-local-dev.md`
-(`docker-compose.dev.yml` + `scripts/db-local-sync.ps1`).
+lenta em dev, suba o banco local: agente `/setup` (ou
+`docs/ops/postgres-local-dev.md` + `scripts/dev-setup.ps1` /
+`scripts/dev-setup.sh`). Secrets do time: `docs/ops/dev-secrets.md`.
 
 ## Convenções (obrigatórias)
 
@@ -275,6 +276,9 @@ lenta em dev, suba o banco local: `docs/ops/postgres-local-dev.md`
   `GROUP BY` (nunca `DISTINCT`+`ORDER BY similarity`); ver
   `docs/data/modulo-comunidade.md` (§ engajamento / § busca) e
   `docs/data/modulo-comunidade-performance.md`.
+  **Criptografia vs moderação (2026-08-07):** Fase A (plaintext + ACL + filas);
+  sem E2EE prometido; plano B/C em `docs/data/plano-criptografia-e-moderacao.md`
+  e `ARCHITECTURE.md` §5.23.
 - **Design** — personalização visual do tenant (`/admin/design`): marca, ações,
   grade `.app-shell-bg`, superfícies; paletas priorizam torcida→escudo→clube
   (3 cores; sem verde/rival forçado; P&B sem virar marrom); nav/badges usam

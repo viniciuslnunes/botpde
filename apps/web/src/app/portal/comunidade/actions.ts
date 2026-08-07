@@ -48,6 +48,7 @@ import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
   getCanalDaUnidadeDoVinculo,
+  isConversaCanalDepartamento,
   getCanalSeMembroAtivo,
   assertElegibilidadeMembroCanal,
   inscreverCanal,
@@ -973,6 +974,7 @@ export interface AtualizarPerfilSocialInput {
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
+  exibirNumeroSocioNoFeed?: boolean
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
@@ -3068,6 +3070,12 @@ export async function entrarCanal(conversaId: string): Promise<void> {
   // Operador navega canais sem entrar — virar membro é participação.
   await assertNaoOperador()
 
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a entrada é automática pelo cargo na equipe — não há inscrição.',
+    )
+  }
+
   let contexto: { session: Session; tenantId: string } | null = null
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
@@ -3133,6 +3141,12 @@ export async function sairCanal(conversaId: string): Promise<void> {
 
   const parsed = sairCanalSchema.safeParse({ conversaId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a saída acompanha o cargo na equipe — remova a pessoa do departamento.',
+    )
+  }
 
   const canalRow: {
     id: string
@@ -3297,6 +3311,7 @@ export async function criarCanalTematico(
   })
 
   revalidatePath('/portal/comunidade/canais')
+  invalidarCachesComunidadeFeed(tenant.id)
   return canal
 }
 
@@ -3473,6 +3488,12 @@ export async function pedirEntradaCanal(conversaId: string): Promise<void> {
   const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Pedido inválido')
 
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a entrada é automática pelo cargo na equipe — não há pedidos.',
+    )
+  }
+
   const canalRow: {
     id: string
     tenantId: string
@@ -3578,6 +3599,12 @@ export async function decidirPedidoCanal(
   const parsed = decidirPedidoCanalSchema.safeParse({ conversaId, userId, aprovar })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Decisão inválida')
 
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a entrada é automática pelo cargo na equipe — não há pedidos.',
+    )
+  }
+
   const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
   if (!canal) throw new Error('Canal não encontrado.')
 
@@ -3670,6 +3697,12 @@ export async function removerMembroCanal(conversaId: string, userId: string): Pr
     throw new Error('Você não pode remover a si mesmo por aqui.')
   }
 
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a saída acompanha o cargo na equipe — remova a pessoa do departamento.',
+    )
+  }
+
   const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
   if (!canal) throw new Error('Canal não encontrado.')
 
@@ -3716,6 +3749,12 @@ export async function adicionarMembroCanal(conversaId: string, userId: string): 
 
   const parsed = adicionarMembroCanalSchema.safeParse({ conversaId, userId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  if (await isConversaCanalDepartamento(parsed.data.conversaId)) {
+    throw new ExpectedError(
+      'Canal de departamento: a entrada é automática pelo cargo na equipe — não há convite manual.',
+    )
+  }
 
   const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
   if (!canal) throw new Error('Canal não encontrado.')

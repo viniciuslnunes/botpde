@@ -536,32 +536,25 @@ async function seedPosts(contexto, resumo) {
       })
     }
 
-    const torcedorIds = new Set(
-      (
-        await db.saasMembro.findMany({
-          where: {
-            tenantId: t.tenantId,
-            tipo: 'TORCEDOR',
-            status: 'APROVADO',
-            userId: { in: t.aprovadosUserIds },
-          },
-          select: { userId: true },
-        })
-      ).map((m) => m.userId),
-    )
+    // TORCEDOR APROVADO da unidade posta só no sintético (Fase 2b) — na TO
+    // real o autor de MEMBRO é sempre sócio (senão o Descobrir da CN mostra
+    // "FIEL MACABRA · Torcedor" em vez de "TIMÃO — COMUNIDADE NACIONAL").
+    const socioIds = (
+      await db.saasMembro.findMany({
+        where: {
+          tenantId: t.tenantId,
+          tipo: 'SOCIO',
+          status: 'APROVADO',
+          userId: { in: t.aprovadosUserIds },
+        },
+        select: { userId: true },
+      })
+    ).map((m) => m.userId)
 
     const mem = templatesMembro(t.afiliacao.nome)
-    for (const autorId of t.aprovadosUserIds.filter(() => Math.random() < 0.5)) {
-      const ehTorcedor = torcedorIds.has(autorId)
-      // TORCEDOR só PUBLICO — TENANT entra no mural do canal oficial (sócio).
-      const visibilidade = ehTorcedor
-        ? 'PUBLICO'
-        : pickPonderado([['PUBLICO', 70], ['TENANT', 25], ['PRIVADO', 5]])
-      // TORCEDOR PUBLICO: maioria com alcance nacional (Descobrir da CN).
-      // Sócio: ~30% (peso histórico do lote).
-      const alcanceNacional =
-        visibilidade === 'PUBLICO' &&
-        (ehTorcedor ? Math.random() < 0.75 : Math.random() < 0.3)
+    for (const autorId of socioIds.filter(() => Math.random() < 0.5)) {
+      const visibilidade = pickPonderado([['PUBLICO', 70], ['TENANT', 25], ['PRIVADO', 5]])
+      const alcanceNacional = visibilidade === 'PUBLICO' && Math.random() < 0.3
       postsRows.push({
         id: crypto.randomUUID(),
         tenantId: t.tenantId,

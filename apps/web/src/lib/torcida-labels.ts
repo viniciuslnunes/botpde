@@ -1,6 +1,6 @@
 /** Tipos e rótulos de torcida — seguros para Client Components (sem next/headers). */
 
-import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 
 export type TorcidaOpcao = {
   id: string
@@ -42,8 +42,9 @@ const TIPO_UNIDADE_LABEL: Record<string, string> = {
   PONTO_ENCONTRO: 'PDE',
 }
 
-export function labelClubeOpcao(c: Pick<ClubeOpcao, 'nome' | 'apelido' | 'estado'>): string {
-  const nome = nomeExibicaoAfiliacao(c)
+/** Nome oficial do clube (não o apelido) + UF — ex. "SPORT CLUB CORINTHIANS PAULISTA (SP)". */
+export function labelClubeOpcao(c: Pick<ClubeOpcao, 'nome' | 'estado'>): string {
+  const nome = formatNomeAfiliacao(c.nome)
   return c.estado ? `${nome} (${c.estado})` : nome
 }
 

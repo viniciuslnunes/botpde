@@ -10,8 +10,9 @@ import {
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
-import { getCanalDaUnidadeDoVinculo, getCanalLeituraDireta, getCanalPorId, getPostsDoCanal } from '@/lib/canais'
+import { getCanalDaUnidadeDoVinculo, getCanalLeituraDireta, getCanalPorId, getPostsDoCanal, resolverFeedInternoDoMural } from '@/lib/canais'
 import { ehOperadorPlataforma, resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 const querySchema = z.object({
   cursor: z.string().optional(),
@@ -20,6 +21,12 @@ const querySchema = z.object({
   conversaId: z.string().optional(),
   escopo: z.enum(['nacional', 'torcida', 'unidade']).optional(),
   afiliacaoId: z.string().uuid().optional(),
+  /**
+   * Opt-in: misturar posts "Só torcida" no mural. Só as abas Minha torcida /
+   * Minha unidade enviam `1`. Soft-switch e `/canais/[id]` omitem → só
+   * posts do conversaId.
+   */
+  feedInterno: z.enum(['0', '1']).optional(),
 })
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +45,7 @@ export async function GET(request: NextRequest) {
       conversaId: request.nextUrl.searchParams.get('conversaId') ?? undefined,
       escopo: request.nextUrl.searchParams.get('escopo') ?? undefined,
       afiliacaoId: request.nextUrl.searchParams.get('afiliacaoId') ?? undefined,
+      feedInterno: request.nextUrl.searchParams.get('feedInterno') ?? undefined,
     })
 
     if (!parsed.success) {
@@ -50,12 +58,17 @@ export async function GET(request: NextRequest) {
       if (!parsed.data.afiliacaoId) {
         return NextResponse.json({ error: 'afiliacaoId obrigatório.' }, { status: 400 })
       }
-      const afiliacaoViewer = await resolveAfiliacaoComunidadeDoUsuario(
-        session.user.id,
-        session.user.email,
-      )
-      if (!afiliacaoViewer || afiliacaoViewer !== parsed.data.afiliacaoId) {
-        return NextResponse.json({ error: 'Sem permissão para este feed.' }, { status: 403 })
+      // Super-admin em modo operador navega a CN do tenant ativo (ex.: Central),
+      // que pode diferir do clube do próprio PerfilTorcedor — a page já monta
+      // com `ctx.afiliacao`; a API não pode exigir match pessoal.
+      if (!isSuperAdminEmail(session.user.email)) {
+        const afiliacaoViewer = await resolveAfiliacaoComunidadeDoUsuario(
+          session.user.id,
+          session.user.email,
+        )
+        if (!afiliacaoViewer || afiliacaoViewer !== parsed.data.afiliacaoId) {
+          return NextResponse.json({ error: 'Sem permissão para este feed.' }, { status: 403 })
+        }
       }
 
       const filtroNacional = parsed.data.filtro ?? 'descobrir'
@@ -119,27 +132,40 @@ export async function GET(request: NextRequest) {
       }
       // Aba "Minha unidade": o gate é o vínculo, não a descoberta cross-tenant
       // (`getCanalPorId` exige sócio fora de canal PÚBLICO e devolveria 404
-      // para o torcedor no mural da própria unidade). Modo operador lê direto.
+      // para o torcedor no mural da própria unidade). Super-admin (com ou
+      // sem vínculo / dual-hat) lê direto — não só o modo operador puro.
       const operador = await ehOperadorPlataforma(
         session.user.id,
         session.user.email,
         tenant.id,
       )
+      const leituraPlataforma = operador || isSuperAdminEmail(session.user.email)
       const canal =
         (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
         (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id)) ??
-        (operador
+        (leituraPlataforma
           ? await getCanalLeituraDireta(parsed.data.conversaId, session.user.id)
           : null)
-      if (!canal || (!canal.souMembro && !operador)) {
+      if (!canal || (!canal.souMembro && !leituraPlataforma)) {
         return NextResponse.json({ error: 'Canal não encontrado.' }, { status: 404 })
       }
+      // Default: só o canal. `feedInterno=1` (Minha torcida/unidade) pode
+      // misturar "Só torcida" do mural próprio — nunca na listagem/soft-switch.
+      const pedirFeedInterno = parsed.data.feedInterno === '1'
+      const feedInterno = pedirFeedInterno
+        ? await resolverFeedInternoDoMural({
+            canalId: canal.id,
+            canalOficial: canal.canalOficial,
+            userId: session.user.id,
+            viewerTenantId: tenant.id,
+          })
+        : { incluir: false, feedInternoTenantId: null as string | null }
       const { posts, pageInfo } = await getPostsDoCanal(canal.id, tenant.id, session.user.id, {
         cursor: parsed.data.cursor,
         take,
-        incluirFeedInterno: canal.canalOficial,
-        viewerTenantId: tenant.id,
-        leituraOperador: operador,
+        incluirFeedInterno: feedInterno.incluir,
+        viewerTenantId: feedInterno.feedInternoTenantId ?? tenant.id,
+        leituraOperador: leituraPlataforma,
       })
 
       return NextResponse.json({ posts, pageInfo })

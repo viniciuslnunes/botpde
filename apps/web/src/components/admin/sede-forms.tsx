@@ -1830,7 +1830,7 @@ export function SedeAcoesMenu({
   }
 
   return (
-    <div className="relative">
+    <div className={`relative ${menuOpen ? 'z-30' : ''}`}>
       <button
         type="button"
         aria-label={`Ações de ${sedeNome}`}

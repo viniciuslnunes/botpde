@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Home, Search, Video, Plus } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
 import { useScrollChromeVisibilityShared } from '@/lib/scroll-chrome-context'
+import { CanalFocoNavLink } from '../canais/canais-list-link'
+import { isComunidadeFeedPath } from '@/lib/comunidade-nav'
 
 interface ComunidadeDockProps {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
@@ -33,7 +34,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
     return () => window.clearTimeout(timer)
   }, [])
 
-  const isFeed = pathname === '/portal/comunidade'
+  const isFeed = isComunidadeFeedPath(pathname)
 
   const items = [
     { href: `/portal/comunidade${sufixoNacional}`, label: 'Feed', icon: Home, active: isFeed },
@@ -101,7 +102,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
             const Icon = item.icon
             return (
               <m.div key={item.href} whileTap={{ scale: 0.9 }} transition={springSnappy}>
-                <Link
+                <CanalFocoNavLink
                   href={item.href}
                   aria-label={item.label}
                   aria-current={item.active ? 'page' : undefined}
@@ -120,7 +121,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
                       />
                     )}
                   </AnimatePresence>
-                </Link>
+                </CanalFocoNavLink>
               </m.div>
             )
           })}
@@ -142,7 +143,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
             const Icon = item.icon
             return (
               <m.div key={item.href} whileTap={{ scale: 0.9 }} transition={springSnappy}>
-                <Link
+                <CanalFocoNavLink
                   href={item.href}
                   aria-label={item.label}
                   aria-current={item.active ? 'page' : undefined}
@@ -160,13 +161,13 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
                       />
                     )}
                   </AnimatePresence>
-                </Link>
+                </CanalFocoNavLink>
               </m.div>
             )
           })}
 
           <m.div whileTap={{ scale: 0.92 }} transition={springSnappy}>
-            <Link
+            <CanalFocoNavLink
               href={currentUser.id ? `/portal/comunidade/perfil/${currentUser.id}` : '/portal/comunidade'}
               aria-label="Meu perfil"
               aria-current={perfilAtivo ? 'page' : undefined}
@@ -180,7 +181,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
               >
                 <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="sm" />
               </span>
-            </Link>
+            </CanalFocoNavLink>
           </m.div>
         </nav>
       </m.div>

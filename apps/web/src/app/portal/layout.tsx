@@ -7,6 +7,7 @@ import {
   resolverEscopoComunidadePorModo,
 } from '@/lib/comunidade-escopo'
 import { lerEscopoComunidadePersistido } from '@/lib/comunidade-escopo-cookie'
+import { lerMarcaCanalFoco } from '@/lib/comunidade-canal-foco-cookie'
 import { getAvatarAtualDoUsuario, getNomeAtualDoUsuario } from '@/lib/perfil-social'
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { Suspense } from 'react'
@@ -91,7 +92,7 @@ export default async function PortalLayout({
       )
     : null
 
-  const brandCanal =
+  const brandEscopo =
     ctx && escopoCanal
       ? resolverBrandPorEscopo(escopoCanal, {
           afiliacao: ctx.afiliacao,
@@ -108,6 +109,10 @@ export default async function PortalLayout({
           corPrimariaNacional: ctx.tenantSintetico?.corPrimaria ?? null,
         })
       : null
+  // Canal oficial Caso A (ex.: Taubaté): marca do canal selecionado sobrevive
+  // fora do mural — senão Canais/Agenda caem no tenant da sessão (Sede/Rio Claro).
+  const brandCanalFoco = await lerMarcaCanalFoco()
+  const brandCanal = brandCanalFoco ?? brandEscopo
 
   // Design completo: tenant real no modo torcida, tenant sintético (paleta do
   // clube) no modo nacional.

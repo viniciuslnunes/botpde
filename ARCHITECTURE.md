@@ -1159,8 +1159,12 @@ diferente. `DepartamentoArea` + `DepartamentoAreaMembro` modelam isso. Spec:
 - **Checklist por frente** em `DepartamentoArea.meta.checklist` (itens livres +
   modelos sugeridos) — mesmo padrão leve do barracão; sem tabela nova. Spec:
   `modulo-departamentos.md` § checklist por frente.
-- **Canal por frente** — `DepartamentoArea.canalConversaId` vínculo manual a
-  `Conversa` CANAL (nunca auto-cria); exclusive com sede/depto/outra área.
+- **Canal por frente / departamento** — `canalConversaId` em `Departamento` e
+  `DepartamentoArea`; roster = equipe + gestores + **liderança do tenant**
+  (`owner`/`admin`/`vice` → ADMIN em todos os canais do tenant). Listagem
+  Comunidade: categoria Departamento, só membro ATIVO no tenant dono, sem
+  pedido. Spec: `modulo-departamentos.md` § canal por frente; foco Caso A:
+  `modulo-comunidade.md` § foco Caso A.
 - **Cockpit consome flags, não refaz RBAC.** `[slug]/_lib/contexto.ts` espelha
   `configuracoes/_lib/contexto.ts`: um loader `cache()`-ado resolve gate,
   permissões e áreas; os blocos só leem booleanos. Blocos sem permissão
@@ -1444,6 +1448,33 @@ lista paralela à Agenda.
 
 Spec: `docs/data/modulo-bandeiras.md`. Invariantes travadas em
 `lib/__tests__/bandeiras.test.ts` e `rbac.test.ts`.
+
+### 5.23 Criptografia vs moderação — Fase A agora; E2EE não prometido (2026-08-07)
+
+Queríamos restringir conversas/canais a membros (com oversight de
+super-admin) **e** continuar deliberando conteúdo grave (racismo, CSAM,
+pornografia, correlatos). **E2EE estrito e moderação server-side são
+incompatíveis**: se o servidor (e o SA) precisam ler o texto, não é ponta a
+ponta — é no máximo envelope/escrow. “E2EE + SA ainda lê” não deve ser
+prometido nem implementado sob esse nome.
+
+**Decisão:** permanecer na **Fase A** (plaintext no Postgres + ACL + denúncia
++ filas tenant/plataforma). Feed, canais institucionais e mural **não** entram
+em E2EE no plano atual — o módulo depende de busca, RSC e moderação legível.
+DM é a única superfície candidata a evolução futura.
+
+Fases futuras (não agendadas): **B** envelope/at-rest com chave da plataforma
+(moderação e safety ainda desencriptam); **C** E2EE real só em DM, e só com
+plano de moderação sem plaintext no server (denúncia com anexo, scan client,
+ação cega).
+
+**Abrir a Fase B** só após o gate fechável em
+`docs/data/plano-criptografia-e-moderacao.md` § Pré-requisitos (política
+safety/CSAM, categorias de denúncia + escalonamento, ops, escopo S1–S6,
+spec KMS/DEK/escrow T1–T6) — não por pedido isolado de “criptografar”.
+
+Plano completo, vocabulário e o que E2EE quebraria no monorepo:
+`docs/data/plano-criptografia-e-moderacao.md`.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

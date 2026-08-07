@@ -176,6 +176,24 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
   Quem é `tipo: TORCEDOR` continua "Torcedor" (nunca vira "Sócio"); os demais
   cargos de sistema não mudam. Não confundir com `PAPEL_DEPARTAMENTO`
   (Membro/Gestor **dentro** de um departamento), que é outro eixo.
+  **Nº de sócio no badge (2026-08-07)**: qualquer badge de **sócio** (Sócio,
+  Membro · área, Presidente, Administrador, …) ganha ` - Nº {n}` quando
+  `PerfilMembro.exibirNumeroSocioNoFeed` está true (default do schema). O nº
+  vem de `SaasSocio.numeroSocio` (carteirinha); se ainda não houver emissão,
+  cai em `SaasMembro.numeroAssociado` da ficha — assim murais de canal/unidade
+  não ficam sem número enquanto a CN já mostra. Torcedor nunca ganha Nº. O
+  sócio desliga em Sobre › "Número de sócio no feed"
+  (`perfil-editar-form.tsx` → `salvarPerfilSocial`). Formatação pura em
+  `formatCargoComNumeroSocio` (após `formatAutorCargoBadge`).
+  **TORCEDOR = CN até sócio (2026-08-07)**: convite de unidade cria vínculo
+  `TORCEDOR` na TO, mas a identidade pública no feed é a Comunidade Nacional
+  do clube (`TIMÃO — COMUNIDADE NACIONAL`) — sem nome da torcida, sem unidade,
+  sem pill "Torcedor" — até `SaasMembro.tipo === SOCIO`. Sócio no sintético
+  sobe a torcida real (`resolverTorcidaRealPorAutor`); post `MEMBRO` de
+  não-sócio em TO real (ex.: seed legado com `alcanceNacional`) é mascarado
+  para o sintético em `enriquecerPostsComBadges` /
+  `deveMascararAutorComoComunidadeNacional`. Comunicado `INSTITUCIONAL` não
+  mascara.
   **Unidade não repete a torcida (2026-08-03)**: onde torcida e unidade
   aparecem lado a lado, a unidade some quando não identifica nada além da
   torcida — dois casos reais: unidade promovida a tenant próprio (Caso B, mesmo
@@ -207,6 +225,9 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
   `seed-torcidas-nacional.js`, `seed-sedes-onboarding.js`); o onboarding real
   usa o nome declarado da unidade, então o tratamento é de exibição.
 - **Moderação**: link "Ver post" na fila em `/admin/comunidade/moderacao`.
+  Conteúdo de feed/canais permanece legível no servidor de propósito (Fase A):
+  restringir por ACL, não por E2EE — ver
+  `docs/data/plano-criptografia-e-moderacao.md` e `ARCHITECTURE.md` §5.23.
 
 ## Engajamento e lives (Sprint 5)
 
@@ -667,6 +688,9 @@ modelo de dados subjacente é maior e ainda não tem doc dedicado:
 `somenteAdminPublica`. Se o módulo crescer além de canal oficial + temáticos,
 vale extrair para `docs/data/modulo-mensageria.md`.
 
+Privacidade de DM/canal vs moderação de conteúdo grave (Fase A agora; B/C
+futuras): `docs/data/plano-criptografia-e-moderacao.md`.
+
 ## Upload de mídia
 
 - Posts: `torcida/{tenantId}/comunidade`
@@ -778,3 +802,45 @@ FIEL SÃO VICENTE) clicava em Agenda e via o escudo do clube (CN).
 
 Testes: `lib/__tests__/comunidade-escopo.test.ts` (`resolverBrandPorEscopo` +
 cookie que não concede aba).
+
+## Foco Caso A — PDE sem portal próprio (2026-08-07)
+
+Unidade **Caso A** (SUBSEDE/PDE no tenant da mãe) não troca cookie de tenant ao
+abrir o canal oficial. A sessão continua na Sede (ou no portal anterior), mas o
+mural e a topbar precisam **ficar** no canal escolhido (ex.: Presidente
+Prudente) até a pessoa escolher outro.
+
+- Cookie `comunidade_canal_foco` (`lib/comunidade-canal-foco-cookie.ts`):
+  `{ canalId, nome, corPrimaria, logoUrl }`. Gravado por
+  `registrarCanalVisitadoAction` → `persistirMarcaCanalOficialCasoA` quando o
+  canal é oficial **sem** portal ativável (`resolverSlugPortalAtivavelDoCanal`
+  retorna `null`). Limpo ao ativar Sede/Caso B, abrir canal não-oficial, trocar
+  torcida, ou na aba **Minha torcida** (`?raiz=1`).
+- **Marca na listagem / Agenda:** `portal/layout.tsx` e
+  `ComunidadeEscopoNavbarOverride` preferem `marcaCanalFoco` sobre a marca do
+  escopo — Canais/Agenda não “voltam” para Gaviões só de cosmético.
+- **Retomar o mural:** `/portal/comunidade` com escopo `torcida` e cookie de
+  foco redireciona para `/portal/comunidade/canais/{canalId}` (Feed, voltar da
+  listagem, link Comunidade). Sem isso o feed reabria sempre o mural da Sede e
+  o `CanalNavbarOverride` da Sede apagava a marca do PDE.
+- **Trocar de canal de propósito:** soft-switch / clique em Minha torcida
+  (canal da Sede) chama `registrarCanalVisitadoAction` na Sede → limpa o foco;
+  fallback `?raiz=1` na href da aba fixa se o soft-switch não estiver montado.
+- **Saída do mural (nav lateral / dock / strip mobile):** `CanalFocoNavLink`
+  (ex-`CanaisListLink`) registra a visita **antes** de ir a Grupos, Canais,
+  Salvos, Buscar, Vídeos, etc. — não só Canais. Sem isso o cookie/marca
+  podiam não gravar e o header caía na Sede.
+- **Menu reativo:** no mural `/canais/[id]`, **Feed** fica ativo (é o feed do
+  canal); **Canais** só na listagem `/canais`. Grupos e demais usam prefixo
+  próprio (`isComunidadeNavActive`).
+- **Grupos:** subtítulo usa `lerMarcaCanalFoco()` quando há PDE Caso A em foco
+  (não o nome da Sede da sessão).
+- **Canais de departamento** com foco Caso A ativo: ocultos na listagem
+  `/canais` (são da torcida/Sede, não da unidade em foco).
+- **Super-admin / dual-hat:** `leituraSuperAdmin` em `listCanaisVisiveis` mostra
+  todos os canais do tenant ativo sem exigir membership (presidente em Gaviões
+  + SA visitando outra unidade). Feed paginado usa `isSuperAdminEmail`, não só
+  modo operador. Hub `/portal/departamentos` já listava tudo via `isSuperAdmin`.
+
+Preferência de navegação — **nunca** autoriza. Testes: portal ativável /
+`lib/__tests__/comunidade-nav-foco.test.ts`.

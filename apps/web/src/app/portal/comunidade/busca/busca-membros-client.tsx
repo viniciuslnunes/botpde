@@ -13,7 +13,7 @@ import type { MembroBuscaItem, SugestaoMembroBusca } from '@/lib/comunidade-busc
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import { MembroSugestaoCard } from './membro-sugestao-card'
 import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais-shared'
-import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
+import { labelCategoriaCanal, labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
 import type { PostSocialItem } from '@/lib/feed'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
@@ -243,14 +243,14 @@ export function BuscaMembrosClient({
             {resultado.canais.map((c) => (
               <Link
                 key={c.id}
-                href={c.canalOficial ? linkUnidadeComunidade(c.tenantId) : linkCanalComunidade(c.id)}
+                href={linkCanalComunidade(c.id)}
                 className="block rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
               >
                 <p className="font-semibold text-[rgb(var(--foreground))]">{c.nome ?? 'Canal'}</p>
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">
                   {/* Canal oficial de unidade Caso B tem o nome da própria torcida. */}
                   {nomesEquivalentes(c.nome, c.tenantNome) ? null : `${c.tenantNome} · `}
-                  {c.canalOficial ? 'Oficial' : 'Temático'}
+                  {labelCategoriaCanal(c)}
                 </p>
               </Link>
             ))}

@@ -54,6 +54,7 @@ export function ComunidadeFeedInfinite({
   conversaId,
   escopo,
   afiliacaoId,
+  incluirFeedInterno = false,
   initialPosts,
   initialPageInfo,
   initialCursor,
@@ -67,6 +68,8 @@ export function ComunidadeFeedInfinite({
   conversaId?: string
   escopo?: EscopoComunidade
   afiliacaoId?: string
+  /** Minha torcida/unidade: pede `feedInterno=1` na API. Soft-switch omite. */
+  incluirFeedInterno?: boolean
   initialPosts: PostSocialItem[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -105,6 +108,7 @@ export function ComunidadeFeedInfinite({
     conversaId,
     escopo,
     afiliacaoId,
+    feedInterno: incluirFeedInterno,
     initialPosts,
     initialPageInfo,
     initialCursor,

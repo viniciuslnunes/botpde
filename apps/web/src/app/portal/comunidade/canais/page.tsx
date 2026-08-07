@@ -2,12 +2,14 @@ import { redirect } from 'next/navigation'
 import { Radio } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comunidade-contexto'
 import {
   listCanaisVisiveis,
   listCanaisPublicosPorAfiliacao,
   ensureCanaisOficiaisHierarquia,
 } from '@/lib/canais'
+import { lerCanalFocoId } from '@/lib/comunidade-canal-foco-cookie'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import {
@@ -74,20 +76,30 @@ export default async function CanaisPage({
     hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
     hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
 
-  const canais = await listCanaisVisiveis(tenant.id, session.user.id)
+  const superAdmin = isSuperAdminEmail(session.user.email)
+
+  let canais = await listCanaisVisiveis(tenant.id, session.user.id, {
+    leituraSuperAdmin: superAdmin,
+  })
+  // Caso A em foco (ex.: PDE Presidente Prudente): canais de depto são da
+  // Sede/torcida — não misturar na listagem da unidade selecionada.
+  if (await lerCanalFocoId()) {
+    canais = canais.filter((c) => !c.ehCanalDepartamento)
+  }
 
   return (
     <div className="space-y-5">
       <ComunidadePageHeader
         icon={Radio}
         titulo="Canais"
-        subtitulo="Unidades oficiais e comunidades temáticas — busque, filtre e ordene por proximidade"
+        subtitulo="Unidades oficiais, departamentos e comunidades temáticas — busque, filtre e ordene por proximidade"
       />
 
       <CanaisClient
         canais={canais}
         podeCriarCanal={podeCriarCanal}
         tenantAtualId={tenant.id}
+        leituraSuperAdmin={superAdmin}
       />
     </div>
   )

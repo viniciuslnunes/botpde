@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import {
+  getCanalOficialDaSede,
+  getCanalLeituraDireta,
   getCanalPorId,
   getPostsDoCanal,
   podePublicarNoCanal,
@@ -20,6 +22,14 @@ import {
   carregarCanaisAbertosOperador,
   lerSlugsCanaisAbertosOperador,
 } from '@/lib/operador-canais-abertos'
+import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
+import {
+  idsCanaisHierarquiaFixosNaBarra,
+  ordemArrastavelSemFixos,
+  slugsHierarquiaFixos,
+  temUnidadeFixaOperador,
+} from '@/lib/operador-canais-ordem'
+import { resolverOrdemBarraMovel } from '@/lib/comunidade-barra-movel-cookie'
 import { getComposerContext } from '../../_components/composer-context'
 import { ComunidadeFeedShell } from '../../_components/comunidade-feed-shell'
 import {
@@ -55,50 +65,95 @@ export default async function CanalDetalhePage({
 
   const viewerTenantId = torcidaReal.id
   const superAdmin = isSuperAdminEmail(session.user.email)
+  const operador = ctx.modo === 'torcida' && Boolean(ctx.operador)
 
-  const [permsRaw, canal, idsTematicos, slugsOperador] = await Promise.all([
+  const [permsRaw, canal, idsVisitados, slugsOperador] = await Promise.all([
     getUserPermissionsInTenant(session.user.id, viewerTenantId),
-    getCanalPorId(id, viewerTenantId, session.user.id),
-    superAdmin ? Promise.resolve([] as string[]) : lerIdsCanaisAbertosSocio(),
+    superAdmin || operador
+      ? getCanalLeituraDireta(id, session.user.id)
+      : getCanalPorId(id, viewerTenantId, session.user.id),
+    lerIdsCanaisAbertosSocio(),
     superAdmin ? lerSlugsCanaisAbertosOperador() : Promise.resolve([] as string[]),
   ])
   if (!canal) notFound()
 
   const permissoes = calculateEffectivePermissions(permsRaw.rolePermissions, permsRaw.overrides)
 
-  const [podePublicarGate, ehSocio, canaisTematicosAbertos, canaisAbertos, chromeFlags, composerCtx, tenantRow] =
+  const atualSlug = ctx.modo === 'torcida' ? ctx.tenant.slug : null
+  const slugTorcida = torcidaReal.slug ?? null
+  const slugUnidade = ctx.unidade?.tenantSlug ?? null
+
+  const oficialSedeEarly = await getCanalOficialDaSede(torcidaReal.id, session.user.id, {
+    leituraOperador: superAdmin || operador,
+  })
+  const idsHierarquiaFixos = idsCanaisHierarquiaFixosNaBarra({
+    canalIdTorcida: oficialSedeEarly?.id ?? null,
+    canalIdUnidade: ctx.unidade?.canalId ?? null,
+    superAdmin,
+    temEscopoUnidade: Boolean(ctx.escopos.unidade),
+    slugUnidade,
+    atualSlug,
+  })
+
+  const [podePublicarGate, ehSocio, canaisVisitados, canaisAbertos, chromeFlags, composerCtx, tenantRow] =
     await Promise.all([
       podePublicarNoCanal(canal, viewerTenantId, permissoes),
       podeVerFeedSocios(session.user.id, viewerTenantId),
+      carregarCanaisAbertosSocio(
+        idsVisitados,
+        session.user.id,
+        viewerTenantId,
+        idsHierarquiaFixos,
+        { leituraOperador: superAdmin || operador },
+      ),
       superAdmin
-        ? Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>)
-        : carregarCanaisAbertosSocio(idsTematicos, session.user.id, viewerTenantId),
-      superAdmin
-        ? carregarCanaisAbertosOperador(slugsOperador)
+        ? (async () => {
+            const lineage = await getTorcidaLineageTenantIds(torcidaReal.id)
+            return carregarCanaisAbertosOperador(slugsOperador, {
+              excluirTenantIds: lineage,
+            })
+          })()
         : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
       resolverChromeCanalMural(canal, viewerTenantId, permissoes),
       getComposerContext(viewerTenantId, session.user.id, session.user.name ?? null),
       db.tenant.findUnique({ where: { id: viewerTenantId }, select: { nome: true } }),
     ])
 
-  const podePublicar = ehSocio && podePublicarGate
+  const podePublicar = !superAdmin && !operador && ehSocio && podePublicarGate
 
-  const tematicosNaBarra =
-    !superAdmin && !canal.canalOficial
-      ? (() => {
-          if (canaisTematicosAbertos.some((c) => c.id === canal.id)) {
-            return canaisTematicosAbertos
-          }
-          return [
-            ...canaisTematicosAbertos,
-            {
-              id: canal.id,
-              nome: canal.nome?.trim() || 'Canal',
-              avatarUrl: canal.avatarUrl,
-            },
-          ]
-        })()
-      : canaisTematicosAbertos
+  const ehHierarquiaFixa = idsHierarquiaFixos.includes(canal.id)
+  const tematicosNaBarra = !ehHierarquiaFixa
+    ? (() => {
+        if (canaisVisitados.some((c) => c.id === canal.id)) return canaisVisitados
+        return [
+          ...canaisVisitados,
+          {
+            id: canal.id,
+            nome: canal.nome?.trim() || 'Canal',
+            avatarUrl: canal.avatarUrl,
+          },
+        ]
+      })()
+    : canaisVisitados
+
+  const slugsFixosBarra = slugsHierarquiaFixos({
+    slugTorcida,
+    slugUnidade,
+    temTorcida: Boolean(slugTorcida),
+    temUnidade: temUnidadeFixaOperador({
+      superAdmin,
+      temEscopoUnidade: Boolean(ctx.escopos.unidade),
+      slugUnidade,
+      atualSlug,
+    }),
+  })
+  const ordemBarraMovelInicial = await resolverOrdemBarraMovel({
+    slugsOperador: ordemArrastavelSemFixos(
+      canaisAbertos.map((c) => c.slug),
+      slugsFixosBarra,
+    ),
+    idsTematicos: tematicosNaBarra.map((c) => c.id),
+  })
 
   const currentUser = {
     id: session.user.id,
@@ -106,17 +161,16 @@ export default async function CanalDetalhePage({
     avatarUrl,
   }
 
-  const atualSlug = ctx.modo === 'torcida' ? ctx.tenant.slug : null
-  const slugTorcida = torcidaReal.slug ?? null
-  const slugUnidade = ctx.unidade?.tenantSlug ?? null
-
-  const [feed, salvoIds] = canal.souMembro
+  // Listagem / soft-switch: só posts do `conversaId`. Feed interno ("Só
+  // torcida") fica nas abas Minha torcida/unidade — senão PDE Caso A no
+  // tenant da Sede repete o mural da mãe em Taubaté, PP, etc.
+  const [feed, salvoIds] = canal.souMembro || operador || superAdmin
     ? await Promise.all([
         getPostsDoCanal(canal.id, viewerTenantId, session.user.id, {
           cursor,
           take: 20,
-          incluirFeedInterno: canal.canalOficial,
-          viewerTenantId,
+          incluirFeedInterno: false,
+          leituraOperador: operador || superAdmin,
         }),
         getPostIdsSalvos(session.user.id, viewerTenantId),
       ])
@@ -129,7 +183,7 @@ export default async function CanalDetalhePage({
     chrome: {
       canal,
       podePublicar,
-      podeCompartilhar: ehSocio,
+      podeCompartilhar: !superAdmin && !operador && ehSocio,
       ...chromeFlags,
     },
     currentUser,
@@ -165,10 +219,22 @@ export default async function CanalDetalhePage({
           slugTorcida={slugTorcida}
           slugUnidade={slugUnidade}
           atualSlug={atualSlug}
+          canalIdTorcida={oficialSedeEarly?.id ?? null}
+          canalIdUnidade={
+            temUnidadeFixaOperador({
+              superAdmin,
+              temEscopoUnidade: Boolean(ctx.escopos.unidade),
+              slugUnidade,
+              atualSlug,
+            })
+              ? (ctx.unidade?.canalId ?? null)
+              : null
+          }
           superAdmin={superAdmin}
           canaisAbertos={canaisAbertos}
           canaisTematicosAbertos={tematicosNaBarra}
-          canalAtivoId={!canal.canalOficial ? canal.id : null}
+          ordemBarraMovelInicial={ordemBarraMovelInicial}
+          canalAtivoId={canal.id}
           renderConteudoCanal={({ busca }) => <CanalSoftMuralHost buscaChrome={busca} />}
         />
       </div>

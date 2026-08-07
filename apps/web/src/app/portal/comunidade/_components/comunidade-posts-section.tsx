@@ -96,6 +96,7 @@ export async function ComunidadePostsSection({
         filtro={filtro}
         conversaId={conversaId}
         escopo="torcida"
+        incluirFeedInterno={incluirFeedInterno}
         initialPosts={feed.posts}
         initialPageInfo={feed.pageInfo}
         initialCursor={cursor ?? null}

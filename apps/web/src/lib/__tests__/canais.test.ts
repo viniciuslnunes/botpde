@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   decidePodeVerCanal,
+  deveTrocarTenantAoAbrirCanal,
+  canalOficialTemPortalProprio,
   isConversaGrupoLike,
+  labelCategoriaCanal,
   labelTipoUnidade,
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
@@ -139,5 +142,88 @@ describe('orPostsDoMuralCanal', () => {
     expect(where.AND).toHaveLength(2)
     expect(where.AND[0]).toEqual({ OR: orPostsDoMuralCanal(CANAL, TENANT) })
     expect(where.AND[1]).toBe(cursorWhere)
+  })
+})
+
+describe('deveTrocarTenantAoAbrirCanal', () => {
+  it('só troca em canal oficial com slug diferente do atual', () => {
+    expect(
+      deveTrocarTenantAoAbrirCanal({
+        canalOficial: false,
+        slugAlvo: 'pde-taubate',
+        slugAtual: 'subsede-rio-claro',
+      }),
+    ).toBe(false)
+    expect(
+      deveTrocarTenantAoAbrirCanal({
+        canalOficial: true,
+        slugAlvo: null,
+        slugAtual: 'subsede-rio-claro',
+      }),
+    ).toBe(false)
+    expect(
+      deveTrocarTenantAoAbrirCanal({
+        canalOficial: true,
+        slugAlvo: 'subsede-rio-claro',
+        slugAtual: 'subsede-rio-claro',
+      }),
+    ).toBe(false)
+    expect(
+      deveTrocarTenantAoAbrirCanal({
+        canalOficial: true,
+        slugAlvo: 'pde-taubate',
+        slugAtual: 'subsede-rio-claro',
+      }),
+    ).toBe(true)
+    expect(
+      deveTrocarTenantAoAbrirCanal({
+        canalOficial: true,
+        slugAlvo: 'pde-taubate',
+        slugAtual: null,
+      }),
+    ).toBe(true)
+  })
+})
+
+describe('canalOficialTemPortalProprio', () => {
+  const raiz = 'tenant-gavioes'
+  const pde = 'tenant-rio-claro'
+
+  it('Sede raiz e Caso B têm portal; Caso A (PDE na mãe) não', () => {
+    expect(
+      canalOficialTemPortalProprio({
+        tipoSede: 'SEDE',
+        tenantIdUnidade: raiz,
+        tenantIdRaiz: raiz,
+      }),
+    ).toBe(true)
+    expect(
+      canalOficialTemPortalProprio({
+        tipoSede: 'SUBSEDE',
+        tenantIdUnidade: pde,
+        tenantIdRaiz: raiz,
+      }),
+    ).toBe(true)
+    expect(
+      canalOficialTemPortalProprio({
+        tipoSede: 'PONTO_ENCONTRO',
+        tenantIdUnidade: raiz,
+        tenantIdRaiz: raiz,
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('labelCategoriaCanal', () => {
+  it('distingue oficial, departamento e temático', () => {
+    expect(labelCategoriaCanal({ canalOficial: true, ehCanalDepartamento: false })).toBe(
+      'Oficial',
+    )
+    expect(labelCategoriaCanal({ canalOficial: false, ehCanalDepartamento: true })).toBe(
+      'Departamento',
+    )
+    expect(labelCategoriaCanal({ canalOficial: false, ehCanalDepartamento: false })).toBe(
+      'Temático',
+    )
   })
 })

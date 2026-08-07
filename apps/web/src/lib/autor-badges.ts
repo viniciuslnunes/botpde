@@ -6,7 +6,16 @@ import type { PostSocialItem } from './feed'
 
 export type TorcidaRealAutor = { tenantId: string; tenantNome: string }
 
-export { formatAutorCargoBadge } from './autor-badges-format'
+export {
+  formatAutorCargoBadge,
+  formatCargoComNumeroSocio,
+  parseNumeroAssociado,
+} from './autor-badges-format'
+import {
+  formatAutorCargoBadge,
+  formatCargoComNumeroSocio,
+  parseNumeroAssociado,
+} from './autor-badges-format'
 
 export interface AutorBadge {
   sedeNome: string | null
@@ -104,7 +113,7 @@ export async function getBadgesPorAutorTenant(
       const map = await carregarBadgesPorAutorTenant(unicos)
       return [...map.entries()]
     },
-    ['autor-badges-feed', cacheKey],
+    ['autor-badges-feed-v2', cacheKey],
     {
       revalidate: 120,
       tags: [...new Set(unicos.map((p) => tagAutorBadgesTenant(p.tenantId)))],
@@ -153,11 +162,12 @@ async function carregarBadgesPorAutorTenant(
     if (raiz) tipoSedeRaizMap.set(tenantId, raiz.tipo)
   }
 
-  const [membros, roles, memberships]: [
+  const [membros, roles, memberships, carteirinhas, perfis]: [
     Array<{
       userId: string
       tenantId: string
       tipo: 'SOCIO' | 'TORCEDOR'
+      numeroAssociado: string | null
       sede: { nome: string; tipo: TipoSede } | null
       departamento: { nome: string } | null
     }>,
@@ -176,6 +186,8 @@ async function carregarBadgesPorAutorTenant(
       tenantId: string
       departamento: { nome: string }
     }>,
+    Array<{ userId: string; tenantId: string; numeroSocio: number }>,
+    Array<{ userId: string; tenantId: string; exibirNumeroSocioNoFeed: boolean }>,
   ] = await Promise.all([
     db.saasMembro.findMany({
       where: { userId: { in: autorIds }, tenantId: { in: tenantIds }, status: 'APROVADO' },
@@ -183,6 +195,7 @@ async function carregarBadgesPorAutorTenant(
         userId: true,
         tenantId: true,
         tipo: true,
+        numeroAssociado: true,
         sede: { select: { nome: true, tipo: true } },
         departamento: { select: { nome: true } },
       },
@@ -211,10 +224,26 @@ async function carregarBadgesPorAutorTenant(
       },
       orderBy: { criadoEm: 'asc' },
     }),
+    db.saasSocio.findMany({
+      where: { userId: { in: autorIds }, tenantId: { in: tenantIds } },
+      select: { userId: true, tenantId: true, numeroSocio: true },
+    }),
+    db.perfilMembro.findMany({
+      where: { userId: { in: autorIds }, tenantId: { in: tenantIds } },
+      select: { userId: true, tenantId: true, exibirNumeroSocioNoFeed: true },
+    }),
   ])
+
+  const numeroPorChave = new Map(
+    carteirinhas.map((c) => [chave(c.userId, c.tenantId), c.numeroSocio]),
+  )
+  const exibirNumeroPorChave = new Map(
+    perfis.map((p) => [chave(p.userId, p.tenantId), p.exibirNumeroSocioNoFeed]),
+  )
 
   const map = new Map<string, AutorBadge>()
   for (const p of unicos) {
+    const k = chave(p.autorId, p.tenantId)
     const membro = membros.find((m) => m.userId === p.autorId && m.tenantId === p.tenantId)
     const rolesDoAutor = roles
       .filter((r) => r.userId === p.autorId && r.tenantId === p.tenantId)
@@ -249,7 +278,23 @@ async function carregarBadgesPorAutorTenant(
       cargoNome = 'Torcedor'
     }
 
-    map.set(chave(p.autorId, p.tenantId), {
+    // Combina cargo + área antes do Nº → "Membro · Bateria - Nº 1032"
+    // (em vez de "Membro - Nº 1032 · Bateria"). A UI reusa formatAutorCargoBadge
+    // e curto-circuita quando o cargo já contém a área.
+    const badgeBase = formatAutorCargoBadge(cargoNome, departamentoNome)
+
+    // Preferência ausente = default do schema (true): número visível no feed.
+    // Carteirinha (`SaasSocio`) manda; ficha (`numeroAssociado`) cobre sócio
+    // aprovado ainda sem emissão — comum em canais/unidades de seed.
+    const exibirNumero = exibirNumeroPorChave.get(k) ?? true
+    const numeroSocio =
+      numeroPorChave.get(k) ?? parseNumeroAssociado(membro?.numeroAssociado) ?? null
+    cargoNome = formatCargoComNumeroSocio(badgeBase, {
+      numeroSocio,
+      exibir: exibirNumero && membro?.tipo === 'SOCIO',
+    })
+
+    map.set(k, {
       sedeNome: membro?.sede?.nome ?? null,
       cargoNome,
       departamentoNome,
@@ -336,6 +381,23 @@ export async function resolverTorcidaRealPorAutor(
   return map
 }
 
+/**
+ * Quem ainda não é sócio de TO real não exibe torcida/unidade do convite —
+ * a identidade pública é a Comunidade Nacional do clube (ex.: "TIMÃO —
+ * COMUNIDADE NACIONAL"), até `SaasMembro.tipo === SOCIO`. Sócio no sintético
+ * sobe a torcida real (caminho inverso, já existente).
+ */
+export function deveMascararAutorComoComunidadeNacional(args: {
+  tipoPost: string
+  emTenantSintetico: boolean
+  ehSocioDeTorcidaReal: boolean
+}): boolean {
+  if (args.tipoPost !== 'MEMBRO') return false
+  if (args.ehSocioDeTorcidaReal) return false
+  // Já no sintético sem ser sócio: o nome do tenant já é a CN.
+  return !args.emTenantSintetico
+}
+
 export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
   if (posts.length === 0) return posts
 
@@ -346,33 +408,62 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
       select: { id: true, sintetico: true, afiliacaoId: true },
     })
 
-  const sinteticoPorTenant = new Map<string, string>()
-  for (const t of tenants) {
-    if (t.sintetico && t.afiliacaoId) sinteticoPorTenant.set(t.id, t.afiliacaoId)
+  const tenantMeta = new Map(tenants.map((t) => [t.id, t]))
+  const afiliacaoIds = [
+    ...new Set(tenants.map((t) => t.afiliacaoId).filter((id): id is string => id != null)),
+  ]
+
+  const sinteticosCn: Array<{ id: string; afiliacaoId: string | null; nome: string }> =
+    afiliacaoIds.length > 0
+      ? await db.tenant.findMany({
+          where: { afiliacaoId: { in: afiliacaoIds }, sintetico: true, ativo: true },
+          select: { id: true, afiliacaoId: true, nome: true },
+        })
+      : []
+  const sinteticoPorAfiliacao = new Map<string, { id: string; nome: string }>()
+  for (const s of sinteticosCn) {
+    if (s.afiliacaoId && !sinteticoPorAfiliacao.has(s.afiliacaoId)) {
+      sinteticoPorAfiliacao.set(s.afiliacaoId, {
+        id: s.id,
+        nome: formatNomeTorcida(s.nome),
+      })
+    }
   }
 
+  // Sócio de TO real no clube — tanto para subir badge no sintético quanto
+  // para NÃO mascarar posts MEMBRO que vivem na torcida (alcance nacional).
   const torcidaRealPorAutor = new Map<string, TorcidaRealAutor>()
-  if (sinteticoPorTenant.size > 0) {
-    const autoresSintetico = [
-      ...new Set(
-        posts.filter((p) => sinteticoPorTenant.has(p.tenantId)).map((p) => p.autorId),
-      ),
-    ]
-    const afiliacaoIds = [...new Set(sinteticoPorTenant.values())]
+  if (afiliacaoIds.length > 0) {
+    const autores = [...new Set(posts.map((p) => p.autorId))]
     await Promise.all(
       afiliacaoIds.map(async (afiliacaoId) => {
-        const map = await resolverTorcidaRealPorAutor(autoresSintetico, afiliacaoId)
-        for (const [autorId, torcida] of map) torcidaRealPorAutor.set(autorId, torcida)
+        const map = await resolverTorcidaRealPorAutor(autores, afiliacaoId)
+        for (const [autorId, torcida] of map) {
+          // Feed é por afiliação; em lote misto a 1ª vitória basta (raro).
+          if (!torcidaRealPorAutor.has(autorId)) torcidaRealPorAutor.set(autorId, torcida)
+        }
       }),
     )
   }
 
   const badges = await getBadgesPorAutorTenant([
     ...posts.map((p) => {
+      const meta = tenantMeta.get(p.tenantId)
       const real = torcidaRealPorAutor.get(p.autorId)
-      const tenantBadgeId =
-        sinteticoPorTenant.has(p.tenantId) && real ? real.tenantId : p.tenantId
-      return { autorId: p.autorId, tenantId: tenantBadgeId }
+      const emSintetico = meta?.sintetico === true
+      if (emSintetico && real) return { autorId: p.autorId, tenantId: real.tenantId }
+      if (
+        deveMascararAutorComoComunidadeNacional({
+          tipoPost: p.tipo,
+          emTenantSintetico: emSintetico,
+          ehSocioDeTorcidaReal: Boolean(real),
+        }) &&
+        meta?.afiliacaoId
+      ) {
+        const cn = sinteticoPorAfiliacao.get(meta.afiliacaoId)
+        if (cn) return { autorId: p.autorId, tenantId: cn.id }
+      }
+      return { autorId: p.autorId, tenantId: p.tenantId }
     }),
     ...posts.flatMap((p) => {
       const c = p.comunicadoOrigem
@@ -382,9 +473,21 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
   ])
 
   return posts.map((p) => {
+    const meta = tenantMeta.get(p.tenantId)
     const real = torcidaRealPorAutor.get(p.autorId)
-    const emSintetico = sinteticoPorTenant.has(p.tenantId)
-    const tenantBadgeId = emSintetico && real ? real.tenantId : p.tenantId
+    const emSintetico = meta?.sintetico === true
+    const mascararCn = deveMascararAutorComoComunidadeNacional({
+      tipoPost: p.tipo,
+      emTenantSintetico: emSintetico,
+      ehSocioDeTorcidaReal: Boolean(real),
+    })
+    const cn =
+      mascararCn && meta?.afiliacaoId
+        ? sinteticoPorAfiliacao.get(meta.afiliacaoId)
+        : undefined
+
+    const tenantBadgeId =
+      emSintetico && real ? real.tenantId : cn ? cn.id : p.tenantId
     const b = badges.get(chave(p.autorId, tenantBadgeId))
 
     const comunicado = p.comunicadoOrigem
@@ -395,14 +498,21 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
 
     const base = {
       ...p,
-      autor: b
+      autor: mascararCn
         ? {
             ...p.autor,
-            sedeNome: b.sedeNome,
-            cargoNome: b.cargoNome,
-            departamentoNome: b.departamentoNome,
+            sedeNome: null,
+            cargoNome: null,
+            departamentoNome: null,
           }
-        : p.autor,
+        : b
+          ? {
+              ...p.autor,
+              sedeNome: b.sedeNome,
+              cargoNome: b.cargoNome,
+              departamentoNome: b.departamentoNome,
+            }
+          : p.autor,
       comunicadoOrigem:
         comunicado && badgeComunicado
           ? {
@@ -415,6 +525,9 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
 
     if (emSintetico && real) {
       return { ...base, tenant: { nome: real.tenantNome, logoUrl: base.tenant.logoUrl } }
+    }
+    if (cn) {
+      return { ...base, tenant: { nome: cn.nome, logoUrl: base.tenant.logoUrl } }
     }
     return base
   })

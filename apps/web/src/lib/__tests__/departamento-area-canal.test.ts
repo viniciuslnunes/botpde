@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   deveListarCanalDepartamentoNaComunidade,
+  deveManterCanalDeptoNoInbox,
+  filtrarLiderancaOperadorPlataforma,
   nomeCanalArea,
   rosterCanalArea,
   rosterCanalDepartamento,
@@ -63,6 +65,17 @@ describe('rosterCanalDepartamento / rosterCanalArea', () => {
     expect(roster.get('u2')).toBe('ADMIN')
   })
 
+  it('liderança do tenant (owner/vice/admin) entra ADMIN em todo depto', () => {
+    const roster = rosterCanalDepartamento({
+      membros: ['u1'],
+      gestores: ['g1'],
+      lideranca: ['owner1', 'u1'],
+    })
+    expect(roster.get('u1')).toBe('ADMIN')
+    expect(roster.get('g1')).toBe('ADMIN')
+    expect(roster.get('owner1')).toBe('ADMIN')
+  })
+
   it('área inclui gestores do departamento pai como ADMIN', () => {
     const roster = rosterCanalArea({
       membrosArea: ['u1'],
@@ -72,13 +85,70 @@ describe('rosterCanalDepartamento / rosterCanalArea', () => {
     expect(roster.get('g1')).toBe('ADMIN')
   })
 
+  it('área também recebe liderança do tenant como ADMIN', () => {
+    const roster = rosterCanalArea({
+      membrosArea: ['u1'],
+      gestoresDepartamento: ['g1'],
+      lideranca: ['vice1'],
+    })
+    expect(roster.get('vice1')).toBe('ADMIN')
+  })
+
   it('nome canônico da frente', () => {
     expect(nomeCanalArea('Social e eventos', 'Agasalho')).toBe('Social e eventos · Agasalho')
   })
 })
 
+describe('filtrarLiderancaOperadorPlataforma', () => {
+  it('mantém liderança comum e dual-hat; remove SA sem vínculo local', () => {
+    expect(
+      filtrarLiderancaOperadorPlataforma({
+        liderancaIds: ['pres', 'sa-operador', 'sa-presidente'],
+        superAdminUserIds: ['sa-operador', 'sa-presidente'],
+        userIdsComVinculoLocal: ['sa-presidente'],
+      }),
+    ).toEqual(['pres', 'sa-presidente'])
+  })
+
+  it('sem allowlist SA, devolve liderança intacta (dedup)', () => {
+    expect(
+      filtrarLiderancaOperadorPlataforma({
+        liderancaIds: ['a', 'a', 'b'],
+        superAdminUserIds: [],
+        userIdsComVinculoLocal: [],
+      }),
+    ).toEqual(['a', 'b'])
+  })
+})
+
+describe('deveManterCanalDeptoNoInbox', () => {
+  it('conversa comum sempre; depto/área só com vínculo local no tenant', () => {
+    expect(
+      deveManterCanalDeptoNoInbox({
+        ehCanalDepartamentoOuArea: false,
+        tenantIdCanal: 'u1',
+        tenantIdsComVinculoLocal: [],
+      }),
+    ).toBe(true)
+    expect(
+      deveManterCanalDeptoNoInbox({
+        ehCanalDepartamentoOuArea: true,
+        tenantIdCanal: 'visitada',
+        tenantIdsComVinculoLocal: new Set(['casa']),
+      }),
+    ).toBe(false)
+    expect(
+      deveManterCanalDeptoNoInbox({
+        ehCanalDepartamentoOuArea: true,
+        tenantIdCanal: 'casa',
+        tenantIdsComVinculoLocal: new Set(['casa']),
+      }),
+    ).toBe(true)
+  })
+})
+
 describe('deveListarCanalDepartamentoNaComunidade', () => {
-  it('canal comum sempre lista; depto/área só se membro ativo', () => {
+  it('canal comum sempre lista; depto/área só se membro ativo no tenant dono', () => {
     expect(
       deveListarCanalDepartamentoNaComunidade({
         ehCanalDepartamentoOuArea: false,
@@ -97,5 +167,39 @@ describe('deveListarCanalDepartamentoNaComunidade', () => {
         souMembroAtivo: true,
       }),
     ).toBe(true)
+    expect(
+      deveListarCanalDepartamentoNaComunidade({
+        ehCanalDepartamentoOuArea: true,
+        souMembroAtivo: true,
+        tenantIdCanal: 'gavioes',
+        viewerTenantId: 'gavioes',
+      }),
+    ).toBe(true)
+    expect(
+      deveListarCanalDepartamentoNaComunidade({
+        ehCanalDepartamentoOuArea: true,
+        souMembroAtivo: true,
+        tenantIdCanal: 'gavioes',
+        viewerTenantId: 'pde-prudente',
+      }),
+    ).toBe(false)
+    expect(
+      deveListarCanalDepartamentoNaComunidade({
+        ehCanalDepartamentoOuArea: true,
+        souMembroAtivo: false,
+        tenantIdCanal: 'gavioes',
+        viewerTenantId: 'gavioes',
+        leituraSuperAdmin: true,
+      }),
+    ).toBe(true)
+    expect(
+      deveListarCanalDepartamentoNaComunidade({
+        ehCanalDepartamentoOuArea: true,
+        souMembroAtivo: false,
+        tenantIdCanal: 'gavioes',
+        viewerTenantId: 'outra',
+        leituraSuperAdmin: true,
+      }),
+    ).toBe(false)
   })
 })

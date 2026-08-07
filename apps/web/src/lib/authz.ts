@@ -610,8 +610,9 @@ export async function resolveAfiliacaoComunidadeDoUsuario(
 
 /**
  * Sessão + afiliação + tenant sintético (container operacional) da
- * Comunidade Nacional do clube do usuário. Único critério de acesso: ter um
- * clube resolvível via `resolveAfiliacaoComunidadeDoUsuario` — a CN não tem
+ * Comunidade Nacional do clube do usuário. Critério: clube resolvível via
+ * `resolveAfiliacaoComunidadeDoUsuario`; super-admin usa o clube do portal
+ * ativo (modo operador pode diferir do perfil pessoal). A CN não tem
  * `SaasMembro`/cargos próprios.
  */
 export async function assertComunidadeNacional(): Promise<AuthzComunidadeNacional> {
@@ -620,9 +621,11 @@ export async function assertComunidadeNacional(): Promise<AuthzComunidadeNaciona
 
   let afiliacaoId = await resolveAfiliacaoComunidadeDoUsuario(session.user.id, session.user.email)
 
-  if (!afiliacaoId && isSuperAdminEmail(session.user.email)) {
+  // Operador: portal ativo manda (pode ser outro clube que o do perfil).
+  // Sem portal/afiliação no tenant, cai no clube pessoal se houver.
+  if (isSuperAdminEmail(session.user.email)) {
     const tenant = await resolvePortalTenant(session)
-    afiliacaoId = tenant?.afiliacaoId ?? null
+    if (tenant?.afiliacaoId) afiliacaoId = tenant.afiliacaoId
   }
 
   if (!afiliacaoId) {

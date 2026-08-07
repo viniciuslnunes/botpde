@@ -49,6 +49,9 @@ eventos esportivos por até **5 anos**. Fonte: Lei 14.597/2023.
 
 → Implicação: moderação de conteúdo na Comunidade não é opcional — conteúdo
 de incitação publicado em nome da torcida gera risco jurídico real ao tenant.
+Por isso feed/canais permanecem legíveis no servidor (Fase A); E2EE que cegue
+a plataforma conflita com esse dever prático — ver
+`docs/data/plano-criptografia-e-moderacao.md` e `ARCHITECTURE.md` §5.23.
 
 ### Cadastro Nacional de Torcedores Impedidos (art. 181)
 

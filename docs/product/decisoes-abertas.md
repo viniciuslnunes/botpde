@@ -14,6 +14,7 @@
 | 9 | Campos obrigatórios da LGE no cadastro de membro | **Fechado 2026-07-16** — campos RG, CPF, filiação, escolaridade, profissão, data de nascimento em `SaasMembro`; edição admin em `/admin/membros/[id]`; export CSV com `MEMBERS_EXPORT_LGE` |
 | 10 | Permissão dedicada de desligamento estatutário | **Fechado 2026-07-16** — `MEMBERS_DISMISS` + `desligadoEm`/`desligadoMotivo`/`desligadoPorId` em `SaasMembro` |
 | 14 | Provedor de gateway (Pix/boleto/cartão) | **Fechado 2026-07-16 (MVP Pix)** — mock default (`PIX_GATEWAY_MODE=mock`); Mercado Pago Pix opcional via `PIX_GATEWAY_MODE=mercadopago` + `MERCADOPAGO_ACCESS_TOKEN`. Ver `docs/data/modulo-associacao.md` |
+| 15 | E2EE em conversas/canais vs moderação de conteúdo grave | **Fechado 2026-08-07 — Fase A**: plaintext + ACL + denúncia/filas; sem E2EE prometido. Feed/canais fora de E2EE; DM candidata só em fases B (envelope+escrow) / C (E2EE com moderação sem plaintext). Ver `docs/data/plano-criptografia-e-moderacao.md` e `ARCHITECTURE.md` §5.23 |
 
 ## Ainda em aberto
 

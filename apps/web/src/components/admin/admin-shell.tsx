@@ -296,8 +296,15 @@ export function AdminShell({
             immersivePdv ? 'h-full overflow-hidden' : 'overflow-auto',
           ].join(' ')}
         >
-          {!immersivePdv ? operatorBanner : null}
-          {children}
+          {/* Fragment único evita lista de irmãos sem key (banner vem do Server Layout). */}
+          {immersivePdv ? (
+            children
+          ) : (
+            <>
+              {operatorBanner}
+              {children}
+            </>
+          )}
         </main>
       </div>
     </div>

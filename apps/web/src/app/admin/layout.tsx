@@ -142,7 +142,12 @@ export default async function AdminLayout({
       notifications={notifications}
       operatorBanner={
         isSuperAdmin ? (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200 sm:px-6">
+          // key: AdminShell re-parenta este nó ao lado de `children` no <main>;
+          // sem key o React 19 avisa (elemento criado no Server Layout).
+          <div
+            key="operator-banner"
+            className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200 sm:px-6"
+          >
             Modo operador — gerenciando <strong>{tenant.nome}</strong>. Dados confidenciais
             ficam isolados por torcida
             <span className="hidden sm:inline">; troque no seletor ao lado</span>
@@ -151,7 +156,7 @@ export default async function AdminLayout({
         ) : null
       }
     >
-      <AdminMotionShell>
+      <AdminMotionShell key="admin-main">
         <AdminRouteTransition>{children}</AdminRouteTransition>
       </AdminMotionShell>
     </AdminShell>

@@ -3378,6 +3378,9 @@ model PerfilMembro {
 
   exibirDesde  Boolean @default(true)  @map("exibir_desde")
 
+  /// No feed: badge "Sócio/Membro - Nº N". Default true (número visível); o sócio desliga em Sobre.
+  exibirNumeroSocioNoFeed Boolean @default(true) @map("exibir_numero_socio_no_feed")
+
 
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

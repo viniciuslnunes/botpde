@@ -146,13 +146,16 @@ export function MensagensShell({
           : 'h-[calc(100dvh-8.5rem)] min-h-[22rem] rounded-2xl border border-[rgb(var(--border))] sm:min-h-[24rem]',
       ].join(' ')}
     >
-      {/* Coluna: inbox */}
+      {/* Coluna: inbox — classes de display exclusivas (nunca flex+hidden juntos). */}
       <div
         className={[
           embedded ? 'w-full' : 'w-full md:w-80 md:shrink-0',
           'flex-col border-r border-[rgb(var(--border))]',
-          embedded ? 'flex' : 'md:flex',
-          selecionada ? (embedded ? 'hidden' : 'hidden md:flex') : 'flex',
+          selecionada
+            ? embedded
+              ? 'hidden'
+              : 'hidden md:flex'
+            : 'flex',
         ].join(' ')}
       >
         <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
@@ -284,11 +287,10 @@ export function MensagensShell({
         </div>
       </div>
 
-      {/* Coluna: thread */}
+      {/* Coluna: thread — display exclusivo; min-h-0 para o h-full da thread. */}
       <div
         className={[
-          'min-w-0 flex-1 flex-col',
-          embedded ? 'flex' : 'md:flex',
+          'min-h-0 min-w-0 flex-1 flex-col',
           selecionada ? 'flex' : embedded ? 'hidden' : 'hidden md:flex',
         ].join(' ')}
       >

@@ -415,7 +415,8 @@ function SedeCard({
         className={[
           // Sem `overflow-hidden`: o menu `SedeAcoesMenu` (absolute) precisa
           // ultrapassar a borda do card. O thumb já faz o clip da imagem.
-          'group relative z-0 rounded-2xl border transition-colors focus-within:z-20 has-[[aria-expanded=true]]:z-20',
+          // z-30 > StickyPersistBar (portal z-20) quando o menu está aberto.
+          'group relative z-0 rounded-2xl border transition-colors focus-within:z-30 has-[[aria-expanded=true]]:z-30',
           sede.ativa
             ? 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.4)]'
             : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-75',

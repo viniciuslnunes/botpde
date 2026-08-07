@@ -10,6 +10,7 @@ import {
   fecharCanalOperador,
   reordenarCanaisOperador,
 } from '@/lib/operador-canais-abertos'
+import { limparMarcaCanalFoco } from '@/lib/comunidade-canal-foco-cookie'
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -80,6 +81,8 @@ export async function trocarTorcidaAction(
 
   await setTenantContextSlug(slug)
 
+  await limparMarcaCanalFoco()
+
   if (destino === 'admin') redirect('/admin')
   if (escopo && escopo !== 'nacional') {
     redirect(`/portal/comunidade?escopo=${escopo}`)
@@ -107,17 +110,28 @@ export async function fecharCanalOperadorAction(
   const slug = String(formData.get('slug') ?? '').trim()
   const atualSlug = String(formData.get('atualSlug') ?? '').trim() || null
   const fallbackSlug = String(formData.get('fallbackSlug') ?? '').trim() || null
+  const canalAtivoSlug = String(formData.get('canalAtivoSlug') ?? '').trim() || null
   if (!slug) return { message: 'Canal inválido.' }
 
   const restantes = await fecharCanalOperador(slug)
+  const { sincronizarBarraMovelCookie } = await import('@/lib/comunidade-barra-movel-cookie')
+  const { lerIdsCanaisAbertosSocio } = await import('@/lib/socio-canais-abertos')
+  await sincronizarBarraMovelCookie({
+    slugsOperador: restantes,
+    idsTematicos: await lerIdsCanaisAbertosSocio(),
+  })
 
-  if (atualSlug && atualSlug === slug) {
-    const proximo = restantes[0] ?? fallbackSlug
-    if (proximo) {
+  const fechandoAtivo =
+    (atualSlug != null && atualSlug === slug) ||
+    (canalAtivoSlug != null && canalAtivoSlug === slug)
+
+  if (fechandoAtivo) {
+    const proximo = restantes.filter((s) => s !== slug)[0] ?? fallbackSlug
+    if (proximo && proximo !== slug) {
       await setTenantContextSlug(proximo)
       redirect('/portal/comunidade')
     }
-    redirect('/portal/comunidade?escopo=nacional')
+    redirect('/portal/comunidade/canais')
   }
 
   redirect('/portal/comunidade')
@@ -135,11 +149,18 @@ export async function registrarCanalAbertoAction(slug: string): Promise<void> {
   })
   if (!tenant) return
   await abrirCanalOperador(tenant.slug)
+  const { sincronizarBarraMovelCookie } = await import('@/lib/comunidade-barra-movel-cookie')
+  const { lerSlugsCanaisAbertosOperador } = await import('@/lib/operador-canais-abertos')
+  const { lerIdsCanaisAbertosSocio } = await import('@/lib/socio-canais-abertos')
+  await sincronizarBarraMovelCookie({
+    slugsOperador: await lerSlugsCanaisAbertosOperador(),
+    idsTematicos: await lerIdsCanaisAbertosSocio(),
+  })
 }
 
 /**
  * Persiste a ordem dos canais abertos (drag na barra).
- * `ordem` deve ser permutação exata dos slugs já abertos.
+ * Aceita subconjunto visível (UI pode omitir lineage / incluir canal efêmero).
  */
 export async function reordenarCanaisOperadorAction(
   ordem: string[],

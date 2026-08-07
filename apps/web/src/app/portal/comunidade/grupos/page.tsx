@@ -3,6 +3,7 @@ import { Users } from 'lucide-react'
 import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comunidade-contexto'
+import { lerMarcaCanalFoco } from '@/lib/comunidade-canal-foco-cookie'
 import { getGruposDoTenant } from '@/lib/feed'
 import { GruposClient } from './grupos-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
@@ -45,14 +46,19 @@ export default async function GruposPage({
   if (ctx.modo !== 'torcida') redirect('/portal/comunidade/grupos?escopo=nacional')
 
   const tenant = ctx.tenant
-  const grupos = await getGruposDoTenant(tenant.id, session.user.id)
+  const [grupos, marcaFoco] = await Promise.all([
+    getGruposDoTenant(tenant.id, session.user.id),
+    lerMarcaCanalFoco(),
+  ])
+  // Caso A: subtítulo segue o canal em foco (PDE), não o nome da Sede na sessão.
+  const nomeContexto = marcaFoco?.nome ?? formatNomeTorcida(tenant.nome)
 
   return (
     <div className="space-y-5">
       <ComunidadePageHeader
         icon={Users}
         titulo="Grupos"
-        subtitulo={`Comunidades temáticas da ${formatNomeTorcida(tenant.nome)}`}
+        subtitulo={`Comunidades temáticas da ${nomeContexto}`}
       />
 
       <GruposClient gruposIniciais={grupos} />

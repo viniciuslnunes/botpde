@@ -3,14 +3,78 @@
  *
  * Idempotente. `criadoPorId` só satisfaz a FK da Conversa (owner → admin →
  * sócio → fallback). Roster:
- *   - dept: UserDepartamento + DepartamentoGestor (ADMIN)
- *   - área: DepartamentoAreaMembro + gestores do dept pai (ADMIN)
+ *   - dept: UserDepartamento + DepartamentoGestor (ADMIN) + liderança
+ *     (owner/admin/vice do tenant → ADMIN em todos os deptos)
+ *   - área: DepartamentoAreaMembro + gestores do dept pai (ADMIN) + liderança
  */
 import {
+  filtrarLiderancaOperadorPlataforma,
   nomeCanalArea,
   rosterCanalArea,
   rosterCanalDepartamento,
 } from '../../types/src/departamento-canal.js'
+import { SYSTEM_ROLES } from '../../types/src/permissions.js'
+
+const NOMES_LIDERANCA_SISTEMA = [
+  SYSTEM_ROLES.OWNER,
+  SYSTEM_ROLES.ADMIN,
+  SYSTEM_ROLES.VICE,
+]
+
+/** Allowlist de plataforma — mesma env do web (`SUPER_ADMIN_EMAILS`). */
+function emailsSuperAdmin() {
+  const raw = process.env.SUPER_ADMIN_EMAILS
+  if (!raw) return []
+  return raw.split(',').map((e) => e.trim()).filter(Boolean)
+}
+
+/**
+ * Presidente / Admin / Vice / owner de unidade (Caso B) no tenant do canal.
+ * Super-admin sem `SaasMembro` local (modo operador) **não** entra — oversight
+ * é via `leituraSuperAdmin`, sem gravar `MembroConversa`.
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {string} tenantId
+ * @returns {Promise<string[]>}
+ */
+export async function idsLiderancaTenant(client, tenantId) {
+  /** @type {Array<{ userId: string }>} */
+  const rows = await client.userRole.findMany({
+    where: {
+      tenantId,
+      role: { isSystem: true, nome: { in: [...NOMES_LIDERANCA_SISTEMA] } },
+    },
+    select: { userId: true },
+  })
+  const liderancaIds = [...new Set(rows.map((r) => r.userId))]
+  const saEmails = emailsSuperAdmin()
+  if (saEmails.length === 0 || liderancaIds.length === 0) return liderancaIds
+
+  /** @type {Array<{ id: string }>} */
+  const saUsers = await client.user.findMany({
+    where: { id: { in: liderancaIds }, email: { in: saEmails } },
+    select: { id: true },
+  })
+  if (saUsers.length === 0) return liderancaIds
+
+  const superAdminUserIds = saUsers.map((u) => u.id)
+  /** @type {Array<{ userId: string }>} */
+  const vinculos = await client.saasMembro.findMany({
+    where: {
+      tenantId,
+      userId: { in: superAdminUserIds },
+      status: 'APROVADO',
+      espelhado: false,
+    },
+    select: { userId: true },
+  })
+
+  return filtrarLiderancaOperadorPlataforma({
+    liderancaIds,
+    superAdminUserIds,
+    userIdsComVinculoLocal: vinculos.map((v) => v.userId),
+  })
+}
 
 /**
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
@@ -124,11 +188,11 @@ async function criarCanalInterno(client, opts) {
 export async function syncMembrosCanalDepartamento(client, departamentoId) {
   const depto = await client.departamento.findUnique({
     where: { id: departamentoId },
-    select: { id: true, canalConversaId: true },
+    select: { id: true, tenantId: true, canalConversaId: true },
   })
   if (!depto?.canalConversaId) return { synced: false }
 
-  const [membros, gestores] = await Promise.all([
+  const [membros, gestores, lideranca] = await Promise.all([
     client.userDepartamento.findMany({
       where: { departamentoId },
       select: { userId: true },
@@ -137,11 +201,13 @@ export async function syncMembrosCanalDepartamento(client, departamentoId) {
       where: { departamentoId },
       select: { userId: true },
     }),
+    idsLiderancaTenant(client, depto.tenantId),
   ])
 
   const desired = rosterCanalDepartamento({
     membros: membros.map((m) => m.userId),
     gestores: gestores.map((g) => g.userId),
+    lideranca,
   })
   await aplicarRosterCanal(client, depto.canalConversaId, desired)
   return { synced: true, membros: desired.size }
@@ -154,11 +220,16 @@ export async function syncMembrosCanalDepartamento(client, departamentoId) {
 export async function syncMembrosCanalArea(client, areaId) {
   const area = await client.departamentoArea.findUnique({
     where: { id: areaId },
-    select: { id: true, canalConversaId: true, departamentoId: true },
+    select: {
+      id: true,
+      tenantId: true,
+      canalConversaId: true,
+      departamentoId: true,
+    },
   })
   if (!area?.canalConversaId) return { synced: false }
 
-  const [membrosArea, gestores] = await Promise.all([
+  const [membrosArea, gestores, lideranca] = await Promise.all([
     client.departamentoAreaMembro.findMany({
       where: { areaId },
       select: { userId: true },
@@ -167,11 +238,13 @@ export async function syncMembrosCanalArea(client, areaId) {
       where: { departamentoId: area.departamentoId },
       select: { userId: true },
     }),
+    idsLiderancaTenant(client, area.tenantId),
   ])
 
   const desired = rosterCanalArea({
     membrosArea: membrosArea.map((m) => m.userId),
     gestoresDepartamento: gestores.map((g) => g.userId),
+    lideranca,
   })
   await aplicarRosterCanal(client, area.canalConversaId, desired)
   return { synced: true, membros: desired.size }
@@ -353,7 +426,7 @@ export async function ensureCanaisDepartamentosTenant(client, tenantId, opts = {
     a.canalConversaId = canal.id
   })
 
-  const [temEquipe, temGestor, temArea] = await Promise.all([
+  const [temEquipe, temGestor, temArea, lideranca] = await Promise.all([
     client.userDepartamento.findFirst({ where: { tenantId }, select: { id: true } }),
     client.departamentoGestor.findFirst({
       where: { departamento: { tenantId } },
@@ -363,9 +436,10 @@ export async function ensureCanaisDepartamentosTenant(client, tenantId, opts = {
       where: { area: { tenantId } },
       select: { id: true },
     }),
+    idsLiderancaTenant(client, tenantId),
   ])
 
-  if (temEquipe || temGestor || temArea) {
+  if (temEquipe || temGestor || temArea || lideranca.length > 0) {
     const deptosComCanal = deptos.filter((d) => d.canalConversaId)
     const areasComCanal = areas.filter((a) => a.canalConversaId)
     await mapPool(deptosComCanal, 4, async (d) => {
@@ -400,7 +474,7 @@ export async function ensureCanaisDepartamentosTenant(client, tenantId, opts = {
  * @param {{ userId: string, tenantId: string }} args
  */
 export async function syncCanaisDepartamentosDoUsuario(client, { userId, tenantId }) {
-  const [uds, gestores, areaMembros] = await Promise.all([
+  const [uds, gestores, areaMembros, liderancaIds] = await Promise.all([
     client.userDepartamento.findMany({
       where: { userId, tenantId },
       select: { departamentoId: true },
@@ -413,7 +487,10 @@ export async function syncCanaisDepartamentosDoUsuario(client, { userId, tenantI
       where: { userId, area: { tenantId } },
       select: { areaId: true, area: { select: { departamentoId: true } } },
     }),
+    idsLiderancaTenant(client, tenantId),
   ])
+
+  const ehLideranca = liderancaIds.includes(userId)
 
   const deptoIds = new Set([
     ...uds.map((u) => u.departamentoId),
@@ -446,8 +523,9 @@ export async function syncCanaisDepartamentosDoUsuario(client, { userId, tenantI
 
   for (const depto of deptosComCanal) {
     if (!depto.canalConversaId) continue
-    if (deptoIds.has(depto.id)) {
-      const papel = gestorDeptoIds.has(depto.id) ? 'ADMIN' : 'MEMBRO'
+    if (ehLideranca || deptoIds.has(depto.id)) {
+      const papel =
+        ehLideranca || gestorDeptoIds.has(depto.id) ? 'ADMIN' : 'MEMBRO'
       await client.membroConversa.upsert({
         where: { conversaId_userId: { conversaId: depto.canalConversaId, userId } },
         create: { conversaId: depto.canalConversaId, userId, papel, status: 'ATIVO' },
@@ -468,9 +546,12 @@ export async function syncCanaisDepartamentosDoUsuario(client, { userId, tenantI
   for (const area of areasComCanal) {
     if (!area.canalConversaId) continue
     const deveEstar =
-      areaIds.has(area.id) || gestorDeptoIds.has(area.departamentoId)
+      ehLideranca ||
+      areaIds.has(area.id) ||
+      gestorDeptoIds.has(area.departamentoId)
     if (deveEstar) {
-      const papel = gestorDeptoIds.has(area.departamentoId) ? 'ADMIN' : 'MEMBRO'
+      const papel =
+        ehLideranca || gestorDeptoIds.has(area.departamentoId) ? 'ADMIN' : 'MEMBRO'
       await client.membroConversa.upsert({
         where: { conversaId_userId: { conversaId: area.canalConversaId, userId } },
         create: { conversaId: area.canalConversaId, userId, papel, status: 'ATIVO' },

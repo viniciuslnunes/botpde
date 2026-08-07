@@ -30,6 +30,7 @@ import {
 import {
   decidePodeVerCanal,
   orPostsDoMuralCanal,
+  canalOficialTemPortalProprio,
   type CanalItem,
   type CandidatoMembroCanalItem,
   type MembroCanalItem,
@@ -711,49 +712,101 @@ export async function inscreverCanal(
 export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
   viewerTenantId: string,
   userId: string,
+  opts?: { leituraSuperAdmin?: boolean },
 ): Promise<CanalItem[]> {
+  const leituraSuperAdmin = opts?.leituraSuperAdmin === true
   const visibleTenantIds = await getVisibleTenantIds(viewerTenantId, 'comunidade')
   const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
 
-  const rows = await unstable_cache(
-    async (): Promise<
-      Array<{
-        id: string
-        tenantId: string
-        nome: string | null
-        descricao: string | null
-        avatarUrl: string | null
-        institucional: boolean
-        canalOficial: boolean
-        visibilidadeCanal: VisibilidadeCanal
-        somenteAdminPublica: boolean
-        publica: boolean
-        tenant: { nome: string }
-        _count: { membros: number }
-      }>
-    > =>
+  const selectCanalListagem = {
+    id: true,
+    tenantId: true,
+    nome: true,
+    descricao: true,
+    avatarUrl: true,
+    institucional: true,
+    canalOficial: true,
+    visibilidadeCanal: true,
+    somenteAdminPublica: true,
+    publica: true,
+    tenant: { select: { nome: true, logoUrl: true } },
+    _count: { select: { membros: { where: { saiuEm: null } } } },
+  } as const
+
+  type CanalListagemRow = {
+    id: string
+    tenantId: string
+    nome: string | null
+    descricao: string | null
+    avatarUrl: string | null
+    institucional: boolean
+    canalOficial: boolean
+    visibilidadeCanal: VisibilidadeCanal
+    somenteAdminPublica: boolean
+    publica: boolean
+    tenant: { nome: string; logoUrl: string | null }
+    _count: { membros: number }
+  }
+
+  // Descoberta: oficiais + temáticos da Comunidade. Exclui canais de depto/área
+  // (só entram via membership abaixo) — senão os ~60 slots após oficiais vão
+  // para "Bateria · Ensaios" etc. e canais como "OS DE PRETO" somem do take.
+  const discoveryRows = await unstable_cache(
+    async (): Promise<CanalListagemRow[]> =>
       db.conversa.findMany({
-        where: { tenantId: { in: visibleTenantIds }, tipo: 'CANAL' },
-        orderBy: [{ canalOficial: 'desc' }, { atualizadoEm: 'desc' }],
-        take: 80,
-        select: {
-          id: true,
-          tenantId: true,
-          nome: true,
-          descricao: true,
-          avatarUrl: true,
-          institucional: true,
-          canalOficial: true,
-          visibilidadeCanal: true,
-          somenteAdminPublica: true,
-          publica: true,
-          tenant: { select: { nome: true } },
-          _count: { select: { membros: { where: { saiuEm: null } } } },
+        where: {
+          tenantId: { in: visibleTenantIds },
+          tipo: 'CANAL',
+          departamentoCanal: { is: null },
+          departamentoAreaCanal: { is: null },
         },
+        orderBy: [{ canalOficial: 'desc' }, { atualizadoEm: 'desc' }],
+        take: 120,
+        select: selectCanalListagem,
       }),
-    ['canais-visiveis-base', viewerTenantId, visibleTenantIdsKey],
+    ['canais-visiveis-base-v3', viewerTenantId, visibleTenantIdsKey],
     { revalidate: 120, tags: [tagCanaisVisiveis(viewerTenantId)] },
   )()
+
+  // Sempre inclui canais em que o viewer é membro (criador / inscrito) —
+  // inclusive depto/área e temáticos fora da janela de descoberta.
+  const discoveryIds = new Set(discoveryRows.map((row) => row.id))
+  const memberRows: CanalListagemRow[] = await db.conversa.findMany({
+    where: {
+      tipo: 'CANAL',
+      tenantId: { in: visibleTenantIds },
+      ...(discoveryIds.size > 0 ? { id: { notIn: [...discoveryIds] } } : {}),
+      membros: {
+        some: {
+          userId,
+          saiuEm: null,
+          status: { in: ['ATIVO', 'PENDENTE'] },
+        },
+      },
+    },
+    orderBy: { atualizadoEm: 'desc' },
+    take: 80,
+    select: selectCanalListagem,
+  })
+
+  let rows: CanalListagemRow[] = [...discoveryRows, ...memberRows]
+
+  // Super-admin: todos os canais do tenant ativo (oficiais, temáticos,
+  // depto/área) sem gravar MembroConversa. Só o portal aberto — não a worktree.
+  if (leituraSuperAdmin) {
+    const jaTem = new Set(rows.map((row) => row.id))
+    const saRows: CanalListagemRow[] = await db.conversa.findMany({
+      where: {
+        tenantId: viewerTenantId,
+        tipo: 'CANAL',
+        ...(jaTem.size > 0 ? { id: { notIn: [...jaTem] } } : {}),
+      },
+      orderBy: [{ canalOficial: 'desc' }, { atualizadoEm: 'desc' }],
+      take: 200,
+      select: selectCanalListagem,
+    })
+    rows = [...rows, ...saRows]
+  }
 
   const memberships: Array<{
     conversaId: string
@@ -782,7 +835,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
 
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
   // React.cache, então pares (viewer, tenant) repetidos não repetem query.
-  // Canais de depto/área: só membro ATIVO (não entram na vitrine da Comunidade).
+  // Canais de depto/área: membro ATIVO ou overlay de super-admin no tenant.
   const canalIds = rows.map((row) => row.id)
   const [visiveis, fallbackAvatars, sedesPorCanal, canaisInternos]: [
     boolean[],
@@ -790,7 +843,13 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     SedeCanalLoc[],
     Set<string>,
   ] = await Promise.all([
-    Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId))),
+    Promise.all(
+      rows.map((row) =>
+        leituraSuperAdmin && row.tenantId === viewerTenantId
+          ? Promise.resolve(true)
+          : podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId),
+      ),
+    ),
     resolveFallbackAvatarsCanalOficial(
       rows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
     ),
@@ -838,10 +897,14 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     if (!visiveis[i]) return
     const membro = membershipMap.get(row.id)
     const souMembroAtivo = membro?.status === 'ATIVO'
+    const ehCanalDepartamento = canaisInternos.has(row.id)
     if (
       !deveListarCanalDepartamentoNaComunidade({
-        ehCanalDepartamentoOuArea: canaisInternos.has(row.id),
+        ehCanalDepartamentoOuArea: ehCanalDepartamento,
         souMembroAtivo,
+        tenantIdCanal: row.tenantId,
+        viewerTenantId,
+        leituraSuperAdmin,
       })
     ) {
       return
@@ -855,6 +918,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
+      ehCanalDepartamento,
       visibilidadeCanal: row.visibilidadeCanal,
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
@@ -864,6 +928,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       pedidoPendente: membro?.status === 'PENDENTE',
       silenciada: souMembroAtivo ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
+      tenantLogoUrl: row.tenant.logoUrl,
       tipoUnidade: sede?.tipo ?? null,
       cidade: sede?.cidade ?? null,
       estado: sede?.estado ?? null,
@@ -886,7 +951,7 @@ export const getSugestoesCanaisParaAside = cache(async function getSugestoesCana
 ): Promise<SugestaoCanalAside[]> {
   const canais = await listCanaisVisiveis(tenantId, userId)
   return canais
-    .filter((c) => !c.souMembro && !c.pedidoPendente)
+    .filter((c) => !c.souMembro && !c.pedidoPendente && !c.ehCanalDepartamento)
     .sort((a, b) => {
       if (a.tenantId === tenantId && b.tenantId !== tenantId) return -1
       if (b.tenantId === tenantId && a.tenantId !== tenantId) return 1
@@ -901,6 +966,7 @@ export const getSugestoesCanaisParaAside = cache(async function getSugestoesCana
       avatarUrl: c.avatarUrl,
       membros: c.membros,
       canalOficial: c.canalOficial,
+      ehCanalDepartamento: c.ehCanalDepartamento,
       publica: c.publica,
       tenantNome: c.tenantNome,
     }))
@@ -926,7 +992,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
     visibilidadeCanal: VisibilidadeCanal
     somenteAdminPublica: boolean
     publica: boolean
-    tenant: { nome: string }
+    tenant: { nome: string; logoUrl: string | null }
     _count: { membros: number }
   }> = await db.conversa.findMany({
     where: {
@@ -947,7 +1013,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       visibilidadeCanal: true,
       somenteAdminPublica: true,
       publica: true,
-      tenant: { select: { nome: true } },
+      tenant: { select: { nome: true, logoUrl: true } },
       _count: { select: { membros: { where: { saiuEm: null } } } },
     },
   })
@@ -1012,6 +1078,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
+      ehCanalDepartamento: false,
       visibilidadeCanal: row.visibilidadeCanal,
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
@@ -1021,6 +1088,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       pedidoPendente: membro?.status === 'PENDENTE',
       silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
+      tenantLogoUrl: row.tenant.logoUrl,
       tipoUnidade: sede?.tipo ?? null,
       cidade: sede?.cidade ?? null,
       estado: sede?.estado ?? null,
@@ -1040,7 +1108,7 @@ export const getSugestoesCanaisPublicosParaAside = cache(async function getSuges
 ): Promise<SugestaoCanalAside[]> {
   const canais = await listCanaisPublicosPorAfiliacao(afiliacaoId, userId)
   return canais
-    .filter((c) => !c.souMembro && !c.pedidoPendente)
+    .filter((c) => !c.souMembro && !c.pedidoPendente && !c.ehCanalDepartamento)
     .sort((a, b) => {
       if (a.canalOficial !== b.canalOficial) return a.canalOficial ? -1 : 1
       return b.membros - a.membros
@@ -1053,6 +1121,7 @@ export const getSugestoesCanaisPublicosParaAside = cache(async function getSuges
       avatarUrl: c.avatarUrl,
       membros: c.membros,
       canalOficial: c.canalOficial,
+      ehCanalDepartamento: c.ehCanalDepartamento,
       publica: c.publica,
       tenantNome: c.tenantNome,
     }))
@@ -1071,6 +1140,79 @@ export const getCanalPorId = cache(async function getCanalPorId(
 
   return projetarCanalItem(row)
 })
+
+/**
+ * Slug do tenant que a barra multi-canal deve representar para um canal
+ * oficial. Prefere a unidade dona (`Sede.canalConversaId`) — Caso B com canal
+ * emprestado na mãe ainda abre o escudo da PDE, não o da Sede.
+ */
+export const resolverSlugTenantDoCanal = cache(async function resolverSlugTenantDoCanal(
+  conversaId: string,
+): Promise<string | null> {
+  const conversa: {
+    canalOficial: boolean
+    tenant: { slug: string }
+  } | null = await db.conversa.findUnique({
+    where: { id: conversaId },
+    select: {
+      canalOficial: true,
+      tenant: { select: { slug: true } },
+    },
+  })
+  if (!conversa) return null
+
+  const unidadeDona: { tenant: { slug: string } | null } | null = await db.sede.findFirst({
+    where: { canalConversaId: conversaId, tenantId: { not: null } },
+    orderBy: { criadoEm: 'asc' },
+    select: { tenant: { select: { slug: true } } },
+  })
+  if (unidadeDona?.tenant?.slug) return unidadeDona.tenant.slug
+  return conversa.tenant.slug
+})
+
+/**
+ * Slug do **portal** que pode ser ativado ao abrir um canal oficial.
+ *
+ * - Canal da Sede (tipo `SEDE`) ou unidade Caso B (tenant ≠ raiz) → slug
+ *   ativável (troca de sessão).
+ * - Unidade Caso A (PDE/subsede no tenant da mãe, ex.: Taubaté em Gaviões) →
+ *   `null`: sem portal próprio; só override cosmético / cookie de marca.
+ *   Ativar a mãe aqui jogava o usuário de Taubaté para "Gaviões da Fiel".
+ */
+export const resolverSlugPortalAtivavelDoCanal = cache(
+  async function resolverSlugPortalAtivavelDoCanal(
+    conversaId: string,
+  ): Promise<string | null> {
+    const sedeDona: {
+      tipo: string
+      tenantId: string | null
+      tenant: { slug: string } | null
+    } | null = await db.sede.findFirst({
+      where: { canalConversaId: conversaId, tenantId: { not: null } },
+      orderBy: { criadoEm: 'asc' },
+      select: {
+        tipo: true,
+        tenantId: true,
+        tenant: { select: { slug: true } },
+      },
+    })
+    if (!sedeDona?.tenantId || !sedeDona.tenant?.slug) return null
+
+    if (sedeDona.tipo === 'SEDE') return sedeDona.tenant.slug
+
+    const raizId = await resolverTenantRaizId(sedeDona.tenantId)
+    if (
+      !canalOficialTemPortalProprio({
+        tipoSede: sedeDona.tipo,
+        tenantIdUnidade: sedeDona.tenantId,
+        tenantIdRaiz: raizId,
+      })
+    ) {
+      return null
+    }
+    return sedeDona.tenant.slug
+  },
+)
 
 /**
  * Canal oficial da unidade em que a pessoa tem vínculo APROVADO — a aba
@@ -1185,7 +1327,7 @@ const carregarCanalRow = cache(async function carregarCanalRow(
       somenteAdminPublica: true,
       publica: true,
       tipo: true,
-      tenant: { select: { nome: true } },
+      tenant: { select: { nome: true, logoUrl: true } },
       _count: { select: { membros: { where: { saiuEm: null } } } },
       membros: {
         where: { userId, saiuEm: null },
@@ -1203,17 +1345,23 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
       : new Map<string, string | null>()
 
   const membro = row.membros[0]
-  const sede: {
-    tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
-    cidade: string | null
-    estado: string | null
-    lat: number | null
-    lng: number | null
-    fotoUrl: string | null
-  } | null = await db.sede.findFirst({
-    where: { canalConversaId: row.id },
-    select: { tipo: true, cidade: true, estado: true, lat: true, lng: true, fotoUrl: true },
-  })
+  const [sede, ehCanalDepartamento]: [
+    {
+      tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+      cidade: string | null
+      estado: string | null
+      lat: number | null
+      lng: number | null
+      fotoUrl: string | null
+    } | null,
+    boolean,
+  ] = await Promise.all([
+    db.sede.findFirst({
+      where: { canalConversaId: row.id },
+      select: { tipo: true, cidade: true, estado: true, lat: true, lng: true, fotoUrl: true },
+    }),
+    isConversaCanalDepartamento(row.id),
+  ])
 
   return {
     id: row.id,
@@ -1223,6 +1371,7 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
     avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
     institucional: row.institucional,
     canalOficial: row.canalOficial,
+    ehCanalDepartamento,
     visibilidadeCanal: row.visibilidadeCanal,
     somenteAdminPublica: row.somenteAdminPublica,
     publica: row.publica,
@@ -1232,12 +1381,28 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
     pedidoPendente: membro?.status === 'PENDENTE',
     silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
     tenantNome: formatNomeTorcida(row.tenant.nome),
+    tenantLogoUrl: row.tenant.logoUrl,
     tipoUnidade: sede?.tipo ?? null,
     cidade: sede?.cidade ?? null,
     estado: sede?.estado ?? null,
     lat: sede?.lat ?? null,
     lng: sede?.lng ?? null,
   }
+}
+
+/** Conversa ligada a `Departamento` ou `DepartamentoArea` (roster por cargo). */
+export async function isConversaCanalDepartamento(conversaId: string): Promise<boolean> {
+  const [depto, area]: [{ id: string } | null, { id: string } | null] = await Promise.all([
+    db.departamento.findFirst({
+      where: { canalConversaId: conversaId },
+      select: { id: true },
+    }),
+    db.departamentoArea.findFirst({
+      where: { canalConversaId: conversaId },
+      select: { id: true },
+    }),
+  ])
+  return Boolean(depto || area)
 }
 
 export type PostsDoCanalOpts = FeedOpts & {
@@ -1254,6 +1419,59 @@ export type PostsDoCanalOpts = FeedOpts & {
    * o super-admin sem vínculo (`ehOperadorPlataforma`).
    */
   leituraOperador?: boolean
+}
+
+/**
+ * Feed interno ("Só torcida") só no mural **próprio** do viewer — abas
+ * Minha torcida / Minha unidade (`feedInterno=1` na API).
+ *
+ * - Canal oficial da Sede do `viewerTenantId`, ou
+ * - Canal da unidade de vínculo (`SaasMembro.sede`) com tenant próprio
+ *   (Caso B). Em Caso A o `tenantId` do vínculo é a mãe — misturar aqui
+ *   repetiria o mural da Sede em todo PDE da listagem.
+ *
+ * `/canais/[id]` e soft-switch **nunca** pedem feed interno: mural = só
+ * posts do `conversaId`.
+ */
+export async function resolverFeedInternoDoMural(opts: {
+  canalId: string
+  canalOficial: boolean
+  userId: string
+  viewerTenantId: string
+}): Promise<{ incluir: boolean; feedInternoTenantId: string | null }> {
+  if (!opts.canalOficial) return { incluir: false, feedInternoTenantId: null }
+
+  const oficialSede = await getCanalOficialDaSede(opts.viewerTenantId, opts.userId, {
+    leituraOperador: true,
+  })
+  if (oficialSede?.id === opts.canalId) {
+    return { incluir: true, feedInternoTenantId: opts.viewerTenantId }
+  }
+
+  const vinculo: { tenantId: string } | null = await db.saasMembro.findFirst({
+    where: {
+      userId: opts.userId,
+      espelhado: false,
+      OR: [
+        { status: 'APROVADO' },
+        { status: 'PENDENTE', tipo: 'SOCIO' },
+      ],
+      sede: { canalConversaId: opts.canalId },
+    },
+    select: { tenantId: true },
+  })
+  // Caso B: vínculo na unidade com tenant próprio (viewer ainda na Sede).
+  if (vinculo && vinculo.tenantId !== opts.viewerTenantId) {
+    return { incluir: true, feedInternoTenantId: vinculo.tenantId }
+  }
+  // Tenant ativo = unidade (Caso B) ou Minha unidade Caso A no tenant da
+  // mãe: mural próprio pode misturar "Só torcida" deste tenant. Listagem
+  // `/canais/[id]` não chega aqui (sem `feedInterno=1`).
+  if (vinculo && vinculo.tenantId === opts.viewerTenantId && oficialSede?.id !== opts.canalId) {
+    return { incluir: true, feedInternoTenantId: vinculo.tenantId }
+  }
+
+  return { incluir: false, feedInternoTenantId: null }
 }
 
 export async function getPostsDoCanal(
@@ -1461,10 +1679,15 @@ export async function resolverChromeCanalMural(
   corPrimaria: string
 }> {
   const leituraOperador = opts?.leituraOperador ?? false
-  const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial && !leituraOperador
+  const podeGerenciarAdmins =
+    canal.souAdmin && !canal.canalOficial && !canal.ehCanalDepartamento && !leituraOperador
   const podeGerenciarMembros =
-    !leituraOperador && (await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes))
-  const podeGerenciarPedidos = podeGerenciarMembros && !canal.publica
+    !leituraOperador &&
+    !canal.ehCanalDepartamento &&
+    (await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes))
+  // Depto/área: roster por cargo — sem pedidos nem inscrição manual.
+  const podeGerenciarPedidos =
+    podeGerenciarMembros && !canal.publica && !canal.ehCanalDepartamento
 
   const [tenant, pedidosPendentesCount]: [
     { corPrimaria: string | null } | null,
@@ -1538,7 +1761,7 @@ export async function buscarCanaisEUnidades(
       visibilidadeCanal: VisibilidadeCanal
       somenteAdminPublica: boolean
       publica: boolean
-      tenant: { nome: string }
+      tenant: { nome: string; logoUrl: string | null }
       _count: { membros: number }
       membros: Array<{
         papel: 'ADMIN' | 'MEMBRO'
@@ -1552,6 +1775,9 @@ export async function buscarCanaisEUnidades(
       where: {
         tenantId: { in: visibleIds },
         tipo: 'CANAL',
+        // Canais de depto/área: roster por cargo — fora da busca da Comunidade.
+        departamentoCanal: { is: null },
+        departamentoAreaCanal: { is: null },
         OR: [
           { nome: { contains: termo, mode: 'insensitive' } },
           { descricao: { contains: termo, mode: 'insensitive' } },
@@ -1569,7 +1795,7 @@ export async function buscarCanaisEUnidades(
         visibilidadeCanal: true,
         somenteAdminPublica: true,
         publica: true,
-        tenant: { select: { nome: true } },
+        tenant: { select: { nome: true, logoUrl: true } },
         _count: { select: { membros: { where: { saiuEm: null } } } },
         membros: {
           where: { userId, saiuEm: null },
@@ -1635,6 +1861,7 @@ export async function buscarCanaisEUnidades(
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sedeFotoPorCanal.get(row.id)),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
+      ehCanalDepartamento: false,
       visibilidadeCanal: row.visibilidadeCanal,
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
@@ -1644,6 +1871,7 @@ export async function buscarCanaisEUnidades(
       pedidoPendente: membro?.status === 'PENDENTE',
       silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
+      tenantLogoUrl: row.tenant.logoUrl,
       tipoUnidade: null,
       cidade: null,
       estado: null,

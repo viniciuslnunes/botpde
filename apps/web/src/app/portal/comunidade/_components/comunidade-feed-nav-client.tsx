@@ -14,20 +14,15 @@ import {
   Scale,
   type LucideIcon,
 } from 'lucide-react'
-import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import { CanalFocoNavLink } from '../canais/canais-list-link'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import { isComunidadeNavActive } from '@/lib/comunidade-nav'
 
 type NavItem = {
   href: string
   label: string
   icon: LucideIcon
   badge?: number
-}
-
-function isNavActive(pathname: string, href: string): boolean {
-  const pathOnly = href.split('?')[0] ?? href
-  if (pathOnly === '/portal/comunidade') return pathname === '/portal/comunidade'
-  return pathname === pathOnly || pathname.startsWith(`${pathOnly}/`)
 }
 
 export function ComunidadeFeedNavClient({
@@ -85,19 +80,15 @@ export function ComunidadeFeedNavClient({
     <nav className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
       {navItems.map((item) => {
         const Icon = item.icon
-        const active = isNavActive(pathname, item.href)
-        return (
-          <ComunidadePrefetchLink
-            key={item.href}
-            href={item.href}
-            aria-current={active ? 'page' : undefined}
-            className={[
-              'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors',
-              active
-                ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-            ].join(' ')}
-          >
+        const active = isComunidadeNavActive(pathname, item.href)
+        const className = [
+          'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors',
+          active
+            ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+            : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+        ].join(' ')
+        const content = (
+          <>
             <Icon className="h-4 w-4" />
             <span className="flex-1">{item.label}</span>
             {(item.badge ?? 0) > 0 && (
@@ -105,7 +96,18 @@ export function ComunidadeFeedNavClient({
                 {(item.badge ?? 0) > 9 ? '9+' : item.badge}
               </span>
             )}
-          </ComunidadePrefetchLink>
+          </>
+        )
+        // Qualquer saída do mural: persiste foco Caso A / ativa Caso B.
+        return (
+          <CanalFocoNavLink
+            key={item.href}
+            href={item.href}
+            aria-current={active ? 'page' : undefined}
+            className={className}
+          >
+            {content}
+          </CanalFocoNavLink>
         )
       })}
     </nav>

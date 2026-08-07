@@ -1,9 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-
-/** Rotas com o mesmo shell de feed (rail de salas/chat à direita). */
-const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
+import { isComunidadeFeedPath } from '@/lib/comunidade-nav'
 
 /**
  * Se a rota atual usa o shell de feed. O layout é síncrono e o rail chega por
@@ -12,5 +10,7 @@ const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
  */
 export function useShellDeFeed(): boolean {
   const pathname = usePathname()
-  return pathname === '/portal/comunidade' || CANAL_DETALHE_RE.test(pathname)
+  return isComunidadeFeedPath(pathname)
 }
+
+export { isComunidadeFeedPath } from '@/lib/comunidade-nav'

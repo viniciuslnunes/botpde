@@ -23,7 +23,7 @@ import { formatNomeTorcida } from '@torcida/types'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { LogoImage } from '@/components/media/logo-image'
 import { Avatar } from '@/components/portal/avatar'
-import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import { AbrirCanalNaBarraLink } from './abrir-canal-na-barra-link'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
@@ -42,6 +42,7 @@ import {
   SECAO_CANAL_LABEL,
 } from '@/lib/canais-listagem'
 import {
+  labelCategoriaCanal,
   labelTipoUnidade,
   labelVisibilidadeCanal,
   linkCanalComunidade,
@@ -52,13 +53,15 @@ import { nomesEquivalentes } from '@/lib/torcida-labels'
 /** Mesma chave do explorer de sedes — localização persiste entre telas do portal. */
 const GEO_STORAGE_KEY = 'portal:sedes:geo'
 
-type FiltroCanal = 'TODOS' | 'OFICIAIS' | 'TEMATICOS' | 'MINHAS' | 'ENTRAR'
+type FiltroCanal = 'TODOS' | 'OFICIAIS' | 'DEPARTAMENTOS' | 'TEMATICOS' | 'MINHAS' | 'ENTRAR'
 type OrdenacaoCanal = 'relevancia' | 'proximidade' | 'membros' | 'nome'
 
 interface CanaisClientProps {
   canais: CanalItem[]
   podeCriarCanal: boolean
   tenantAtualId: string
+  /** Super-admin: Abrir sem pedir entrada (overlay de leitura). */
+  leituraSuperAdmin?: boolean
 }
 
 function lerGeoSalva(): LocalizacaoOnboarding | null {
@@ -112,6 +115,7 @@ export function CanaisClient({
   canais: canaisIniciais,
   podeCriarCanal,
   tenantAtualId,
+  leituraSuperAdmin = false,
 }: CanaisClientProps) {
   const [canais, setCanais] = useState(canaisIniciais)
   const [criando, setCriando] = useState(false)
@@ -192,15 +196,23 @@ export function CanaisClient({
     const c: Record<FiltroCanal, number> = {
       TODOS: canais.length,
       OFICIAIS: 0,
+      DEPARTAMENTOS: 0,
       TEMATICOS: 0,
       MINHAS: 0,
       ENTRAR: 0,
     }
     for (const canal of canais) {
       if (canal.canalOficial) c.OFICIAIS += 1
+      else if (canal.ehCanalDepartamento) c.DEPARTAMENTOS += 1
       else c.TEMATICOS += 1
       if (canal.souMembro) c.MINHAS += 1
-      if (!canal.souMembro && !canal.pedidoPendente) c.ENTRAR += 1
+      if (
+        !canal.souMembro &&
+        !canal.pedidoPendente &&
+        !canal.ehCanalDepartamento
+      ) {
+        c.ENTRAR += 1
+      }
     }
     return c
   }, [canais])
@@ -209,9 +221,20 @@ export function CanaisClient({
     const q = normalizarTexto(buscaDeferred)
     let list = canais.filter((canal) => {
       if (filtro === 'OFICIAIS' && !canal.canalOficial) return false
-      if (filtro === 'TEMATICOS' && canal.canalOficial) return false
+      if (filtro === 'DEPARTAMENTOS' && !canal.ehCanalDepartamento) return false
+      if (
+        filtro === 'TEMATICOS' &&
+        (canal.canalOficial || canal.ehCanalDepartamento)
+      ) {
+        return false
+      }
       if (filtro === 'MINHAS' && !canal.souMembro) return false
-      if (filtro === 'ENTRAR' && (canal.souMembro || canal.pedidoPendente)) return false
+      if (
+        filtro === 'ENTRAR' &&
+        (canal.souMembro || canal.pedidoPendente || canal.ehCanalDepartamento)
+      ) {
+        return false
+      }
       if (!canalCombinaUfCidade(canal, filtroUf, filtroCidade)) return false
       if (!q) return true
       const hay = normalizarTexto(
@@ -222,6 +245,7 @@ export function CanaisClient({
           canal.cidade,
           canal.estado,
           canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null,
+          canal.ehCanalDepartamento ? 'departamento' : null,
         ]
           .filter(Boolean)
           .join(' '),
@@ -372,6 +396,9 @@ export function CanaisClient({
   const filtros: Array<{ id: FiltroCanal; label: string }> = [
     { id: 'TODOS', label: 'Todos' },
     { id: 'OFICIAIS', label: 'Oficiais' },
+    ...(contagens.DEPARTAMENTOS > 0
+      ? [{ id: 'DEPARTAMENTOS' as const, label: 'Departamentos' }]
+      : []),
     { id: 'TEMATICOS', label: 'Temáticos' },
     { id: 'MINHAS', label: 'Minhas' },
     { id: 'ENTRAR', label: 'Para entrar' },
@@ -666,6 +693,7 @@ export function CanaisClient({
                     <CanalCard
                       canal={c}
                       tenantAtualId={tenantAtualId}
+                      leituraSuperAdmin={leituraSuperAdmin}
                       distanciaKm={localizacao ? distanciaKm(localizacao, c) : null}
                       destaqueProximo={c.id === maisProximoId}
                       onEntrar={entrar}
@@ -686,6 +714,7 @@ export function CanaisClient({
 function CanalCard({
   canal,
   tenantAtualId,
+  leituraSuperAdmin = false,
   distanciaKm: dist,
   destaqueProximo,
   onEntrar,
@@ -694,6 +723,7 @@ function CanalCard({
 }: {
   canal: CanalItem
   tenantAtualId: string
+  leituraSuperAdmin?: boolean
   distanciaKm: number | null
   destaqueProximo: boolean
   onEntrar: (id: string) => void
@@ -710,11 +740,14 @@ function CanalCard({
   const canalNome = canal.canalOficial
     ? formatNomeTorcida(canal.nome ?? tenantNome)
     : (canal.nome ?? 'Canal')
+  const categoria = labelCategoriaCanal(canal)
   const resumo =
     canal.descricao?.trim() ||
     (canal.canalOficial
       ? 'Canal oficial da unidade.'
-      : labelVisibilidadeCanal(canal.visibilidadeCanal))
+      : canal.ehCanalDepartamento
+        ? 'Canal interno da equipe — entrada pelo cargo no departamento.'
+        : labelVisibilidadeCanal(canal.visibilidadeCanal))
 
   return (
     <article
@@ -727,7 +760,8 @@ function CanalCard({
     >
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start gap-3">
-          <ComunidadePrefetchLink
+          <AbrirCanalNaBarraLink
+            canalId={canal.id}
             href={href}
             className="flex h-20 w-20 shrink-0 items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] sm:h-24 sm:w-24"
             aria-label={`Abrir canal ${canalNome}`}
@@ -743,7 +777,7 @@ function CanalCard({
             ) : (
               <Avatar nome={canalNome} avatarUrl={canal.avatarUrl} size="xl" fit="contain" />
             )}
-          </ComunidadePrefetchLink>
+          </AbrirCanalNaBarraLink>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1">
@@ -752,10 +786,12 @@ function CanalCard({
                   'inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
                   canal.canalOficial
                     ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                    : canal.ehCanalDepartamento
+                      ? 'bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
+                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >
-                {canal.canalOficial ? 'Oficial' : 'Temático'}
+                {categoria}
               </span>
               {canal.tenantId === tenantAtualId ? (
                 <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
@@ -770,12 +806,14 @@ function CanalCard({
               ) : null}
             </div>
 
-            <ComunidadePrefetchLink
+            <AbrirCanalNaBarraLink
+              canalId={canal.id}
               href={href}
-              className="mt-1.5 line-clamp-2 text-sm font-semibold uppercase leading-snug tracking-wide text-[rgb(var(--foreground))] text-balance hover:underline"
+              className="mt-1.5 line-clamp-2 text-left text-sm font-semibold uppercase leading-snug tracking-wide text-[rgb(var(--foreground))] text-balance hover:underline"
+              aria-label={`Abrir canal ${canalNome}`}
             >
               {canalNome}
-            </ComunidadePrefetchLink>
+            </AbrirCanalNaBarraLink>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[rgb(var(--foreground-muted))]">
               {tipoLabel ? <span>{tipoLabel}</span> : null}
@@ -785,7 +823,7 @@ function CanalCard({
                   {canal.membros} {canal.membros === 1 ? 'membro' : 'membros'}
                 </span>
               </span>
-              {!canal.publica ? (
+              {!canal.publica && !canal.ehCanalDepartamento && !leituraSuperAdmin ? (
                 <span className="inline-flex items-center gap-1">
                   <Lock className="h-3 w-3" aria-hidden />
                   Pedido
@@ -819,13 +857,15 @@ function CanalCard({
             ) : null}
           </div>
 
-          {canal.souMembro ? (
-            <ComunidadePrefetchLink
+          {canal.souMembro || canal.ehCanalDepartamento || leituraSuperAdmin ? (
+            <AbrirCanalNaBarraLink
+              canalId={canal.id}
               href={href}
-              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
+              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+              aria-label={`Abrir canal ${canalNome}`}
             >
               Abrir canal
-            </ComunidadePrefetchLink>
+            </AbrirCanalNaBarraLink>
           ) : canal.publica ? (
             <m.button
               type="button"

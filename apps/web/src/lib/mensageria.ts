@@ -6,6 +6,7 @@ import { canFollowUser } from './social'
 import { getTenantsRestritos } from './isolamento'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 /**
  * Mensageria (DM 1×1 e grupos) — ver ARCHITECTURE.md §6 item 27.
@@ -782,6 +783,51 @@ export async function criarGrupoConversa(
   return conversa
 }
 
+/**
+ * SA em modo operador não deve ficar no roster de canais de depto/área das
+ * unidades que só visita. Soft-leave limitado (passivo de setup/herança de
+ * owner) para a inbox não encher com dezenas de "Bandeiras · …".
+ */
+async function limparRosterOperadorCanaisDepto(userId: string): Promise<void> {
+  const user: { email: string | null } | null = await db.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  })
+  if (!isSuperAdminEmail(user?.email)) return
+
+  const vinculos: Array<{ tenantId: string }> = await db.saasMembro.findMany({
+    where: { userId, status: 'APROVADO', espelhado: false },
+    select: { tenantId: true },
+  })
+  const comVoz = vinculos.map((v) => v.tenantId)
+
+  const membros: Array<{ conversaId: string }> = await db.membroConversa.findMany({
+    where: {
+      userId,
+      saiuEm: null,
+      conversa: {
+        OR: [
+          { departamentoCanal: { isNot: null } },
+          { departamentoAreaCanal: { isNot: null } },
+        ],
+        ...(comVoz.length > 0 ? { tenantId: { notIn: comVoz } } : {}),
+      },
+    },
+    select: { conversaId: true },
+    take: 500,
+  })
+  if (membros.length === 0) return
+
+  await db.membroConversa.updateMany({
+    where: {
+      userId,
+      conversaId: { in: membros.map((m) => m.conversaId) },
+      saiuEm: null,
+    },
+    data: { saiuEm: new Date() },
+  })
+}
+
 /** Inbox do usuário: conversas ativas ordenadas por atividade, com não-lidas. */
 export async function listConversas(userId: string): Promise<ConversaInboxItem[]> {
   interface InboxRow extends MembroAtivoRow {
@@ -795,6 +841,9 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       }[]
     }
   }
+
+  // Best-effort: tira o SA-operador dos canais de depto/área herdados.
+  await limparRosterOperadorCanaisDepto(userId).catch(() => undefined)
 
   // Sem nested `membros[]` completo — grupos grandes inflavam a payload (N membros × 50 conversas).
   const rows: InboxRow[] = await db.membroConversa.findMany({

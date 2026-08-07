@@ -21,22 +21,47 @@ export function abrirCanalNaOrdem(
 }
 
 /**
- * Nova ordem manual (drag). Aceita só permutação dos slugs atuais —
- * ignora extras e rejeita se faltar algum (retorna `null`).
+ * Nova ordem manual (drag). A barra pode mandar um **subconjunto** do cookie:
+ * - canais da worktree omitidos na UI (`excluirTenantIds`)
+ * - canal atual só na barra (ainda sem cookie)
+ *
+ * Ids desconhecidos são ignorados; slots do cookie fora do subconjunto
+ * (ex.: lineage filtrada) mantêm a posição relativa. Retorna `null` só se
+ * o cookie estiver corrompido (duplicata) ou a proposta tiver duplicata.
  */
 export function reordenarCanaisOperador(
   atuais: string[],
   novaOrdem: string[],
 ): string[] | null {
-  if (novaOrdem.length !== atuais.length) return null
+  if (atuais.length === 0) return []
+
   const setAtual = new Set(atuais)
   if (setAtual.size !== atuais.length) return null
+
+  const desejada: string[] = []
   const vistos = new Set<string>()
   for (const slug of novaOrdem) {
-    if (!setAtual.has(slug) || vistos.has(slug)) return null
+    if (!setAtual.has(slug)) continue
+    if (vistos.has(slug)) return null
     vistos.add(slug)
+    desejada.push(slug)
   }
-  return [...novaOrdem]
+
+  if (desejada.length === 0) return [...atuais]
+
+  if (desejada.length === atuais.length) return desejada
+
+  const movidos = new Set(desejada)
+  const resultado: string[] = []
+  let i = 0
+  for (const slug of atuais) {
+    if (!movidos.has(slug)) {
+      resultado.push(slug)
+    } else {
+      resultado.push(desejada[i++]!)
+    }
+  }
+  return resultado
 }
 
 /** Move `from` → `to` (índices) em uma lista imutável. */
@@ -65,6 +90,65 @@ export function slugsHierarquiaFixos(opts: {
   if (opts.temTorcida && torcida) out.push(torcida)
   if (opts.temUnidade && unidade && unidade !== torcida) out.push(unidade)
   return out
+}
+
+/**
+ * Unidade entra no prefixo fixo (sem X) da barra multi-canal?
+ *
+ * Sócio comum: sim, quando há escopo unidade — é a aba "Minha unidade".
+ *
+ * Super-admin: só quando o tenant ativo **é** essa unidade. Caso contrário o
+ * vínculo residual (`SaasMembro` com `sedeId` de SUBSEDE/PDE, ainda APROVADO
+ * depois de `removerLideranca`) trava a 3ª aba em Gaviões sem poder fechar —
+ * e ela "volta" ao sair do PDE, onde a mesma unidade era só extra do cookie
+ * (4ª posição, fechável).
+ */
+export function temUnidadeFixaOperador(opts: {
+  superAdmin: boolean
+  temEscopoUnidade: boolean
+  slugUnidade: string | null | undefined
+  atualSlug: string | null | undefined
+}): boolean {
+  const unidade = opts.slugUnidade?.trim() || ''
+  if (!opts.temEscopoUnidade || !unidade) return false
+  if (!opts.superAdmin) return true
+  const atual = opts.atualSlug?.trim() || ''
+  return atual === unidade
+}
+
+/**
+ * Conversa ids que NÃO entram na barra 4+ (já cobertos pelas abas fixas).
+ *
+ * - Canal oficial da Sede (aba torcida): sempre fixo.
+ * - Canal da unidade do vínculo: só quando a aba unidade está fixa
+ *   (`temUnidadeFixaOperador`). Super-admin na Sede com vínculo residual
+ *   (ex.: Rio Claro) deve poder abrir essa unidade como 4+ fechável —
+ *   senão o mural abre e a aba some.
+ */
+export function idsCanaisHierarquiaFixosNaBarra(opts: {
+  canalIdTorcida: string | null | undefined
+  canalIdUnidade: string | null | undefined
+  superAdmin: boolean
+  temEscopoUnidade: boolean
+  slugUnidade: string | null | undefined
+  atualSlug: string | null | undefined
+}): string[] {
+  const ids: string[] = []
+  const sede = opts.canalIdTorcida?.trim() || ''
+  if (sede) ids.push(sede)
+  const unidade = opts.canalIdUnidade?.trim() || ''
+  if (
+    unidade &&
+    temUnidadeFixaOperador({
+      superAdmin: opts.superAdmin,
+      temEscopoUnidade: opts.temEscopoUnidade,
+      slugUnidade: opts.slugUnidade,
+      atualSlug: opts.atualSlug,
+    })
+  ) {
+    ids.push(unidade)
+  }
+  return ids
 }
 
 /** Canais do cookie que podem ser arrastados/fechados (fora da hierarquia). */

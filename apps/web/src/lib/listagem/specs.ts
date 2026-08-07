@@ -640,6 +640,45 @@ export const LISTAGEM_SUPER_ADMIN_SETUP: ListagemSpec = {
   ],
 }
 
+/**
+ * Lideranças da plataforma — pagina por torcida-raiz. Busca e `escopo` são
+ * resolvidos em `lib/liderancas-console.ts` (árvore + líderes), não via
+ * `montarWhereListagem` no modelo Tenant puro.
+ */
+export const LISTAGEM_SUPER_ADMIN_LIDERANCAS: ListagemSpec = {
+  id: 'super-admin-liderancas',
+  basePath: '/super-admin/liderancas',
+  sortPadrao: 'nome',
+  dirPadrao: 'asc',
+  porPaginaPadrao: 10,
+  buscaPlaceholder: 'Torcida, unidade, clube ou e-mail de quem lidera…',
+  buscaModo: 'termos',
+  // Campos declarados para o contrato/URL; a busca real varre também sedes e líderes.
+  buscaEm: [{ campo: 'nome' }, { campo: 'slug' }],
+  filtrosAvulsos: [
+    {
+      id: 'escopo',
+      label: 'Escopo',
+      tipo: 'enum',
+      // A página traduz — não usar `montarWhereListagem` com este filtro.
+      campo: 'id',
+      opcoes: [
+        { valor: 'minhas', label: 'Onde eu lidero' },
+        { valor: 'sem-lider', label: 'Com vaga de liderança' },
+      ],
+    },
+  ],
+  colunas: [
+    { id: 'nome', label: 'Torcida', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'criadoEm',
+      label: 'Criada em',
+      ordenarPor: 'criadoEm',
+      dirPadrao: 'desc',
+    },
+  ],
+}
+
 /** Todas as listagens registradas — base dos testes de invariante. */
 export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_TORCEDORES,
@@ -652,4 +691,5 @@ export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_SOCIOS_AGUARDANDO,
   LISTAGEM_LOJA_PEDIDOS,
   LISTAGEM_SUPER_ADMIN_SETUP,
+  LISTAGEM_SUPER_ADMIN_LIDERANCAS,
 ]

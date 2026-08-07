@@ -54,9 +54,9 @@ const LINKS_SOMENTE_TORCIDA = new Set([
 const LINKS_OCULTOS_TORCEDOR_VINCULO = new Set(['/portal/carteirinha'])
 
 /**
- * Módulos do canal (torcida/unidade). Na CN somem da topbar — sócio,
- * torcedor e super-admin — e voltam ao abrir a aba torcida/unidade.
- * Na praça do clube fica só Comunidade.
+ * Módulos do canal (torcida/unidade). Somem na CN e em canal temático/
+ * público (`canalOficial: false`); voltam em escopo torcida/unidade ou
+ * detalhe de canal oficial.
  */
 const LINKS_REATIVOS_CANAL = new Set([
   '/portal/carteirinha',
@@ -115,7 +115,11 @@ export function PortalNavbar({
   const searchParams = useSearchParams()
   const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
-  const { override: brandOverride, escopoAtivo } = useNavbarBrandOverride()
+  const {
+    override: brandOverride,
+    escopoAtivo,
+    ocultarModulosReativos,
+  } = useNavbarBrandOverride()
   // Override cosmético (visão de canal): substitui só o slot esquerdo, sem
   // afetar sessão/tenant ativo/permissões. `brandCanal` cobre as rotas fora da
   // Comunidade, onde nenhum override monta — e evita o flash do escudo do
@@ -141,11 +145,12 @@ export function PortalNavbar({
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
 
-  // CN: sem cadeado admin e sem módulos do canal (Carteirinha/Departamentos/
-  // Agenda/Sedes/Loja). Dentro da Comunidade a fonte de verdade é o escopo do
-  // chrome (mesmo resolver da marca), com a URL como fallback até ele montar.
-  // Fora dela não existe `?escopo=`: vale o cookie já revalidado no layout —
-  // senão Agenda/Sedes/Loja voltavam à CN a cada clique da topbar.
+  // CN / canal temático: sem módulos do canal (Carteirinha/Departamentos/
+  // Agenda/Sedes/Loja). Cadeado admin segue só o escopo nacional. Dentro da
+  // Comunidade a fonte de verdade é o escopo do chrome (mesmo resolver da
+  // marca), com a URL como fallback até ele montar. Fora dela não existe
+  // `?escopo=`: vale o cookie já revalidado no layout — senão Agenda/Sedes/
+  // Loja voltavam à CN a cada clique da topbar.
   const naComunidade = pathname.startsWith('/portal/comunidade')
   const escopoParam = searchParams.get('escopo')
   const escopoDaUrl: EscopoComunidade | null =
@@ -169,11 +174,12 @@ export function PortalNavbar({
     : [...navLinks]
   // Departamentos: só sócio com área (temDepartamentos) ou SA no tenant.
   // Torcedor do convite nunca entra — layout já passa 0 no modo nacional.
-  // Na CN o filtro abaixo remove o atalho mesmo com temDepartamentos=true.
+  // CN / temático: o filtro abaixo remove o atalho mesmo com temDepartamentos.
   const linksComDepto = temDepartamentos
     ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
-  const links = emEscopoNacional
+  const ocultarModulos = emEscopoNacional || ocultarModulosReativos
+  const links = ocultarModulos
     ? linksComDepto.filter((link) => !LINKS_REATIVOS_CANAL.has(link.href))
     : linksComDepto
 

@@ -10,8 +10,11 @@ import {
   getCanalDaUnidadeDoVinculo,
   getCanalLeituraDireta,
   getCanalOficialDaSede,
+  getCanalPorId,
   podePublicarNoCanal,
 } from '@/lib/canais'
+import { linkCanalComunidade } from '@/lib/canais-shared'
+import { lerCanalFocoId } from '@/lib/comunidade-canal-foco-cookie'
 import {
   carregarCanaisAbertosOperador,
   lerSlugsCanaisAbertosOperador,
@@ -20,6 +23,14 @@ import {
   carregarCanaisAbertosSocio,
   lerIdsCanaisAbertosSocio,
 } from '@/lib/socio-canais-abertos'
+import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
+import {
+  idsCanaisHierarquiaFixosNaBarra,
+  ordemArrastavelSemFixos,
+  slugsHierarquiaFixos,
+  temUnidadeFixaOperador,
+} from '@/lib/operador-canais-ordem'
+import { resolverOrdemBarraMovel } from '@/lib/comunidade-barra-movel-cookie'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { podeVerFeedSocios } from '@/lib/feed'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
@@ -38,7 +49,7 @@ export const metadata: Metadata = { title: 'Comunidade' }
 export default async function ComunidadePage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; eventoId?: string; escopo?: string }>
+  searchParams: Promise<{ filtro?: string; eventoId?: string; escopo?: string; raiz?: string }>
 }) {
   const params = await searchParams
   const filtro =
@@ -47,6 +58,7 @@ export default async function ComunidadePage({
       : params.filtro === 'grupos'
         ? 'grupos'
         : 'descobrir'
+  const forcarRaiz = params.raiz === '1'
   const eventoIdComposer =
     typeof params.eventoId === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -92,14 +104,35 @@ export default async function ComunidadePage({
         superAdminNacional
           ? carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
           : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
-        !superAdminNacional && torcidaReal
+        superAdminNacional || torcidaReal
           ? carregarCanaisAbertosSocio(
               await lerIdsCanaisAbertosSocio(),
               session.user.id,
-              torcidaReal.id,
+              torcidaReal?.id ?? ctx.tenantSintetico.id,
+              [...(ctx.unidade?.canalId ? [ctx.unidade.canalId] : [])],
+              { leituraOperador: superAdminNacional },
             )
           : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosSocio>>),
       ])
+
+    const slugsFixosNacional = slugsHierarquiaFixos({
+      slugTorcida,
+      slugUnidade,
+      temTorcida: Boolean(slugTorcida),
+      temUnidade: temUnidadeFixaOperador({
+        superAdmin: superAdminNacional,
+        temEscopoUnidade: Boolean(ctx.escopos.unidade),
+        slugUnidade,
+        atualSlug,
+      }),
+    })
+    const ordemBarraMovelNacional = await resolverOrdemBarraMovel({
+      slugsOperador: ordemArrastavelSemFixos(
+        canaisAbertosNacional.map((c) => c.slug),
+        slugsFixosNacional,
+      ),
+      idsTematicos: canaisTematicosNacional.map((c) => c.id),
+    })
 
     return (
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -130,6 +163,7 @@ export default async function ComunidadePage({
           superAdmin={superAdminNacional}
           canaisAbertos={canaisAbertosNacional}
           canaisTematicosAbertos={canaisTematicosNacional}
+          ordemBarraMovelInicial={ordemBarraMovelNacional}
         />
       </div>
     )
@@ -140,25 +174,80 @@ export default async function ComunidadePage({
   // ainda não tiver ponteiro (legado).
   if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')
 
+  const operador = ctx.modo === 'torcida' && Boolean(ctx.operador)
+  const superAdmin = isSuperAdminEmail(session.user.email)
+
+  // Caso A (PDE sem portal): o canal escolhido vive no cookie de foco.
+  // `/portal/comunidade` sem isso sempre reabria a Sede e apagava a marca.
+  // `?raiz=1` (aba Minha torcida) desfaz o foco de propósito.
+  // Cookie só pode ser apagado em Route Handler — ver limpar-canal-foco/route.ts.
+  if (escopo === 'torcida') {
+    const focoId = await lerCanalFocoId()
+    if (focoId) {
+      if (forcarRaiz) {
+        redirect(
+          `/portal/comunidade/limpar-canal-foco?next=${encodeURIComponent('/portal/comunidade?escopo=torcida')}`,
+        )
+      }
+      const canalFoco = operador || superAdmin
+        ? await getCanalLeituraDireta(focoId, session.user.id)
+        : await getCanalPorId(focoId, torcidaReal.id, session.user.id)
+      if (canalFoco) redirect(linkCanalComunidade(focoId))
+      redirect(
+        `/portal/comunidade/limpar-canal-foco?next=${encodeURIComponent('/portal/comunidade?escopo=torcida')}`,
+      )
+    }
+  }
+
   const unidade = escopo === 'unidade' ? ctx.unidade : null
   const tenantDoEscopo = unidade
     ? { id: unidade.tenantId, nome: unidade.nome }
     : { id: torcidaReal.id, nome: torcidaReal.nome }
 
-  const operador = ctx.modo === 'torcida' && Boolean(ctx.operador)
-  const superAdmin = isSuperAdminEmail(session.user.email)
-
-  // Cookie de abertos é gravado nas actions de troca — aqui só lê.
+  // Cookie de abertos: slugs de OUTRAS torcidas + conversas visitadas (4+).
   const canaisAbertos = superAdmin
-    ? await carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
+    ? await carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador(), {
+        excluirTenantIds: await getTorcidaLineageTenantIds(torcidaReal.id),
+      })
     : []
-  const canaisTematicosAbertos = !superAdmin
-    ? await carregarCanaisAbertosSocio(
-        await lerIdsCanaisAbertosSocio(),
-        session.user.id,
-        torcidaReal.id,
-      )
-    : []
+  const oficialSedeBarra = await getCanalOficialDaSede(torcidaReal.id, session.user.id, {
+    leituraOperador: operador || superAdmin,
+  })
+  const idsHierarquiaFixos = idsCanaisHierarquiaFixosNaBarra({
+    canalIdTorcida: oficialSedeBarra?.id ?? null,
+    canalIdUnidade: ctx.unidade?.canalId ?? null,
+    superAdmin,
+    temEscopoUnidade: Boolean(ctx.escopos.unidade),
+    slugUnidade: ctx.unidade?.tenantSlug ?? null,
+    atualSlug,
+  })
+
+  const canaisTematicosAbertos = await carregarCanaisAbertosSocio(
+    await lerIdsCanaisAbertosSocio(),
+    session.user.id,
+    torcidaReal.id,
+    idsHierarquiaFixos,
+    { leituraOperador: superAdmin || operador },
+  )
+
+  const slugsFixosBarra = slugsHierarquiaFixos({
+    slugTorcida,
+    slugUnidade,
+    temTorcida: Boolean(slugTorcida),
+    temUnidade: temUnidadeFixaOperador({
+      superAdmin,
+      temEscopoUnidade: Boolean(ctx.escopos.unidade),
+      slugUnidade,
+      atualSlug,
+    }),
+  })
+  const ordemBarraMovelInicial = await resolverOrdemBarraMovel({
+    slugsOperador: ordemArrastavelSemFixos(
+      canaisAbertos.map((c) => c.slug),
+      slugsFixosBarra,
+    ),
+    idsTematicos: canaisTematicosAbertos.map((c) => c.id),
+  })
 
   const salasAtivas = await listSalasAtivas(tenantDoEscopo.id)
 
@@ -262,9 +351,21 @@ export default async function ComunidadePage({
         slugTorcida={slugTorcida}
         slugUnidade={slugUnidade}
         atualSlug={atualSlug}
+        canalIdTorcida={oficialSedeBarra?.id ?? null}
+        canalIdUnidade={
+          temUnidadeFixaOperador({
+            superAdmin,
+            temEscopoUnidade: Boolean(ctx.escopos.unidade),
+            slugUnidade,
+            atualSlug,
+          })
+            ? (ctx.unidade?.canalId ?? null)
+            : null
+        }
         superAdmin={superAdmin}
         canaisAbertos={canaisAbertos}
         canaisTematicosAbertos={canaisTematicosAbertos}
+        ordemBarraMovelInicial={ordemBarraMovelInicial}
       />
     </div>
   )

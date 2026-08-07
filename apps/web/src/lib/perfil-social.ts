@@ -17,6 +17,7 @@ export interface PerfilSocialLite {
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
+  exibirNumeroSocioNoFeed: boolean
   criadoEm: Date
 }
 
@@ -46,6 +47,7 @@ const perfilSelect = {
   exibirCidade: true,
   exibirSede: true,
   exibirDesde: true,
+  exibirNumeroSocioNoFeed: true,
   criadoEm: true,
 } as const
 

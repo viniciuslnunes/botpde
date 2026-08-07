@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { ChevronDown, UserMinus } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { deixarDeSeguir, solicitarSeguir } from '@/app/portal/comunidade/actions'
-import { fadeScale, popoverPanel, springSnappy, menuItemStagger } from '@/lib/motion-presets'
+import { fadeScale, springSnappy, menuItemStagger } from '@/lib/motion-presets'
+import { FloatingMenu } from './floating-menu'
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' | null
 
@@ -21,6 +22,7 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
   const [pending, startTransition] = useTransition()
   const [menuOpen, setMenuOpen] = useState(false)
   const [localStatus, setLocalStatus] = useState(status)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLocalStatus(status), 0)
@@ -44,10 +46,12 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
           className="relative shrink-0"
         >
           <m.button
+            ref={triggerRef}
             type="button"
             layout
             disabled={pending}
             onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
             className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg border border-[rgb(var(--border))] ${actionPad} ${actionText} font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60`}
@@ -55,46 +59,38 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
             Seguindo
             <ChevronDown className="h-3.5 w-3.5" />
           </m.button>
-          <AnimatePresence>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-hidden />
-                <m.div
-                  variants={popoverPanel}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  transition={springSnappy}
-                  className="absolute right-0 z-20 mt-1 min-w-[10rem] overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
-                >
-                  <m.button
-                    type="button"
-                    custom={0}
-                    variants={menuItemStagger}
-                    initial="hidden"
-                    animate="show"
-                    disabled={pending}
-                    onClick={() => {
-                      setMenuOpen(false)
-                      startTransition(async () => {
-                        try {
-                          await deixarDeSeguir(userId)
-                          setLocalStatus(null)
-                          toast.success('Você deixou de seguir este membro.')
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : 'Não foi possível deixar de seguir.')
-                        }
-                      })
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    <UserMinus className="h-3.5 w-3.5" />
-                    Deixar de seguir
-                  </m.button>
-                </m.div>
-              </>
-            )}
-          </AnimatePresence>
+          <FloatingMenu
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={triggerRef}
+            minWidth={160}
+          >
+            <m.button
+              type="button"
+              role="menuitem"
+              custom={0}
+              variants={menuItemStagger}
+              initial="hidden"
+              animate="show"
+              disabled={pending}
+              onClick={() => {
+                setMenuOpen(false)
+                startTransition(async () => {
+                  try {
+                    await deixarDeSeguir(userId)
+                    setLocalStatus(null)
+                    toast.success('Você deixou de seguir este membro.')
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : 'Não foi possível deixar de seguir.')
+                  }
+                })
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
+            >
+              <UserMinus className="h-3.5 w-3.5" />
+              Deixar de seguir
+            </m.button>
+          </FloatingMenu>
         </m.div>
       ) : localStatus === 'PENDENTE' ? (
         <m.span

@@ -20,6 +20,7 @@ interface PerfilMembroLite {
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
+  exibirNumeroSocioNoFeed: boolean
 }
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO'
@@ -100,6 +101,7 @@ export async function getOrCreatePerfilMembro(
       exibirCidade: true,
       exibirSede: true,
       exibirDesde: true,
+      exibirNumeroSocioNoFeed: true,
     },
   })
   return perfil

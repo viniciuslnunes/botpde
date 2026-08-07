@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   abrirCanalNaOrdem,
   aplicarOrdemArrastavel,
+  idsCanaisHierarquiaFixosNaBarra,
   moverItem,
   moverSlugArrastavel,
   ordemArrastavelSemFixos,
   reordenarCanaisOperador,
   slugsHierarquiaFixos,
+  temUnidadeFixaOperador,
 } from '@/lib/operador-canais-ordem'
 
 describe('abrirCanalNaOrdem', () => {
@@ -32,10 +34,27 @@ describe('reordenarCanaisOperador', () => {
     ])
   })
 
-  it('rejeita ordem incompleta ou com extras', () => {
-    expect(reordenarCanaisOperador(['a', 'b'], ['a'])).toBeNull()
-    expect(reordenarCanaisOperador(['a', 'b'], ['a', 'b', 'c'])).toBeNull()
+  it('reordena subconjunto e preserva ids omitidos na UI (ex.: lineage)', () => {
+    expect(reordenarCanaisOperador(['a', 'b', 'hidden', 'c'], ['c', 'a', 'b'])).toEqual([
+      'c',
+      'a',
+      'hidden',
+      'b',
+    ])
+  })
+
+  it('ignora id só da barra (ainda sem cookie) e aplica o resto', () => {
+    expect(reordenarCanaisOperador(['a', 'b', 'c'], ['b', 'a', 'c', 'ephemeral'])).toEqual([
+      'b',
+      'a',
+      'c',
+    ])
+  })
+
+  it('rejeita duplicata na proposta; cookie vazio / proposta vazia = no-op', () => {
     expect(reordenarCanaisOperador(['a', 'b'], ['a', 'a'])).toBeNull()
+    expect(reordenarCanaisOperador(['a', 'b'], [])).toEqual(['a', 'b'])
+    expect(reordenarCanaisOperador([], ['a'])).toEqual([])
   })
 })
 
@@ -81,6 +100,88 @@ describe('slugsHierarquiaFixos', () => {
   })
 })
 
+describe('temUnidadeFixaOperador', () => {
+  it('sócio: fixa quando há escopo unidade', () => {
+    expect(
+      temUnidadeFixaOperador({
+        superAdmin: false,
+        temEscopoUnidade: true,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'gavioes',
+      }),
+    ).toBe(true)
+  })
+
+  it('super-admin na Sede: vínculo residual NÃO fixa a unidade', () => {
+    expect(
+      temUnidadeFixaOperador({
+        superAdmin: true,
+        temEscopoUnidade: true,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'gavioes',
+      }),
+    ).toBe(false)
+  })
+
+  it('super-admin na própria unidade: fixa (sem X enquanto estiver nela)', () => {
+    expect(
+      temUnidadeFixaOperador({
+        superAdmin: true,
+        temEscopoUnidade: true,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'sub-sede-rio-claro',
+      }),
+    ).toBe(true)
+  })
+
+  it('sem escopo ou slug: nunca fixa', () => {
+    expect(
+      temUnidadeFixaOperador({
+        superAdmin: true,
+        temEscopoUnidade: false,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'sub-sede-rio-claro',
+      }),
+    ).toBe(false)
+    expect(
+      temUnidadeFixaOperador({
+        superAdmin: false,
+        temEscopoUnidade: true,
+        slugUnidade: null,
+        atualSlug: 'gavioes',
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('idsCanaisHierarquiaFixosNaBarra', () => {
+  it('super-admin na Sede: só sede — unidade residual entra na 4+', () => {
+    expect(
+      idsCanaisHierarquiaFixosNaBarra({
+        canalIdTorcida: 'canal-gavioes',
+        canalIdUnidade: 'canal-rio-claro',
+        superAdmin: true,
+        temEscopoUnidade: true,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'gavioes',
+      }),
+    ).toEqual(['canal-gavioes'])
+  })
+
+  it('sócio: sede + unidade do vínculo ficam fora da 4+', () => {
+    expect(
+      idsCanaisHierarquiaFixosNaBarra({
+        canalIdTorcida: 'canal-gavioes',
+        canalIdUnidade: 'canal-rio-claro',
+        superAdmin: false,
+        temEscopoUnidade: true,
+        slugUnidade: 'sub-sede-rio-claro',
+        atualSlug: 'gavioes',
+      }),
+    ).toEqual(['canal-gavioes', 'canal-rio-claro'])
+  })
+})
+
 describe('ordem arrastável com hierarquia', () => {
   const fixos = ['sede', 'unidade']
 
@@ -119,7 +220,12 @@ describe('ordem arrastável com hierarquia', () => {
       'b',
       'a',
     ])
-    expect(aplicarOrdemArrastavel(['sede', 'a', 'b'], ['a'], ['sede'])).toBeNull()
+    // Subconjunto: 'a' sozinho só permuta o slot de a; 'b' permanece.
+    expect(aplicarOrdemArrastavel(['sede', 'a', 'b'], ['a'], ['sede'])).toEqual([
+      'sede',
+      'a',
+      'b',
+    ])
   })
 
   it('fixo ausente do cookie não é inventado', () => {
