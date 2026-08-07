@@ -42,6 +42,7 @@ export function PatrimonioItensLista({
   pageSize,
   basePath,
   query,
+  categoriaTravada,
 }: {
   itens: PatrimonioRow[]
   podeGerir: boolean
@@ -51,6 +52,8 @@ export function PatrimonioItensLista({
   pageSize: number
   basePath: string
   query?: Record<string, string | undefined>
+  /** Categoria imposta pelo RBAC — a edição não pode reclassificar para fora. */
+  categoriaTravada?: string | null
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -110,6 +113,7 @@ export function PatrimonioItensLista({
                   compact
                   initial={initial}
                   candidatos={candidatos}
+                  categoriaTravada={categoriaTravada}
                   onCancel={() => setEditingId(null)}
                 />
               ) : (

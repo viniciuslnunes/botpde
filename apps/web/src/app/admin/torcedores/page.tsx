@@ -82,7 +82,6 @@ const SPEC = LISTAGEM_TORCEDORES
 
 /** Classes de visibilidade responsiva por coluna — a tabela esconde as laterais. */
 const COLUNA_CLASSE: Record<string, string> = {
-  nome: 'px-3 sm:px-4',
   departamento: 'hidden md:table-cell',
   sede: 'hidden lg:table-cell',
   cidade: 'hidden xl:table-cell',
@@ -969,6 +968,7 @@ export default async function TorcedoresPage({
           ))}
           spec={SPEC}
           params={listagem}
+          classesPorColuna={COLUNA_CLASSE}
           podeGerirAcessos={podeGerirAcessos}
           podeBloquear={podeBloquear}
           podeApagar={podeApagar}

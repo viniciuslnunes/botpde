@@ -714,7 +714,7 @@ aderir.
   resolvido, cria/atualiza `Tenant` + cargos de sistema + `Sede` principal,
   linkando `Tenant.torcidaConhecidaId` (único). Idempotente; reutiliza tenants
   existentes (ex.: `pde-gavioes-fiel`) por nome+afiliacao normalizados. Sem
-  owner — transferível via super-admin (`transferirOwnerAction`).
+  owner — atribuível em `/super-admin/liderancas` (`lib/lideranca.ts`, §5.21).
 - **Modelo**: `TorcidaConhecida` (`@@map("saas_torcidas_conhecidas")`) com
   relação opcional a `Afiliacao`. `Tenant.torcidaConhecidaId` liga tenant aos
   dados ricos do catálogo (fundação, lema, sede, logo). `PerfilTorcedor.torcidaConhecidaId`
@@ -1349,6 +1349,101 @@ layout de Comunidade/admin, rodar
 (precisa do dev server e de `--project=setup` para renovar `e2e/.auth`).
 Charts: `e2e/charts.measure.ts` (mesmas pré-condições) — falha se overflow > 2px
 ou texto vazar da coluna do MiniBarChart.
+
+### 5.21 Troca de gestão — presidência e liderança de unidade (2026-08-06)
+
+Presidente de torcida não é vitalício: a gestão troca a cada 3–4 anos. Até aqui
+o produto não tinha esse conceito — a única forma de mexer em quem lidera era um
+`<details>` no rodapé de `/super-admin/torcidas`, e a liderança de unidade era
+um campo qualquer do formulário de sede.
+
+**Bug que motivou a feature.** `promoverSedeParaTenant` atribuía o owner do
+tenant **mãe** ao portal novo quando a unidade não tinha `responsavelUserId`
+válido. Como quem provisiona a torcida costuma ser o super-admin, promover uma
+subsede fazia dele o dono de um portal que nunca foi dele (SUBSEDE RIO CLARO,
+FIEL SÃO VICENTE). O fallback saiu: **sem liderança, o portal nasce sem owner** —
+estado já suportado, em que `assertOwnerOuSuportePlataforma` deixa o super-admin
+operar as configs reservadas até haver presidente de verdade. Passivo:
+`db:repair-owner-heranca-promocao` (dry-run por padrão, `--apply` para gravar).
+A rota irmã `promoverUnidadeAPortal` (super-admin) nunca teve o fallback — a
+divergência entre os dois caminhos era o próprio bug.
+
+**Regra única.** `lib/lideranca.ts` concentra a decisão nos dois formatos de
+unidade que o produto tem:
+
+- **Caso B** (Sede raiz e unidade promovida): liderança é o cargo de sistema
+  `owner`. Trocar move `UserRole`, garante `SaasMembro` APROVADO, vincula canais
+  e alinha `Sede.responsavelUserId` da unidade do tenant.
+- **Caso A** (subsede/PDE sem portal): não há cargo — liderança é
+  `Sede.responsavelUserId`, identidade sem RBAC próprio.
+
+Sempre com `AuditLog` (`LIDERANCA_TRANSFERIDA`, `LIDERANCA_UNIDADE_TRANSFERIDA`,
+`LIDERANCA_UNIDADE_REMOVIDA`, `OWNER_REMOVIDO`) e notificação aos dois lados.
+
+**Duas decisões de produto.** (1) A transferência é **imediata**, com
+confirmação explícita — o cargo é fato consumado na vida real, e o super-admin
+sempre reverte; aceite em duas etapas cabe depois sem refazer o núcleo. (2) O
+presidente que sai **vira `admin`**, não perde o acesso: ex-presidente trancado
+para fora do portal que construiu é perda de memória operacional, não segurança.
+
+**Escopo nunca atravessa tenant.** A permissão nova `leadership:transfer` é
+exclusiva do pacote `owner` (`SYSTEM_ROLE_PERMISSIONS` a tira de `admin` e
+`vice`: vice substitui, não sucede) e diz apenas *se* pode. O alvo é resolvido a
+partir do **tenant ativo**, no servidor — presidente da Sede não escolhe o
+presidente de uma subsede promovida (é outro tenant, com mandato próprio), e
+liderança de unidade não alcança a Sede. Invariantes em
+`lib/__tests__/lideranca.test.ts`.
+
+**Superfícies.** Admin: aba Estrutura › **Presidência** (`/admin/presidencia`,
+etapa de `ADMIN_MODULOS`, some para quem não é presidente). Super-admin:
+`/super-admin/liderancas` — a árvore real (torcida › portais de unidade ›
+unidades sem portal), com KPI de "sem liderança", filtro **"só onde eu lidero"**
+e remoção. O painel antigo (`transferirOwnerAction`/`removerOwnerAction`,
+`listarTorcidasParaTransferencia`) foi removido: listava tenants em ordem
+alfabética sem dizer qual era raiz e qual era unidade.
+
+### 5.22 Bandeiras — departamento por recorte de categoria (2026-08-06)
+
+Bandeira e bateria são o patrimônio simbólico da torcida, e o produto tratava
+"bandeirão" como uma **categoria** de `PatrimonioItem` mais uma área de atuação
+do Patrimônio. Isso funcionava enquanto Patrimônio era o acervo simbólico;
+deixou de funcionar quando o módulo cresceu para inventário geral (mesa,
+cadeira, projetor — expansão correta). O efeito colateral: para guardar um
+bandeirão era preciso `patrimony:manage`, que abre o inventário inteiro, e o
+departamento de Bandeiras não existia em lugar nenhum — nem no canônico, nem na
+matriz de o-que-o-membro-pode × o-que-o-gestor-pode.
+
+**A decisão foi recorte de permissão, não módulo novo.** `Bandeiras` entra como
+11º departamento canônico e o par `flags:view` / `flags:manage` vale **somente**
+para `categoria: BANDEIRA`. `patrimony:*` continua cobrindo tudo, inclusive
+bandeira — a assimetria é o ponto: quem cuida do trapo não herda o projetor,
+quem cuida do inventário não perde a bandeira.
+
+Três invariantes sustentam isso, todas no servidor:
+
+- **A trava é da query.** `resolverEscopoPatrimonio`
+  (`packages/types/src/patrimonio.js`) devolve `categoriaTravada`, aplicada
+  **depois** do filtro do usuário em `listarPatrimonio` / `resumirPatrimonio` /
+  `listarEmprestimosPatrimonio`. Filtrar só na UI faria `flags:view` virar
+  `patrimony:view` na primeira URL montada à mão.
+- **Edição confere origem e destino.** `garantirCategoriaPermitida` roda duas
+  vezes no `editar`: sem checar a categoria de destino, `flags:manage`
+  reclassificaria um bandeirão como `MOBILIARIO` e ficaria com um item fora do
+  próprio escopo.
+- **Gestor de área não é mini-admin.** O pacote do gestor leva `patrimony:view`
+  (saber onde a peça está guardada) e `finance:view` (confecção é despesa
+  rateada), nunca os `manage` correspondentes.
+
+Ficha de **vistoria** (medidas, mastro, órgão, validade da liberação de entrada)
+vive em `PatrimonioItem.meta.vistoria` — mesma escolha de `Departamento.meta` do
+barracão: sem tabela nova e sem ERP de compliance. `validade` ausente **não**
+alarma: liberação sem prazo é o caso comum, e alarmar nele treina o gestor a
+ignorar o aviso (mesmo princípio de `progressoMeta` sem meta em `projeto.js`).
+Escala de jogo reusa `Evento` com `partidaId`, como o `#escala` da Bateria — sem
+lista paralela à Agenda.
+
+Spec: `docs/data/modulo-bandeiras.md`. Invariantes travadas em
+`lib/__tests__/bandeiras.test.ts` e `rbac.test.ts`.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

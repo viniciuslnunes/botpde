@@ -15,7 +15,14 @@ export {
   metricsEnabled,
 }
 
-const WEB_CONNECTION_LIMIT = 5
+// Produção: app e Postgres no mesmo datacenter Railway (RTT ~1ms), então 5
+// conexões dão vazão de sobra e o pool pequeno protege o `max_connections`.
+// Desenvolvimento: o dev roda na máquina do dev e fala com o Postgres pelo
+// proxy público (RTT ~125ms medido). Com pool 5, as queries que a página
+// dispara em paralelo (`Promise.all`) viram 4 ondas de 130ms em vez de uma —
+// o pool, não o banco, é o gargalo. Um pool maior local não pressiona o banco
+// (é um único processo dev) e devolve o paralelismo que a página já pediu.
+const WEB_CONNECTION_LIMIT = process.env.NODE_ENV === 'production' ? 5 : 20
 // Timeouts tolerantes a blips do proxy Railway (mesmos parâmetros do
 // seed-departamentos.js). Só entram se a URL ainda não os definir.
 const WEB_URL_PARAMS = {

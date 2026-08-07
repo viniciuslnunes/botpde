@@ -47,6 +47,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
       PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.ROLES_MANAGE,
       PERMISSIONS.AFFILIATION_MANAGE,
+      PERMISSIONS.LEADERSHIP_TRANSFER,
     ],
     secao: 'governanca',
   },
@@ -106,6 +107,21 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE],
     secao: 'operacao',
     departamentoSlug: 'bateria',
+  },
+  {
+    id: 'bandeiras',
+    label: 'Bandeiras',
+    href: '/admin/bandeiras',
+    // `flags:manage` é o pacote do gestor da área; events:* entra porque a
+    // escala de jogo é evento da Agenda. `flags:view` (colaborador) fica de
+    // fora de propósito: acervo se opera no portal.
+    permissao: [
+      PERMISSIONS.FLAGS_MANAGE,
+      PERMISSIONS.EVENTS_CREATE,
+      PERMISSIONS.EVENTS_MANAGE,
+    ],
+    secao: 'operacao',
+    departamentoSlug: 'bandeiras',
   },
   {
     id: 'social',
@@ -498,6 +514,15 @@ export const ADMIN_MODULOS = ([
         label: 'Solicitações',
         href: '/admin/afiliacoes',
         permissao: PERMISSIONS.AFFILIATION_MANAGE,
+      },
+      // Passar o mandato adiante. Só o owner tem `leadership:transfer`
+      // (`SYSTEM_ROLE_PERMISSIONS` tira de admin e vice), então a etapa some
+      // para o resto da diretoria em vez de aparecer bloqueada.
+      {
+        id: 'presidencia',
+        label: 'Presidência',
+        href: '/admin/presidencia',
+        permissao: PERMISSIONS.LEADERSHIP_TRANSFER,
       },
     ],
   },

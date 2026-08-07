@@ -66,6 +66,19 @@ export const PERMISSIONS = /** @type {const} */ ({
   PATRIMONY_VIEW: 'patrimony:view',
   PATRIMONY_MANAGE: 'patrimony:manage',
 
+  /**
+   * Bandeiras — recorte do acervo dentro do Patrimônio.
+   *
+   * Bandeirão e faixa são patrimônio, mas o Patrimônio virou inventário geral
+   * (mesa, cadeira, projetor). Quem cuida do trapo não precisa — nem deve —
+   * abrir o inventário inteiro. Estas duas permissões valem **só** para itens
+   * de categoria `BANDEIRA`: quem tem `patrimony:manage` continua gerindo tudo,
+   * incluindo bandeiras. A trava é do servidor
+   * (`podeGerirCategoriaPatrimonio` em `patrimonio.js`), nunca da UI.
+   */
+  FLAGS_VIEW: 'flags:view',
+  FLAGS_MANAGE: 'flags:manage',
+
   // Comunidade (mural de posts locais/não-oficiais)
   /** Leitura do módulo Comunidade admin — sem moderar/publicar. */
   COMMUNITY_VIEW: 'community:view',
@@ -107,6 +120,15 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Decidir afiliação/promoção de unidades (subsede/PDE → portal próprio).
   // Só Presidente (owner) e Vice; admin comum não tem.
   AFFILIATION_MANAGE: 'affiliation:manage',
+
+  /**
+   * Passar a presidência/liderança adiante — troca de gestão, que em torcida
+   * acontece a cada 3–4 anos. Exclusiva do **owner** (nem admin nem vice):
+   * quem não é presidente não escolhe o próximo. Escopo é sempre a própria
+   * unidade — a trava de alcance é do servidor (`lib/lideranca.ts`), não desta
+   * permissão. Fora do formulário de cargos de propósito.
+   */
+  LEADERSHIP_TRANSFER: 'leadership:transfer',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -173,6 +195,14 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.PATRIMONY_VIEW, label: 'Ver patrimônio' },
       { key: PERMISSIONS.PATRIMONY_MANAGE, label: 'Gerenciar patrimônio' },
+    ],
+  },
+  {
+    label: 'Bandeiras',
+    base: PERMISSIONS.FLAGS_VIEW,
+    items: [
+      { key: PERMISSIONS.FLAGS_VIEW, label: 'Ver acervo de bandeiras' },
+      { key: PERMISSIONS.FLAGS_MANAGE, label: 'Gerenciar bandeiras (acervo e vistoria)' },
     ],
   },
   {
@@ -311,6 +341,7 @@ export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
   { key: 'sedes', label: 'Sedes e subsedes' },
   { key: 'financeiro', label: 'Financeiro' },
   { key: 'patrimonio', label: 'Patrimônio' },
+  { key: 'bandeiras', label: 'Bandeiras' },
   { key: 'caravanas', label: 'Caravanas' },
   { key: 'bateria', label: 'Bateria' },
   { key: 'membros', label: 'Membros' },
@@ -336,6 +367,10 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   diretoria: { href: null, disponivel: false },
   financeiro: { href: '/portal/financeiro', disponivel: true },
   patrimonio: { href: '/portal/patrimonio', disponivel: true },
+  // Bandeiras não ganha módulo de portal próprio: é o mesmo inventário, já
+  // recortado na categoria. Quem só tem `flags:view` é travado nesse recorte
+  // pelo servidor — o query param é conveniência, não autorização.
+  bandeiras: { href: '/portal/patrimonio?categoria=BANDEIRA', disponivel: true },
   caravanas: { href: '/portal/eventos?tipo=CARAVANA', disponivel: true },
   bateria: { href: '/portal/eventos?tipo=ENSAIO', disponivel: true },
 })
@@ -357,6 +392,7 @@ export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   membros: '/admin/torcedores',
   financeiro: '/admin/financeiro',
   patrimonio: '/admin/patrimonio',
+  bandeiras: '/admin/bandeiras',
   bateria: '/admin/bateria',
   caravanas: '/admin/caravanas',
 })
@@ -380,7 +416,7 @@ export function slugifyDepartamento(nome) {
 }
 
 /**
- * Slugs dos 10 departamentos canônicos semeados por tenant (badge "padrão" na UI).
+ * Slugs dos departamentos canônicos semeados por tenant (badge "padrão" na UI).
  * @type {readonly string[]}
  */
 export const DEPARTAMENTOS_CANONICOS_SLUGS = Object.freeze([
@@ -390,6 +426,7 @@ export const DEPARTAMENTOS_CANONICOS_SLUGS = Object.freeze([
   'materiais-loja',
   'comunicacao',
   'patrimonio',
+  'bandeiras',
   'bateria',
   'caravanas',
   'feminino',
@@ -438,15 +475,22 @@ export const SYSTEM_ROLE_PERMISSIONS = {
   // `MEMBERS_PURGE` é hard delete do cadastro: fica só com o Presidente
   // (owner) e o super-admin. Sem excluí-la aqui, admin e vice a herdariam de
   // graça — `ALL_PERMISSIONS` é a base dos dois pacotes.
+  // `LEADERSHIP_TRANSFER` sai dos dois pacotes: passar a presidência adiante é
+  // ato do presidente. Vice substitui, não sucede — quem escolhe o sucessor é
+  // quem tem o mandato (ou o super-admin, que opera fora do RBAC por tenant).
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
     (p) =>
       p !== PERMISSIONS.SETTINGS_MANAGE &&
       p !== PERMISSIONS.TORCIDA_GLOBAL_VIEW &&
       p !== PERMISSIONS.AFFILIATION_MANAGE &&
-      p !== PERMISSIONS.MEMBERS_PURGE,
+      p !== PERMISSIONS.MEMBERS_PURGE &&
+      p !== PERMISSIONS.LEADERSHIP_TRANSFER,
   ),
   [SYSTEM_ROLES.VICE]: ALL_PERMISSIONS.filter(
-    (p) => p !== PERMISSIONS.SETTINGS_MANAGE && p !== PERMISSIONS.MEMBERS_PURGE,
+    (p) =>
+      p !== PERMISSIONS.SETTINGS_MANAGE &&
+      p !== PERMISSIONS.MEMBERS_PURGE &&
+      p !== PERMISSIONS.LEADERSHIP_TRANSFER,
   ),
   [SYSTEM_ROLES.MEMBER]: [
     PERMISSIONS.COMMUNITY_POST,
@@ -598,6 +642,7 @@ export function permissoesForaDoAlcance(atorEfetivas, desejadas) {
 const PERMISSION_LABELS_FORA_DO_FORMULARIO = {
   [PERMISSIONS.SETTINGS_MANAGE]: 'Configurações da torcida',
   [PERMISSIONS.ASSOCIACAO_PENDENCIAS_MANAGE]: 'Solicitação de dados pendentes',
+  [PERMISSIONS.LEADERSHIP_TRANSFER]: 'Transferir a presidência da unidade',
 }
 
 /**

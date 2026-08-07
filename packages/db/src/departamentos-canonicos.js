@@ -37,7 +37,7 @@ import {
 export const DEPARTAMENTOS_SLUGS_LEGADOS = ['socio', 'torcedor']
 
 /**
- * Slugs dos 10 departamentos canônicos — útil para badge "padrão" na UI.
+ * Slugs dos departamentos canônicos — útil para badge "padrão" na UI.
  * @type {readonly string[]}
  */
 export const DEPARTAMENTOS_CANONICOS_SLUGS = [
@@ -47,6 +47,7 @@ export const DEPARTAMENTOS_CANONICOS_SLUGS = [
   'materiais-loja',
   'comunicacao',
   'patrimonio',
+  'bandeiras',
   'bateria',
   'caravanas',
   'feminino',
@@ -219,6 +220,38 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.CHANNELS_MANAGE,
+    ],
+  },
+  {
+    // Bandeiras — o trapo: acervo, escala de jogo e vistoria de entrada.
+    // Colaborador NÃO leva `patrimony:view`: com o Patrimônio virando
+    // inventário geral (mesa, cadeira, projetor), quem cuida da bandeira
+    // enxerga só a bandeira. `flags:manage` (gestor) escreve apenas em
+    // categoria BANDEIRA — a trava é `podeGerirCategoriaPatrimonio`.
+    nome: 'Bandeiras',
+    cor: '#4338ca',
+    moduloPortal: 'bandeiras',
+    permissions: [
+      PERMISSIONS.FLAGS_VIEW,
+      PERMISSIONS.COMMUNITY_POST,
+      PERMISSIONS.MESSAGES_SEND,
+      PERMISSIONS.GROUPS_CREATE,
+      PERMISSIONS.MEETINGS_HOST,
+    ],
+    permissionsGestor: [
+      PERMISSIONS.FLAGS_MANAGE,
+      PERMISSIONS.EVENTS_CREATE,
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+      PERMISSIONS.CHANNELS_MANAGE,
+      PERMISSIONS.COMMUNITY_MANAGE,
+      PERMISSIONS.COMMUNITY_MODERATE,
+      // Ver (não gerir) o inventário geral: saber onde a bandeira está
+      // guardada junto do resto. Confecção/reforma sai como despesa rateada,
+      // por isso `finance:view` — nunca `finance:manage`.
+      PERMISSIONS.PATRIMONY_VIEW,
+      PERMISSIONS.FINANCE_VIEW,
+      PERMISSIONS.REPORTS_VIEW,
     ],
   },
   {
@@ -428,7 +461,7 @@ async function runTasks(concurrent, tasks) {
 }
 
 /**
- * Upsert dos 10 departamentos canônicos no tenant. Idempotente.
+ * Upsert dos departamentos canônicos no tenant. Idempotente.
  * Também remove departamentos legados socio/torcedor.
  *
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client

@@ -4986,6 +4986,11 @@ model PatrimonioItem {
 
   observacao   String?
 
+  /// Extensões por categoria, sem tabela nova. Hoje: `meta.vistoria` do
+  /// departamento de Bandeiras (medidas, mastro, órgão, validade da
+  /// liberação) — ver `packages/types/src/patrimonio.js`.
+  meta Json?
+
   /// Frente do departamento Patrimônio (instrumentos / bandeirões / sede).
   areaId String? @map("area_id")
 

@@ -1,0 +1,45 @@
+# Postgres local para desenvolvimento — ver docs/ops/postgres-local-dev.md
+#
+# Motivo: em dev o Next roda na máquina do dev e o Postgres da Railway só é
+# alcançável pelo proxy público (RTT medido: 125ms). Cada query Prisma paga
+# esse RTT; uma página de módulo com 30 queries gasta ~4s só de rede. Em
+# produção app e banco ficam no mesmo datacenter (~1ms). Este container põe o
+# banco a ~0,1ms e devolve a paridade com produção.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Mesma major version do banco da Railway (PostgreSQL 18) para que o dump
+# restaure sem incompatibilidade de catálogo.
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: torcida-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: torcida
+      POSTGRES_PASSWORD: torcida
+      POSTGRES_DB: torcida
+    ports:
+      - '5432:5432'
+    volumes:
+      - torcida-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U torcida -d torcida']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Banco de desenvolvimento descartável: sem fsync o restore do dump e as
+    # escritas dos seeds ficam bem mais rápidos. NUNCA usar isto em produção —
+    # um crash corrompe o cluster.
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c shared_buffers=512MB
+      -c work_mem=32MB
+      -c max_connections=200
+
+volumes:
+  torcida-pgdata:

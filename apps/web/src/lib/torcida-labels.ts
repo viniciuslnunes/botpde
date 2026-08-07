@@ -145,11 +145,6 @@ export function labelUnidadeSub(u: Pick<UnidadeOpcao, 'tipo' | 'cidade'>): strin
   return u.cidade ? `${tipo} · ${u.cidade}` : tipo
 }
 
-export type TorcidaTransferencia = TorcidaOpcao & {
-  temOwner: boolean
-  ownerEmail: string | null
-}
-
 /** "CORINTHIANS (SP)" — subtítulo / busca. */
 export function labelClubeComUf(
   t: Pick<TorcidaOpcao, 'clubeNome' | 'clubeUf'>,

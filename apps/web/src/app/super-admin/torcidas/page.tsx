@@ -7,15 +7,13 @@ import {
   isSuperAdminEmail,
   listarClubesParaSelecao,
   listarTorcidasParaSelecao,
-  listarTorcidasParaTransferencia,
 } from '@/lib/tenant-context'
 import { listarUnidadesParaSelecao } from '@/lib/admin-context-unidades'
 import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
-import { ArrowRight, Building2, FileSearch, Settings, Users } from 'lucide-react'
+import { ArrowRight, Building2, Crown, FileSearch, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 import type { UnidadeOpcao } from '@/lib/torcida-labels'
-import { TransferirOwnerPainel } from './transferir-owner-painel'
 import { TorcidasListaCliente } from './torcidas-lista-cliente'
 
 export const metadata: Metadata = { title: 'Torcidas — Super Admin' }
@@ -27,10 +25,9 @@ export default async function TorcidasPage() {
     redirect('/')
   }
 
-  const [torcidas, clubes, torcidasTransferencia, tenantAtual, totalTenants] = await Promise.all([
+  const [torcidas, clubes, tenantAtual, totalTenants] = await Promise.all([
     listarTorcidasParaSelecao(),
     listarClubesParaSelecao(),
-    listarTorcidasParaTransferencia(),
     getTenantFromHost(),
     db.tenant.count({ where: { ativo: true, sintetico: false } }),
   ])
@@ -136,20 +133,27 @@ export default async function TorcidasPage() {
         </div>
       </div>
 
-      <details
-        className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-        open
-      >
-        <summary className="cursor-pointer text-sm font-medium text-[rgb(var(--foreground))]">
-          Gerenciar presidente (owner)
-        </summary>
-        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-          Transfira o cargo para o e-mail do presidente, ou remova a qualquer momento (a unidade
-          fica sem liderança até nova atribuição — e o super-admin volta a operar as configs
-          reservadas).
-        </p>
-        <TransferirOwnerPainel torcidas={torcidasTransferencia} />
-      </details>
+      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+              <Crown className="h-4 w-4" />
+              Presidência e lideranças
+            </h2>
+            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+              Quem lidera cada torcida e cada unidade, na árvore real — transferir, remover, ou
+              sair da posse de um portal que caiu no seu colo.
+            </p>
+          </div>
+          <Link
+            href="/super-admin/liderancas"
+            className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--foreground))] px-4 py-2 text-sm font-semibold text-[rgb(var(--surface))] transition-opacity hover:opacity-90"
+          >
+            Abrir lideranças
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
       </div>
     </div>
   )

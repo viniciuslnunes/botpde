@@ -10,7 +10,11 @@
  * erros de conexão do proxy Railway.
  */
 import { PrismaClient } from '@prisma/client'
-import { upsertDepartamentosCanonicos, upsertPerfisDepartamentoCanonicos } from '../src/departamentos-canonicos.js'
+import {
+  DEPARTAMENTOS_CANONICOS,
+  upsertDepartamentosCanonicos,
+  upsertPerfisDepartamentoCanonicos,
+} from '../src/departamentos-canonicos.js'
 import { ensureCanaisDepartamentosTenant } from '../src/departamento-canais.js'
 
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY) || 6)
@@ -200,7 +204,7 @@ async function main() {
 
   const elapsedSec = ((Date.now() - started) / 1000).toFixed(1)
   console.log(
-    `\n10 departamentos × ${tenants.length} tenant(s) sincronizados` +
+    `\n${DEPARTAMENTOS_CANONICOS.length} departamentos × ${tenants.length} tenant(s) sincronizados` +
       (removedLegacy > 0 ? ` (${removedLegacy} legado(s) removidos)` : '') +
       (falhas > 0 ? ` — ${falhas} falha(s)` : '') +
       ` em ${elapsedSec}s.`,

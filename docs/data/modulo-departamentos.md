@@ -75,6 +75,7 @@ Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` 
 | **Materiais / Loja** | DMs/grupos; postar; relatórios | Ver/gerir pedidos e catálogo; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
 | **Comunicação** | Postar; salas/grupos; DMs | Curar notícias; comunicados; mural/moderação/canais; post nacional; moderar msgs; eventos; relatórios; ver pedidos |
 | **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos | Gerir patrimônio; eventos; ver financeiro; comunicados; salas/canais |
+| **Bandeiras** | Ver o acervo de bandeiras (`flags:view`); postar; DMs/grupos/salas | Gerir bandeiras (`flags:manage`, só categoria BANDEIRA); eventos; mural/moderação/canais; comunicados; ver patrimônio, financeiro e relatórios |
 | **Bateria** | Postar; grupos/salas; ver patrimônio | Criar/gerir eventos; canais/mural/notícias; comunicados; gerir patrimônio (instrumentos) |
 | **Caravanas** | DMs/grupos/salas; postar; ver financeiro/relatórios | Criar/gerir eventos; canais/mural; comunicados; advertir |
 | **Feminino** | Postar; DMs/grupos/salas | Eventos; notícias; mural/moderação/canais; comunicados; relatórios; advertir |
@@ -508,6 +509,13 @@ criar/editar evento (`Evento.projetoId`).
    mutações seguem `*:manage` / approve / publish. Matriz completa:
    `docs/data/matriz-cargos-permissoes.md`. Demais áreas colaboradoras
    permanecem na regra do item 7.
-9. **Área de atuação é organização, não RBAC** (2026-08-03): `DepartamentoArea`
+9. **Bandeiras é departamento com recorte de permissão** (2026-08-06): 11º
+   canônico. Bandeirão continua sendo `PatrimonioItem` (`categoria: BANDEIRA`);
+   o que separa o departamento do Patrimônio é o par `flags:view` /
+   `flags:manage`, que vale **só** para essa categoria, com a trava aplicada na
+   query (`resolverEscopoPatrimonio.categoriaTravada`). `patrimony:manage`
+   continua cobrindo tudo, inclusive bandeira. Detalhe:
+   [`modulo-bandeiras.md`](./modulo-bandeiras.md).
+10. **Área de atuação é organização, não RBAC** (2026-08-03): `DepartamentoArea`
    segmenta gente e trabalho dentro do departamento; permissão continua no
    departamento e `RESPONSAVEL` é accountability. Ver seção acima.

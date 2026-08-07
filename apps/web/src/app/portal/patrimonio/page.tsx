@@ -1,14 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Landmark } from 'lucide-react'
-import {
-  calculateEffectivePermissions,
-  hasPermission,
-  PERMISSIONS,
-} from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
-import { getUserPermissionsInTenant } from '@/lib/tenant'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { Flag, Landmark } from 'lucide-react'
+import { assertAcervoView } from '@/lib/patrimonio-authz'
 import {
   listarCandidatosResponsavelPatrimonio,
   listarEmprestimosPatrimonio,
@@ -38,40 +31,36 @@ export const metadata: Metadata = { title: 'Patrimônio' }
 type Props = { searchParams: Promise<PatrimonioSearchParams> }
 
 export default async function PortalPatrimonioPage({ searchParams }: Props) {
-  let session: Awaited<ReturnType<typeof assertPermission>>['session']
-  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  let acervo: Awaited<ReturnType<typeof assertAcervoView>>
   try {
-    ;({ session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_VIEW))
+    acervo = await assertAcervoView()
   } catch {
     redirect('/portal/departamentos')
   }
+  const { session, tenant, escopo, escopoCategoria } = acervo
 
-  const isSuperAdmin = isSuperAdminEmail(session.user.email)
-  let podeGerir = isSuperAdmin
-  if (!podeGerir && session.user.id) {
-    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
-      session.user.id,
-      tenant.id,
-    )
-    const effective = calculateEffectivePermissions(rolePermissions, overrides)
-    podeGerir = hasPermission(effective, PERMISSIONS.PATRIMONY_MANAGE)
-  }
+  // Quem entrou por `flags:*` vê e opera só o acervo de bandeiras — o módulo é
+  // o mesmo, a página é que se apresenta como o recorte dele.
+  const soBandeiras = escopoCategoria !== null
+  const podeGerir = soBandeiras ? escopo.podeGerirBandeiras : escopo.podeGerirTudo
 
   const sp = await searchParams
   const { filtro, values } = parseFiltroPatrimonio(sp)
 
   const [resumo, lista, candidatos, meusEmprestimos, disponiveisRetirada] = await Promise.all([
-    resumirPatrimonio(tenant.id),
-    listarPatrimonio(tenant.id, { filtro }),
+    resumirPatrimonio(tenant.id, escopoCategoria),
+    listarPatrimonio(tenant.id, { filtro, escopoCategoria }),
     podeGerir ? listarCandidatosResponsavelPatrimonio(tenant.id) : Promise.resolve([]),
     listarEmprestimosPatrimonio(tenant.id, {
       userId: session.user.id!,
       status: 'ABERTO',
       limite: 20,
+      escopoCategoria,
     }),
     listarPatrimonio(tenant.id, {
       filtro: { status: 'DISPONIVEL', page: 1 },
       pageSize: 8,
+      escopoCategoria,
     }),
   ])
 
@@ -100,18 +89,28 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
       <MotionReveal>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-500/15 text-stone-700 dark:text-stone-300">
-              <Landmark className="h-5 w-5" />
+            <div
+              className={
+                soBandeiras
+                  ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                  : 'flex h-10 w-10 items-center justify-center rounded-xl bg-stone-500/15 text-stone-700 dark:text-stone-300'
+              }
+            >
+              {soBandeiras ? <Flag className="h-5 w-5" /> : <Landmark className="h-5 w-5" />}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Patrimônio</h1>
+              <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+                {soBandeiras ? 'Bandeiras' : 'Patrimônio'}
+              </h1>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                Inventário de bens da torcida
+                {soBandeiras
+                  ? 'Acervo de bandeirões, faixas e mastros da torcida'
+                  : 'Inventário de bens da torcida'}
               </p>
             </div>
           </div>
           <Link
-            href="/portal/departamentos/patrimonio"
+            href={soBandeiras ? '/portal/departamentos/bandeiras' : '/portal/departamentos/patrimonio'}
             className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver departamento
@@ -155,8 +154,14 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
         </section>
       )}
 
-      <PatrimonioFiltros basePath="/portal/patrimonio" values={values} />
-      {podeGerir && <PatrimonioItemForm candidatos={candidatos} />}
+      <PatrimonioFiltros
+        basePath="/portal/patrimonio"
+        values={values}
+        categoriaTravada={escopoCategoria}
+      />
+      {podeGerir && (
+        <PatrimonioItemForm candidatos={candidatos} categoriaTravada={escopoCategoria} />
+      )}
       <PatrimonioItensLista
         itens={itens}
         podeGerir={podeGerir}
@@ -166,6 +171,7 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
         pageSize={lista.pageSize}
         basePath="/portal/patrimonio"
         query={query}
+        categoriaTravada={escopoCategoria}
       />
     </div>
   )

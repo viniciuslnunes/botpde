@@ -41,6 +41,8 @@ export interface SocioEmitidoItem {
   validadeIso: string
   validadeLabel: string
   email: string | null
+  /** Área de atuação no tenant (vem do `SaasMembro`, não da carteirinha). */
+  departamentoNome: string | null
   avatarUrl: string | null
   vencida: boolean
   vencendo: boolean
@@ -828,6 +830,7 @@ export function AdminSociosClient({
                               membro.numeroAssociado
                                 ? `nº ${membro.numeroAssociado}`
                                 : null,
+                              membro.departamentoNome,
                               membro.sedeNome,
                               membro.cidade,
                               membro.telefone,
@@ -911,6 +914,11 @@ export function AdminSociosClient({
                                 </p>
                               </div>
                             </div>
+                          </td>
+                          <td className="hidden px-4 py-3 sm:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {membro.departamentoNome ?? '—'}
+                            </span>
                           </td>
                           <td className="hidden px-4 py-3 md:table-cell">
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -1012,9 +1020,11 @@ export function AdminSociosClient({
                             {socio.nome}
                           </span>
                         </div>
-                        {socio.email && (
+                        {(socio.departamentoNome || socio.email) && (
                           <p className="mt-0.5 truncate text-xs text-[rgb(var(--foreground-muted))]">
-                            {socio.email}
+                            {[socio.departamentoNome, socio.email]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </p>
                         )}
                         <div className="mt-2">
@@ -1073,6 +1083,11 @@ export function AdminSociosClient({
                               {socio.nome}
                             </span>
                           </div>
+                        </td>
+                        <td className="hidden px-4 py-3 md:table-cell">
+                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                            {socio.departamentoNome ?? '—'}
+                          </span>
                         </td>
                         <td className="hidden px-4 py-3 lg:table-cell">
                           <span className="text-xs text-[rgb(var(--foreground-muted))]">

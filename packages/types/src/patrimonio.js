@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PERMISSIONS, hasPermission } from './permissions.js'
 
 export const CategoriaPatrimonioSchema = z.enum([
   'INSTRUMENTO',
@@ -146,4 +147,185 @@ export const STATUS_EMPRESTIMO_PATRIMONIO_LABEL = {
  */
 export function categoriaExigeEvidencia(categoria) {
   return categoria === 'INSTRUMENTO' || categoria === 'BANDEIRA'
+}
+
+/* ------------------------------------------------------------------ *
+ * Bandeiras — recorte do acervo (departamento próprio, mesmo modelo)
+ * ------------------------------------------------------------------ */
+
+/** Categoria operada pelo departamento de Bandeiras. */
+export const CATEGORIA_BANDEIRA = 'BANDEIRA'
+
+/**
+ * Escopo de acesso ao inventário, resolvido de uma vez para a página/action.
+ *
+ * Regra central do módulo: `patrimony:*` é o inventário inteiro (mesa, cadeira,
+ * projetor, instrumento, bandeirão); `flags:*` é **só** categoria `BANDEIRA`.
+ * Quem tem `patrimony:manage` gere bandeira também — o contrário não vale.
+ *
+ * `categoriaTravada` não é filtro de UI: quando vem `'BANDEIRA'`, a query do
+ * servidor precisa aplicá-la, senão `flags:view` viraria `patrimony:view`.
+ *
+ * @typedef {{
+ *   podeVer: boolean,
+ *   podeVerTudo: boolean,
+ *   podeGerir: boolean,
+ *   podeGerirTudo: boolean,
+ *   podeGerirBandeiras: boolean,
+ *   categoriaTravada: 'BANDEIRA' | null,
+ * }} EscopoPatrimonio
+ *
+ * @param {readonly string[]} permissoes
+ * @param {{ isSuperAdmin?: boolean }} [opts] plataforma opera fora do RBAC do
+ *   tenant — mesmo bypass que `/portal/patrimonio` e `/admin/patrimonio` já
+ *   aplicavam antes das bandeiras existirem.
+ * @returns {EscopoPatrimonio}
+ */
+export function resolverEscopoPatrimonio(permissoes, opts = {}) {
+  const isSuperAdmin = opts.isSuperAdmin === true
+  const podeVerTudo =
+    isSuperAdmin ||
+    hasPermission(permissoes, PERMISSIONS.PATRIMONY_VIEW) ||
+    hasPermission(permissoes, PERMISSIONS.PATRIMONY_MANAGE)
+  const podeGerirTudo = isSuperAdmin || hasPermission(permissoes, PERMISSIONS.PATRIMONY_MANAGE)
+  const podeGerirBandeiras =
+    podeGerirTudo || hasPermission(permissoes, PERMISSIONS.FLAGS_MANAGE)
+  const podeVerBandeiras =
+    podeVerTudo ||
+    podeGerirBandeiras ||
+    hasPermission(permissoes, PERMISSIONS.FLAGS_VIEW)
+
+  return {
+    podeVer: podeVerTudo || podeVerBandeiras,
+    podeVerTudo,
+    podeGerir: podeGerirTudo || podeGerirBandeiras,
+    podeGerirTudo,
+    podeGerirBandeiras,
+    categoriaTravada: podeVerTudo ? null : podeVerBandeiras ? CATEGORIA_BANDEIRA : null,
+  }
+}
+
+/**
+ * Pode escrever neste item? `patrimony:manage` em qualquer categoria;
+ * `flags:manage` só em `BANDEIRA`.
+ *
+ * @param {readonly string[]} permissoes
+ * @param {string} categoria
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ * @returns {boolean}
+ */
+export function podeGerirCategoriaPatrimonio(permissoes, categoria, opts = {}) {
+  const escopo = resolverEscopoPatrimonio(permissoes, opts)
+  if (escopo.podeGerirTudo) return true
+  return escopo.podeGerirBandeiras && categoria === CATEGORIA_BANDEIRA
+}
+
+/**
+ * Pode ler este item?
+ *
+ * @param {readonly string[]} permissoes
+ * @param {string} categoria
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ * @returns {boolean}
+ */
+export function podeVerCategoriaPatrimonio(permissoes, categoria, opts = {}) {
+  const escopo = resolverEscopoPatrimonio(permissoes, opts)
+  if (!escopo.podeVer) return false
+  if (escopo.categoriaTravada) return categoria === escopo.categoriaTravada
+  return true
+}
+
+/**
+ * Ficha de vistoria/liberação: o que clube e polícia pedem para o bandeirão
+ * entrar no estádio. Vive em `PatrimonioItem.meta.vistoria` — sem tabela nova
+ * e sem virar ERP de compliance.
+ */
+export const VistoriaBandeiraSchema = z.object({
+  larguraM: z.coerce.number().positive('Largura inválida').max(200),
+  alturaM: z.coerce.number().positive('Altura inválida').max(200),
+  /**
+   * Bandeira de mastro costuma ter regra própria de entrada.
+   * Checkbox de FormData: ausente = false; `z.coerce.boolean` transformaria a
+   * string "false" em `true`.
+   */
+  comMastro: z
+    .union([z.literal('1'), z.literal('true'), z.literal('on'), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === '1' || v === 'true' || v === 'on'),
+  orgao: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  protocolo: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  /** ISO `yyyy-mm-dd`; ausente = liberação sem prazo declarado. */
+  validade: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  observacao: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+export const RegistrarVistoriaBandeiraSchema = z.object({
+  itemId: z.string().uuid('Item inválido'),
+  ...VistoriaBandeiraSchema.shape,
+})
+
+/**
+ * Lê a vistoria gravada em `meta` sem confiar no formato (dado antigo, JSON
+ * escrito por script). Retorna `null` em vez de estourar.
+ *
+ * @param {unknown} meta
+ * @returns {{ larguraM: number, alturaM: number, comMastro: boolean, orgao?: string, protocolo?: string, validade?: string, observacao?: string } | null}
+ */
+export function lerVistoriaBandeira(meta) {
+  if (!meta || typeof meta !== 'object') return null
+  const bruto = /** @type {Record<string, unknown>} */ (meta).vistoria
+  if (!bruto || typeof bruto !== 'object') return null
+  const parsed = VistoriaBandeiraSchema.safeParse(bruto)
+  return parsed.success ? parsed.data : null
+}
+
+/**
+ * Grava a vistoria preservando o resto de `meta`.
+ *
+ * @param {unknown} meta
+ * @param {unknown} vistoria
+ * @returns {Record<string, unknown>}
+ */
+export function gravarVistoriaBandeira(meta, vistoria) {
+  const base = meta && typeof meta === 'object' ? { .../** @type {object} */ (meta) } : {}
+  return { ...base, vistoria }
+}
+
+/**
+ * Vistoria vencida (ou vencendo dentro de `diasAviso`). Sem `validade`
+ * declarada não há prazo a cobrar — devolve `false`, não `true`: liberação sem
+ * prazo é o caso comum, e alarmar nele treinaria o gestor a ignorar o aviso.
+ *
+ * @param {{ validade?: string } | null} vistoria
+ * @param {{ ref?: Date, diasAviso?: number }} [opts]
+ * @returns {boolean}
+ */
+export function vistoriaVencendo(vistoria, opts = {}) {
+  if (!vistoria?.validade) return false
+  const ref = opts.ref ?? new Date()
+  const dias = opts.diasAviso ?? 0
+  const limite = new Date(ref.getTime() + dias * 24 * 60 * 60 * 1000)
+  const validade = new Date(`${vistoria.validade}T23:59:59`)
+  if (Number.isNaN(validade.getTime())) return false
+  return validade.getTime() <= limite.getTime()
 }

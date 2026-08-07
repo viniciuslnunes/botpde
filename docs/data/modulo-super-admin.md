@@ -56,8 +56,24 @@ gravam `detalhes.viaSuperAdmin: true` no `AuditLog`, para o admin local saber
 que a ação veio da operação da plataforma, não de alguém da própria diretoria.
 
 Referências: `torcidas/actions.ts` (`alternarAtivoTenantAction`,
-`alterarPlanoTenantAction`, `transferirOwnerAction`), `moderacao/actions.ts`
-(`resolverDenunciaSuperAdminAction` e pares).
+`alterarPlanoTenantAction`), `liderancas/actions.ts`
+(`transferirLiderancaSuperAdmin`, `removerLiderancaSuperAdmin`),
+`moderacao/actions.ts` (`resolverDenunciaSuperAdminAction` e pares).
+
+## Lideranças (2026-08-06)
+
+`/super-admin/liderancas` mostra a **árvore real** — torcida no topo, portais de
+unidade (Caso B) e unidades sem portal (Caso A) abaixo — com quem lidera cada
+linha, KPI de "sem liderança" e o filtro **"só onde eu lidero"**, que responde
+"de quais portais eu virei dono sem querer?". Loader:
+`lib/liderancas-console.ts`; regra de escrita: `lib/lideranca.ts` (a mesma que o
+presidente usa na aba Estrutura › Presidência). O super-admin passa
+`exigirMembroAprovado: false` — só a plataforma consegue dar presidência a um
+portal recém-promovido, ainda sem quadro associativo.
+
+Substituiu o painel `TransferirOwnerPainel` de `/super-admin/torcidas`, que
+listava tenants em ordem alfabética sem distinguir Sede raiz de subsede
+promovida. Ver `ARCHITECTURE.md` §5.21.
 
 ## Acesso a Salas/Feed de qualquer torcida (2026-07-27)
 

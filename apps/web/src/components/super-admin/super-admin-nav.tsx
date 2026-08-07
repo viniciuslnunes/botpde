@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Building2,
+  Crown,
   FileSearch,
   Handshake,
   LayoutDashboard,
@@ -27,6 +28,7 @@ export interface SuperAdminNavItem {
 export const SUPER_ADMIN_NAV_ITEMS: SuperAdminNavItem[] = [
   { href: '/super-admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
   { href: '/super-admin/torcidas', label: 'Torcidas', icon: Building2 },
+  { href: '/super-admin/liderancas', label: 'Lideranças', icon: Crown },
   { href: '/super-admin/afiliacoes', label: 'Afiliações', icon: Handshake, badgeKey: 'afiliacoes' },
   { href: '/super-admin/usuarios', label: 'Usuários', icon: UserCheck },
   { href: '/super-admin/moderacao', label: 'Moderação', icon: ShieldAlert, badgeKey: 'moderacao' },

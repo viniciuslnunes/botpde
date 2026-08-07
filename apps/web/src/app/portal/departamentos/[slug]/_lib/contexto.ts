@@ -11,6 +11,7 @@ import {
   hasPermission,
   isDepartamentoLegado,
   PERMISSIONS,
+  resolverEscopoPatrimonio,
 } from '@torcida/types'
 import {
   podeAbrirDepartamentoPortal,
@@ -58,6 +59,8 @@ export interface DepartamentoContexto {
   /** Oversight: SA vê blocos mesmo sem a permissão no tenant. */
   podeVerFinanceiro: boolean
   podeVerPatrimonio: boolean
+  /** Acervo de bandeiras: `patrimony:view` (tudo) OU `flags:view` (só bandeira). */
+  podeVerAcervoBandeiras: boolean
   podeModerar: boolean
   areas: AreaAcesso[]
   minhasAreas: AreaAcesso[]
@@ -151,6 +154,9 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.FINANCE_VIEW)
   const podeVerPatrimonio =
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.PATRIMONY_VIEW)
+  const podeVerAcervoBandeiras = resolverEscopoPatrimonio(permissoesEfetivas, {
+    isSuperAdmin,
+  }).podeVer
   const podeModerar =
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.COMMUNITY_MODERATE)
 
@@ -233,6 +239,7 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
     podeAprovarArea,
     podeVerFinanceiro,
     podeVerPatrimonio,
+    podeVerAcervoBandeiras,
     podeModerar,
     areas,
     minhasAreas,

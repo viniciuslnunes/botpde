@@ -311,6 +311,43 @@ export const DEPARTAMENTO_AREAS_CANONICAS = Object.freeze([
     ]),
   },
   {
+    deptoSlug: 'bandeiras',
+    areas: Object.freeze([
+      {
+        slug: 'acervo-e-guarda',
+        nome: 'Acervo e guarda',
+        descricao:
+          'Guarda, conservação e conferência dos bandeirões, faixas e mastros — cada peça com responsável e local.',
+        sazonal: false,
+        icone: 'flag',
+      },
+      {
+        slug: 'escala-de-jogo',
+        nome: 'Escala de jogo',
+        descricao:
+          'Quem leva, estende e recolhe cada bandeira no jogo, com o horário de chegada na arquibancada.',
+        sazonal: false,
+        icone: 'clipboard-list',
+      },
+      {
+        slug: 'confeccao-e-reforma',
+        nome: 'Confecção e reforma',
+        descricao:
+          'Bandeira nova, remendo, pintura e troca de mastro — orçamento e prestação de contas via projeto.',
+        sazonal: false,
+        icone: 'scissors',
+      },
+      {
+        slug: 'vistoria-e-liberacao',
+        nome: 'Vistoria e liberação',
+        descricao:
+          'Medidas, mastro e autorização de entrada exigidas pelo clube e pela polícia, conferidas antes do jogo.',
+        sazonal: false,
+        icone: 'shield-check',
+      },
+    ]),
+  },
+  {
     deptoSlug: 'feminino',
     areas: Object.freeze([
       {

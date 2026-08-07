@@ -55,6 +55,9 @@ pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 pnpm --filter @torcida/db db:repair-carteirinha-espelho  # carteirinha do sócio Caso B nos dois níveis
+pnpm --filter @torcida/db db:repair-owner-heranca-promocao  # tira owner herdado da mãe em portal de unidade (simula; --apply grava)
+pnpm --filter @torcida/db db:repair-espelho-membros-sede # membro (sócio OU torcedor) de unidade sem espelho na Sede
+pnpm --filter @torcida/db db:reconciliar-torcedor-convite -- --email=<e> --convite=<slug>  # torcedor global que devia ter entrado por convite
 pnpm --filter @torcida/db audit:regras       # invariantes de negócio + matriz de relações
 pnpm --filter @torcida/web audit:dados       # auditoria funcional (código real × banco semeado)
 pnpm --filter @torcida/web audit:fluxos      # fluxos ponta a ponta (Server Actions reais; muta e reverte)
@@ -75,6 +78,13 @@ pnpm --filter @torcida/web audit:achados        # status medido dos achados de A
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
+
+**Lentidão em `localhost` não é bug do app**: sem Postgres local, cada query
+Prisma atravessa o proxy público da Railway (RTT medido: 125ms; ~131ms por
+query), então uma página com 30 queries gasta ~4s só de rede — contra ~40ms em
+produção, onde app e banco dividem datacenter. Antes de "otimizar" uma rota
+lenta em dev, suba o banco local: `docs/ops/postgres-local-dev.md`
+(`docker-compose.dev.yml` + `scripts/db-local-sync.ps1`).
 
 ## Convenções (obrigatórias)
 
@@ -157,8 +167,6 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   mínimo. Preferir Sonnet ou o modelo Auto da sessão — não fixar Opus para
   planejamento. Ver `docs/agents/README.md`.
 - Commit/push só quando pedido. Se estiver na branch default, crie branch antes.
-- Mensagens de commit terminam com:
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
 
 ## Arquivos-chave
 
@@ -218,6 +226,16 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
  a pessoa vem do `membroId` aberto, e o gate é `roles:manage`. Sócios abrem o
  mesmo modal. O log grava diff legível (`lib/acesso-audit-diff.ts`) e a aba
  Histórico lê também `entidade: 'User'`.
+- **Liderança / troca de gestão (2026-08-06)** — presidência não é vitalícia.
+  Regra única em `apps/web/src/lib/lideranca.ts` (Caso B = cargo `owner` do
+  tenant; Caso A = `Sede.responsavelUserId`), com `AuditLog` + notificação dos
+  dois lados. Permissão `leadership:transfer` é **só do owner** e diz apenas
+  *se* pode — o alvo sai do **tenant ativo**, resolvido no servidor: presidente
+  da Sede não escolhe presidente de subsede promovida. UI: aba Estrutura ›
+  Presidência (`/admin/presidencia`) e `/super-admin/liderancas`
+  (`lib/liderancas-console.ts`). Promoção a portal **não** herda mais o owner da
+  mãe — sem liderança, o portal nasce sem owner; passivo em
+  `db:repair-owner-heranca-promocao`. Ver `ARCHITECTURE.md` §5.21.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Bar** — PDV do bar da sede (`/admin/bar`): catálogo, estoque, venda rápida com
@@ -226,6 +244,16 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `BAR`); ver `docs/data/modulo-bar.md`.
 - **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
   portal `/portal/patrimonio`, admin `/admin/patrimonio`.
+- **Bandeiras (2026-08-06)** — 11º departamento canônico, sem módulo novo: é o
+  inventário recortado em `categoria: BANDEIRA`. `flags:view`/`flags:manage`
+  valem **só** para essa categoria; `patrimony:manage` cobre tudo, inclusive
+  bandeira. A trava é da **query** (`resolverEscopoPatrimonio.categoriaTravada`
+  em `packages/types/src/patrimonio.js`), nunca da UI, e a edição confere
+  categoria de **origem e destino**. Gate web em `lib/patrimonio-authz.ts`;
+  vistoria de entrada em `PatrimonioItem.meta.vistoria`; escala de jogo via
+  `Evento.partidaId` (sem lista paralela). Portal
+  `/portal/departamentos/bandeiras`, admin `/admin/bandeiras`. Ver
+  `docs/data/modulo-bandeiras.md` e `ARCHITECTURE.md` §5.22.
 - **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`);
   hubs legado redirecionam para Agenda: `docs/data/modulo-caravanas.md`,
   `docs/data/modulo-bateria.md`. Caravana paga: lotação por `PAGA`, cobrança

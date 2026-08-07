@@ -13,6 +13,7 @@ export type PatrimonioItemLite = {
   localizacao: string | null
   valorEstimado: Prisma.Decimal | null
   observacao: string | null
+  meta: Prisma.JsonValue | null
   criadoEm: Date
   atualizadoEm: Date
   responsavel: { id: string; nome: string | null } | null
@@ -36,14 +37,29 @@ export type PatrimonioFiltro = {
   incluirBaixados?: boolean
 }
 
+/**
+ * Recorte de categoria imposto pelo RBAC (`flags:view` = só `BANDEIRA`).
+ * Aplicado **depois** do filtro do usuário: o query param nunca amplia escopo.
+ */
+export type EscopoCategoria = CategoriaPatrimonioItem | null
+
+function aplicarEscopo(
+  where: Prisma.PatrimonioItemWhereInput,
+  escopoCategoria: EscopoCategoria,
+): Prisma.PatrimonioItemWhereInput {
+  if (escopoCategoria) where.categoria = escopoCategoria
+  return where
+}
+
 function buildWhere(
   tenantId: string,
   filtro?: PatrimonioFiltro,
+  escopoCategoria: EscopoCategoria = null,
 ): Prisma.PatrimonioItemWhereInput {
   const where: Prisma.PatrimonioItemWhereInput = { tenantId }
   if (!filtro) {
     where.status = { not: 'BAIXADO' }
-    return where
+    return aplicarEscopo(where, escopoCategoria)
   }
 
   if (filtro.categoria) where.categoria = filtro.categoria
@@ -59,11 +75,12 @@ function buildWhere(
       { observacao: { contains: filtro.q, mode: 'insensitive' } },
     ]
   }
-  return where
+  return aplicarEscopo(where, escopoCategoria)
 }
 
 export const resumirPatrimonio = cache(async function resumirPatrimonio(
   tenantId: string,
+  escopoCategoria: EscopoCategoria = null,
 ): Promise<PatrimonioResumo> {
   const grouped: Array<{
     status: StatusPatrimonioItem
@@ -71,7 +88,7 @@ export const resumirPatrimonio = cache(async function resumirPatrimonio(
     _sum: { quantidade: number | null }
   }> = await db.patrimonioItem.groupBy({
     by: ['status'],
-    where: { tenantId },
+    where: aplicarEscopo({ tenantId }, escopoCategoria),
     _count: { _all: true },
     _sum: { quantidade: true },
   })
@@ -102,11 +119,15 @@ export const resumirPatrimonio = cache(async function resumirPatrimonio(
 
 export const listarPatrimonio = cache(async function listarPatrimonio(
   tenantId: string,
-  opts?: { filtro?: PatrimonioFiltro; pageSize?: number },
+  opts?: {
+    filtro?: PatrimonioFiltro
+    pageSize?: number
+    escopoCategoria?: EscopoCategoria
+  },
 ): Promise<{ itens: PatrimonioItemLite[]; page: number; pageSize: number; total: number }> {
   const pageSize = opts?.pageSize ?? PATRIMONIO_PAGE_SIZE
   const page = Math.max(1, opts?.filtro?.page ?? 1)
-  const where = buildWhere(tenantId, opts?.filtro)
+  const where = buildWhere(tenantId, opts?.filtro, opts?.escopoCategoria ?? null)
 
   const [total, rows]: [number, PatrimonioItemLite[]] = await Promise.all([
     db.patrimonioItem.count({ where }),
@@ -124,6 +145,7 @@ export const listarPatrimonio = cache(async function listarPatrimonio(
         localizacao: true,
         valorEstimado: true,
         observacao: true,
+        meta: true,
         criadoEm: true,
         atualizadoEm: true,
         responsavel: { select: { id: true, nome: true } },
@@ -151,13 +173,19 @@ export type PatrimonioEmprestimoLite = {
 /** Empréstimos abertos (+ recentes devolvidos) para inbox admin / meus empréstimos. */
 export const listarEmprestimosPatrimonio = cache(async function listarEmprestimosPatrimonio(
   tenantId: string,
-  opts?: { userId?: string; status?: 'ABERTO' | 'DEVOLVIDO' | 'COM_DANO'; limite?: number },
+  opts?: {
+    userId?: string
+    status?: 'ABERTO' | 'DEVOLVIDO' | 'COM_DANO'
+    limite?: number
+    escopoCategoria?: EscopoCategoria
+  },
 ): Promise<PatrimonioEmprestimoLite[]> {
   const rows: PatrimonioEmprestimoLite[] = await db.patrimonioEmprestimo.findMany({
     where: {
       tenantId,
       ...(opts?.userId ? { userId: opts.userId } : {}),
       ...(opts?.status ? { status: opts.status } : {}),
+      ...(opts?.escopoCategoria ? { item: { categoria: opts.escopoCategoria } } : {}),
     },
     orderBy: { abertoEm: 'desc' },
     take: opts?.limite ?? 40,
@@ -180,10 +208,11 @@ export const listarEmprestimosPatrimonio = cache(async function listarEmprestimo
 export const carregarPainelPatrimonio = cache(async function carregarPainelPatrimonio(
   tenantId: string,
   recentes = 5,
+  escopoCategoria: EscopoCategoria = null,
 ): Promise<{ resumo: PatrimonioResumo; recentes: PatrimonioItemLite[] }> {
   const [resumo, lista] = await Promise.all([
-    resumirPatrimonio(tenantId),
-    listarPatrimonio(tenantId, { pageSize: recentes, filtro: { page: 1 } }),
+    resumirPatrimonio(tenantId, escopoCategoria),
+    listarPatrimonio(tenantId, { pageSize: recentes, filtro: { page: 1 }, escopoCategoria }),
   ])
   return { resumo, recentes: lista.itens }
 })

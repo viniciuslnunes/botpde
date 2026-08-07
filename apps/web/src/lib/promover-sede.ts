@@ -9,7 +9,7 @@ import { invalidateHierarchyCache } from '@/lib/hierarquia'
 
 /**
  * A promoção faz ~40 round-trips sequenciais numa transação interativa: cria
- * tenant, move sedes, 3 upserts de cargo, 10 departamentos canônicos, 22
+ * tenant, move sedes, 3 upserts de cargo, os departamentos canônicos, seus
  * perfis, owner, membros migrados (loop por membro), canal e `AuditLog`. Só o
  * seed canônico mediu 5,86 s contra o Postgres remoto — o default de 5 s do
  * Prisma expira e faz rollback da promoção inteira ("Transaction already
@@ -58,7 +58,12 @@ export type PromoverSedeResult =
       /** Carteirinhas que acompanharam os membros. Ver ARCHITECTURE §7 21. */
       carteirinhasMigradas: number
       filhosMovidos: number
-      ownerUserId: string
+      /**
+       * `null` quando a unidade não tinha liderança vinculada — o portal nasce
+       * **sem presidente**, à espera de `transferirLideranca`. Ver o comentário
+       * em `promoverSedeParaTenant` sobre a herança do owner da mãe.
+       */
+      ownerUserId: string | null
     }
   | { ok: false; error: string }
 
@@ -107,18 +112,17 @@ export async function promoverSedeParaTenant(params: {
   })
   if (!tenantMae) return { ok: false, error: 'Tenant mãe não encontrado.' }
 
-  const ownerMae = await db.userRole.findFirst({
-    where: {
-      tenantId: tenantMaeId,
-      role: { isSystem: true, nome: SYSTEM_ROLES.OWNER },
-    },
-    select: { userId: true },
-  })
-  if (!ownerMae) {
-    return { ok: false, error: 'Tenant mãe não tem owner — não é possível promover.' }
-  }
-
-  let ownerUserId = ownerMae.userId
+  /**
+   * Owner do portal novo é **só** a liderança da própria unidade. Havia aqui um
+   * fallback para o owner do tenant mãe: unidade sem `responsavelUserId` (ou
+   * com liderança que não é `SaasMembro` APROVADO na mãe) fazia o presidente da
+   * Sede — na prática o super-admin que provisionou a torcida — virar dono de
+   * um portal que não é dele. Sem liderança, o portal nasce **sem owner**:
+   * estado já suportado (é o que `removerOwnerAction` produz), em que o
+   * super-admin opera as configs reservadas até `transferirLideranca` definir o
+   * presidente de verdade. Ver `lib/lideranca.ts`.
+   */
+  let ownerUserId: string | null = null
   if (sede.responsavelUserId) {
     const lider = await db.saasMembro.findFirst({
       where: {
@@ -196,21 +200,23 @@ export async function promoverSedeParaTenant(params: {
     })
     if (!ownerRole) throw new Error('Falha ao criar role owner no novo tenant.')
 
-    await tx.userRole.upsert({
-      where: {
-        userId_tenantId_roleId: {
+    if (ownerUserId) {
+      await tx.userRole.upsert({
+        where: {
+          userId_tenantId_roleId: {
+            userId: ownerUserId,
+            tenantId: novoTenant.id,
+            roleId: ownerRole.id,
+          },
+        },
+        update: {},
+        create: {
           userId: ownerUserId,
           tenantId: novoTenant.id,
           roleId: ownerRole.id,
         },
-      },
-      update: {},
-      create: {
-        userId: ownerUserId,
-        tenantId: novoTenant.id,
-        roleId: ownerRole.id,
-      },
-    })
+      })
+    }
 
     // Migra membros cuja unidade está entre as movidas
     const membros: { id: string; userId: string; sedeId: string | null }[] =
@@ -300,44 +306,46 @@ export async function promoverSedeParaTenant(params: {
     }
 
     // Garante SaasMembro APROVADO do owner no novo tenant
-    const ownerMembroMae = await tx.saasMembro.findUnique({
-      where: {
-        tenantId_userId: { tenantId: tenantMaeId, userId: ownerUserId },
-      },
-      select: {
-        nome: true,
-        tipo: true,
-        telefone: true,
-        cidade: true,
-        sedeId: true,
-      },
-    })
-    await tx.saasMembro.upsert({
-      where: {
-        tenantId_userId: { tenantId: novoTenant.id, userId: ownerUserId },
-      },
-      update: { status: 'APROVADO', departamentoId: null },
-      create: {
-        tenantId: novoTenant.id,
-        userId: ownerUserId,
-        nome: ownerMembroMae?.nome ?? 'Owner',
-        tipo: ownerMembroMae?.tipo ?? 'SOCIO',
-        status: 'APROVADO',
-        telefone: ownerMembroMae?.telefone,
-        cidade: ownerMembroMae?.cidade,
-        sedeId: sede.id,
-      },
-    })
-
-    // Owner do novo tenant é dono da própria unidade — sem isso ele ficava de
-    // fora do canal oficial dela até pedir entrada manualmente (mesmo bug do
-    // FIEL CUBATÃO em promoverUnidadeAPortal / vincularMembroCanaisAposAprovacao).
-    if (sede.canalConversaId) {
-      await tx.membroConversa.upsert({
-        where: { conversaId_userId: { conversaId: sede.canalConversaId, userId: ownerUserId } },
-        create: { conversaId: sede.canalConversaId, userId: ownerUserId, papel: 'ADMIN' },
-        update: { papel: 'ADMIN', saiuEm: null },
+    if (ownerUserId) {
+      const ownerMembroMae = await tx.saasMembro.findUnique({
+        where: {
+          tenantId_userId: { tenantId: tenantMaeId, userId: ownerUserId },
+        },
+        select: {
+          nome: true,
+          tipo: true,
+          telefone: true,
+          cidade: true,
+          sedeId: true,
+        },
       })
+      await tx.saasMembro.upsert({
+        where: {
+          tenantId_userId: { tenantId: novoTenant.id, userId: ownerUserId },
+        },
+        update: { status: 'APROVADO', departamentoId: null },
+        create: {
+          tenantId: novoTenant.id,
+          userId: ownerUserId,
+          nome: ownerMembroMae?.nome ?? 'Owner',
+          tipo: ownerMembroMae?.tipo ?? 'SOCIO',
+          status: 'APROVADO',
+          telefone: ownerMembroMae?.telefone,
+          cidade: ownerMembroMae?.cidade,
+          sedeId: sede.id,
+        },
+      })
+
+      // Owner do novo tenant é dono da própria unidade — sem isso ele ficava de
+      // fora do canal oficial dela até pedir entrada manualmente (mesmo bug do
+      // FIEL CUBATÃO em promoverUnidadeAPortal / vincularMembroCanaisAposAprovacao).
+      if (sede.canalConversaId) {
+        await tx.membroConversa.upsert({
+          where: { conversaId_userId: { conversaId: sede.canalConversaId, userId: ownerUserId } },
+          create: { conversaId: sede.canalConversaId, userId: ownerUserId, papel: 'ADMIN' },
+          update: { papel: 'ADMIN', saiuEm: null },
+        })
+      }
     }
 
     await tx.auditLog.create({

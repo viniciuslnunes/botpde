@@ -85,9 +85,15 @@ vi.mock('@/lib/tenant-context', () => ({
   setTenantContextSlug: (...args: unknown[]) => setTenantContextSlugFn(...args),
   clearTenantContextSlug: (...args: unknown[]) => clearTenantContextSlugFn(...args),
 }))
-vi.mock('@/lib/convite-cookie-server', () => ({ limparSlugConviteCookie: vi.fn() }))
+const lerSlugConviteDoCookieFn = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null))
+const resolverConviteFn = vi.hoisted(() => vi.fn(async (): Promise<unknown> => null))
+vi.mock('@/lib/convite-cookie-server', () => ({
+  limparSlugConviteCookie: vi.fn(),
+  lerSlugConviteDoCookie: lerSlugConviteDoCookieFn,
+}))
 vi.mock('@/lib/convite', () => ({
   resolverAfiliacaoIdEfetiva: vi.fn(async (_id: string, direto: string | null) => direto),
+  resolverConvite: resolverConviteFn,
 }))
 // `notificacoes.ts` valida env vars no import (fora do escopo deste teste).
 const notificarSafeFn = vi.hoisted(() => vi.fn())
@@ -632,5 +638,44 @@ describe('concluirComoTorcedor', () => {
         create: expect.objectContaining({ onboardingConcluidoEm: expect.any(Date) }),
       }),
     )
+  })
+
+  // Sem isto, quem chega por convite e clica «sou só torcedor do clube» termina
+  // sem SaasMembro nenhum — invisível na unidade e na Sede, sem nada a espelhar.
+  it('com convite no cookie, vira torcedor DA UNIDADE em vez de global', async () => {
+    lerSlugConviteDoCookieFn.mockResolvedValueOnce('abc12345')
+    resolverConviteFn.mockResolvedValueOnce({ tenantId: UUID, unidadeId: 'sede-1' })
+    tenantFindFirst.mockResolvedValue({
+      id: UUID,
+      slug: 'torcida-teste',
+      nome: 'Torcida Teste',
+      exigirDocumentosCadastro: false,
+      periodicidadesOnboarding: [],
+    })
+    sedeFindMany.mockResolvedValue([{ id: 'sede-1', tenantId: UUID, ativa: true }])
+    sedeFindUnique.mockResolvedValue({ id: 'sede-1', tenantId: UUID, ativa: true })
+    membroFindUnique.mockResolvedValue(null)
+    membroCreate.mockResolvedValue({ id: 'novo' })
+
+    const r = await concluirComoTorcedor()
+
+    expect(r.ok).toBe(true)
+    // Passou por `solicitarVinculo`: vínculo gravado na unidade e destino de
+    // torcedor da torcida. É esse vínculo que o espelho na Sede replica
+    // (coberto pelo teste de `solicitarVinculo` acima).
+    expect(membroCreate).toHaveBeenCalled()
+    expect(r.redirectTo).toBe('/portal/comunidade?escopo=nacional')
+  })
+
+  // Convite quebrado/expirado não pode prender a pessoa na última etapa.
+  it('cai no caminho global quando o convite não resolve', async () => {
+    lerSlugConviteDoCookieFn.mockResolvedValueOnce('naoexiste')
+    resolverConviteFn.mockResolvedValueOnce(null)
+    perfilUpsert.mockResolvedValue({})
+
+    const r = await concluirComoTorcedor()
+
+    expect(r.ok).toBe(true)
+    expect(r.redirectTo).toBe('/portal/comunidade')
   })
 })

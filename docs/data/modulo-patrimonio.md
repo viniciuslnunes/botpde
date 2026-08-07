@@ -38,8 +38,15 @@ Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-d
 3. **RBAC**
    - `patrimony:view` — portal `/portal/patrimonio` e painel do departamento
    - `patrimony:manage` — CRUD; admin `/admin/patrimonio`
+   - `flags:view` / `flags:manage` — **recorte**: mesmas telas, mas só
+     `categoria: BANDEIRA` (departamento de Bandeiras). `patrimony:manage`
+     cobre bandeira; `flags:manage` não cobre o resto. A trava é da query
+     (`resolverEscopoPatrimonio.categoriaTravada`), não da UI — ver
+     [`modulo-bandeiras.md`](./modulo-bandeiras.md).
 4. Membro do depto **sem** `patrimony:view` não vê o inventário no painel.
 5. Multi-tenant + sensibilidade **RESTRITO**.
+6. `meta` (`Json?`) guarda extensões por categoria — hoje só
+   `meta.vistoria` das bandeiras. Não é campo livre para o form geral.
 
 ## Superfícies
 

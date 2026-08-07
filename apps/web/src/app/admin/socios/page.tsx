@@ -597,17 +597,20 @@ export default async function SociosPage({
 
   const COLUNA_CLASSE: Record<string, string> = isSolicitacoes
     ? {
+        departamento: 'hidden sm:table-cell',
         sede: 'hidden md:table-cell',
         cidade: 'hidden lg:table-cell',
         criadoEm: 'hidden xl:table-cell',
       }
     : isAguardando
       ? {
+          departamento: 'hidden sm:table-cell',
           sede: 'hidden md:table-cell',
           cidade: 'hidden lg:table-cell',
           aprovadoEm: 'hidden xl:table-cell',
         }
       : {
+          departamento: 'hidden md:table-cell',
           email: 'hidden lg:table-cell',
         }
 
@@ -662,6 +665,7 @@ export default async function SociosPage({
               cabecalho={cabecalho}
               spec={SPEC}
               params={listagem}
+              classesPorColuna={COLUNA_CLASSE}
               podeGerirAcessos={podeGerirAcessos}
               podeBloquear={podeBloquear}
               podeApagar={podeApagar}
@@ -682,6 +686,7 @@ export default async function SociosPage({
           validadeIso: s.validade.toISOString().split('T')[0] ?? '',
           validadeLabel: s.validade.toLocaleDateString('pt-BR'),
           email: s.user.email,
+          departamentoNome: detalhePorUserId.get(s.userId)?.departamentoNome ?? null,
           avatarUrl: s.user.avatarUrl,
           vencida: s.validade < now,
           vencendo: s.validade > now && s.validade < em30dias,

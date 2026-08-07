@@ -114,6 +114,38 @@ Exceção pontual à R1 da governança hierárquica — ver
 `docs/data/proposta-governanca-hierarquica.md` §1. Caso A (unidade leve no
 mesmo tenant) não muda: fila única da Sede.
 
+### Torcedor da unidade também conta na Sede (2026-08-06)
+
+**Regra:** quem entra numa unidade Caso B — sócio **ou torcedor**, pelo
+onboarding ou pelo link de convite — existe nos dois níveis. O espelho é o que
+faz a pessoa aparecer em `/admin/torcedores` e `/admin/socios` da Sede (as duas
+listagens filtram por `tenantId` e **não** excluem `espelhado: true`).
+
+`solicitarVinculo` já chama `sincronizarSocioNaSedeRaiz` também para
+`tipo: 'TORCEDOR'` (que entra `APROVADO`, sem fila). Duas lacunas foram
+fechadas em 2026-08-06:
+
+- **O atalho «sou só torcedor do clube» furava a regra.** Esse card do passo
+  Torcida chama `concluirComoTorcedor`, que grava só `PerfilTorcedor` — a
+  pessoa terminava **sem `SaasMembro` nenhum**, invisível na unidade e na
+  Sede, sem nada para espelhar. Bastava o `?convite=` se perder num elo do
+  login social (o cookie `torcida_convite` sobrevive, mas o wizard já tinha
+  caído no fluxo genérico). Agora `concluirComoTorcedor` resolve o convite
+  (parâmetro **ou** cookie) e delega a `solicitarVinculo` com
+  `tipo: 'TORCEDOR'` na unidade convidada. A checagem é no **servidor**: a
+  regra "convite ⇒ vínculo" não pode depender de a UI ter o slug. Convite
+  quebrado, expirado ou recusado (bloqueio da diretoria) cai no caminho global
+  — ninguém trava na última etapa.
+- **O espelho é best-effort** (`try/catch` que só loga) e não tinha
+  reconciliação: uma falha deixava o membro só na unidade, em silêncio.
+  Backfill: `pnpm --filter @torcida/db db:repair-espelho-membros-sede`
+  (aceita `-- --dry-run` e `-- --tenant=<slug>`; ignora quem já é membro
+  **direto** da Sede, mesma regra de `sincronizarSocioNaSedeRaiz`).
+
+Caso individual de torcedor global que deveria ter entrado por um convite:
+`pnpm --filter @torcida/db db:reconciliar-torcedor-convite --
+--email=<email> --convite=<slug>` (cria vínculo + espelho, com `AuditLog`).
+
 ### Carteirinha espelhada (2026-08-03)
 
 `SaasSocio` é por tenant, mas o sócio é o **mesmo** nos dois níveis — mesmo

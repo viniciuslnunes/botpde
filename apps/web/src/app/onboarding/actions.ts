@@ -23,7 +23,7 @@ import {
 } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug, setTenantContextSlug } from '@/lib/tenant-context'
 import { lerSlugConviteDoCookie, limparSlugConviteCookie } from '@/lib/convite-cookie-server'
-import { resolverAfiliacaoIdEfetiva } from '@/lib/convite'
+import { resolverAfiliacaoIdEfetiva, resolverConvite } from '@/lib/convite'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
   encontrarConflitoCpf,
@@ -225,14 +225,81 @@ export async function salvarClubeRegiao(input: {
 // ─── 2. Concluir como torcedor global (sem torcida) ─────────────────────────────
 
 /**
+ * Convite ativo (URL ou cookie) ⇒ o «torcedor global» vira torcedor DA UNIDADE.
+ *
+ * Devolve `null` quando não há convite utilizável — e aí o chamador segue com o
+ * caminho global normal. Nunca lança: um convite quebrado não pode prender a
+ * pessoa na última etapa do wizard.
+ */
+async function tentarVincularTorcedorPorConvite(
+  slugInformado: string | undefined,
+  nomeDaSessao: string,
+): Promise<OnboardingActionState | null> {
+  const slug = slugInformado ?? (await lerSlugConviteDoCookie())
+  if (!slug) return null
+
+  // `nome` tem mínimo de 3 caracteres no schema do vínculo. Conta social sem
+  // nome utilizável cai no caminho global em vez de falhar o onboarding.
+  const nome = nomeDaSessao.trim()
+  if (nome.length < 3) return null
+
+  try {
+    const convite = await resolverConvite(slug)
+    if (!convite) return null
+
+    const res = await solicitarVinculo({
+      tenantId: convite.tenantId,
+      tipo: 'TORCEDOR',
+      nome,
+      sedeId: convite.unidadeId ?? undefined,
+      unidadeNaoListada: convite.unidadeId ? undefined : true,
+      conviteSlug: slug,
+    })
+    // Recusa legítima (bloqueio da diretoria, unidade inativa): a pessoa não
+    // pode ficar presa no wizard por causa do atalho — segue como torcedor
+    // global, que é exatamente o que este botão prometia.
+    if (!res.ok) {
+      console.warn('[concluirComoTorcedor] convite não gerou vínculo', {
+        slug,
+        motivo: res.message ?? res.errors,
+      })
+      return null
+    }
+    return res
+  } catch (err) {
+    console.error('[concluirComoTorcedor] vínculo pelo convite falhou', err)
+    return null
+  }
+}
+
+/**
  * Marca o onboarding como concluído para um torcedor global (não pertence a
  * nenhuma torcida da plataforma). Redireciona para a comunidade.
+ *
+ * **Quem chegou por convite nunca sai global.** O card «sou só torcedor do
+ * clube» é o botão mais destacado do passo Torcida, e quando o contexto do
+ * convite sobrevive só no cookie (o `?convite=` se perdeu num elo do login) a
+ * pessoa terminava sem `SaasMembro` nenhum — invisível na unidade e na Sede,
+ * sem nada para espelhar. Com convite resolvível, este caminho delega a
+ * `solicitarVinculo` com `tipo: 'TORCEDOR'` na unidade convidada, que é o
+ * fluxo que grava o vínculo e sincroniza o espelho na Sede raiz.
+ *
+ * A checagem é no SERVIDOR de propósito: o cliente pode não ter o slug, e a
+ * regra "convite ⇒ vínculo" não pode depender da UI ter acertado.
  */
-export async function concluirComoTorcedor(): Promise<OnboardingActionState> {
+export async function concluirComoTorcedor(
+  conviteSlugInformado?: string,
+): Promise<OnboardingActionState> {
   const session = await auth()
   if (!session?.user?.id) {
     return { message: 'Você precisa estar logado.' }
   }
+
+  const vinculado = await tentarVincularTorcedorPorConvite(
+    conviteSlugInformado,
+    session.user.name ?? '',
+  )
+  if (vinculado) return vinculado
 
   await db.perfilTorcedor.upsert({
     where: { userId: session.user.id },

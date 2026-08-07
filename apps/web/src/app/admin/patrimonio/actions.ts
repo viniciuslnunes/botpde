@@ -2,12 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
+import { AtualizarPatrimonioItemSchema, CriarPatrimonioItemSchema } from '@torcida/types'
 import {
-  AtualizarPatrimonioItemSchema,
-  CriarPatrimonioItemSchema,
-  PERMISSIONS,
-} from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+  assertAcervoEscrita,
+  assertPodeGerirItem,
+  garantirCategoriaPermitida,
+} from '@/lib/patrimonio-authz'
+import { isExpectedError } from '@/lib/expected-error'
 import { notificarSafe } from '@/lib/notificacoes'
 
 export type PatrimonioState = {
@@ -18,9 +19,20 @@ export type PatrimonioState = {
 
 function revalidatePatrimonio() {
   revalidatePath('/admin/patrimonio')
+  revalidatePath('/admin/bandeiras')
   revalidatePath('/portal/patrimonio')
   revalidatePath('/portal/departamentos/patrimonio')
+  revalidatePath('/portal/departamentos/bandeiras')
   revalidatePath('/portal/departamentos', 'layout')
+}
+
+/**
+ * Recusa de escopo (`flags:manage` fora de BANDEIRA) é regra de negócio: vira
+ * mensagem no formulário, não exceção não tratada.
+ */
+function comoEstado(error: unknown): PatrimonioState {
+  if (isExpectedError(error)) return { error: error.message }
+  throw error
 }
 
 function formToPayload(formData: FormData) {
@@ -53,7 +65,8 @@ export async function criarPatrimonioItem(
   _prev: PatrimonioState,
   formData: FormData,
 ): Promise<PatrimonioState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE)
+  const authz = await assertAcervoEscrita()
+  const { session, tenant } = authz
 
   const parsed = CriarPatrimonioItemSchema.safeParse(formToPayload(formData))
   if (!parsed.success) {
@@ -61,6 +74,12 @@ export async function criarPatrimonioItem(
   }
 
   const data = parsed.data
+  try {
+    garantirCategoriaPermitida(authz, data.categoria)
+  } catch (error) {
+    return comoEstado(error)
+  }
+
   const respErr = await assertResponsavelNoTenant(tenant.id, data.responsavelId)
   if (respErr) return { errors: { responsavelId: [respErr] } }
 
@@ -99,7 +118,8 @@ export async function editarPatrimonioItem(
   _prev: PatrimonioState,
   formData: FormData,
 ): Promise<PatrimonioState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE)
+  const authz = await assertAcervoEscrita()
+  const { session, tenant } = authz
 
   const parsed = AtualizarPatrimonioItemSchema.safeParse({
     id: formData.get('id'),
@@ -110,12 +130,26 @@ export async function editarPatrimonioItem(
   }
 
   const data = parsed.data
-  const existente: { id: string; responsavelId: string | null; nome: string } | null =
-    await db.patrimonioItem.findFirst({
-      where: { id: data.id, tenantId: tenant.id },
-      select: { id: true, responsavelId: true, nome: true },
-    })
+  const existente: {
+    id: string
+    responsavelId: string | null
+    nome: string
+    categoria: 'INSTRUMENTO' | 'BANDEIRA' | 'UNIFORME' | 'MOBILIARIO' | 'ELETRONICO' | 'ESPACO' | 'OUTROS'
+  } | null = await db.patrimonioItem.findFirst({
+    where: { id: data.id, tenantId: tenant.id },
+    select: { id: true, responsavelId: true, nome: true, categoria: true },
+  })
   if (!existente) return { error: 'Item não encontrado' }
+
+  // Duas checagens: a categoria de onde o item está e a de destino. Sem a
+  // segunda, `flags:manage` reclassificaria um bandeirão como MOBILIARIO e
+  // ficaria com um item fora do próprio escopo.
+  try {
+    garantirCategoriaPermitida(authz, existente.categoria)
+    garantirCategoriaPermitida(authz, data.categoria)
+  } catch (error) {
+    return comoEstado(error)
+  }
 
   const respErr = await assertResponsavelNoTenant(tenant.id, data.responsavelId)
   if (respErr) return { errors: { responsavelId: [respErr] } }
@@ -162,7 +196,13 @@ export async function editarPatrimonioItem(
 }
 
 export async function baixarPatrimonioItem(itemId: string): Promise<PatrimonioState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE)
+  let session: Awaited<ReturnType<typeof assertPodeGerirItem>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPodeGerirItem>>['tenant']
+  try {
+    ;({ session, tenant } = await assertPodeGerirItem(itemId))
+  } catch (error) {
+    return comoEstado(error)
+  }
 
   const existente: { id: string; nome: string; status: string } | null =
     await db.patrimonioItem.findFirst({
@@ -193,7 +233,13 @@ export async function baixarPatrimonioItem(itemId: string): Promise<PatrimonioSt
 }
 
 export async function excluirPatrimonioItem(itemId: string): Promise<PatrimonioState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE)
+  let session: Awaited<ReturnType<typeof assertPodeGerirItem>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPodeGerirItem>>['tenant']
+  try {
+    ;({ session, tenant } = await assertPodeGerirItem(itemId))
+  } catch (error) {
+    return comoEstado(error)
+  }
 
   const existente: { id: string; nome: string; categoria: string; status: string } | null =
     await db.patrimonioItem.findFirst({

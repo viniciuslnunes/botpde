@@ -312,6 +312,10 @@ describe('departamento capabilities', () => {
     expect(capabilityPorSlug('carnaval')?.portalPanel).toBe('carnaval')
     expect(capabilityPorSlug('feminino')?.moduloPortal).toBe('feminino')
     expect(capabilityPorSlug('diretoria')?.moduloPortal).toBe('diretoria')
+    // Bandeiras não tem módulo de portal próprio: é o inventário recortado.
+    expect(capabilityPorSlug('bandeiras')?.portalPanel).toBe('bandeiras')
+    expect(hrefModuloPortal('bandeiras')).toBe('/portal/patrimonio?categoria=BANDEIRA')
+    expect(hrefOperacaoAdmin('bandeiras')).toBe('/admin/bandeiras')
   })
 
   it('Torcedor e Sócio não são departamentos (slug ou nome)', () => {
@@ -402,7 +406,40 @@ describe('filterMenuByPermissions com OR', () => {
     )
   })
 
+  it('Bandeiras: só o gestor da área abre /admin/bandeiras; flags:view nunca', () => {
+    const colaborador = filterMenuByPermissionsAndGestoria(ADMIN_MENU, [PERMISSIONS.FLAGS_VIEW], {
+      gestorSlugs: ['bandeiras'],
+    }).map((i) => i.id)
+    expect(colaborador).toEqual(['dashboard'])
+
+    const gestor = filterMenuByPermissionsAndGestoria(ADMIN_MENU, [PERMISSIONS.FLAGS_MANAGE], {
+      gestorSlugs: ['bandeiras'],
+    }).map((i) => i.id)
+    expect(gestor).toContain('bandeiras')
+
+    // `flags:manage` sem gestoria da área (ex.: override solto) não abre o hub,
+    // como já vale para Caravanas/Bateria.
+    const semGestoria = filterMenuByPermissionsAndGestoria(
+      ADMIN_MENU,
+      [PERMISSIONS.FLAGS_MANAGE],
+      { gestorSlugs: [] },
+    ).map((i) => i.id)
+    expect(semGestoria).not.toContain('bandeiras')
+
+    // Gestor de bandeiras não vê o módulo Patrimônio (inventário geral).
+    const efetivas = [
+      ...DEPARTAMENTOS_CANONICOS.find((d) => d.nome === 'Bandeiras')!.permissions,
+      ...DEPARTAMENTOS_CANONICOS.find((d) => d.nome === 'Bandeiras')!.permissionsGestor,
+    ]
+    expect(
+      filterMenuByPermissionsAndGestoria(ADMIN_MENU, efetivas, {
+        gestorSlugs: ['bandeiras'],
+      }).map((i) => i.id),
+    ).not.toContain('patrimonio')
+  })
+
   it('resolverMenuIdDeRota: hubs thin de departamento', () => {
+    expect(resolverMenuIdDeRota('/admin/bandeiras')).toBe('bandeiras')
     expect(resolverMenuIdDeRota('/admin/caravanas')).toBe('caravanas')
     expect(resolverMenuIdDeRota('/admin/caravanas/abc')).toBe('caravanas')
     expect(resolverMenuIdDeRota('/admin/bateria')).toBe('bateria')
@@ -538,7 +575,7 @@ describe('filterMenuByPermissions com OR', () => {
       PERMISSIONS.COMMUNITY_POST_NACIONAL,
     )
     // Gestores operacionais não são mini-admin transversais
-    for (const nome of ['Caravanas', 'Carnaval', 'Patrimônio', 'Bateria', 'Feminino']) {
+    for (const nome of ['Caravanas', 'Carnaval', 'Patrimônio', 'Bateria', 'Feminino', 'Bandeiras']) {
       expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.SEDES_MANAGE)
       expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.STORE_MANAGE)
       expect(porNome[nome].permissionsGestor, nome).not.toContain(PERMISSIONS.FINANCE_MANAGE)

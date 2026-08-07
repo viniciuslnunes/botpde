@@ -58,7 +58,8 @@ interface UserPermissionLite {
  * Mudança de acesso não cabe nos 5s de transação interativa do Prisma: além
  * dos `UserRole`/`UserPermission`, ela sincroniza a presença do usuário nos
  * canais de **todos** os departamentos e áreas do tenant
- * (`sincronizarCanaisDepartamentoUsuario`). Numa torcida com 10 departamentos
+ * (`sincronizarCanaisDepartamentoUsuario`). Numa torcida com os departamentos
+ * canônicos
  * e o banco atrás do proxy, o default estoura e a promoção falha inteira, com
  * "Transaction not found" — mesmo motivo que já obrigou
  * `TRANSACAO_DECISAO_MEMBRO_OPTS` em `admin/membros/actions.ts`.

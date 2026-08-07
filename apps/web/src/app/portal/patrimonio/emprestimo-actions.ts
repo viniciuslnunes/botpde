@@ -3,14 +3,20 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
+import type { CategoriaPatrimonioItem } from '@torcida/db'
 import {
   AbrirEmprestimoPatrimonioSchema,
   DevolverEmprestimoPatrimonioSchema,
-  hasPermission,
   MarcarDanoEmprestimoSchema,
-  PERMISSIONS,
+  podeGerirCategoriaPatrimonio,
+  podeVerCategoriaPatrimonio,
 } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import {
+  assertAcervoEscrita,
+  assertAcervoView,
+  garantirCategoriaPermitida,
+} from '@/lib/patrimonio-authz'
+import { isExpectedError } from '@/lib/expected-error'
 
 export type EmprestimoState = {
   ok?: boolean
@@ -20,17 +26,22 @@ export type EmprestimoState = {
 
 function revalidateEmprestimos() {
   revalidatePath('/admin/patrimonio')
+  revalidatePath('/admin/bandeiras')
   revalidatePath('/portal/patrimonio')
   revalidatePath('/portal/departamentos/patrimonio')
+  revalidatePath('/portal/departamentos/bandeiras')
   revalidatePath('/portal/departamentos', 'layout')
 }
 
-/** Retirada com foto — colaborador com patrimony:view; auto-conclui (EM_USO). */
+/**
+ * Retirada com foto — colaborador com `patrimony:view` (inventário inteiro) ou
+ * `flags:view` (só bandeira). Auto-conclui (EM_USO).
+ */
 export async function abrirEmprestimoPatrimonio(
   _prev: EmprestimoState,
   formData: FormData,
 ): Promise<EmprestimoState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_VIEW)
+  const { session, tenant, escopo } = await assertAcervoView()
   const userId = session.user.id
   if (!userId) return { error: 'Sessão inválida' }
 
@@ -45,10 +56,21 @@ export async function abrirEmprestimoPatrimonio(
 
   const { itemId, fotoSaidaUrl, observacao } = parsed.data
 
-  type ItemRow = { id: string; nome: string; status: string }
+  type ItemRow = {
+    id: string
+    nome: string
+    status: string
+    categoria: CategoriaPatrimonioItem
+  }
   const item: ItemRow | null = await db.patrimonioItem.findFirst({
-    where: { id: itemId, tenantId: tenant.id },
-    select: { id: true, nome: true, status: true },
+    where: {
+      id: itemId,
+      tenantId: tenant.id,
+      // Recorte do RBAC na própria query: quem só tem `flags:view` não retira
+      // o projetor nem descobre que ele existe.
+      ...(escopo.categoriaTravada ? { categoria: escopo.categoriaTravada } : {}),
+    },
+    select: { id: true, nome: true, status: true, categoria: true },
   })
   if (!item) return { error: 'Item não encontrado' }
   if (item.status === 'BAIXADO') return { error: 'Item baixado — não pode sair' }
@@ -98,9 +120,7 @@ export async function devolverEmprestimoPatrimonio(
   _prev: EmprestimoState,
   formData: FormData,
 ): Promise<EmprestimoState> {
-  const { session, tenant, permissoesEfetivas, isSuperAdmin } = await assertPermission(
-    PERMISSIONS.PATRIMONY_VIEW,
-  )
+  const { session, tenant, permissoesEfetivas, isSuperAdmin } = await assertAcervoView()
   const userId = session.user.id
   if (!userId) return { error: 'Sessão inválida' }
 
@@ -120,7 +140,7 @@ export async function devolverEmprestimoPatrimonio(
     userId: string
     itemId: string
     status: string
-    item: { nome: string }
+    item: { nome: string; categoria: CategoriaPatrimonioItem }
   }
   const emp: EmpRow | null = await db.patrimonioEmprestimo.findFirst({
     where: { id: emprestimoId, tenantId: tenant.id },
@@ -129,15 +149,26 @@ export async function devolverEmprestimoPatrimonio(
       userId: true,
       itemId: true,
       status: true,
-      item: { select: { nome: true } },
+      item: { select: { nome: true, categoria: true } },
     },
   })
   if (!emp) return { error: 'Empréstimo não encontrado' }
   if (emp.status !== 'ABERTO') return { error: 'Empréstimo já encerrado' }
+  if (
+    !podeVerCategoriaPatrimonio(permissoesEfetivas ?? [], emp.item.categoria, {
+      isSuperAdmin: Boolean(isSuperAdmin),
+    })
+  ) {
+    return { error: 'Empréstimo não encontrado' }
+  }
 
-  const podeManage =
-    Boolean(isSuperAdmin) ||
-    hasPermission(permissoesEfetivas ?? [], PERMISSIONS.PATRIMONY_MANAGE)
+  // Gestor "por cima" do titular vale dentro do próprio escopo: o gestor de
+  // Bandeiras encerra empréstimo de bandeira, não de mobiliário.
+  const podeManage = podeGerirCategoriaPatrimonio(
+    permissoesEfetivas ?? [],
+    emp.item.categoria,
+    { isSuperAdmin: Boolean(isSuperAdmin) },
+  )
   if (emp.userId !== userId && !podeManage) {
     return { error: 'Só quem retirou (ou o gestor) pode devolver' }
   }
@@ -177,7 +208,8 @@ export async function marcarDanoEmprestimoPatrimonio(
   _prev: EmprestimoState,
   formData: FormData,
 ): Promise<EmprestimoState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.PATRIMONY_MANAGE)
+  const authz = await assertAcervoEscrita()
+  const { session, tenant } = authz
   const atorId = session.user.id
   if (!atorId) return { error: 'Sessão inválida' }
 
@@ -193,7 +225,7 @@ export async function marcarDanoEmprestimoPatrimonio(
     id: string
     itemId: string
     status: string
-    item: { nome: string }
+    item: { nome: string; categoria: CategoriaPatrimonioItem }
   }
   const emp: EmpRow | null = await db.patrimonioEmprestimo.findFirst({
     where: { id: parsed.data.emprestimoId, tenantId: tenant.id },
@@ -201,10 +233,16 @@ export async function marcarDanoEmprestimoPatrimonio(
       id: true,
       itemId: true,
       status: true,
-      item: { select: { nome: true } },
+      item: { select: { nome: true, categoria: true } },
     },
   })
   if (!emp) return { error: 'Empréstimo não encontrado' }
+  try {
+    garantirCategoriaPermitida(authz, emp.item.categoria)
+  } catch (error) {
+    if (isExpectedError(error)) return { error: error.message }
+    throw error
+  }
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.patrimonioEmprestimo.update({

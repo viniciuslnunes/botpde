@@ -14,12 +14,22 @@ export type PatrimonioFiltroValues = {
 export function PatrimonioFiltros({
   basePath,
   values,
+  /**
+   * Categoria imposta pelo RBAC (`flags:view` = só BANDEIRA). O filtro some em
+   * vez de virar select desabilitado: escolher entre uma opção é ruído, e a
+   * trava real é da query no servidor.
+   */
+  categoriaTravada,
 }: {
   basePath: string
   values: PatrimonioFiltroValues
+  categoriaTravada?: string | null
 }) {
   const hasAny = Boolean(
-    values.categoria || values.status || values.q || values.incluirBaixados,
+    (!categoriaTravada && values.categoria) ||
+      values.status ||
+      values.q ||
+      values.incluirBaixados,
   )
 
   return (
@@ -28,7 +38,13 @@ export function PatrimonioFiltros({
       action={basePath}
       className="flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={
+          categoriaTravada
+            ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
+            : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
+        }
+      >
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Busca
           <input
@@ -38,21 +54,23 @@ export function PatrimonioFiltros({
             className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
           />
         </label>
-        <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Categoria
-          <select
-            name="categoria"
-            defaultValue={values.categoria ?? ''}
-            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          >
-            <option value="">Todas</option>
-            {Object.entries(CATEGORIA_PATRIMONIO_LABEL).map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!categoriaTravada && (
+          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Categoria
+            <select
+              name="categoria"
+              defaultValue={values.categoria ?? ''}
+              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+            >
+              <option value="">Todas</option>
+              {Object.entries(CATEGORIA_PATRIMONIO_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Status
           <select

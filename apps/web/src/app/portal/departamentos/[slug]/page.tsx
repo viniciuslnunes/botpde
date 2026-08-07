@@ -46,6 +46,10 @@ import {
   PatrimonioInventarioSkeleton,
 } from '../_components/patrimonio-inventario-aside'
 import {
+  BandeirasAcervoAside,
+  BandeirasAcervoSkeleton,
+} from '../_components/bandeiras-acervo-aside'
+import {
   CaravanasAgendaAside,
   CaravanasAgendaSkeleton,
 } from '../_components/caravanas-agenda-aside'
@@ -111,6 +115,7 @@ export default async function DepartamentoHomePage({
     podeAprovarArea,
     podeVerFinanceiro,
     podeVerPatrimonio,
+    podeVerAcervoBandeiras,
     podeModerar,
     areas,
   } = ctx
@@ -658,6 +663,17 @@ export default async function DepartamentoHomePage({
                 moduloHref={moduloHref}
                 operacaoHref={operacaoHref}
                 podeVerPatrimonio={podeVerPatrimonio}
+              />
+            </Suspense>
+          ) : panel === 'bandeiras' ? (
+            <Suspense fallback={<BandeirasAcervoSkeleton />}>
+              <BandeirasAcervoAside
+                tenantId={tenant.id}
+                nome={depto.nome}
+                isGestor={isGestor}
+                moduloHref={moduloHref}
+                operacaoHref={operacaoHref}
+                podeVer={podeVerAcervoBandeiras}
               />
             </Suspense>
           ) : panel === 'caravanas' ? (

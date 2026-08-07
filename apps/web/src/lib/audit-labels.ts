@@ -130,6 +130,12 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   TENANT_CRIADO: 'Torcida criada',
   OWNER_ATRIBUIDO: 'Presidência atribuída',
   OWNER_TRANSFERIDO: 'Presidência transferida',
+  OWNER_REMOVIDO: 'Presidência removida',
+  // Troca de gestão por `lib/lideranca.ts` — Caso B (cargo owner do tenant) e
+  // Caso A (`Sede.responsavelUserId`).
+  LIDERANCA_TRANSFERIDA: 'Presidência transferida',
+  LIDERANCA_UNIDADE_TRANSFERIDA: 'Liderança da unidade transferida',
+  LIDERANCA_UNIDADE_REMOVIDA: 'Liderança da unidade removida',
 
   // Alianças
   ALIANCA_PROPOSTA: 'Aliança proposta',

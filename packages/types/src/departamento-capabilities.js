@@ -8,7 +8,7 @@ import { DEPARTAMENTO_MODULO_ADMIN_ROTA, DEPARTAMENTO_MODULO_ROTA, DEPARTAMENTO_
 import { thinCopyPorSlug } from './departamento-thin.js'
 
 /**
- * @typedef {'equipe' | 'modulo' | 'avisos' | 'agenda' | 'caixa' | 'inventario' | 'ensaios' | 'embarque' | 'mensalidades' | 'pedidos' | 'moderacao' | 'barracao' | 'canal'} DepartamentoFeature
+ * @typedef {'equipe' | 'modulo' | 'avisos' | 'agenda' | 'caixa' | 'inventario' | 'ensaios' | 'embarque' | 'mensalidades' | 'pedidos' | 'moderacao' | 'barracao' | 'canal' | 'acervo' | 'vistoria'} DepartamentoFeature
  */
 
 /**
@@ -25,7 +25,7 @@ import { thinCopyPorSlug } from './departamento-thin.js'
  *   slug: string,
  *   moduloPortal: string | null,
  *   features: readonly DepartamentoFeature[],
- *   portalPanel: 'generico' | 'financeiro' | 'patrimonio' | 'bateria' | 'caravanas' | 'diretoria' | 'carnaval',
+ *   portalPanel: 'generico' | 'financeiro' | 'patrimonio' | 'bandeiras' | 'bateria' | 'caravanas' | 'diretoria' | 'carnaval',
  *   kind: 'plugin' | 'thin',
  *   mission: string,
  *   subareas: readonly DepartamentoSubarea[],
@@ -110,6 +110,29 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
       { id: 'inventario', label: 'Inventário', feature: 'inventario', href: '/portal/patrimonio' },
       { id: 'dominio', label: 'Resumo', feature: 'inventario' },
+    ],
+  },
+  {
+    // Bandeirão e faixa são patrimônio, mas com dia a dia próprio: guarda,
+    // escala de quem leva ao jogo e vistoria de entrada. Reusa o inventário
+    // (categoria BANDEIRA) e a Agenda — sem módulo paralelo.
+    slug: 'bandeiras',
+    moduloPortal: 'bandeiras',
+    features: ['equipe', 'acervo', 'agenda', 'vistoria'],
+    portalPanel: 'bandeiras',
+    kind: 'plugin',
+    mission:
+      'O trapo da torcida: guarda e conservação do acervo, escala de quem leva no jogo e vistoria de entrada no estádio.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      {
+        id: 'acervo',
+        label: 'Acervo',
+        feature: 'acervo',
+        href: '/portal/patrimonio?categoria=BANDEIRA',
+      },
+      { id: 'escala', label: 'Escala', feature: 'agenda', href: '/portal/eventos' },
+      { id: 'dominio', label: 'Vistoria', feature: 'vistoria' },
     ],
   },
   {
@@ -270,6 +293,7 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
   if (cap?.portalPanel === 'diretoria') return 'Departamento · Membros e governança'
   if (cap?.portalPanel === 'financeiro') return 'Departamento · Financeiro e mensalidades'
   if (cap?.portalPanel === 'patrimonio') return 'Departamento · Inventário'
+  if (cap?.portalPanel === 'bandeiras') return 'Departamento · Acervo e escala de bandeiras'
   if (cap?.portalPanel === 'bateria') return 'Departamento · Ensaios (Bateria)'
   if (cap?.portalPanel === 'caravanas') return 'Departamento · Viagens e embarque'
   if (cap?.portalPanel === 'carnaval') return 'Departamento · Cronograma e barracão'

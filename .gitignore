@@ -58,3 +58,6 @@ apps/web/public/escudos/*.png
 apps/web/auditoria-*.txt
 apps/web/audit-*.txt
 apps/web/seed-jornadas.txt
+
+# Dumps do banco (cópia local da Railway — ver docs/ops/postgres-local-dev.md)
+.dumps/

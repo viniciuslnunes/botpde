@@ -39,11 +39,14 @@ export function PatrimonioItemForm({
   candidatos,
   onCancel,
   compact,
+  /** Categoria imposta pelo RBAC (`flags:manage` só escreve em BANDEIRA). */
+  categoriaTravada,
 }: {
   initial?: PatrimonioFormInitial
   candidatos: ResponsavelOption[]
   onCancel?: () => void
   compact?: boolean
+  categoriaTravada?: string | null
 }) {
   const isEdit = Boolean(initial?.id)
   const formRef = useRef<HTMLFormElement>(null)
@@ -87,6 +90,16 @@ export function PatrimonioItemForm({
           <FieldError messages={state.errors?.nome} />
         </label>
 
+        {categoriaTravada ? (
+          <div className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Categoria
+            <input type="hidden" name="categoria" value={categoriaTravada} />
+            <p className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
+              {CATEGORIA_PATRIMONIO_LABEL[categoriaTravada] ?? categoriaTravada}
+            </p>
+            <FieldError messages={state.errors?.categoria} />
+          </div>
+        ) : (
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Categoria
           <select
@@ -103,6 +116,7 @@ export function PatrimonioItemForm({
           </select>
           <FieldError messages={state.errors?.categoria} />
         </label>
+        )}
 
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Status

@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { revalidateTag, unstable_cache } from 'next/cache'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
-import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao, SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
 import { env, isProd, superAdminEmails } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
@@ -10,10 +10,9 @@ import {
   labelTorcidaComClube,
   type ClubeOpcao,
   type TorcidaOpcao,
-  type TorcidaTransferencia,
 } from '@/lib/torcida-labels'
 
-export type { ClubeOpcao, TorcidaOpcao, TorcidaTransferencia }
+export type { ClubeOpcao, TorcidaOpcao }
 export { labelClubeComUf, labelTorcidaComClube }
 
 /** Cookie httpOnly — torcida ativa quando não há subdomínio (single-tenant ou apex). */
@@ -318,29 +317,3 @@ export async function listarVinculosAprovadosDoUsuario(userId: string): Promise<
   return opcoes
 }
 
-/** Torcidas ativas com indicação de owner — para transferência no super-admin. */
-export async function listarTorcidasParaTransferencia(): Promise<TorcidaTransferencia[]> {
-  const [tenants, owners]: [
-    TorcidaOpcao[],
-    { tenantId: string; user: { email: string | null } }[],
-  ] = await Promise.all([
-    listarTorcidasParaSelecao(),
-    db.userRole.findMany({
-      where: { role: { nome: SYSTEM_ROLES.OWNER, isSystem: true } },
-      select: { tenantId: true, user: { select: { email: true } } },
-    }),
-  ])
-
-  const ownerPorTenant = new Map<string, string>()
-  for (const o of owners) {
-    if (o.user.email && !ownerPorTenant.has(o.tenantId)) {
-      ownerPorTenant.set(o.tenantId, o.user.email)
-    }
-  }
-
-  return tenants.map((t) => ({
-    ...t,
-    temOwner: ownerPorTenant.has(t.id),
-    ownerEmail: ownerPorTenant.get(t.id) ?? null,
-  }))
-}

@@ -441,7 +441,10 @@ export function OnboardingWizard({
     setErro(null)
     aplicarPasso('concluindo', 1)
     startTransition(async () => {
-      const res = await concluirComoTorcedor()
+      // Com convite, o servidor converte este atalho em torcedor da unidade
+      // (e espelha na Sede). O slug vai junto porque o cookie tem TTL de 1 h
+      // e pode ter expirado enquanto a pessoa preenchia o wizard.
+      const res = await concluirComoTorcedor(conviteSlug ?? undefined)
       if (res?.redirectTo) {
         allowUnload()
         window.location.assign(res.redirectTo)

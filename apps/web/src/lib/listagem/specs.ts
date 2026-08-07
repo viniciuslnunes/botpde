@@ -364,6 +364,9 @@ export const LISTAGEM_SOCIOS_EMITIDAS: ListagemSpec = {
   colunas: [
     { id: 'numero', label: 'Nº', ordenarPor: 'numeroSocio', dirPadrao: 'asc' },
     { id: 'nome', label: 'Sócio', ordenarPor: 'nome', dirPadrao: 'asc' },
+    // A área mora em `SaasMembro`, não na carteirinha: exibida a partir do
+    // cadastro já carregado para o card, e por isso sem ordenação.
+    { id: 'departamento', label: 'Área' },
     {
       id: 'email',
       label: 'E-mail',
@@ -405,16 +408,26 @@ export const LISTAGEM_SOCIOS_SOLICITACOES: ListagemSpec = {
   sortPadrao: 'criadoEm',
   dirPadrao: 'desc',
   porPaginaPadrao: 25,
-  buscaPlaceholder: 'Buscar solicitação por nome, cidade ou telefone…',
+  buscaPlaceholder: 'Buscar solicitação por nome, nº, cidade ou telefone…',
   buscaEm: [
     { campo: 'nome' },
     { campo: 'cidade' },
     { campo: 'telefone', modo: 'digitos' },
     { campo: 'discordTag' },
+    { campo: 'numeroAssociado', modo: 'digitos' },
   ],
   camposProibidos: CAMPOS_SENSIVEIS_MEMBRO,
   colunas: [
+    // Nº declarado pelo solicitante no recrutamento — vazio até ele informar.
+    { id: 'numero', label: 'Nº', ordenarPor: 'numeroAssociado', dirPadrao: 'asc' },
     { id: 'nome', label: 'Solicitante', ordenarPor: 'nome', dirPadrao: 'asc' },
+    // Sem coluna de perfil: a aba já é só de sócios (o `tipo` é constante).
+    {
+      id: 'departamento',
+      label: 'Área',
+      ordenarPor: 'departamento.nome',
+      dirPadrao: 'asc',
+    },
     {
       id: 'sede',
       label: 'Unidade',
@@ -468,6 +481,12 @@ export const LISTAGEM_SOCIOS_AGUARDANDO: ListagemSpec = {
       dirPadrao: 'asc',
     },
     { id: 'nome', label: 'Sócio', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'departamento',
+      label: 'Área',
+      ordenarPor: 'departamento.nome',
+      dirPadrao: 'asc',
+    },
     {
       id: 'sede',
       label: 'Unidade',

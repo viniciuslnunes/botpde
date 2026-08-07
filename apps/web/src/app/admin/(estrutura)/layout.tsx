@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { Building2, ClipboardCheck, Eye, MapPin, Network } from 'lucide-react'
+import { Building2, ClipboardCheck, Crown, Eye, MapPin, Network } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { tenantIsAdministracaoSede } from '@/lib/authz'
@@ -43,6 +43,7 @@ export default async function EstruturaModuloLayout({ children }: { children: Re
       count: solicitacoesPendentes,
       countClass: 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
+    presidencia: { icon: <Crown className={ICONE} /> },
   }).filter((tab) => tab.id !== 'solicitacoes' || ehSedePrincipal)
 
   if (tabs.length === 0) redirect('/admin')
