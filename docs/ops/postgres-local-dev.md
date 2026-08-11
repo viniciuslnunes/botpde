@@ -99,7 +99,7 @@ Em `apps/web/.env.local` **e** em `packages/db/.env` (Prisma/scripts leem daí):
 ```env
 DATABASE_URL=postgresql://torcida:torcida@localhost:5432/torcida
 # URL antiga preservada — é dela que scripts/db-local-sync.ps1 puxa os dados.
-DATABASE_URL_RAILWAY=postgresql://...@turntable.proxy.rlwy.net:43067/railway
+DATABASE_URL_RAILWAY=postgresql://USER:PASSWORD@HOST.proxy.rlwy.net:PORT/railway
 ```
 
 O sync procura `DATABASE_URL_RAILWAY` / `DATABASE_URL` nesses dois arquivos.

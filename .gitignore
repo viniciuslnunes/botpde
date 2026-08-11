@@ -14,17 +14,32 @@ packages/db/node_modules/
 *.db-shm
 *.db-wal
 
-# Ambiente
+# Ambiente — nunca versionar valores reais (só *.example)
 .env
-.env.local
-.env.production
-.env.*.local
+.env.*
+!.env.example
+!**/.env.example
+!.env.team.example
+!**/.env.team.example
 .env.team
 *.secrets.env
+*secrets*.env
 torcida-dev.secrets.env
+setorize-secrets.kdbx
+*.kdbx
 
 # Dumps do banco (cópia local da Railway — ver docs/ops/postgres-local-dev.md)
 .dumps/
+
+# Scratch local (Playwright ad-hoc, capturas, dumps temporários)
+shot-*.mjs
+apps/web/shot-*.mjs
+tmp-*.png
+tmp-*.jpg
+tmp-*.webp
+tmp-*.json
+**/tmp-*.png
+**/tmp-*.jpg
 
 # Logs
 *.log
