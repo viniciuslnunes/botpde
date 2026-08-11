@@ -25,6 +25,17 @@ export const GAVIOES_SUBSEDES_OFICIAIS = [
     fonte: 'gavioes.com.br/sub-sede.php',
   },
   {
+    // Irmão da Subsede Baixada (não filho dela): ambos pendem da Sede Gaviões.
+    // Endereço/foto/coords: sync pontual HML→prod (`sync:pde-fiel-baixada-hml-prod`).
+    id: 'pde-fiel-baixada',
+    nome: 'PDE FIEL BAIXADA',
+    tipo: 'PONTO_ENCONTRO',
+    endereco: 'Rua Manoel Rodrigues dos Reis, 131',
+    cidade: 'Praia Grande',
+    estado: 'SP',
+    fonte: 'estrutura operacional Gaviões — PDE Baixada (Praia Grande)',
+  },
+  {
     id: 'subsede-gavioes-brasilia',
     nome: 'Subsede Brasília',
     tipo: 'SUBSEDE',

@@ -1,7 +1,8 @@
 # Plano — Ambientes (dev / homolog / prod) + domínio `torcidas.setorize.com`
 
 > Status: **em execução** — prod no ar em `torcidas.setorize.com` (2026-08-10);
-> homolog isolada parcial; wildcard/OAuth/homolog DNS ainda pendentes.  
+> catálogo seedado (2026-08-11); Google OAuth prod OK; Discord/homolog DNS ainda
+> pendentes. Rotação de secrets Postgres no **final**.  
 > Domínio: `setorize.com` (HostGator → DNS Cloudflare). Produto: **Sertorize Torcidas**.  
 > Complementa: `deploy-multi-tenant.md`, `cloudflare-cdn.md`, `dev-secrets.md`,
 > `plano-investimento-infra.md` (Faixa A).  
@@ -154,14 +155,14 @@ Manter serviços/vars iguais na forma; **trocar** só o que isola dados e mídia
 
 1. [x] Em `setorize-torcidas-prod`: adicionar **Postgres novo** (não reusar `dbo-bot-pde`)
 2. [x] `DATABASE_URL` do `@torcida/web` em **prod** → Postgres novo
-3. [x] `db:push` no banco prod (2026-08-10) — seed mínimo ainda pendente
-4. [ ] `CLOUDINARY_*` em **prod** → conta nova (`ops@` / cloud prod)
-5. [ ] `AUTH_SECRET` em **prod** → valor **novo** (`openssl rand -base64 32`)
-6. [ ] `AUTH_URL` / `NEXTAUTH_URL` em cada env → URL pública daquele env (Railway agora; domínio depois)
-7. [ ] Hom: **não** alterar Cloudinary/DB (continua teste)
+3. [x] `db:push` no banco prod (2026-08-10) + seed catálogo (`seed:catalogo-producao` / âncoras) — 2026-08-11
+4. [x] `CLOUDINARY_*` em **prod** → conta nova (`ops@` / cloud prod)
+5. [x] `AUTH_SECRET` em **prod** → valor **novo**
+6. [x] `AUTH_URL` / `NEXTAUTH_URL` / `ROOT_DOMAIN` em prod → `torcidas.setorize.com`
+7. [ ] Hom: **não** alterar Cloudinary/DB (continua teste) — validar no cutover HML
 8. [ ] Branches: `main` → prod; `staging` → hom (quando configurar Source)
 9. [ ] Bot Discord: continua fora do hom; ligar só em prod depois se precisar
-10. [ ] Rotacionar senha do Postgres prod (exposta no chat/terminal durante o setup)
+10. [ ] Rotacionar senha do Postgres prod (exposta no chat/terminal durante o setup) — **deixar para o final**
 
 ### 4.2.2 Seed de produção — o que entra / o que fica de fora
 
@@ -197,8 +198,10 @@ Escudos com match errado (ex. Palmeiras×Boa Vista): após correção do matcher
 pnpm --filter @torcida/db seed:escudos-ogol -- --recheck
 ```
 
-**Unidade Gaviões:** o catálogo cria **Subsede Baixada Santista** (lista oficial
-gavioes.com.br), não “PDE FIEL BAIXADA” (tenant Caso B de teste — fora deste seed).
+**Unidade Gaviões:** catálogo mantém **Subsede Baixada Santista** (Santos,
+lista oficial gavioes.com.br) **e** **PDE FIEL BAIXADA** (Praia Grande) como
+**irmãos** sob a Sede Gaviões — canais/unidades distintos (SUBSEDE vs PDE),
+ambos Caso A no tenant até promoção a portal.
 
 **Não entra (teste / volume / demo operacional):**
 
@@ -495,11 +498,11 @@ após homolog ok.
 - [x] DNS + Custom Domain Railway para `torcidas.setorize.com` (site abre `/entrar`)
 - [x] Wildcard `*.torcidas.setorize.com` (Railway + Cloudflare) — DNS resolve OK 2026-08-10
 - [ ] KeePassXC + `setorize-secrets.kdbx` (opcional)
-- [ ] Apps OAuth Discord/Google ×3 (Dev, Homolog, Prod) — **prod urgente** (callbacks no apex)
+- [ ] Apps OAuth Discord/Google ×3 (Dev, Homolog, Prod) — **Google prod OK**; Discord prod a validar; HML/Dev ainda
 - [x] Environments Railway `setorize-torcidas-hom` / `setorize-torcidas-prod`
 - [ ] Domínio homolog `homolog.setorize.com` (atenção: limite de custom domains do plano Railway)
-- [ ] Seed mínimo no Postgres prod
-- [ ] Rotacionar senha Postgres prod (exposta no setup)
+- [x] Seed catálogo no Postgres prod (`seed:catalogo-producao` + completar âncoras) — 2026-08-11
+- [ ] Rotacionar senha Postgres prod (exposta no setup) — **só no final**, após configs completas
 
 ## 10. Checklists de verificação
 
@@ -514,12 +517,22 @@ após homolog ok.
 
 ### Produção
 
-- [ ] `https://torcidas.setorize.com/entrar` login OK
-- [ ] `{slug}.torcidas.setorize.com` tema/tenant corretos
-- [ ] OAuth só no apex prod
-- [ ] Assets `/_next/static` com `cf-cache-status: HIT` (2ª carga)
-- [ ] Nenhuma variável de HML colada em Production
+- [ ] `https://torcidas.setorize.com/entrar` login OK (e-mail/senha e/ou Google)
+- [ ] Discord OAuth no apex (quando app prod validado)
+- [ ] `{slug}.torcidas.setorize.com` tema/tenant corretos (ex.: `pde-gavioes-fiel`)
+- [ ] OAuth só no apex prod (callbacks sem localhost / sem homolog)
+- [ ] Assets `/_next/static` com `cf-cache-status: HIT` (2ª carga) — ver `cloudflare-cdn.md` §6
+- [ ] Nenhuma variável de HML colada em Production (Cloudinary cloud name ≠ HML; `DATABASE_URL` ≠ Staging)
 - [ ] Pacote de time **sem** DSN/API de prod
+- [ ] Gaviões: Subsede Baixada Santista **e** PDE FIEL BAIXADA visíveis em Estrutura / onboarding Unidade
+
+### Como validar §10 prod (rápido)
+
+1. **Login apex** — abrir `/entrar`, Google + e-mail; Discord quando o app estiver OK.
+2. **Subdomínio** — com torcida selecionada (ou host `{slug}.torcidas.setorize.com`), conferir marca/logo/cor daquela torcida no portal.
+3. **Cache CF** — DevTools → Network → arquivo `/_next/static/...js` → 2ª carga com `cf-cache-status: HIT` (detalhe em `docs/ops/cloudflare-cdn.md` §6). Se não aparecer `cf-`, DNS ainda cinza ou fora do proxy.
+4. **Vars** — no Railway Production: `CLOUDINARY_CLOUD_NAME` = cloud **prod**; `DATABASE_URL` aponta ao Postgres **novo** (não o de hom); `AUTH_URL`/`ROOT_DOMAIN` = `torcidas.setorize.com`; `TENANT_SLUG` vazio.
+5. **Catálogo** — super-admin → torcidas listadas; Gaviões → sedes com Baixada + PDE FIEL BAIXADA.
 
 ### Segurança
 

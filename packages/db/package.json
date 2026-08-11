@@ -36,6 +36,7 @@
     "seed:torcidas-tenants": "node scripts/seed-torcidas-tenants.js",
     "seed:torcidas-tenants-ancoras": "node scripts/seed-torcidas-tenants.js --somente-ancoras",
     "sync:catalogo-hml-prod": "node --use-system-ca scripts/sync-catalogo-hml-prod.js",
+    "sync:pde-fiel-baixada-hml-prod": "node --use-system-ca scripts/sync-pde-fiel-baixada-hml-prod.js",
     "seed:sedes-onboarding": "node scripts/seed-sedes-onboarding.js",
     "report:sedes-catalogo": "node scripts/generate-sedes-from-catalogo.js",
     "coleta:sedes-geocode": "node --use-system-ca scripts/coleta-sedes-geocode.js",

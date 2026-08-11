@@ -6,8 +6,10 @@
  * Cada entrada vira um Tenant na plataforma (sem owner — transferência futura).
  * `clube` + `estado` casam com `Afiliacao` no seed via nome/UF.
  *
- * Não inclui: unidades Caso B (PDE FIEL BAIXADA), subsedes como tenant, nem
- * as ~500 conhecidas só de scraper — isso é `seed:torcidas-tenants` completo.
+ * Não inclui: portais Caso B (unidade promovida a tenant), nem as ~500
+ * conhecidas só de scraper — isso é `seed:torcidas-tenants` completo.
+ * PDE FIEL BAIXADA fica como unidade sob Gaviões (`seed:sedes-onboarding`),
+ * não como âncora TORCIDAS_BRASIL.
  *
  * @typedef {{ slug: string, nome: string, clube: string, estado: string, corPrimaria?: string, cidade?: string, sedeId?: string }} TorcidaCurada
  */
