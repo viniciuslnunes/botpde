@@ -24,14 +24,14 @@ import { PrismaClient } from '@prisma/client'
 import { TORCIDAS_CONHECIDAS, TORCIDAS_CONHECIDAS_META } from '../src/data/torcidas-conhecidas.js'
 import { normalizeNome, chaveMatch, gerarSlugUnico, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
 import {
-  loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
   isCloudinaryUrl,
   FOLDER_LOGOS,
 } from './lib/cloudinary-admin.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
 
-loadEnvFiles()
+prepareSeedEnv({ requireCloudinary: true, scriptLabel: 'seed:torcidas-conhecidas' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 

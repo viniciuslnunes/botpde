@@ -16,6 +16,9 @@ import {
   upsertPerfisDepartamentoCanonicos,
 } from '../src/departamentos-canonicos.js'
 import { ensureCanaisDepartamentosTenant } from '../src/departamento-canais.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:departamentos' })
 
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY) || 6)
 const SEED_CONNECTION_LIMIT = Math.max(CONCURRENCY + 2, 8)

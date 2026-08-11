@@ -7,6 +7,9 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'db:enable-pg-trgm' })
 
 const prisma = new PrismaClient()
 

@@ -17,17 +17,17 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
 import {
-  loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
   isCloudinaryUrl,
   FOLDER_ESCUDOS,
   MONOREPO_ROOT,
 } from './lib/cloudinary-admin.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
 import { gerarSlugUnico } from '../src/data/afiliacoes-normalize.js'
 import { scoreWikiAfiliacao } from '../src/data/escudos-wiki-match.js'
 
-loadEnvFiles()
+prepareSeedEnv({ requireCloudinary: true, scriptLabel: 'seed:escudos-soccerwiki' })
 
 const __dir = dirname(fileURLToPath(import.meta.url))
 const DRY_RUN = process.argv.includes('--dry-run')

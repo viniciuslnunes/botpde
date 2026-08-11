@@ -7,36 +7,10 @@
  *   pnpm --filter @torcida/db coleta:sedes-geocode
  *   pnpm --filter @torcida/db coleta:sedes-geocode -- --dry-run
  */
-import { readFileSync, existsSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
+import { prepareSeedEnv } from './lib/seed-env.js'
 
-const __dir = dirname(fileURLToPath(import.meta.url))
-/** packages/db/scripts → raiz do monorepo */
-const root = resolve(__dir, '../../..')
-
-/** Carrega .env do monorepo sem sobrescrever variáveis já definidas. */
-function loadEnvFiles() {
-  for (const rel of ['packages/db/.env', 'apps/web/.env.local', 'apps/web/.env', '.env']) {
-    const path = resolve(root, rel)
-    if (!existsSync(path)) continue
-    for (const line of readFileSync(path, 'utf8').split('\n')) {
-      const t = line.trim()
-      if (!t || t.startsWith('#')) continue
-      const eq = t.indexOf('=')
-      if (eq === -1) continue
-      const key = t.slice(0, eq).trim()
-      let val = t.slice(eq + 1).trim()
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1)
-      }
-      if (!process.env[key]) process.env[key] = val
-    }
-  }
-}
-
-loadEnvFiles()
+prepareSeedEnv({ scriptLabel: 'coleta:sedes-geocode' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const API_KEY =

@@ -6,6 +6,7 @@
  * o Tenant correspondente, linkado por `torcidaConhecidaId` (idempotente).
  *
  *   pnpm --filter @torcida/db seed:torcidas-tenants
+ *   pnpm --filter @torcida/db seed:torcidas-tenants -- --somente-ancoras
  *   pnpm --filter @torcida/db seed:torcidas-tenants -- --dry-run
  */
 import { PrismaClient } from '@prisma/client'
@@ -13,8 +14,13 @@ import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissio
 import { normalizeNome, chaveMatch, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
 import { upsertDepartamentosCanonicos, upsertPerfisDepartamentoCanonicos } from '../src/departamentos-canonicos.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:torcidas-tenants' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
+/** Só linka as 32 âncoras de TORCIDAS_BRASIL (não cria tenants para as ~546 conhecidas). */
+const SOMENTE_ANCORAS = process.argv.includes('--somente-ancoras')
 const db = new PrismaClient()
 
 const SYSTEM_ROLE_DEFS = [
@@ -93,6 +99,38 @@ function nomesEquivalentes(a, b) {
   if (!na || !nb) return false
   if (na === nb) return true
   return na.startsWith(nb) || nb.startsWith(na)
+}
+
+/** Remove prefixos comuns do catálogo organizadasbrasil. */
+function nomeNucleoTorcida(nome) {
+  return normalizeNome(nome)
+    .replace(/^(torcida organizada|movimento)\s+/g, '')
+    .replace(/^torcida uniformizada\s+(do|da|de)\s+/g, 'uniformizada ')
+    .replace(/^torcida uniformizada\s+/g, 'uniformizada ')
+    .replace(/^torcida\s+/g, '')
+    .replace(/\s+torcida$/g, '')
+    .replace(/\balvi\s+verde\b/g, 'alviverde')
+    .replace(/\balvi\s+rubra\b/g, 'alvirubra')
+    .replace(/\balvi\s+negra\b/g, 'alvinegra')
+    .trim()
+}
+
+/** Match mais permissivo âncora ↔ catálogo (Mancha Alviverde × MANCHA ALVI-VERDE). */
+function nomesCatalogoEquivalentes(a, b) {
+  if (nomesEquivalentes(a, b)) return true
+  const na = nomeNucleoTorcida(a)
+  const nb = nomeNucleoTorcida(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.includes(nb) || nb.includes(na)) return true
+  // TUP ↔ Torcida Uniformizada do Palmeiras
+  const aTup = na.includes('tup') || (na.includes('uniformizada') && na.includes('palmeiras'))
+  const bTup = nb.includes('tup') || (nb.includes('uniformizada') && nb.includes('palmeiras'))
+  if (aTup && bTup) return true
+  // "Torcida Jovem do Santos" × "Torcida Jovem Santos"
+  const compact = (s) => s.replace(/\b(do|da|de|dos|das)\b/g, ' ').replace(/\s+/g, ' ').trim()
+  if (compact(na) === compact(nb)) return true
+  return false
 }
 
 /**
@@ -242,7 +280,130 @@ function resolverTenantExistente(tc, tenantsExistentes, tenantPorNomeAfiliacao, 
   return undefined
 }
 
+/**
+ * Linka logo + torcidaConhecidaId nas âncoras nacionais já existentes.
+ * Não cria tenants novos a partir das ~546 conhecidas.
+ */
+async function linkarAncorasNacionais() {
+  console.log(`Link âncoras nacionais — ${TORCIDAS_BRASIL.length} slugs (somente-ancoras).`)
+  if (DRY_RUN) console.log('(dry-run: sem gravação)')
+
+  const conhecidas = await db.torcidaConhecida.findMany({
+    where: { afiliacaoId: { not: null } },
+    select: {
+      id: true,
+      nome: true,
+      titulo: true,
+      slug: true,
+      afiliacaoId: true,
+      logoUrl: true,
+    },
+  })
+
+  const ancorasSlug = new Set(TORCIDAS_BRASIL.map((t) => t.slug))
+
+  let vinculados = 0
+  let jaOk = 0
+  let semCatalogo = 0
+  let semTenant = 0
+  let conflitos = 0
+
+  for (const tb of TORCIDAS_BRASIL) {
+    const tenant = await db.tenant.findUnique({
+      where: { slug: tb.slug },
+      select: { id: true, slug: true, nome: true, logoUrl: true, torcidaConhecidaId: true },
+    })
+    if (!tenant) {
+      semTenant += 1
+      console.warn(`  ! tenant ausente: ${tb.slug}`)
+      continue
+    }
+
+    const tc =
+      conhecidas.find((c) => c.slug === tb.slug)
+      ?? conhecidas.find(
+        (c) =>
+          nomesCatalogoEquivalentes(c.nome, tb.nome)
+          || nomesCatalogoEquivalentes(c.titulo ?? '', tb.nome),
+      )
+      ?? conhecidas.find(
+        (c) =>
+          nomesCatalogoEquivalentes(c.nome, tenant.nome)
+          || nomesCatalogoEquivalentes(c.titulo ?? '', tenant.nome),
+      )
+
+    if (!tc) {
+      semCatalogo += 1
+      console.warn(`  ! sem TorcidaConhecida para ${tb.slug} (${tb.nome})`)
+      continue
+    }
+
+    if (tenant.torcidaConhecidaId === tc.id) {
+      if (!DRY_RUN && tc.logoUrl && tenant.logoUrl !== tc.logoUrl) {
+        await db.tenant.update({
+          where: { id: tenant.id },
+          data: { logoUrl: tc.logoUrl },
+        })
+      }
+      jaOk += 1
+      continue
+    }
+
+    if (DRY_RUN) {
+      console.log(`  · ${tb.slug} ← ${tc.slug} logo=${tc.logoUrl ? 'sim' : 'não'}`)
+      vinculados += 1
+      continue
+    }
+
+    // Unique(torcidaConhecidaId): libera ocupante que não bloqueia a âncora.
+    const ocupante = await db.tenant.findFirst({
+      where: { torcidaConhecidaId: tc.id, NOT: { id: tenant.id } },
+      select: {
+        id: true,
+        slug: true,
+        _count: { select: { membros: true } },
+      },
+    })
+    if (ocupante) {
+      const ocupanteEhAncora = ancorasSlug.has(ocupante.slug)
+      if (ocupanteEhAncora && ocupante._count.membros > 0) {
+        conflitos += 1
+        console.warn(
+          `  ! conflito: ${tc.slug} já em ${ocupante.slug} (âncora com membros) — pulando ${tb.slug}`,
+        )
+        continue
+      }
+      await db.tenant.update({
+        where: { id: ocupante.id },
+        data: { torcidaConhecidaId: null },
+      })
+      console.log(`  · liberou link de ${ocupante.slug} → ${tb.slug}`)
+    }
+
+    await db.tenant.update({
+      where: { id: tenant.id },
+      data: {
+        torcidaConhecidaId: tc.id,
+        logoUrl: tc.logoUrl ?? tenant.logoUrl,
+      },
+    })
+    vinculados += 1
+  }
+
+  console.log('\nResumo (somente-ancoras):')
+  console.log(`  vinculados     : ${vinculados}`)
+  console.log(`  já ok          : ${jaOk}`)
+  console.log(`  sem catálogo   : ${semCatalogo}`)
+  console.log(`  sem tenant     : ${semTenant}`)
+  console.log(`  conflitos      : ${conflitos}`)
+}
+
 async function main() {
+  if (SOMENTE_ANCORAS) {
+    await linkarAncorasNacionais()
+    return
+  }
+
   /**
    * @type {Array<{ id: string, nome: string, titulo: string|null, slug: string,
    *   afiliacaoId: string|null, logoUrl: string|null, sede: string|null,

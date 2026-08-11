@@ -7,6 +7,9 @@
 import { PrismaClient } from '@prisma/client'
 import { chaveGrupoClube } from '../src/data/afiliacoes-normalize.js'
 import { resolverTorcedoresEstimados } from '../src/data/torcedores-estimados.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:torcedores-estimados' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const db = new PrismaClient()

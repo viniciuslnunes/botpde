@@ -20,15 +20,15 @@ import {
   termosBuscaApi,
 } from '../src/data/escudos-thesportsdb-match.js'
 import {
-  loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
   isCloudinaryUrl,
   FOLDER_ESCUDOS,
   MONOREPO_ROOT,
 } from './lib/cloudinary-admin.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
 
-loadEnvFiles()
+prepareSeedEnv({ requireCloudinary: true, scriptLabel: 'seed:escudos-thesportsdb' })
 
 const API_KEY = process.env.THESPORTSDB_KEY || '3'
 const API_LIGAS = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/search_all_teams.php`

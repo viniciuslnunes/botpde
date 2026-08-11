@@ -4,6 +4,7 @@
  *   pnpm --filter @torcida/db coleta:ogol-clubes          # gera ogol-clubes-brasil.json
  *   pnpm --filter @torcida/db seed:escudos-ogol -- --report-only
  *   pnpm --filter @torcida/db seed:escudos-ogol
+ *   pnpm --filter @torcida/db seed:escudos-ogol -- --recheck  # rematcha inclusive quem já tem escudo
  *
  * REQUER REDE + DATABASE_URL; upload exige CLOUDINARY_*.
  */
@@ -12,22 +13,22 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
 import {
-  loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
-  isCloudinaryUrl,
   FOLDER_ESCUDOS,
   MONOREPO_ROOT,
 } from './lib/cloudinary-admin.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
 import { gerarSlugUnico } from '../src/data/afiliacoes-normalize.js'
 import { scoreOgolAfiliacao } from '../src/data/escudos-ogol-match.js'
 
-loadEnvFiles()
+prepareSeedEnv({ requireCloudinary: true, scriptLabel: 'seed:escudos-ogol' })
 
 const __dir = dirname(fileURLToPath(import.meta.url))
 const CATALOGO_PATH = resolve(__dir, '../src/data/ogol-clubes-brasil.json')
 const DRY_RUN = process.argv.includes('--dry-run')
 const REPORT_ONLY = process.argv.includes('--report-only')
+const RECHECK = process.argv.includes('--recheck')
 const DELAY_MS = 150
 
 const db = new PrismaClient()
@@ -49,19 +50,23 @@ function carregarCatalogo() {
 /**
  * @param {string} logoUrl
  * @param {string} slug
- * @param {string | null} existente
+ * @param {{ overwrite?: boolean }} [opts]
  */
-async function hospedarEscudo(logoUrl, slug, existente) {
-  if (existente && isCloudinaryUrl(existente)) return existente
+async function hospedarEscudo(logoUrl, slug, opts = {}) {
   if (!getCloudinaryConfig()) return null
   if (DRY_RUN) return `https://res.cloudinary.com/dry-run/${FOLDER_ESCUDOS}/${slug}.png`
-  return uploadImageUrl(logoUrl, { folder: FOLDER_ESCUDOS, publicId: slug })
+  return uploadImageUrl(logoUrl, {
+    folder: FOLDER_ESCUDOS,
+    publicId: slug,
+    overwrite: opts.overwrite !== false,
+  })
 }
 
 async function main() {
   console.log('Escudos Ogol — casamento + Cloudinary')
   if (DRY_RUN) console.log('(dry-run)')
   if (REPORT_ONLY) console.log('(report-only)')
+  if (RECHECK) console.log('(recheck: rematcha afiliações que já têm escudo)')
 
   const catalogo = carregarCatalogo()
   console.log(`  catálogo Ogol: ${catalogo.total ?? catalogo.clubes.length} clubes`)
@@ -71,13 +76,20 @@ async function main() {
     process.exit(1)
   }
 
-  /** @type {Array<{ id: string, nome: string, estado: string | null, slug: string | null, escudoUrl: string | null }>} */
-  const semEscudo = await db.afiliacao.findMany({
-    where: { escudoUrl: null },
-    select: { id: true, nome: true, estado: true, slug: true, escudoUrl: true },
+  /** @type {Array<{ id: string, nome: string, estado: string | null, cidade: string | null, slug: string | null, escudoUrl: string | null }>} */
+  const alvo = await db.afiliacao.findMany({
+    where: RECHECK ? {} : { escudoUrl: null },
+    select: {
+      id: true,
+      nome: true,
+      estado: true,
+      cidade: true,
+      slug: true,
+      escudoUrl: true,
+    },
     orderBy: { nome: 'asc' },
   })
-  console.log(`  afiliações sem escudo: ${semEscudo.length}`)
+  console.log(`  afiliações no escopo: ${alvo.length}${RECHECK ? ' (todas)' : ' (sem escudo)'}`)
 
   /** @type {Set<string>} */
   const slugsUsados = new Set(
@@ -86,10 +98,10 @@ async function main() {
       .filter(Boolean),
   )
 
-  /** @type {Array<{ score: number, afiliacaoId: string, nome: string, estado: string | null, ogolNome: string, ogolId: string, logoUrl: string, slug: string }>} */
+  /** @type {Array<{ score: number, afiliacaoId: string, nome: string, estado: string | null, ogolNome: string, ogolId: string, logoUrl: string, slug: string, escudoUrlAtual: string | null }>} */
   const candidatos = []
 
-  for (const af of semEscudo) {
+  for (const af of alvo) {
     for (const ogol of catalogo.clubes) {
       const score = scoreOgolAfiliacao(ogol, af)
       if (score < 90) continue
@@ -103,10 +115,12 @@ async function main() {
         ogolId: ogol.ogolId,
         logoUrl: ogol.logoUrl,
         slug,
+        escudoUrlAtual: af.escudoUrl,
       })
     }
   }
 
+  // Preferir score maior; em empate, preferir quem tem cidade no Ogol (já filtrada no score).
   candidatos.sort((a, b) => b.score - a.score)
 
   /** @type {typeof candidatos} */
@@ -125,15 +139,16 @@ async function main() {
     mapeados.push(c)
   }
 
-  for (const af of semEscudo) {
+  for (const af of alvo) {
     if (!afUsados.has(af.id)) semMatch.push(`${af.nome} (${af.estado ?? '?'})`)
   }
 
   const reportPath = resolve(MONOREPO_ROOT, 'packages/db/src/data/escudos-ogol-report.json')
   const report = {
     geradoEm: new Date().toISOString(),
+    recheck: RECHECK,
     ogolTotal: catalogo.clubes.length,
-    semEscudoAntes: semEscudo.length,
+    escopoAntes: alvo.length,
     mapeados: mapeados.length,
     semMatch: semMatch.length,
     pares: mapeados.map((m) => ({
@@ -154,10 +169,14 @@ async function main() {
   if (REPORT_ONLY) return
 
   let enviados = 0
+  let sobrescritos = 0
   let erros = 0
   for (const m of mapeados) {
     try {
-      const escudoUrl = await hospedarEscudo(m.logoUrl, m.slug, null)
+      const precisaUpload = RECHECK || !m.escudoUrlAtual
+      if (!precisaUpload) continue
+
+      const escudoUrl = await hospedarEscudo(m.logoUrl, m.slug, { overwrite: true })
       if (!escudoUrl) {
         console.warn(`  ! sem upload: ${m.nome}`)
         continue
@@ -169,6 +188,10 @@ async function main() {
         })
       }
       enviados += 1
+      if (m.escudoUrlAtual) {
+        sobrescritos += 1
+        console.log(`  ↻ ${m.nome} → ${m.ogolNome} (${m.ogolId})`)
+      }
       if (enviados % 25 === 0) console.log(`  … ${enviados} escudos`)
       await sleep(DELAY_MS)
     } catch (err) {
@@ -179,11 +202,12 @@ async function main() {
   }
 
   const restantes = DRY_RUN
-    ? semEscudo.length - mapeados.length
+    ? alvo.filter((a) => !a.escudoUrl && !afUsados.has(a.id)).length
     : await db.afiliacao.count({ where: { escudoUrl: null } })
 
   console.log('\nResumo:')
   console.log(`  escudos enviados : ${enviados}`)
+  console.log(`  sobrescritos     : ${sobrescritos}`)
   console.log(`  erros            : ${erros}`)
   console.log(`  sem escudo ainda : ${restantes}`)
 }

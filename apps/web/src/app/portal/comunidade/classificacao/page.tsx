@@ -6,6 +6,7 @@ import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { resolverClubeClassificacao } from '@/lib/sofascore-server'
 import { WidgetSection } from '@/components/sofascore/widget-section'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Classificação — Comunidade' }
@@ -22,7 +23,10 @@ export default async function ClassificacaoPage() {
   if (!session?.user?.id) redirect('/entrar')
 
   const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
-  if (!ctx) redirect('/')
+  if (!ctx) {
+    if (isSuperAdminEmail(session.user.email)) redirect('/super-admin/torcidas')
+    redirect('/onboarding')
+  }
 
   const clube = await resolverClubeClassificacao(session.user.id, session.user.email)
   const afiliacaoSlug = clube?.slug ?? null

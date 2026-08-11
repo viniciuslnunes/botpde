@@ -39,6 +39,7 @@
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
 import { senhaHashTeste } from './lib/senha-teste.js'
+import { assertNotProductionSeed } from './lib/seed-env.js'
 import {
   ALIANCAS,
   CLUBE_CORINTHIANS,
@@ -48,6 +49,8 @@ import {
   RIVALIDADES_CLUBE,
   TENANT_CORINTHIANS,
 } from './lib/lote-nacional.js'
+
+assertNotProductionSeed('seed:nacional-teste')
 
 const PESSOAS_POR_UNIDADE = 30
 const UNIDADES_POR_TORCIDA = 2

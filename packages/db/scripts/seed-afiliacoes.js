@@ -29,14 +29,14 @@ import {
   normalizeNome,
 } from '../src/data/afiliacoes-normalize.js'
 import {
-  loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
   isCloudinaryUrl,
   FOLDER_ESCUDOS,
 } from './lib/cloudinary-admin.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
 
-loadEnvFiles()
+prepareSeedEnv({ requireCloudinary: true, scriptLabel: 'seed:afiliacoes' })
 
 const API_KEY = process.env.THESPORTSDB_KEY || '3'
 const API_BASE = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/search_all_teams.php`

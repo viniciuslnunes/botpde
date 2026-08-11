@@ -32,6 +32,9 @@
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
+import { assertNotProductionSeed } from './lib/seed-env.js'
+
+assertNotProductionSeed('seed:convites-teste')
 
 const ROTACIONAR = process.argv.includes('--rotacionar')
 const SO_LISTAR = process.argv.includes('--listar')

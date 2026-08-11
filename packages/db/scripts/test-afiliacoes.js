@@ -292,4 +292,26 @@ ok('scoreOgolAfiliacao casa nome oficial com UF', () => {
   assert.ok(score >= 90)
 })
 
+ok('scoreOgolAfiliacao casa SE Palmeiras (São Paulo) e rejeita Boa Vista', () => {
+  const se = {
+    ogolId: '2248',
+    nomeOficial: 'Sociedade Esportiva Palmeiras',
+    titulo: 'Palmeiras',
+    cidade: 'São Paulo',
+    uf: 'SP',
+    logoUrl: 'https://cdn-img.staticzz.com/se.png',
+  }
+  const boaVista = {
+    ogolId: '232754',
+    nomeOficial: 'Palmeiras Futebol Clube',
+    titulo: 'Palmeiras',
+    cidade: 'São João da Boa Vista',
+    uf: 'SP',
+    logoUrl: 'https://cdn-img.staticzz.com/bv.png',
+  }
+  const af = { nome: 'Palmeiras', estado: 'SP', cidade: 'São Paulo' }
+  assert.ok(scoreOgolAfiliacao(se, af) >= 90, `SE score=${scoreOgolAfiliacao(se, af)}`)
+  assert.equal(scoreOgolAfiliacao(boaVista, af), 0)
+})
+
 console.log(`\n${passed} asserções OK — ${AFILIACOES_BRASIL.length} clubes no dataset.`)

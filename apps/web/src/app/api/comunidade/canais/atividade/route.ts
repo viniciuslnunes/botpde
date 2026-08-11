@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .slice(0, MAX_CANAIS_ATIVIDADE)
 
-    let afiliacaoId = parsed.data.afiliacaoId ?? null
+    const afiliacaoId = parsed.data.afiliacaoId ?? null
     if (afiliacaoId && !isSuperAdminEmail(session.user.email)) {
       const afiliacaoViewer = await resolveAfiliacaoComunidadeDoUsuario(
         session.user.id,

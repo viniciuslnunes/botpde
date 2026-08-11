@@ -15,6 +15,9 @@
 import { PrismaClient } from '@prisma/client'
 import { DEPARTAMENTO_AREAS_CANONICAS } from '../../types/src/departamento-areas-canonicas.js'
 import { ensureCanaisDepartamentosTenant } from '../src/departamento-canais.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:departamento-areas' })
 
 const CONCURRENCY = Math.max(1, Number(process.env.CONCURRENCY) || 6)
 const SEED_CONNECTION_LIMIT = Math.max(CONCURRENCY + 2, 8)

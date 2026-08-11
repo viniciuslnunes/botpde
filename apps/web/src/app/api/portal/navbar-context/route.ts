@@ -18,6 +18,17 @@ export async function GET() {
     const userId = session.user.id
     const tenantId = await resolveTenantIdPortalComunidade(userId, session.user.email)
     if (!tenantId) {
+      // Super-admin sem torcida/CN: navbar ainda monta; não 404 (evita ruído e
+      // loops de refetch). Contadores vazios + acesso admin de plataforma.
+      if (isSuperAdminEmail(session.user.email)) {
+        return NextResponse.json({
+          unreadMessages: 0,
+          unreadNotifications: 0,
+          hasAdminAreaAccess: true,
+          isAdmin: true,
+          notifications: [],
+        })
+      }
       return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
     }
 

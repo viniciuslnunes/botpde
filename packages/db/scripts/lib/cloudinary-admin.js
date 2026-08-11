@@ -30,7 +30,10 @@ export function loadEnvFiles() {
       if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1)
       }
-      if (!process.env[key]) process.env[key] = val
+      // Só preenche se a chave ainda não existir no process.env.
+      // `export FOO=` (string vazia) conta como definida — não sobrescrever
+      // com .env.local (ex.: TENANT_SLUG=pde-gavioes-fiel).
+      if (!Object.hasOwn(process.env, key)) process.env[key] = val
     }
   }
 }

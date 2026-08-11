@@ -38,6 +38,9 @@
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
 import { senhaHashTeste } from './lib/senha-teste.js'
+import { assertNotProductionSeed } from './lib/seed-env.js'
+
+assertNotProductionSeed('seed:corinthians-teste')
 
 const DOMINIO_TESTE = 'teste.corinthians.torcida.app'
 const AFILIACAO_SLUG = 'sport-club-corinthians-paulista-sp'

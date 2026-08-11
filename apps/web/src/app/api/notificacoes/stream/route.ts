@@ -3,6 +3,7 @@ import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { subscribeNotificacaoPing } from '@/lib/notificacoes-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
 import { getTenantFromHost } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,10 @@ export async function GET(request: Request) {
         ? ((await getTenantFromHost())?.id ?? null)
         : await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
     if (!tenantId) {
+      // Super-admin sem vínculo: stream ocioso (evita 404 no console; navbar faz poll).
+      if (escopo !== 'admin' && isSuperAdminEmail(session.user.email)) {
+        return createSsePingResponse(() => () => {}, request.signal)
+      }
       return new Response('Tenant não encontrado', { status: 404 })
     }
 

@@ -1,9 +1,10 @@
 {
-  "geradoEm": "2026-07-13T03:48:38.795Z",
+  "geradoEm": "2026-08-11T03:00:09.230Z",
+  "recheck": true,
   "ogolTotal": 9858,
-  "semEscudoAntes": 186,
-  "mapeados": 116,
-  "semMatch": 70,
+  "escopoAntes": 318,
+  "mapeados": 185,
+  "semMatch": 133,
   "pares": [
     {
       "clube": "4 de Julho",
@@ -14,11 +15,27 @@
       "score": 100
     },
     {
+      "clube": "ABC",
+      "uf": "RN",
+      "ogol": "ABC Futebol Clube",
+      "ogolId": "3083",
+      "slug": "abc-rn",
+      "score": 100
+    },
+    {
       "clube": "Alagoinhas Atlético Clube",
       "uf": "BA",
       "ogol": "Alagoinhas Atlético Clube",
       "ogolId": "3128",
       "slug": "alagoinhas-atletico-clube-ba",
+      "score": 100
+    },
+    {
+      "clube": "Alecrim",
+      "uf": "RN",
+      "ogol": "Alecrim Futebol Clube",
+      "ogolId": "3089",
+      "slug": "alecrim-rn",
       "score": 100
     },
     {
@@ -38,11 +55,43 @@
       "score": 100
     },
     {
+      "clube": "América-MG",
+      "uf": "MG",
+      "ogol": "América Futebol Clube",
+      "ogolId": "2227",
+      "slug": "america-mg-mg",
+      "score": 100
+    },
+    {
+      "clube": "Americano",
+      "uf": "RJ",
+      "ogol": "Americano Futebol Clube",
+      "ogolId": "3104",
+      "slug": "americano-rj",
+      "score": 100
+    },
+    {
       "clube": "América-PE",
       "uf": "PE",
       "ogol": "América Futebol Clube",
       "ogolId": "106902",
       "slug": "america-pe-pe",
+      "score": 100
+    },
+    {
+      "clube": "América-RN",
+      "uf": "RN",
+      "ogol": "América Futebol Clube",
+      "ogolId": "2616",
+      "slug": "america-rn-rn",
+      "score": 100
+    },
+    {
+      "clube": "Anápolis FC",
+      "uf": "GO",
+      "ogol": "Anápolis Futebol Clube",
+      "ogolId": "3108",
+      "slug": "anapolis-fc-go",
       "score": 100
     },
     {
@@ -59,6 +108,22 @@
       "ogol": "Araguaína Futebol e Regatas",
       "ogolId": "3112",
       "slug": "araguaina-futebol-e-regatas-to",
+      "score": 100
+    },
+    {
+      "clube": "Araxá Esporte Clube",
+      "uf": "MG",
+      "ogol": "Araxá Esporte Clube",
+      "ogolId": "37450",
+      "slug": "araxa-esporte-clube-mg",
+      "score": 100
+    },
+    {
+      "clube": "ASA",
+      "uf": "AL",
+      "ogol": "Agremiação Sportiva Arapiraquense",
+      "ogolId": "3116",
+      "slug": "asa-al",
       "score": 100
     },
     {
@@ -91,14 +156,6 @@
       "ogol": "Associação Atlética Francana",
       "ogolId": "3251",
       "slug": "associacao-atletica-francana-sp",
-      "score": 100
-    },
-    {
-      "clube": "Associacao Cultural e Desportiva Potiguar",
-      "uf": "RN",
-      "ogol": "Associação Cultural e Desportiva Potiguar",
-      "ogolId": "3410",
-      "slug": "associacao-cultural-e-desportiva-potiguar-rn",
       "score": 100
     },
     {
@@ -150,6 +207,14 @@
       "score": 100
     },
     {
+      "clube": "Athletico-PR",
+      "uf": "PR",
+      "ogol": "Club Athletico Paranaense",
+      "ogolId": "2230",
+      "slug": "athletico-pr-pr",
+      "score": 100
+    },
+    {
       "clube": "Atlético Clube Corintians",
       "uf": "RN",
       "ogol": "Atlético Clube Coríntians",
@@ -166,11 +231,35 @@
       "score": 100
     },
     {
+      "clube": "Atlético-GO",
+      "uf": "GO",
+      "ogol": "Atlético Clube Goianiense",
+      "ogolId": "3129",
+      "slug": "atletico-go-go",
+      "score": 100
+    },
+    {
+      "clube": "Atlético-MG",
+      "uf": "MG",
+      "ogol": "Clube Atlético Mineiro",
+      "ogolId": "2229",
+      "slug": "atletico-mg-mg",
+      "score": 100
+    },
+    {
       "clube": "Atlético Rio Negro Clube",
       "uf": "AM",
       "ogol": "Atlético Rio Negro Clube",
       "ogolId": "228546",
       "slug": "atletico-rio-negro-clube-am",
+      "score": 100
+    },
+    {
+      "clube": "Auto Esporte",
+      "uf": "PB",
+      "ogol": "Auto Esporte Clube",
+      "ogolId": "345866",
+      "slug": "auto-esporte-pb",
       "score": 100
     },
     {
@@ -182,6 +271,70 @@
       "score": 100
     },
     {
+      "clube": "Bahia",
+      "uf": "BA",
+      "ogol": "Esporte Clube Bahia",
+      "ogolId": "2231",
+      "slug": "bahia-ba",
+      "score": 100
+    },
+    {
+      "clube": "Barretos Esporte Clube",
+      "uf": "SP",
+      "ogol": "Barretos Esporte Clube",
+      "ogolId": "24576",
+      "slug": "barretos-esporte-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Batatais Futebol Clube",
+      "uf": "SP",
+      "ogol": "Batatais Futebol Clube",
+      "ogolId": "67249",
+      "slug": "batatais-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Bonsucesso Futebol Clube",
+      "uf": "RJ",
+      "ogol": "Bonsucesso Futebol Clube",
+      "ogolId": "3151",
+      "slug": "bonsucesso-futebol-clube-rj",
+      "score": 100
+    },
+    {
+      "clube": "Botafogo",
+      "uf": "RJ",
+      "ogol": "Botafogo de Futebol e Regatas",
+      "ogolId": "2233",
+      "slug": "botafogo-rj",
+      "score": 100
+    },
+    {
+      "clube": "Botafogo-PB",
+      "uf": "PB",
+      "ogol": "Botafogo Futebol Clube",
+      "ogolId": "3153",
+      "slug": "botafogo-pb-pb",
+      "score": 100
+    },
+    {
+      "clube": "Botafogo-SP",
+      "uf": "SP",
+      "ogol": "Botafogo Futebol Clube",
+      "ogolId": "3154",
+      "slug": "botafogo-sp-sp",
+      "score": 100
+    },
+    {
+      "clube": "Brasiliense",
+      "uf": "DF",
+      "ogol": "Brasiliense Futebol Clube",
+      "ogolId": "2617",
+      "slug": "brasiliense-df",
+      "score": 100
+    },
+    {
       "clube": "Campinas Futebol Clube",
       "uf": "SP",
       "ogol": "Campinas Futebol Clube",
@@ -190,11 +343,19 @@
       "score": 100
     },
     {
-      "clube": "Campo Grande Atlético Clube",
-      "uf": "RJ",
-      "ogol": "Campo Grande Atlético Clube",
-      "ogolId": "287007",
-      "slug": "campo-grande-atletico-clube-rj",
+      "clube": "Campinense",
+      "uf": "PB",
+      "ogol": "Campinense Clube",
+      "ogolId": "3171",
+      "slug": "campinense-pb",
+      "score": 100
+    },
+    {
+      "clube": "Cascavel",
+      "uf": "PR",
+      "ogol": "Cascavel Esporte Clube",
+      "ogolId": "52741",
+      "slug": "cascavel-pr",
       "score": 100
     },
     {
@@ -206,6 +367,14 @@
       "score": 100
     },
     {
+      "clube": "Castanhal",
+      "uf": "PA",
+      "ogol": "Castanhal Esporte Clube",
+      "ogolId": "3178",
+      "slug": "castanhal-pa",
+      "score": 100
+    },
+    {
       "clube": "Caucaia Esporte Clube",
       "uf": "CE",
       "ogol": "Caucaia Esporte Clube",
@@ -214,11 +383,19 @@
       "score": 100
     },
     {
-      "clube": "Centro Sportivo Alagoano",
-      "uf": "AL",
-      "ogol": "Centro Sportivo Alagoano",
-      "ogolId": "3217",
-      "slug": "centro-sportivo-alagoano-al",
+      "clube": "Ceilândia EC",
+      "uf": "DF",
+      "ogol": "Ceilândia Esporte Clube",
+      "ogolId": "3185",
+      "slug": "ceilandia-ec-df",
+      "score": 100
+    },
+    {
+      "clube": "Ceres Futebol Clube",
+      "uf": "RJ",
+      "ogol": "Ceres Futebol Clube",
+      "ogolId": "3189",
+      "slug": "ceres-futebol-clube-rj",
       "score": 100
     },
     {
@@ -326,19 +503,27 @@
       "score": 100
     },
     {
-      "clube": "Club Sportivo Sergipe",
-      "uf": "SE",
-      "ogol": "Club Sportivo Sergipe",
-      "ogolId": "3473",
-      "slug": "club-sportivo-sergipe-se",
-      "score": 100
-    },
-    {
       "clube": "Colo Colo Futebol e Regatas",
       "uf": "BA",
       "ogol": "Colo Colo de Futebol e Regatas",
       "ogolId": "3199",
       "slug": "colo-colo-futebol-e-regatas-ba",
+      "score": 100
+    },
+    {
+      "clube": "Comercial-SP",
+      "uf": "SP",
+      "ogol": "Comercial Futebol Clube",
+      "ogolId": "3202",
+      "slug": "comercial-sp-sp",
+      "score": 100
+    },
+    {
+      "clube": "Confiança",
+      "uf": "SE",
+      "ogol": "Associação Desportiva Confiança",
+      "ogolId": "3204",
+      "slug": "confianca-se",
       "score": 100
     },
     {
@@ -358,11 +543,51 @@
       "score": 100
     },
     {
+      "clube": "Cruzeiro",
+      "uf": "MG",
+      "ogol": "Cruzeiro Esporte Clube",
+      "ogolId": "2236",
+      "slug": "cruzeiro-mg",
+      "score": 100
+    },
+    {
+      "clube": "Cruzeiro Esporte Clube",
+      "uf": "PB",
+      "ogol": "Cruzeiro Esporte Clube",
+      "ogolId": "295749",
+      "slug": "cruzeiro-esporte-clube-pb",
+      "score": 100
+    },
+    {
+      "clube": "CSA",
+      "uf": "AL",
+      "ogol": "Centro Sportivo Alagoano",
+      "ogolId": "3217",
+      "slug": "csa-al",
+      "score": 100
+    },
+    {
+      "clube": "Cuiabá",
+      "uf": "MT",
+      "ogol": "Cuiabá Esporte Clube",
+      "ogolId": "3220",
+      "slug": "cuiaba-mt",
+      "score": 100
+    },
+    {
       "clube": "Democrata",
       "uf": "MG",
       "ogol": "Esporte Clube Democrata",
       "ogolId": "3223",
       "slug": "democrata-mg",
+      "score": 100
+    },
+    {
+      "clube": "Esporte Clube Água Santa",
+      "uf": "SP",
+      "ogol": "Esporte Clube Água Santa",
+      "ogolId": "71236",
+      "slug": "esporte-clube-agua-santa-sp",
       "score": 100
     },
     {
@@ -382,14 +607,6 @@
       "score": 100
     },
     {
-      "clube": "Esporte Clube Limoeiro",
-      "uf": "CE",
-      "ogol": "Esporte Clube Limoeiro",
-      "ogolId": "115862",
-      "slug": "esporte-clube-limoeiro-ce",
-      "score": 100
-    },
-    {
       "clube": "Esporte Clube Mamoré",
       "uf": "MG",
       "ogol": "Esporte Clube Mamoré",
@@ -406,11 +623,19 @@
       "score": 100
     },
     {
-      "clube": "Esporte Clube XV de Novembro",
+      "clube": "Esporte Clube Taubaté",
       "uf": "SP",
-      "ogol": "Esporte Clube XV de Novembro",
-      "ogolId": "8229",
-      "slug": "esporte-clube-xv-de-novembro-sp",
+      "ogol": "Esporte Clube Taubaté",
+      "ogolId": "8240",
+      "slug": "esporte-clube-taubate-sp",
+      "score": 100
+    },
+    {
+      "clube": "Esporte Clube Ypiranga",
+      "uf": "BA",
+      "ogol": "Esporte Clube Ypiranga",
+      "ogolId": "233257",
+      "slug": "esporte-clube-ypiranga-ba",
       "score": 100
     },
     {
@@ -430,6 +655,14 @@
       "score": 100
     },
     {
+      "clube": "Estrela do Norte",
+      "uf": "ES",
+      "ogol": "Estrela do Norte Futebol Clube",
+      "ogolId": "341417",
+      "slug": "estrela-do-norte-es",
+      "score": 100
+    },
+    {
       "clube": "Ferroviário Esporte Clube do Cabo",
       "uf": "PE",
       "ogol": "Ferroviário Esporte Clube do Cabo",
@@ -438,11 +671,35 @@
       "score": 100
     },
     {
+      "clube": "Flamengo-PI",
+      "uf": "PI",
+      "ogol": "Esporte Clube Flamengo",
+      "ogolId": "244865",
+      "slug": "flamengo-pi-pi",
+      "score": 100
+    },
+    {
+      "clube": "Fluminense de Feira",
+      "uf": "BA",
+      "ogol": "Fluminense de Feira Futebol Clube",
+      "ogolId": "3247",
+      "slug": "fluminense-de-feira-ba",
+      "score": 100
+    },
+    {
       "clube": "Formiga Esporte Clube",
       "uf": "MG",
       "ogol": "Formiga Esporte Clube",
       "ogolId": "318405",
       "slug": "formiga-esporte-clube-mg",
+      "score": 100
+    },
+    {
+      "clube": "Fortaleza",
+      "uf": "CE",
+      "ogol": "Fortaleza Esporte Clube",
+      "ogolId": "2239",
+      "slug": "fortaleza-ce",
       "score": 100
     },
     {
@@ -462,11 +719,43 @@
       "score": 100
     },
     {
+      "clube": "Gama",
+      "uf": "DF",
+      "ogol": "Sociedade Esportiva do Gama",
+      "ogolId": "3254",
+      "slug": "gama-df",
+      "score": 100
+    },
+    {
       "clube": "Goianésia Esporte Clube",
       "uf": "GO",
       "ogol": "Associação Esportiva Goianésia",
       "ogolId": "312294",
       "slug": "goianesia-esporte-clube-go",
+      "score": 100
+    },
+    {
+      "clube": "Goiás",
+      "uf": "GO",
+      "ogol": "Goiás Esporte Clube",
+      "ogolId": "2244",
+      "slug": "goias-go",
+      "score": 100
+    },
+    {
+      "clube": "Goytacaz Futebol Clube",
+      "uf": "RJ",
+      "ogol": "Goytacaz Futebol Clube",
+      "ogolId": "3261",
+      "slug": "goytacaz-futebol-clube-rj",
+      "score": 100
+    },
+    {
+      "clube": "Grêmio",
+      "uf": "RS",
+      "ogol": "Grêmio Foot-Ball Porto Alegrense",
+      "ogolId": "2243",
+      "slug": "gremio-rs",
       "score": 100
     },
     {
@@ -486,14 +775,6 @@
       "score": 100
     },
     {
-      "clube": "Grêmio Esportivo Brasil",
-      "uf": "RS",
-      "ogol": "Grêmio Esportivo Brasil",
-      "ogolId": "3157",
-      "slug": "gremio-esportivo-brasil-rs",
-      "score": 100
-    },
-    {
       "clube": "Grêmio Esportivo Osasco",
       "uf": "SP",
       "ogol": "Grêmio Esportivo Osasco",
@@ -510,11 +791,35 @@
       "score": 100
     },
     {
-      "clube": "Guarani Esporte Clube",
-      "uf": "MG",
+      "clube": "Guarani",
+      "uf": "SP",
       "ogol": "Guarani Futebol Clube",
-      "ogolId": "3275",
-      "slug": "guarani-esporte-clube-mg",
+      "ogolId": "2242",
+      "slug": "guarani-sp",
+      "score": 100
+    },
+    {
+      "clube": "Guaratinguetá Esporte Clube",
+      "uf": "SP",
+      "ogol": "Associação Esportiva Guaratinguetá",
+      "ogolId": "304282",
+      "slug": "guaratingueta-esporte-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Horizonte Futebol Clube",
+      "uf": "CE",
+      "ogol": "Horizonte Futebol Clube",
+      "ogolId": "13683",
+      "slug": "horizonte-futebol-clube-ce",
+      "score": 100
+    },
+    {
+      "clube": "Independente Futebol Clube",
+      "uf": "SP",
+      "ogol": "Independente Futebol Clube",
+      "ogolId": "24583",
+      "slug": "independente-futebol-clube-sp",
       "score": 100
     },
     {
@@ -526,11 +831,11 @@
       "score": 100
     },
     {
-      "clube": "Internacional Esporte Clube",
-      "uf": "PR",
-      "ogol": "Internacional Futebol Clube",
-      "ogolId": "68819",
-      "slug": "internacional-esporte-clube-pr",
+      "clube": "Internacional",
+      "uf": "RS",
+      "ogol": "Sport Club Internacional",
+      "ogolId": "2245",
+      "slug": "internacional-rs",
       "score": 100
     },
     {
@@ -542,11 +847,11 @@
       "score": 100
     },
     {
-      "clube": "Iraty Sport Club",
-      "uf": "PR",
-      "ogol": "Iraty Sport Club",
-      "ogolId": "260288",
-      "slug": "iraty-sport-club-pr",
+      "clube": "Itabaiana",
+      "uf": "SE",
+      "ogol": "Associação Olímpica de Itabaiana",
+      "ogolId": "3301",
+      "slug": "itabaiana-se",
       "score": 100
     },
     {
@@ -574,11 +879,27 @@
       "score": 100
     },
     {
-      "clube": "Jabaquara Atlético clube",
+      "clube": "Itapipoca Esporte Clube",
+      "uf": "CE",
+      "ogol": "Itapipoca Esporte Clube",
+      "ogolId": "3305",
+      "slug": "itapipoca-esporte-clube-ce",
+      "score": 100
+    },
+    {
+      "clube": "Ituano Futebol Clube",
       "uf": "SP",
-      "ogol": "Jabaquara Atlético Clube",
-      "ogolId": "19455",
-      "slug": "jabaquara-atletico-clube-sp",
+      "ogol": "Ituano Futebol Clube",
+      "ogolId": "2543",
+      "slug": "ituano-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Itumbiara",
+      "uf": "GO",
+      "ogol": "Itumbiara Esporte Clube",
+      "ogolId": "3308",
+      "slug": "itumbiara-go",
       "score": 100
     },
     {
@@ -590,11 +911,11 @@
       "score": 100
     },
     {
-      "clube": "Ji-Paraná Futebol Clube",
-      "uf": "RO",
-      "ogol": "Ji-Paraná Futebol Clube",
-      "ogolId": "3316",
-      "slug": "ji-parana-futebol-clube-ro",
+      "clube": "Juventude",
+      "uf": "RS",
+      "ogol": "Esporte Clube Juventude",
+      "ogolId": "2246",
+      "slug": "juventude-rs",
       "score": 100
     },
     {
@@ -622,11 +943,43 @@
       "score": 100
     },
     {
+      "clube": "Macaé",
+      "uf": "RJ",
+      "ogol": "Macaé Esporte Futebol Clube",
+      "ogolId": "97846",
+      "slug": "macae-rj",
+      "score": 100
+    },
+    {
+      "clube": "Madureira",
+      "uf": "RJ",
+      "ogol": "Madureira Esporte Clube",
+      "ogolId": "3332",
+      "slug": "madureira-rj",
+      "score": 100
+    },
+    {
       "clube": "Maracanã Esporte Clube",
       "uf": "CE",
       "ogol": "Maracanã Esporte Clube",
       "ogolId": "24906",
       "slug": "maracana-esporte-clube-ce",
+      "score": 100
+    },
+    {
+      "clube": "Mirassol Futebol Clube",
+      "uf": "SP",
+      "ogol": "Mirassol Futebol Clube",
+      "ogolId": "3348",
+      "slug": "mirassol-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Mixto",
+      "uf": "MT",
+      "ogol": "Mixto Esporte Clube",
+      "ogolId": "3349",
+      "slug": "mixto-mt",
       "score": 100
     },
     {
@@ -646,11 +999,35 @@
       "score": 100
     },
     {
+      "clube": "Nacional-AM",
+      "uf": "AM",
+      "ogol": "Nacional Futebol Clube",
+      "ogolId": "3356",
+      "slug": "nacional-am-am",
+      "score": 100
+    },
+    {
       "clube": "Nacional Atlético Clube",
       "uf": "PB",
       "ogol": "Nacional Atlético Clube",
       "ogolId": "9786",
       "slug": "nacional-atletico-clube-pb",
+      "score": 100
+    },
+    {
+      "clube": "Nova Iguaçu",
+      "uf": "RJ",
+      "ogol": "Nova Iguaçu Futebol Clube",
+      "ogolId": "3363",
+      "slug": "nova-iguacu-rj",
+      "score": 100
+    },
+    {
+      "clube": "Novo Hamburgo",
+      "uf": "RS",
+      "ogol": "Esporte Clube Novo Hamburgo",
+      "ogolId": "3365",
+      "slug": "novo-hamburgo-rs",
       "score": 100
     },
     {
@@ -670,19 +1047,27 @@
       "score": 100
     },
     {
-      "clube": "Parnahyba Sport Club",
-      "uf": "PI",
-      "ogol": "Parnahyba Sport Club",
-      "ogolId": "3384",
-      "slug": "parnahyba-sport-club-pi",
+      "clube": "Palmeiras",
+      "uf": "SP",
+      "ogol": "Sociedade Esportiva Palmeiras",
+      "ogolId": "2248",
+      "slug": "palmeiras-sp",
       "score": 100
     },
     {
-      "clube": "Paulista Futebol Clube",
-      "uf": "SP",
-      "ogol": "Paulista Futebol Club",
-      "ogolId": "45358",
-      "slug": "paulista-futebol-clube-sp",
+      "clube": "Paraná Clube",
+      "uf": "PR",
+      "ogol": "Paraná Clube",
+      "ogolId": "2249",
+      "slug": "parana-clube-pr",
+      "score": 100
+    },
+    {
+      "clube": "Pelotas",
+      "uf": "RS",
+      "ogol": "Esporte Clube Pelotas",
+      "ogolId": "3390",
+      "slug": "pelotas-rs",
       "score": 100
     },
     {
@@ -694,11 +1079,11 @@
       "score": 100
     },
     {
-      "clube": "Petrolina Social Futebol Clube",
-      "uf": "PE",
-      "ogol": "Petrolina Social Futebol Clube",
-      "ogolId": "247764",
-      "slug": "petrolina-social-futebol-clube-pe",
+      "clube": "Portuguesa",
+      "uf": "SP",
+      "ogol": "Associação Atlética Portuguesa",
+      "ogolId": "3408",
+      "slug": "portuguesa-sp",
       "score": 100
     },
     {
@@ -710,18 +1095,26 @@
       "score": 100
     },
     {
-      "clube": "Rio Branco Atlético Clube",
-      "uf": "ES",
-      "ogol": "Rio Branco Atlético Clube",
-      "ogolId": "3426",
-      "slug": "rio-branco-atletico-clube-es",
+      "clube": "Remo",
+      "uf": "PA",
+      "ogol": "Clube do Remo",
+      "ogolId": "3423",
+      "slug": "remo-pa",
+      "score": 100
+    },
+    {
+      "clube": "Resende",
+      "uf": "RJ",
+      "ogol": "Resende Futebol Clube",
+      "ogolId": "12036",
+      "slug": "resende-rj",
       "score": 100
     },
     {
       "clube": "Rio Branco Esporte Clube",
       "uf": "SP",
-      "ogol": "Esporte Clube Rio Branco",
-      "ogolId": "232758",
+      "ogol": "Rio Branco Esporte Clube",
+      "ogolId": "3430",
       "slug": "rio-branco-esporte-clube-sp",
       "score": 100
     },
@@ -742,11 +1135,35 @@
       "score": 100
     },
     {
+      "clube": "Rio Preto Esporte Clube",
+      "uf": "SP",
+      "ogol": "Rio Preto Esporte Clube",
+      "ogolId": "3434",
+      "slug": "rio-preto-esporte-clube-sp",
+      "score": 100
+    },
+    {
       "clube": "River Atlético Clube",
       "uf": "PI",
       "ogol": "River Atlético Clube",
       "ogolId": "13253",
       "slug": "river-atletico-clube-pi",
+      "score": 100
+    },
+    {
+      "clube": "Sampaio Corrêa",
+      "uf": "MA",
+      "ogol": "Sampaio Corrêa Futebol Clube",
+      "ogolId": "3444",
+      "slug": "sampaio-correa-ma",
+      "score": 100
+    },
+    {
+      "clube": "Santa Cruz",
+      "uf": "PE",
+      "ogol": "Santa Cruz Futebol Clube",
+      "ogolId": "2253",
+      "slug": "santa-cruz-pe",
       "score": 100
     },
     {
@@ -758,19 +1175,115 @@
       "score": 100
     },
     {
-      "clube": "São Cristovão Futebol e Regatas",
-      "uf": "RJ",
-      "ogol": "São Cristóvão de Futebol e Regatas",
-      "ogolId": "36896",
-      "slug": "sao-cristovao-futebol-e-regatas-rj",
+      "clube": "Santo André",
+      "uf": "SP",
+      "ogol": "Esporte Clube Santo André",
+      "ogolId": "3452",
+      "slug": "santo-andre-sp",
       "score": 100
     },
     {
-      "clube": "Social Futebol Clube",
-      "uf": "MG",
-      "ogol": "Social Futebol Clube",
-      "ogolId": "235161",
-      "slug": "social-futebol-clube-mg",
+      "clube": "Santos",
+      "uf": "SP",
+      "ogol": "Santos Futebol Clube",
+      "ogolId": "2254",
+      "slug": "santos-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Bento",
+      "uf": "SP",
+      "ogol": "Esporte Clube São Bento",
+      "ogolId": "3457",
+      "slug": "sao-bento-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Bernardo Futebol Clube",
+      "uf": "SP",
+      "ogol": "Esporte Clube São Bernardo",
+      "ogolId": "34451",
+      "slug": "sao-bernardo-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Caetano",
+      "uf": "SP",
+      "ogol": "São Caetano Esporte Clube",
+      "ogolId": "80977",
+      "slug": "sao-caetano-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Carlos Futebol Clube",
+      "uf": "SP",
+      "ogol": "São Carlos Futebol Clube",
+      "ogolId": "379277",
+      "slug": "sao-carlos-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "São José-RS",
+      "uf": "RS",
+      "ogol": "Esporte Clube São José",
+      "ogolId": "3463",
+      "slug": "sao-jose-rs-rs",
+      "score": 100
+    },
+    {
+      "clube": "São José-SP",
+      "uf": "SP",
+      "ogol": "São José Esporte Clube",
+      "ogolId": "9638",
+      "slug": "sao-jose-sp-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Paulo FC",
+      "uf": "SP",
+      "ogol": "São Paulo Futebol Clube",
+      "ogolId": "2256",
+      "slug": "sao-paulo-fc-sp",
+      "score": 100
+    },
+    {
+      "clube": "São Raimundo-AM",
+      "uf": "AM",
+      "ogol": "São Raimundo Esporte Clube",
+      "ogolId": "3469",
+      "slug": "sao-raimundo-am-am",
+      "score": 100
+    },
+    {
+      "clube": "São Raimundo-PA",
+      "uf": "PA",
+      "ogol": "São Raimundo Esporte Clube",
+      "ogolId": "3470",
+      "slug": "sao-raimundo-pa-pa",
+      "score": 100
+    },
+    {
+      "clube": "Sergipe",
+      "uf": "SE",
+      "ogol": "Club Sportivo Sergipe",
+      "ogolId": "3473",
+      "slug": "sergipe-se",
+      "score": 100
+    },
+    {
+      "clube": "Sertãozinho Futebol Clube",
+      "uf": "SP",
+      "ogol": "Sertãozinho Futebol Clube",
+      "ogolId": "8513",
+      "slug": "sertaozinho-futebol-clube-sp",
+      "score": 100
+    },
+    {
+      "clube": "Sobradinho",
+      "uf": "DF",
+      "ogol": "Sobradinho Esporte Clube",
+      "ogolId": "3481",
+      "slug": "sobradinho-df",
       "score": 100
     },
     {
@@ -787,14 +1300,6 @@
       "ogol": "Sociedade Desportiva Serra Futebol Clube",
       "ogolId": "3474",
       "slug": "sociedade-desportiva-serra-futebol-clube-es",
-      "score": 100
-    },
-    {
-      "clube": "Sociedade Esportiva Gama",
-      "uf": "DF",
-      "ogol": "Sociedade Esportiva do Gama",
-      "ogolId": "3254",
-      "slug": "sociedade-esportiva-gama-df",
       "score": 100
     },
     {
@@ -827,6 +1332,14 @@
       "ogol": "Sociedade Imperatriz de Desportos",
       "ogolId": "3285",
       "slug": "sociedade-imperatriz-de-desportos-ma",
+      "score": 100
+    },
+    {
+      "clube": "Sousa",
+      "uf": "PB",
+      "ogol": "Sociedade Esportiva Sousa",
+      "ogolId": "289482",
+      "slug": "sousa-pb",
       "score": 100
     },
     {
@@ -878,11 +1391,11 @@
       "score": 100
     },
     {
-      "clube": "Tuna Luso Brasileira",
-      "uf": "PA",
-      "ogol": "Tuna Luso Brasileira",
-      "ogolId": "3501",
-      "slug": "tuna-luso-brasileira-pa",
+      "clube": "Treze",
+      "uf": "PB",
+      "ogol": "Treze Futebol Clube",
+      "ogolId": "3499",
+      "slug": "treze-pb",
       "score": 100
     },
     {
@@ -896,8 +1409,8 @@
     {
       "clube": "União Futebol Clube",
       "uf": "SP",
-      "ogol": "Esporte Clube União",
-      "ogolId": "233631",
+      "ogol": "União Futebol Clube",
+      "ogolId": "325760",
       "slug": "uniao-futebol-clube-sp",
       "score": 100
     },
@@ -918,11 +1431,35 @@
       "score": 100
     },
     {
+      "clube": "Vasco",
+      "uf": "RJ",
+      "ogol": "Club de Regatas Vasco da Gama",
+      "ogolId": "2258",
+      "slug": "vasco-rj",
+      "score": 100
+    },
+    {
+      "clube": "Vila Nova",
+      "uf": "GO",
+      "ogol": "Vila Nova Futebol Clube",
+      "ogolId": "3532",
+      "slug": "vila-nova-go",
+      "score": 100
+    },
+    {
       "clube": "Villa Nova Atlético Clube",
       "uf": "MG",
       "ogol": "Villa Nova Atlético Clube",
       "ogolId": "3536",
       "slug": "villa-nova-atletico-clube-mg",
+      "score": 100
+    },
+    {
+      "clube": "Vitória",
+      "uf": "BA",
+      "ogol": "Esporte Clube Vitória",
+      "ogolId": "2259",
+      "slug": "vitoria-ba",
       "score": 100
     },
     {
@@ -932,13 +1469,29 @@
       "ogolId": "3537",
       "slug": "vitoria-es-es",
       "score": 100
+    },
+    {
+      "clube": "Volta Redonda",
+      "uf": "RJ",
+      "ogol": "Volta Redonda Futebol Clube",
+      "ogolId": "3538",
+      "slug": "volta-redonda-rj",
+      "score": 100
+    },
+    {
+      "clube": "Ypiranga Clube",
+      "uf": "AP",
+      "ogol": "Ypiranga Clube",
+      "ogolId": "3539",
+      "slug": "ypiranga-clube-ap",
+      "score": 100
     }
   ],
   "semMatchLista": [
     "Alfenense Futebol Clube (MG)",
-    "América Futebol Clube de Natal (RN)",
+    "América Futebol Clube (RJ)",
     "America Futebol Clube de Teófilo Ottoni (MG)",
-    "Asociação Atlética Anapolina (GO)",
+    "Anapolina (GO)",
     "Associação Atlética Batel (PR)",
     "Associação Atlética Internacional de Limeira (SP)",
     "Associação Atletica Luziânia (DF)",
@@ -952,57 +1505,120 @@
     "Atlético de Alagoinhas (BA)",
     "Atlético de Ibirama (SC)",
     "Atlético Roraima Clube (RR)",
+    "Avaí (SC)",
+    "Bangu (RJ)",
     "Baraúnas (RN)",
     "Barra do Garças Futebol Clube (MT)",
     "Blumenal Esporte Clube (SC)",
-    "Brasiliense Futebol Clube de Taguatinga (DF)",
+    "Boavista (RJ)",
+    "Brasil de Pelotas (RS)",
+    "Brusque (SC)",
+    "Cabofriense (RJ)",
+    "Cametá (PA)",
+    "Campo Grande Atlético Clube (RJ)",
+    "Caxias (RS)",
     "Caxias Futebol Clube (SC)",
+    "Ceará (CE)",
     "Ceilandense (DF)",
+    "Central (PE)",
+    "Chapecoense (SC)",
     "Cia Norte (PR)",
     "Clube Atlético Bragantino (SP)",
     "Clube Atlético Juventus (SP)",
     "Clube Atlético Lages (SC)",
     "Clube Atlético Metropolitano (SC)",
     "Clube Atlético Tubarão (SC)",
-    "Clube Náutico Capiberibe (PE)",
+    "Clube Esportivo Sete de Setembro (MS)",
     "Clube Náutico Marcílio Dias (SC)",
+    "Corinthians (SP)",
+    "Coritiba (PR)",
+    "Corumbaense Futebol Clube (MS)",
+    "CRB (AL)",
+    "Criciúma (SC)",
     "Desportiva Ferroviária (ES)",
+    "Duque de Caxias (RJ)",
     "ECPP Vitória da Conquista (BA)",
+    "Esporte Clube Limoeiro (CE)",
+    "Esporte Clube Noroeste (SP)",
+    "Esporte Clube XV de Novembro (SP)",
+    "Esporte Clube XV de Piracicaba (SP)",
     "Fast Clube (AM)",
+    "Ferroviário (CE)",
+    "Figueirense (SC)",
+    "Flamengo (RJ)",
+    "Fluminense (RJ)",
     "Formosa Esporte Clube (GO)",
+    "Friburguense (RJ)",
     "Grêmio Esportivo Juventus (SC)",
     "Grêmio Maringá (PR)",
     "Guarani da Palhoça (SC)",
+    "Guarani Esporte Clube (MG)",
+    "Guarany de Sobral (CE)",
     "Guarany Futebol Clube de Camaquã (RS)",
+    "Hercílio Luz (SC)",
+    "Icasa (CE)",
     "Imperatriz (MA)",
     "Internacional de Lages (SC)",
-    "Itabaiana (SE)",
+    "Internacional Esporte Clube (PR)",
+    "Ipatinga (MG)",
+    "Iraty (PR)",
     "Ituiutaba Futebol Clube (MG)",
+    "Jabaquara Atlético clube (SP)",
+    "Ji-Paraná Futebol Clube (RO)",
+    "Joinville (SC)",
     "Juventus (SP)",
+    "Londrina (PR)",
+    "Maranhão AC (MA)",
     "Marcílio Dias (SC)",
     "Marilia Atlético Clube (SP)",
+    "Maringá (PR)",
     "Metropolitano (SC)",
+    "Mogi Mirim Esporte Clube (SP)",
+    "Moto Club (MA)",
     "Nacional de Patos (PB)",
+    "Náutico (PE)",
+    "Olaria (RJ)",
     "Operário de Varzea Grande (MT)",
     "Operário Futebol Clube (MS)",
+    "Operário-PR (PR)",
     "Operário-VG (MT)",
+    "Parnahyba (PI)",
+    "Paulista (SP)",
+    "Paysandu (PA)",
+    "Petrolina (PE)",
     "Poços de Caldas Futebol Clube (MG)",
+    "Ponte Preta (SP)",
     "Porto (PE)",
+    "Potiguar (RN)",
     "Quatro de Julho Esporte Clube (PI)",
+    "Rio Branco Atlético Clube (ES)",
+    "Rio Branco-ES (ES)",
     "Rio Branco Football Club (AC)",
     "Rio Branco-PR (PR)",
     "Rio Negro (AM)",
+    "River-PI (PI)",
+    "Salgueiro (PE)",
+    "São Cristóvão (RJ)",
     "Serra (ES)",
+    "Serrano-BA (BA)",
     "Serrano Sport Club (BA)",
+    "Social Futebol Clube (MG)",
+    "Sociedade Esportiva Gama (DF)",
+    "Sport (PE)",
     "Sport Club Ulbra (RS)",
     "Toledo Colônia Work (PR)",
     "Tubarão (SC)",
+    "Tuna Luso (PA)",
+    "Tupi (MG)",
+    "Tupí Futebol Clube (SP)",
     "Uberaba Sporte Clube (MG)",
     "Uberlândia (MG)",
     "União Barbarense Futebol Clube (SP)",
     "União Futebol Clube (AL)",
     "União São João de Araras (SP)",
+    "URT (MG)",
     "Viçosa Esporte Clube (CE)",
+    "Villa Nova (MG)",
     "Vitória da Conquista (BA)",
     "Votoraty Futebol Clube (SP)"
   ]

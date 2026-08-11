@@ -13,6 +13,9 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { assertNotProductionSeed } from './lib/seed-env.js'
+
+assertNotProductionSeed('db:seed-test-data')
 
 const db = new PrismaClient()
 const slug = process.argv[2] ?? 'pde-gavioes-fiel'

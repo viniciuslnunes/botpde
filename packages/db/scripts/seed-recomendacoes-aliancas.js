@@ -12,6 +12,9 @@ import {
   TORCIDAS_PRINCIPAIS,
   resumoRecomendacoes,
 } from '../src/data/recomendacoes-aliancas.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:recomendacoes-aliancas' })
 
 const db = new PrismaClient()
 

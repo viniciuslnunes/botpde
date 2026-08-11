@@ -4,10 +4,12 @@
  */
 import {
   normalizeNome,
+  normalizeNomeSemUf,
   chaveMatch,
   chaveGrupoClube,
   saoMesmoClube,
   inferirUfDoNome,
+  cidadesCompativeis,
 } from './afiliacoes-normalize.js'
 
 /** Aliases: nome normalizado no Soccer Wiki → chave curta de casamento. */
@@ -169,13 +171,18 @@ export const WIKI_UF_POR_NOME = {
 export const CHAVES_HOMONIMAS = new Set([
   'america', 'operario', 'botafogo', 'vitoria', 'atletico', 'gremio', 'sport',
   'paulista', 'portuguesa', 'internacional', 'nautico', 'juventude',
-  'guarani', 'santa cruz', 'rio branco', 'central',
+  'guarani', 'santa cruz', 'rio branco', 'central', 'palmeiras', 'comercial',
 ])
 
 /** @param {string} nome */
+function chaveAliasLookup(nome) {
+  const semUf = normalizeNomeSemUf(nome)
+  return WIKI_ALIASES[semUf] ?? WIKI_ALIASES[normalizeNome(nome)] ?? null
+}
+
+/** @param {string} nome */
 export function chaveWiki(nome) {
-  const nm = normalizeNome(nome)
-  const alias = WIKI_ALIASES[nm]
+  const alias = chaveAliasLookup(nome)
   return alias ? chaveMatch(alias) : chaveMatch(nome)
 }
 
@@ -184,8 +191,8 @@ export function chaveWiki(nome) {
  * @returns {string | null}
  */
 export function inferirUfWiki(nome) {
-  const nm = normalizeNome(nome)
-  const fixa = WIKI_UF_POR_NOME[nm]
+  const semUf = normalizeNomeSemUf(nome)
+  const fixa = WIKI_UF_POR_NOME[semUf] ?? WIKI_UF_POR_NOME[normalizeNome(nome)]
   if (fixa) return fixa
   return inferirUfDoNome(nome)
 }
@@ -196,13 +203,12 @@ export function inferirUfWiki(nome) {
  * @returns {string}
  */
 export function nomeCanonicoWiki(nome) {
-  const nm = normalizeNome(nome)
-  return WIKI_ALIASES[nm] ?? nome
+  return chaveAliasLookup(nome) ?? nome
 }
 
 /**
  * @param {{ nome: string, cidade?: string|null }} wiki
- * @param {{ nome: string, estado: string|null }} afiliacao
+ * @param {{ nome: string, estado: string|null, cidade?: string|null }} afiliacao
  * @returns {number} 0 = sem match; maior = melhor
  */
 export function scoreWikiAfiliacao(wiki, afiliacao) {
@@ -210,6 +216,7 @@ export function scoreWikiAfiliacao(wiki, afiliacao) {
   const ufAf = afiliacao.estado?.toUpperCase() ?? null
 
   if (ufWiki && ufAf && ufWiki !== ufAf) return 0
+  if (!cidadesCompativeis(wiki.cidade, afiliacao.cidade)) return 0
 
   const refWiki = { nome: nomeCanonicoWiki(wiki.nome), estado: ufWiki ?? ufAf }
   if (ufWiki && ufAf && saoMesmoClube(refWiki, afiliacao)) return 100

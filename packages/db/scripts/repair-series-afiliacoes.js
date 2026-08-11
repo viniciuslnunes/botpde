@@ -8,6 +8,9 @@
 import { PrismaClient } from '@prisma/client'
 import { SERIES_BRASILEIRAO_2026 } from '../src/data/series-brasileirao-2026.js'
 import { chaveGrupoClube, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'db:repair-series-afiliacoes' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const db = new PrismaClient()

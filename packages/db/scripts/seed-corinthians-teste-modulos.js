@@ -38,6 +38,9 @@
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
+import { assertNotProductionSeed } from './lib/seed-env.js'
+
+assertNotProductionSeed('seed:corinthians-teste-modulos')
 
 const DOMINIO_TESTE = 'teste.corinthians.torcida.app'
 const MARCA = '[TESTE-CORINTHIANS]'

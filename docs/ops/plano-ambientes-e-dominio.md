@@ -1,7 +1,8 @@
 # Plano — Ambientes (dev / homolog / prod) + domínio `torcidas.setorize.com`
 
-> Status: **decisões fechadas — pronto para Fase 0/1** (ainda não executado).  
-> Domínio comprado: `setorize.com` (HostGator). Produto: **Sertorize Torcidas**.  
+> Status: **em execução** — prod no ar em `torcidas.setorize.com` (2026-08-10);
+> homolog isolada parcial; wildcard/OAuth/homolog DNS ainda pendentes.  
+> Domínio: `setorize.com` (HostGator → DNS Cloudflare). Produto: **Sertorize Torcidas**.  
 > Complementa: `deploy-multi-tenant.md`, `cloudflare-cdn.md`, `dev-secrets.md`,
 > `plano-investimento-infra.md` (Faixa A).  
 > Decisões do fundador: **2026-08-07**.
@@ -136,12 +137,105 @@ Mitigações de custo (sem Neon):
 - Staging com limites de RAM/CPU menores e sleep agressivo se o Hobby permitir
 - Não criar 3º ambiente “preview” por enquanto
 
-### 4.2 Postgres por Environment
+### 4.2 Environments Railway (nomes 2026-08-10)
 
-| Environment | Postgres |
-|-------------|----------|
-| Staging (homolog) | Banco Railway **atual** (opção B — já tem demo/teste) |
-| Production | Postgres Railway **novo**, vazio → seed limpo |
+Projeto: **`setorize-torcidas`** (ex-`torcida-web`).
+
+| Environment | Papel | Estado |
+|-------------|--------|--------|
+| `setorize-torcidas-hom` | Homolog (stack/dados atuais) | Ativo — Cloudinary antigo, DB atual |
+| `setorize-torcidas-prod` | Produção oficial | **Cópia estrutural do hom**; isolar agora com Postgres novo + Cloudinary prod + `AUTH_SECRET` novo (decisão 2026-08-10) |
+
+O default `production` do Railway foi **renomeado** para `setorize-torcidas-hom`.
+
+### 4.2.1 Isolar cópia → prod real (checklist)
+
+Manter serviços/vars iguais na forma; **trocar** só o que isola dados e mídia:
+
+1. [x] Em `setorize-torcidas-prod`: adicionar **Postgres novo** (não reusar `dbo-bot-pde`)
+2. [x] `DATABASE_URL` do `@torcida/web` em **prod** → Postgres novo
+3. [x] `db:push` no banco prod (2026-08-10) — seed mínimo ainda pendente
+4. [ ] `CLOUDINARY_*` em **prod** → conta nova (`ops@` / cloud prod)
+5. [ ] `AUTH_SECRET` em **prod** → valor **novo** (`openssl rand -base64 32`)
+6. [ ] `AUTH_URL` / `NEXTAUTH_URL` em cada env → URL pública daquele env (Railway agora; domínio depois)
+7. [ ] Hom: **não** alterar Cloudinary/DB (continua teste)
+8. [ ] Branches: `main` → prod; `staging` → hom (quando configurar Source)
+9. [ ] Bot Discord: continua fora do hom; ligar só em prod depois se precisar
+10. [ ] Rotacionar senha do Postgres prod (exposta no chat/terminal durante o setup)
+
+### 4.2.2 Seed de produção — o que entra / o que fica de fora
+
+**Entra (base canônica / catálogo — sistema utilizável):**
+
+| Conteúdo | Comando(s) |
+|----------|------------|
+| Clubes (`Afiliacao`) + escudos → Cloudinary **prod** | `seed:afiliacoes` (+ `seed:escudos-ogol` / `thesportsdb` / `soccerwiki` se precisar cobertura) |
+| Série das afiliações | `db:repair-series-afiliacoes` |
+| Torcedores estimados (cards onboarding) | `seed:torcedores-estimados` |
+| Recomendações de alianças (referência) | `seed:recomendacoes-aliancas` |
+| Torcidas nacionais vazias (Tenant + Sede + cargos, **sem** owner/user de teste) | `seed:torcidas-nacional` |
+| Logos de torcidas conhecidas → Cloudinary **prod** | `seed:torcidas-conhecidas` |
+| Link logo/catálogo nas 32 âncoras (`Tenant.logoUrl` + `torcidaConhecidaId`) | `seed:torcidas-tenants-ancoras` |
+| Departamentos / áreas canônicas | `seed:departamentos` + `seed:departamento-areas` |
+| Subsede/PDE curados (passo Unidade) | `seed:sedes-onboarding` |
+| Coordenadas / mapas das sedes | `coleta:sedes-geocode` (**com** `GOOGLE_MAPS_API_KEY`; senão Nominatim genérico) |
+| Extensão busca comunidade | `db:enable-pg-trgm` |
+| Canais oficiais vazios (estrutura, sem posts) | `db:ensure-canais-oficiais` (opcional, após torcidas) |
+
+**Não é cópia do banco homolog.** Pins manuais, escudos corrigidos à mão e logos já
+linkados em HML só chegam a prod via:
+
+```bash
+# remirror Cloudinary prod + coords por id estável de Sede
+export DATABASE_URL_HML='…DATABASE_PUBLIC_URL homolog…'
+pnpm --filter @torcida/db sync:catalogo-hml-prod
+```
+
+Escudos com match errado (ex. Palmeiras×Boa Vista): após correção do matcher,
+
+```bash
+pnpm --filter @torcida/db seed:escudos-ogol -- --recheck
+```
+
+**Unidade Gaviões:** o catálogo cria **Subsede Baixada Santista** (lista oficial
+gavioes.com.br), não “PDE FIEL BAIXADA” (tenant Caso B de teste — fora deste seed).
+
+**Não entra (teste / volume / demo operacional):**
+
+- `seed:corinthians-teste`, `seed:corinthians-teste-modulos`, `seed:nacional-teste`
+- `seed:convites-teste`, `db:seed-test-data` / `seed-dados-teste`
+- `seed:loja-gavioes`, `seed:bar-gavioes`, `seed:agenda-demo`
+- `db:senha-teste` e qualquer user com e-mail `@teste.*.torcida.app` / jornadas
+
+**Usuários:** manter só contas reais (ex.: login social já feitos em prod).  
+**Comunidade:** sem posts/membros de seed — feed/comunidade nascem vazios até uso real.
+
+**Cloudinary:** ao rodar seeds de imagem, exportar no shell as chaves da conta **prod** (não as do hom). Escudos/logos novos sobem no cloud prod.
+
+### Como rodar (laptop)
+
+```bash
+cd /c/Users/vinic/Projetos/botpde
+
+export TORCIDA_ENV=production
+export DATABASE_URL='…DATABASE_PUBLIC_URL (*.proxy.rlwy.net)…'
+export CLOUDINARY_CLOUD_NAME='…prod…'
+export CLOUDINARY_API_KEY='…'
+export CLOUDINARY_API_SECRET='…'
+
+pnpm --filter @torcida/db seed:catalogo-producao
+```
+
+`TORCIDA_ENV` é **obrigatório**. Em `production` o seed **recusa**:
+- `DATABASE_URL` localhost ou `*.railway.internal`
+- Cloudinary só vindo do `.env.local` (tem que exportar no shell)
+
+Lotes de teste (`seed:corinthians-teste`, etc.) abortam se `TORCIDA_ENV=production`.
+
+Homolog: `TORCIDA_ENV=homolog` + URL/Cloudinary de HML.  
+Local: `TORCIDA_ENV=local` + Postgres localhost.
+
+Idempotente: pode reexecutar com cuidado; não roda lote de teste.
 
 ## 5. Matriz de secrets (o que nunca misturar)
 
@@ -390,11 +484,22 @@ após homolog ok.
 - [x] Cloudinary: atual = HML; nova conta Free = PROD
 - [x] Secrets: KeePassXC + Railway Variables + `*.secrets.env` (sem Bitwarden)
 - [x] **Fase 0.5 caminho:** Cloudflare Email Routing ($0)
-- [ ] **Fase 0.5:** domínio Active na CF + `ops@setorize.com` recebendo
-- [ ] Criar conta Cloudinary Free **prod** com `ops@setorize.com`
+- [x] **Fase 0.5:** domínio Active na CF + `ops@setorize.com` recebendo
+      (2026-08-10: MX `rota*`→`route*` corrigido; forwarding OK; 1ºs e-mails
+      caíram em Spam do Gmail — normal em domínio novo)
+- [x] Criar conta Cloudinary Free **prod** com `ops@setorize.com`
+      (cloud_name provisório visto no console; secrets só no KeePassXC /
+      Railway Production — **nunca** no chat/git)
+- [x] `CLOUDINARY_*` + `AUTH_SECRET` no env `setorize-torcidas-prod` (2026-08-10)
+- [x] `AUTH_URL` / `NEXTAUTH_URL` / `ROOT_DOMAIN=torcidas.setorize.com` no prod
+- [x] DNS + Custom Domain Railway para `torcidas.setorize.com` (site abre `/entrar`)
+- [x] Wildcard `*.torcidas.setorize.com` (Railway + Cloudflare) — DNS resolve OK 2026-08-10
 - [ ] KeePassXC + `setorize-secrets.kdbx` (opcional)
-- [ ] Apps OAuth Discord/Google ×3 (Dev, Homolog, Prod)
-- [ ] Environments Railway + domínios `homolog` / `torcidas`
+- [ ] Apps OAuth Discord/Google ×3 (Dev, Homolog, Prod) — **prod urgente** (callbacks no apex)
+- [x] Environments Railway `setorize-torcidas-hom` / `setorize-torcidas-prod`
+- [ ] Domínio homolog `homolog.setorize.com` (atenção: limite de custom domains do plano Railway)
+- [ ] Seed mínimo no Postgres prod
+- [ ] Rotacionar senha Postgres prod (exposta no setup)
 
 ## 10. Checklists de verificação
 

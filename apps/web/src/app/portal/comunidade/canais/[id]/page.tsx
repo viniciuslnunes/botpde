@@ -58,7 +58,10 @@ export default async function CanalDetalhePage({
     resolverContextoComunidade(session.user.id, session.user.email),
     getAvatarAtualDoUsuario(session.user.id),
   ])
-  if (!ctx) redirect('/')
+  if (!ctx) {
+    if (isSuperAdminEmail(session.user.email)) redirect('/super-admin/torcidas')
+    redirect('/onboarding')
+  }
 
   const torcidaReal = ctx.torcidaReal ?? (ctx.modo === 'torcida' ? ctx.tenant : null)
   if (!torcidaReal) redirect('/portal/comunidade?escopo=nacional')

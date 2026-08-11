@@ -9,6 +9,9 @@ import { SEDES_ONBOARDING_CURADAS } from '../src/data/sedes-onboarding-curadas.j
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
 import { TORCIDAS_CONHECIDAS } from '../src/data/torcidas-conhecidas.js'
 import { normalizeNome, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
+import { prepareSeedEnv } from './lib/seed-env.js'
+
+prepareSeedEnv({ scriptLabel: 'seed:sedes-onboarding' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const db = new PrismaClient()

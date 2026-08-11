@@ -54,10 +54,17 @@ export default async function PortalLayout({
   // Contexto pode ser torcida ativa ou comunidade nacional (torcedor global).
   const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
 
+  // Super-admin sem vínculo / sem onboarding de torcedor: portal não tem CN.
+  // Sem isso, `/portal/comunidade` → `/` → `/portal/comunidade` (loop).
+  if (!ctx) {
+    if (isSuperAdmin) redirect('/super-admin/torcidas')
+    redirect('/onboarding')
+  }
+
   // Link agregado "Departamentos" na navbar — hub de áreas (atuação + visão Diretoria).
   // Áreas → /portal/departamentos → /portal/departamentos/[slug]
   const totalDepartamentos: number =
-    ctx?.modo === 'torcida'
+    ctx.modo === 'torcida'
       ? await db.userDepartamento.count({
           where: { userId: session.user.id, tenantId: ctx.tenant.id },
         })
@@ -65,12 +72,12 @@ export default async function PortalLayout({
 
   // Modo nacional (torcedor global sem tenant real) herda a cor/design do
   // tenant sintético da Comunidade Nacional do clube em vez do roxo de fábrica.
-  const corNacional = ctx?.modo === 'nacional' ? (ctx.tenantSintetico?.corPrimaria ?? COR_PRIMARIA_PLATAFORMA) : null
+  const corNacional = ctx.modo === 'nacional' ? (ctx.tenantSintetico?.corPrimaria ?? COR_PRIMARIA_PLATAFORMA) : null
 
   const navbarTenant =
-    ctx?.modo === 'torcida'
+    ctx.modo === 'torcida'
       ? { nome: ctx.tenant.nome, corPrimaria: ctx.tenant.corPrimaria, logoUrl: ctx.tenant.logoUrl }
-      : ctx?.modo === 'nacional'
+      : ctx.modo === 'nacional'
         ? {
             nome: ctx.afiliacao.apelido ?? ctx.afiliacao.nome,
             corPrimaria: corNacional ?? COR_PRIMARIA_PLATAFORMA,
@@ -83,32 +90,27 @@ export default async function PortalLayout({
   // é ele que mantém Agenda/Sedes/Loja no canal selecionado em vez de jogar o
   // header de volta para a Comunidade Nacional. Sempre revalidado contra os
   // escopos que a pessoa realmente tem — cookie não concede acesso.
-  const escopoCanal = ctx
-    ? resolverEscopoComunidadePorModo(
-        ctx.modo,
-        ctx.escopos,
-        await lerEscopoComunidadePersistido(),
-        { tenantAtivoEhUnidade: ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade) },
-      )
-    : null
+  const escopoCanal = resolverEscopoComunidadePorModo(
+    ctx.modo,
+    ctx.escopos,
+    await lerEscopoComunidadePersistido(),
+    { tenantAtivoEhUnidade: ctx.modo === 'torcida' && Boolean(ctx.tenantAtivoEhUnidade) },
+  )
 
-  const brandEscopo =
-    ctx && escopoCanal
-      ? resolverBrandPorEscopo(escopoCanal, {
-          afiliacao: ctx.afiliacao,
-          torcidaReal:
-            ctx.torcidaReal ??
-            (ctx.modo === 'torcida'
-              ? {
-                  nome: ctx.tenant.nome,
-                  corPrimaria: ctx.tenant.corPrimaria,
-                  logoUrl: ctx.tenant.logoUrl,
-                }
-              : null),
-          unidade: ctx.unidade ? { nome: ctx.unidade.nome, logoUrl: ctx.unidade.logoUrl } : null,
-          corPrimariaNacional: ctx.tenantSintetico?.corPrimaria ?? null,
-        })
-      : null
+  const brandEscopo = resolverBrandPorEscopo(escopoCanal, {
+    afiliacao: ctx.afiliacao,
+    torcidaReal:
+      ctx.torcidaReal ??
+      (ctx.modo === 'torcida'
+        ? {
+            nome: ctx.tenant.nome,
+            corPrimaria: ctx.tenant.corPrimaria,
+            logoUrl: ctx.tenant.logoUrl,
+          }
+        : null),
+    unidade: ctx.unidade ? { nome: ctx.unidade.nome, logoUrl: ctx.unidade.logoUrl } : null,
+    corPrimariaNacional: ctx.tenantSintetico?.corPrimaria ?? null,
+  })
   // Canal oficial Caso A (ex.: Taubaté): marca do canal selecionado sobrevive
   // fora do mural — senão Canais/Agenda caem no tenant da sessão (Sede/Rio Claro).
   const brandCanalFoco = await lerMarcaCanalFoco()
@@ -116,18 +118,18 @@ export default async function PortalLayout({
 
   // Design completo: tenant real no modo torcida, tenant sintético (paleta do
   // clube) no modo nacional.
-  const hostTenant = ctx?.modo === 'torcida' ? await getTenantFromHost() : null
+  const hostTenant = ctx.modo === 'torcida' ? await getTenantFromHost() : null
   const designBridgeProps =
-    ctx?.modo === 'torcida' && hostTenant
+    ctx.modo === 'torcida' && hostTenant
       ? { corPrimaria: hostTenant.corPrimaria, design: hostTenant.design }
-      : ctx?.modo === 'nacional' && ctx.tenantSintetico
+      : ctx.modo === 'nacional' && ctx.tenantSintetico
         ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
         : null
 
   const [avatarUrl, userName, pendenciasSnap] = await Promise.all([
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
-    ctx?.modo === 'torcida' && !isSuperAdmin
+    ctx.modo === 'torcida' && !isSuperAdmin
       ? carregarPendenciasCadastro(ctx.tenant.id, session.user.id).catch((err: unknown) => {
           console.error('[portal/layout] pendencias cadastro', err)
           return null
@@ -141,11 +143,11 @@ export default async function PortalLayout({
       userAvatar={avatarUrl}
       tenant={navbarTenant}
       temDepartamentos={totalDepartamentos > 0 || isSuperAdmin}
-      modoNacional={ctx?.modo === 'nacional'}
+      modoNacional={ctx.modo === 'nacional'}
       // Convite TORCEDOR: torcidaReal/unidade liberam Loja/Sedes/Agenda nas
       // abas de canal (a navbar oculta esses links no escopo nacional).
       temVinculoTorcida={Boolean(
-        ctx?.modo === 'nacional' && (ctx.torcidaReal || ctx.unidade),
+        ctx.modo === 'nacional' && (ctx.torcidaReal || ctx.unidade),
       )}
       tenantSlugAtual={hostTenant?.slug ?? null}
       escopoCanal={escopoCanal}
@@ -165,7 +167,7 @@ export default async function PortalLayout({
         <Suspense fallback={navbar}>{navbar}</Suspense>
         <main className="app-container relative py-4 sm:py-8">
           <ModoOperadorProvider
-            ativo={ctx?.modo === 'torcida' && Boolean(ctx.operador)}
+            ativo={ctx.modo === 'torcida' && Boolean(ctx.operador)}
           >
             <PortalMotionShell>{children}</PortalMotionShell>
           </ModoOperadorProvider>

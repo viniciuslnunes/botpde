@@ -98,11 +98,43 @@ const UF_AMBIGUOS_SUFIXO_CLUBE = new Set(['sc', 'ac', 'fc', 'ec', 'cf'])
 
 const PALAVRAS_RUIDO = new Set([
   'fc','ec','cf','ac','sc','fbc','afc','clube','club','futebol','esporte',
-  'esportivo','esportiva','de','da','do','das','dos','e','associacao',
+  'esportivo','esportiva','sociedade','de','da','do','das','dos','e','associacao',
   'atletico', // NÃO: atletico é distintivo; removido da lista abaixo
 ])
 // `atletico` é distintivo (Atlético-MG/GO/PR) — não deve ser ruído.
 PALAVRAS_RUIDO.delete('atletico')
+
+/**
+ * Remove sufixo de UF no fim do nome normalizado (`… palmeiras sp` → `… palmeiras`)
+ * para lookup de aliases. Não mexe em nomes cujo último token não é UF.
+ * @param {string} nome
+ * @returns {string}
+ */
+export function normalizeNomeSemUf(nome) {
+  const nm = normalizeNome(nome)
+  const tokens = nm.split(' ').filter(Boolean)
+  if (tokens.length < 2) return nm
+  const last = tokens[tokens.length - 1]
+  if (SUFIXOS_UF.has(last) && !UF_AMBIGUOS_SUFIXO_CLUBE.has(last)) {
+    return tokens.slice(0, -1).join(' ')
+  }
+  return nm
+}
+
+/**
+ * Cidades batem se iguais após normalize, ou uma contém a outra
+ * (ex.: São Caetano ⊂ São Caetano do Sul).
+ * @param {string | null | undefined} a
+ * @param {string | null | undefined} b
+ * @returns {boolean}
+ */
+export function cidadesCompativeis(a, b) {
+  const na = normalizeNome(a ?? '')
+  const nb = normalizeNome(b ?? '')
+  if (!na || !nb) return true
+  if (na === nb) return true
+  return na.includes(nb) || nb.includes(na)
+}
 
 /**
  * Remove acentos, baixa a caixa, tira pontuação e colapsa espaços.

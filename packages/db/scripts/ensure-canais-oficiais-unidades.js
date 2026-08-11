@@ -10,7 +10,10 @@
  *   node scripts/ensure-canais-oficiais-unidades.js
  *   node scripts/ensure-canais-oficiais-unidades.js --dry-run
  */
+import { prepareSeedEnv } from './lib/seed-env.js'
 import { db } from '../src/index.js'
+
+prepareSeedEnv({ scriptLabel: 'ensure-canais-oficiais-unidades' })
 
 const dryRun = process.argv.includes('--dry-run')
 

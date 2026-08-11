@@ -13,7 +13,10 @@
  *   node scripts/ensure-canais-oficiais-torcidas.js
  *   node scripts/ensure-canais-oficiais-torcidas.js --dry-run
  */
+import { prepareSeedEnv } from './lib/seed-env.js'
 import { db } from '../src/index.js'
+
+prepareSeedEnv({ scriptLabel: 'ensure-canais-oficiais-torcidas' })
 
 const dryRun = process.argv.includes('--dry-run')
 const CONCURRENCY = 8

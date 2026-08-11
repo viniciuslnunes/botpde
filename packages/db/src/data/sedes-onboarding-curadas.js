@@ -86,7 +86,11 @@ export const SEDES_ONBOARDING_CURADAS = [
     ],
   },
   {
-    tenantSlugs: ['torcida-organizada-coringao-chopp', 'coringao-chopp'],
+    tenantSlugs: [
+      'torcida-organizada-coringao-chopp-sp',
+      'torcida-organizada-coringao-chopp',
+      'coringao-chopp',
+    ],
     tenantNomes: ['Coringão Chopp', 'CORINGÃO CHOPP'],
     unidades: [
       {
@@ -110,8 +114,8 @@ export const SEDES_ONBOARDING_CURADAS = [
     ],
   },
   {
-    tenantSlugs: ['estopim-da-fiel'],
-    tenantNomes: ['Estopim', 'ESTOPIM'],
+    tenantSlugs: ['estopim-da-fiel-sp', 'estopim-da-fiel'],
+    tenantNomes: ['Estopim', 'ESTOPIM', 'Estopim da Fiel'],
     unidades: [
       {
         id: 'subsede-estopim-grande-abc',
@@ -134,7 +138,7 @@ export const SEDES_ONBOARDING_CURADAS = [
     ],
   },
   {
-    tenantSlugs: ['torcida-fiel-macabra', 'fiel-macabra'],
+    tenantSlugs: ['torcida-fiel-macabra-sp', 'torcida-fiel-macabra', 'fiel-macabra'],
     tenantNomes: ['Fiel Macabra', 'FIEL MACABRA'],
     unidades: [
       {

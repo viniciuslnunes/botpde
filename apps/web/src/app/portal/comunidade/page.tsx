@@ -73,7 +73,10 @@ export default async function ComunidadePage({
     resolverContextoComunidade(session.user.id, session.user.email),
     getAvatarAtualDoUsuario(session.user.id),
   ])
-  if (!ctx) redirect('/')
+  if (!ctx) {
+    if (isSuperAdminEmail(session.user.email)) redirect('/super-admin/torcidas')
+    redirect('/onboarding')
+  }
 
   const currentUser = {
     id: session.user.id,
