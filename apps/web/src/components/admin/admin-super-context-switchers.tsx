@@ -308,6 +308,8 @@ export function AdminSuperContextSwitchers({
             >
               {!torcidaCompativelComClube && clubeId
                 ? 'Selecione uma torcida deste clube para continuar.'
+                : destino === 'portal'
+                  ? 'Ao trocar, você entra na Comunidade da torcida escolhida.'
                 : 'Ao trocar, você entra no admin da torcida escolhida.'}
             </p>
           ) : null

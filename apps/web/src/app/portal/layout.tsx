@@ -54,10 +54,13 @@ export default async function PortalLayout({
   // Contexto pode ser torcida ativa ou comunidade nacional (torcedor global).
   const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
 
-  // Super-admin sem vínculo / sem onboarding de torcedor: portal não tem CN.
-  // Sem isso, `/portal/comunidade` → `/` → `/portal/comunidade` (loop).
+  // Super-admin sem torcida ativa (cookie/vínculo): evita loop
+  // `/portal/comunidade` → `/` → `/portal/comunidade`. Manda ao seletor com
+  // `proxima` para, ao escolher, abrir a comunidade em modo operador.
   if (!ctx) {
-    if (isSuperAdmin) redirect('/super-admin/torcidas')
+    if (isSuperAdmin) {
+      redirect('/super-admin/torcidas?proxima=/portal/comunidade')
+    }
     redirect('/onboarding')
   }
 

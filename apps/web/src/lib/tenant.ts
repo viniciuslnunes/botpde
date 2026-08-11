@@ -248,6 +248,13 @@ export const getActiveTenant = cache(async function getActiveTenant(
     if (fromCookie) return fromCookie
   }
 
+  // Super-admin que também é sócio: usa a torcida-casa sem exigir cookie
+  // (evita cair no console e bloquear /portal/comunidade).
+  if (userId && superAdmin) {
+    const userSlug = await resolveUserTenantSlugForUser(userId)
+    if (userSlug) return fetchTenantBySlug(userSlug)
+  }
+
   const fallback = fallbackTenantSlug(host)
   if (fallback) return fetchTenantBySlug(fallback)
 

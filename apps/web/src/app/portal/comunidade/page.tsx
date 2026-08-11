@@ -74,7 +74,9 @@ export default async function ComunidadePage({
     getAvatarAtualDoUsuario(session.user.id),
   ])
   if (!ctx) {
-    if (isSuperAdminEmail(session.user.email)) redirect('/super-admin/torcidas')
+    if (isSuperAdminEmail(session.user.email)) {
+      redirect('/super-admin/torcidas?proxima=/portal/comunidade')
+    }
     redirect('/onboarding')
   }
 

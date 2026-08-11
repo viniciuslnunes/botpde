@@ -332,17 +332,13 @@ export const resolverContextoComunidade = cache(
         select: { id: true },
       })
 
-      // Operador da plataforma: super-admin sem vínculo APROVADO no tenant
-      // ativo. Entra na comunidade DESSE tenant (o mesmo que ele selecionou no
-      // /admin) em vez de cair na CN do próprio clube, e só lê — a trava de
-      // escrita é servidor-side (`assertVozComunidade`).
+      // Operador da plataforma: super-admin sem SOCIO APROVADO na worktree do
+      // tenant ativo (presidente na própria torcida não é operador). TORCEDOR
+      // APROVADO no mesmo tenant NÃO bloqueia — senão o SA fica sem CN (sem
+      // onboarding) e sem modo torcida. Entra na comunidade DESSE tenant (o
+      // mesmo do /admin) em leitura; escrita via `assertVozComunidade`.
       const superAdmin = isSuperAdminEmail(email)
-      const operador = superAdmin
-        ? !(await db.saasMembro.findFirst({
-            where: { userId, tenantId: tenant.id, status: 'APROVADO', espelhado: false },
-            select: { id: true },
-          }))
-        : false
+      const operador = superAdmin && !socioAprovado
 
       if (socioAprovado || operador) {
         let afiliacao: AfiliacaoComunidade | null = null

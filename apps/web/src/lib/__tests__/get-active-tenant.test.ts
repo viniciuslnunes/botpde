@@ -122,6 +122,21 @@ describe('getActiveTenant — subdomínio com o mesmo critério do cookie', () =
     expect(vinculoAutoriza).not.toHaveBeenCalled()
   })
 
+  it('super-admin no apex sem cookie usa torcida-casa (sócio)', async () => {
+    headersGet.mockImplementation((name: string) => {
+      if (name === 'host') return 'torcida.app'
+      return null
+    })
+    isSuperAdminFn.mockReturnValue(true)
+    resolveUserSlug.mockResolvedValue('pde-gavioes-fiel')
+    tenantGavioes()
+
+    const { getActiveTenant } = await import('@/lib/tenant')
+    const tenant = await getActiveTenant('u-sa', 'admin@torcida.com')
+    expect(tenant?.slug).toBe('pde-gavioes-fiel')
+    expect(resolveUserSlug).toHaveBeenCalledWith('u-sa')
+  })
+
   it('cookie da Sede sem vínculo APROVADO é ignorado (perfil → CN)', async () => {
     headersGet.mockImplementation((name: string) => {
       if (name === 'host') return 'torcida.app'

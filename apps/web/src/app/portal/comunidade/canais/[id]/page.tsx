@@ -59,7 +59,9 @@ export default async function CanalDetalhePage({
     getAvatarAtualDoUsuario(session.user.id),
   ])
   if (!ctx) {
-    if (isSuperAdminEmail(session.user.email)) redirect('/super-admin/torcidas')
+    if (isSuperAdminEmail(session.user.email)) {
+      redirect('/super-admin/torcidas?proxima=/portal/comunidade')
+    }
     redirect('/onboarding')
   }
 

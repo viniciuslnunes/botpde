@@ -18,12 +18,22 @@ import { TorcidasListaCliente } from './torcidas-lista-cliente'
 
 export const metadata: Metadata = { title: 'Torcidas — Super Admin' }
 
-export default async function TorcidasPage() {
+export default async function TorcidasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ proxima?: string }>
+}) {
   const session = await auth()
 
   if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
     redirect('/')
   }
+
+  const params = await searchParams
+  const proximaRaw = typeof params.proxima === 'string' ? params.proxima.trim() : ''
+  const abrirComunidade =
+    proximaRaw === '/portal/comunidade' || proximaRaw.startsWith('/portal/')
+  const destinoSelecao = abrirComunidade ? 'portal' : 'admin'
 
   const [torcidas, clubes, tenantAtual, totalTenants] = await Promise.all([
     listarTorcidasParaSelecao(),
@@ -42,7 +52,11 @@ export default async function TorcidasPage() {
     <div className="flex min-h-full flex-col">
       <AdminPageHeader
         title="Gerenciar torcidas"
-        description="Selecione a torcida no menu ao lado (ou abaixo) e você entra no painel administrativo dela — aprovar membros, eventos, comunicados, tudo isolado por torcida."
+        description={
+          abrirComunidade
+            ? 'Escolha a torcida para entrar na Comunidade em modo operador (leitura). Sem torcida ativa o portal não tem contexto.'
+            : 'Selecione a torcida no menu ao lado (ou abaixo) e você entra no painel administrativo dela — aprovar membros, eventos, comunicados, tudo isolado por torcida.'
+        }
         icon={<Building2 className="h-5 w-5" />}
       />
 
@@ -53,7 +67,9 @@ export default async function TorcidasPage() {
           <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
             {tenantAtual
               ? `Ativa agora: ${tenantAtual.nome}`
-              : 'Nenhuma selecionada — escolha clube e torcida para abrir o admin.'}
+              : abrirComunidade
+                ? 'Nenhuma selecionada — escolha clube e torcida para abrir a Comunidade.'
+                : 'Nenhuma selecionada — escolha clube e torcida para abrir o admin.'}
           </p>
           <div className="mt-4">
             <AdminSuperContextSwitchers
@@ -62,19 +78,45 @@ export default async function TorcidasPage() {
               unidades={unidades}
               torcidaAtualSlug={tenantAtual?.slug ?? null}
               tenantAtualId={tenantAtual?.id ?? null}
-              destino="admin"
+              destino={destinoSelecao}
               variant="admin"
             />
           </div>
           {tenantAtual && (
             <div className="mt-4 flex flex-wrap gap-2">
+              {abrirComunidade ? (
+                <Link
+                  href="/portal/comunidade"
+                  className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
+                >
+                  Abrir comunidade — {tenantAtual.nome}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <Link
+                  href="/admin"
+                  className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
+                >
+                  <Settings className="h-4 w-4" />
+                  Abrir admin — {tenantAtual.nome}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
               <Link
-                href="/admin"
-                className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
+                href={abrirComunidade ? '/admin' : '/portal/comunidade'}
+                className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
               >
-                <Settings className="h-4 w-4" />
-                Abrir admin — {tenantAtual.nome}
-                <ArrowRight className="h-4 w-4" />
+                {abrirComunidade ? (
+                  <>
+                    <Settings className="h-4 w-4" />
+                    Abrir admin
+                  </>
+                ) : (
+                  <>
+                    Abrir comunidade
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Link>
               <Link
                 href="/admin/torcedores"
