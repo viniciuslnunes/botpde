@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { listLojasDoSocio, tenantsPermitidosLoja } from '@/lib/loja-lojas'
+import { listLojasDoSocio, podeVerLojaTenant } from '@/lib/loja-lojas'
 import { resolveTenantLogoUrl } from '@/lib/tenant'
 import { notFound, redirect } from 'next/navigation'
 import { LojaTenantThemeScope } from '../_components/loja-tenant-theme-scope'
@@ -20,8 +20,7 @@ export default async function LojaTenantLayout({
   const { tenantId } = await params
   const userId = session.user.id
 
-  const permitidos = await tenantsPermitidosLoja(userId)
-  if (!permitidos.has(tenantId)) notFound()
+  if (!(await podeVerLojaTenant(userId, tenantId, session.user.email))) notFound()
 
   const [tenant, lojas, sacolaAgg, sacolaPorTenant, pedidosCount, categorias] = await Promise.all([
     db.tenant.findFirst({

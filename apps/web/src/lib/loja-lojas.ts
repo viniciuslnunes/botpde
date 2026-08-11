@@ -80,6 +80,28 @@ export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
   return ids
 })
 
+/**
+ * Leitura da vitrine no portal. Membership (`tenantsPermitidosLoja`) **ou**
+ * super-admin no tenant ativo do modo operador — mesma ideia da Comunidade
+ * (vê o catálogo da torcida que está operando; compra continua só com vínculo).
+ */
+export async function podeVerLojaTenant(
+  userId: string,
+  tenantId: string,
+  email?: string | null,
+): Promise<boolean> {
+  const permitidos = await tenantsPermitidosLoja(userId)
+  if (permitidos.has(tenantId)) return true
+
+  if (!email) return false
+  const { isSuperAdminEmail } = await import('@/lib/tenant-context')
+  if (!isSuperAdminEmail(email)) return false
+
+  const { getActiveTenant } = await import('@/lib/tenant')
+  const ativo = await getActiveTenant(userId, email)
+  return ativo?.id === tenantId
+}
+
 export interface LojaResumo {
   tenantId: string
   nome: string

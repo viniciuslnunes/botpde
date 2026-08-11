@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
-import { listLojasDoSocio, tenantsPermitidosLoja, type LojaResumo } from '@/lib/loja-lojas'
+import { listLojasDoSocio, tenantsPermitidosLoja, podeVerLojaTenant, type LojaResumo } from '@/lib/loja-lojas'
 import { labelTipoUnidade } from '@/lib/canais-shared'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -29,9 +29,15 @@ export default async function PortalLojaListagemPage() {
 
   let lojas: LojaResumo[] = await listLojasDoSocio(userId)
 
-  if (lojas.length === 0) {
+  // Super-admin em modo operador não tem SaasMembro na torcida ativa — inclui
+  // a loja do contexto (cookie/seletor) para não cair em 404 ao clicar Loja.
+  {
     const tenant = await getActiveTenant(userId, session.user.email)
-    if (tenant) {
+    if (
+      tenant &&
+      !lojas.some((l) => l.tenantId === tenant.id) &&
+      (await podeVerLojaTenant(userId, tenant.id, session.user.email))
+    ) {
       const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl ?? null)
       lojas = [
         {
@@ -46,6 +52,7 @@ export default async function PortalLojaListagemPage() {
             where: { tenantId: tenant.id, ativo: true },
           }),
         },
+        ...lojas,
       ]
     }
   }

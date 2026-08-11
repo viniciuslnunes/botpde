@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { tenantsPermitidosLoja } from '@/lib/loja-lojas'
+import { podeVerLojaTenant } from '@/lib/loja-lojas'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -26,8 +26,7 @@ export default async function ProdutoDetailPage({
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const permitidos = await tenantsPermitidosLoja(session.user.id)
-  if (!permitidos.has(tenantId)) notFound()
+  if (!(await podeVerLojaTenant(session.user.id, tenantId, session.user.email))) notFound()
 
   const produto = await db.saasProduto.findFirst({
     where: { id: produtoId, tenantId, ativo: true },

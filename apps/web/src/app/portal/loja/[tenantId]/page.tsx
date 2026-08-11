@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { listLojasDoSocio, tenantsPermitidosLoja } from '@/lib/loja-lojas'
+import { listLojasDoSocio, podeVerLojaTenant } from '@/lib/loja-lojas'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -40,8 +40,7 @@ export default async function PortalLojaTenantPage({
 
   if (!session?.user?.id) redirect('/entrar')
 
-  const permitidos = await tenantsPermitidosLoja(session.user.id)
-  if (!permitidos.has(tenantId)) notFound()
+  if (!(await podeVerLojaTenant(session.user.id, tenantId, session.user.email))) notFound()
 
   const [lojas, tenantRow, cupomDestaque, produtoDestaque] = await Promise.all([
     listLojasDoSocio(session.user.id),
