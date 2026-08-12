@@ -28,6 +28,8 @@ flowchart LR
 
 Anti-loop: se o destino já tem o mesmo SHA, o job sai 0 sem push.
 Sem force-push: tip divergente falha e pede o fallback local.
+Commits `chore(release)` feitos pelo Actions (GITHUB_TOKEN) não re-disparam
+`push` em outros workflows — o mirror também escuta o workflow **Release**.
 
 Arquivos:
 

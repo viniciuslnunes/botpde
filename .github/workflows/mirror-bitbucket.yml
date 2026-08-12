@@ -11,6 +11,11 @@ name: Mirror → Bitbucket
 on:
   push:
     branches: [main]
+  # Pushes feitos com GITHUB_TOKEN (ex.: chore(release)) não disparam `push` em
+  # outros workflows — reagir ao Release fecha o gap do tip no Bitbucket.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 concurrency:
   group: mirror-bitbucket-main
@@ -23,10 +28,14 @@ jobs:
   mirror:
     name: push-main-to-bitbucket
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Mirror main → Bitbucket
         env:
@@ -37,6 +46,9 @@ jobs:
             echo "Missing secret BITBUCKET_API_TOKEN — see docs/ops/git-remotes.md"
             exit 1
           fi
+
+          git fetch origin main
+          git checkout -B main origin/main
 
           AUTH="$(printf '%s' "x-bitbucket-api-token-auth:${BITBUCKET_API_TOKEN}" | base64 -w0 2>/dev/null || printf '%s' "x-bitbucket-api-token-auth:${BITBUCKET_API_TOKEN}" | base64)"
           git remote remove bitbucket 2>/dev/null || true
