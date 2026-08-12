@@ -13,12 +13,15 @@ export function dataTransferHasFiles(dt: DataTransfer): boolean {
  * for cancelado (Esc, soltar fora) — sem isso o overlay trava.
  */
 export function useFileDragOver(enabled = true) {
-  const [active, setActive] = useState(false)
+  const [arrastando, setArrastando] = useState(false)
   const depthRef = useRef(0)
+  // Desligar o hook esconde o overlay por derivação — não precisa de effect
+  // zerando o estado, que ainda deixava o overlay visível por um frame.
+  const active = enabled && arrastando
 
   function reset() {
     depthRef.current = 0
-    setActive(false)
+    setArrastando(false)
   }
 
   useEffect(() => {
@@ -34,16 +37,13 @@ export function useFileDragOver(enabled = true) {
     }
   }, [active])
 
-  useEffect(() => {
-    if (!enabled) reset()
-  }, [enabled])
 
   function onDragEnter(e: DragEvent) {
     if (!enabled || !dataTransferHasFiles(e.dataTransfer)) return
     e.preventDefault()
     e.stopPropagation()
     depthRef.current += 1
-    setActive(true)
+    setArrastando(true)
   }
 
   function onDragOver(e: DragEvent) {
@@ -58,7 +58,7 @@ export function useFileDragOver(enabled = true) {
     e.preventDefault()
     e.stopPropagation()
     depthRef.current = Math.max(0, depthRef.current - 1)
-    if (depthRef.current === 0) setActive(false)
+    if (depthRef.current === 0) setArrastando(false)
   }
 
   /** Retorna os arquivos e limpa o estado. Chamar no `onDrop` do alvo. */

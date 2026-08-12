@@ -96,14 +96,22 @@ function CriarManualForm({
 
   // Só reseta o form no sucesso — em erro de validação os campos controlados
   // devem permanecer (React 19 requestFormReset limparia inputs uncontrolled).
-  useEffect(() => {
+  // No render: em effect os campos ficavam preenchidos por um frame após criar.
+  const [stateSincronizado, setStateSincronizado] = useState(state)
+  if (state !== stateSincronizado) {
+    setStateSincronizado(state)
     if (state.success) {
       setCampos(CAMPOS_MANUAL_INICIAIS)
       setTenantId(null)
       setFotoUrl('')
       setErroFoto(null)
-      onCriado?.()
     }
+  }
+
+  // `onCriado` é do pai (pode dar setState lá) — avisar durante o nosso render
+  // seria render aninhado. Fica em effect, agora sem estado local junto.
+  useEffect(() => {
+    if (state.success) onCriado?.()
   }, [state.success, onCriado])
 
   useEffect(() => {

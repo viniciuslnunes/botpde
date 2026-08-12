@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { MapPin, Sparkles, X, ZoomOut } from 'lucide-react'
 import { BandeiraEstado } from '@/components/onboarding/bandeira-estado'
@@ -57,22 +57,16 @@ export function MapaBrasilUfPicker({ ufSelecionada, onUfSelecionar, className = 
   const reduceMotion = useReducedMotion()
   const [ufHover, setUfHover] = useState<string | null>(null)
   const [regiaoDestaque, setRegiaoDestaque] = useState<RegiaoBrasilId | null>(null)
-  const [viewport, setViewport] = useState<MapViewport>(VIEWBOX_BRASIL)
+  // Não é estado: o enquadramento é função da seleção. Como estado, dependia de
+  // um effect para se corrigir, e o mapa exibia o enquadramento anterior por um
+  // frame a cada clique.
+  const viewport: MapViewport =
+    (ufSelecionada ? VIEWBOX_UF[ufSelecionada] : null) ??
+    (regiaoDestaque ? VIEWBOX_REGIAO[regiaoDestaque] : null) ??
+    VIEWBOX_BRASIL
 
   const zoomAtivo = !isViewportBrasil(viewport)
   const ufTooltip = ufHover && ufHover !== ufSelecionada ? ufHover : null
-
-  useEffect(() => {
-    if (ufSelecionada && VIEWBOX_UF[ufSelecionada]) {
-      setViewport(VIEWBOX_UF[ufSelecionada])
-      return
-    }
-    if (regiaoDestaque && VIEWBOX_REGIAO[regiaoDestaque]) {
-      setViewport(VIEWBOX_REGIAO[regiaoDestaque])
-      return
-    }
-    setViewport(VIEWBOX_BRASIL)
-  }, [ufSelecionada, regiaoDestaque])
 
   function selecionarUf(uf: string) {
     onUfSelecionar(ufSelecionada === uf ? '' : uf)
@@ -80,9 +74,9 @@ export function MapaBrasilUfPicker({ ufSelecionada, onUfSelecionar, className = 
   }
 
   function limparTudo() {
+    // Zerar uf/região já devolve o enquadramento do Brasil (viewport é derivado).
     onUfSelecionar('')
     setRegiaoDestaque(null)
-    setViewport(VIEWBOX_BRASIL)
   }
 
   function toggleRegiao(id: RegiaoBrasilId) {

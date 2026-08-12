@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { m, AnimatePresence } from 'motion/react'
 
 /** Envolve um card recém-inserido (prepend otimista) com um anel que se
@@ -14,9 +14,13 @@ export function OptimisticHighlight({
 }) {
   const [pulsing, setPulsing] = useState(active)
 
-  useEffect(() => {
+  // Rearma no render quando `active` sobe (o anel também some sozinho ao fim
+  // da animação, daí o estado não ser só derivado de `active`).
+  const [activeAnterior, setActiveAnterior] = useState(active)
+  if (active !== activeAnterior) {
+    setActiveAnterior(active)
     if (active) setPulsing(true)
-  }, [active])
+  }
 
   return (
     <div className="relative">

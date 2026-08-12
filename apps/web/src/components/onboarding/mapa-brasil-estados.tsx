@@ -397,11 +397,18 @@ export function MapaBrasilEstados({
   const reduceMotion = useReducedMotion()
   const [ufHover, setUfHover] = useState<string | null>(null)
   const [regiaoDestaque, setRegiaoDestaque] = useState<RegiaoBrasilId | null>(null)
-  const [viewport, setViewport] = useState<MapViewport>(VIEWBOX_BRASIL)
   const [filtroPainel, setFiltroPainel] = useState('')
   const painelRef = useRef<HTMLElement | null>(null)
 
   const buscaAtiva = Boolean(busca.trim())
+  // Derivado, não estado: o enquadramento é função de (busca, uf, região).
+  // Como estado, um effect corrigia depois e o mapa mostrava o enquadramento
+  // anterior por um frame.
+  const viewport: MapViewport = buscaAtiva
+    ? VIEWBOX_BRASIL
+    : ((ufSelecionada ? VIEWBOX_UF[ufSelecionada] : null) ??
+      (regiaoDestaque ? VIEWBOX_REGIAO[regiaoDestaque] : null) ??
+      VIEWBOX_BRASIL)
   const painelAtivo = Boolean(ufSelecionada) || buscaAtiva || Boolean(regiaoDestaque)
   const modoPainel: 'estado' | 'regiao' | 'busca' | null = buscaAtiva
     ? 'busca'
@@ -448,25 +455,15 @@ export function MapaBrasilEstados({
   const ufTooltip = ufHover && ufHover !== ufSelecionada ? ufHover : null
   const zoomAtivo = !isViewportBrasil(viewport)
 
-  useEffect(() => {
+  // Trocar o recorte do painel zera o filtro local — no render, senão o campo
+  // fica um frame com o texto do recorte anterior.
+  const recortePainel = `${ufSelecionada}|${busca}|${regiaoDestaque ?? ''}`
+  const [recorteSincronizado, setRecorteSincronizado] = useState(recortePainel)
+  if (recortePainel !== recorteSincronizado) {
+    setRecorteSincronizado(recortePainel)
     setFiltroPainel('')
-  }, [ufSelecionada, busca, regiaoDestaque])
+  }
 
-  useEffect(() => {
-    if (buscaAtiva) {
-      setViewport(VIEWBOX_BRASIL)
-      return
-    }
-    if (ufSelecionada && VIEWBOX_UF[ufSelecionada]) {
-      setViewport(VIEWBOX_UF[ufSelecionada])
-      return
-    }
-    if (regiaoDestaque && VIEWBOX_REGIAO[regiaoDestaque]) {
-      setViewport(VIEWBOX_REGIAO[regiaoDestaque])
-      return
-    }
-    setViewport(VIEWBOX_BRASIL)
-  }, [ufSelecionada, regiaoDestaque, buscaAtiva])
 
   // No mobile o mapa fica acima da lista — ao selecionar UF/busca, leva o painel à vista.
   useEffect(() => {
@@ -488,9 +485,9 @@ export function MapaBrasilEstados({
   }
 
   function limparTudo() {
+    // Zerar uf/região já devolve o enquadramento do Brasil (viewport é derivado).
     onUfSelecionar('')
     setRegiaoDestaque(null)
-    setViewport(VIEWBOX_BRASIL)
   }
 
   function fecharPainel() {

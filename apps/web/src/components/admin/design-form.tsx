@@ -404,9 +404,14 @@ function ColorField({
 }) {
   const [draft, setDraft] = useState(value ?? resolved)
 
-  useEffect(() => {
-    setDraft(value ?? resolved)
-  }, [value, resolved])
+  // Ressincroniza com o valor de fora no render — em effect o campo hex
+  // mostrava a cor anterior por um frame ao trocar de token.
+  const efetivo = value ?? resolved
+  const [efetivoSincronizado, setEfetivoSincronizado] = useState(efetivo)
+  if (efetivo !== efetivoSincronizado) {
+    setEfetivoSincronizado(efetivo)
+    setDraft(efetivo)
+  }
 
   const display =
     value && HEX6.test(value)
@@ -1035,12 +1040,15 @@ export function DesignForm({
     }
   }, [imagemUrls])
 
-  // Auto-scene when switching section
-  useEffect(() => {
+  // Auto-scene ao trocar de seção — no render, para o preview não aparecer um
+  // frame na cena anterior. O usuário ainda pode trocar a cena depois.
+  const [sectionCena, setSectionCena] = useState(section)
+  if (section !== sectionCena) {
+    setSectionCena(section)
     if (section === 'acoes') setScene('admin')
     else if (section === 'identidade') setScene('portal')
     else if (section === 'fundo') setScene('portal')
-  }, [section])
+  }
 
   const clubePaleta = useMemo(
     () => paletaDoClube(clubeNome, clubeApelido),

@@ -578,9 +578,10 @@ function SedeLocalizacaoFields({
     ((zoomSlider - SV_FOV_MIN) / (SV_FOV_MAX - SV_FOV_MIN)) * 100,
   )
 
-  useEffect(() => {
-    if (!hasCoords && mapPanelTab === 'street') setMapPanelTab('mapa')
-  }, [hasCoords, mapPanelTab])
+  // Street View exige coordenada: sem ela a aba efetiva é sempre o mapa.
+  // Derivado, não corrigido por effect — assim não existe o frame intermediário
+  // em que a aba Street aparece selecionada e vazia.
+  const mapPanelTabEfetiva = !hasCoords && mapPanelTab === 'street' ? 'mapa' : mapPanelTab
 
   function confirmarLocalizacaoNoMapa() {
     if (!hasCoords) {
@@ -1045,13 +1046,13 @@ function SedeLocalizacaoFields({
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={mapPanelTab === 'mapa'}
+                    aria-selected={mapPanelTabEfetiva === 'mapa'}
                     id="sede-map-tab-mapa"
                     aria-controls="sede-map-panel-mapa"
                     onClick={() => setMapPanelTab('mapa')}
                     className={[
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors',
-                      mapPanelTab === 'mapa'
+                      mapPanelTabEfetiva === 'mapa'
                         ? 'border-b-2 border-[rgb(var(--color-primary))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]'
                         : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                     ].join(' ')}
@@ -1062,7 +1063,7 @@ function SedeLocalizacaoFields({
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={mapPanelTab === 'street'}
+                    aria-selected={mapPanelTabEfetiva === 'street'}
                     id="sede-map-tab-street"
                     aria-controls="sede-map-panel-street"
                     disabled={!hasCoords}
@@ -1076,7 +1077,7 @@ function SedeLocalizacaoFields({
                     }}
                     className={[
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                      mapPanelTab === 'street'
+                      mapPanelTabEfetiva === 'street'
                         ? 'border-b-2 border-[rgb(var(--color-primary))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]'
                         : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                     ].join(' ')}
@@ -1086,7 +1087,7 @@ function SedeLocalizacaoFields({
                   </button>
                 </div>
 
-                {mapPanelTab === 'mapa' ? (
+                {mapPanelTabEfetiva === 'mapa' ? (
                   <div
                     id="sede-map-panel-mapa"
                     role="tabpanel"
@@ -1520,10 +1521,14 @@ function SedeFormFields({
       Number.isFinite(defaults.lng),
   )
 
-  useEffect(() => {
+  // Erro de validação leva o wizard para o passo do campo. No render: em effect
+  // o usuário via o passo antigo com a mensagem de erro por um frame.
+  const [errosSincronizados, setErrosSincronizados] = useState(state.errors)
+  if (state.errors !== errosSincronizados) {
+    setErrosSincronizados(state.errors)
     const fromErrors = stepFromErrors(state.errors)
     if (fromErrors) setStep(fromErrors)
-  }, [state.errors])
+  }
 
   const hasErrors: Partial<Record<SedeStepId, boolean>> = {}
   for (const s of SEDE_STEPS) {
