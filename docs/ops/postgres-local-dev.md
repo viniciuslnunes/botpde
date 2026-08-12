@@ -92,6 +92,38 @@ imagem `postgres:18` como ferramenta, então **não** é preciso instalar
 Rode de novo sempre que quiser ressincronizar com o estado da Railway; o script
 recria o schema `public` local antes de restaurar.
 
+#### O snapshot congela — e isso vira "bug" fantasma
+
+O banco local é uma **cópia do momento do sync**, não uma réplica viva. Tudo que
+for publicado na Railway depois disso **não existe** em `localhost:3000`.
+
+Caso real (2026-08-12): relato de que um post feito "há 55 min" na Comunidade
+Nacional não aparecia para outro usuário. Não era o feed — as duas telas estavam
+em **bancos diferentes**. O sync tinha sido feito em 11/08 e o post mais recente
+do banco local era de **07/08**; o autor do post nem existia como `User` ali. A
+publicação tinha acontecido no ambiente Railway; o `localhost` lia um snapshot
+que nunca a viu.
+
+**Antes de investigar qualquer "não apareceu / não atualizou" em dev**, confirme
+que as duas pontas olham o mesmo banco:
+
+```bash
+# o dado existe no banco que o app está lendo?
+pnpm --filter @torcida/db exec node -e "import('../src/index.js').then(async ({db})=>{ \
+  console.log(await db.post.findFirst({orderBy:{criadoEm:'desc'},select:{criadoEm:true,conteudo:true}})); \
+  await db.\$disconnect() })"
+```
+
+Se o post mais recente do banco for de dias atrás, o problema é o snapshot —
+rode o sync de novo (ou reproduza o cenário no mesmo ambiente das duas sessões)
+antes de suspeitar de cache, `revalidate` ou ranking do feed. Sintoma clássico:
+comparar uma tela em produção/HML com outra em `localhost` e concluir que o feed
+"não propagou".
+
+> Só depois de descartar isso vale olhar o cache: o feed nacional usa
+> `unstable_cache` com `revalidate: 45` (`apps/web/src/lib/feed.ts`), então
+> qualquer atraso maior que ~1 minuto **não** é cache.
+
 ### Apontar o app para o banco local
 
 Em `apps/web/.env.local` **e** em `packages/db/.env` (Prisma/scripts leem daí):

@@ -3,7 +3,9 @@
 Guia curto para trabalhar neste repositório. Detalhe arquitetural em `ARCHITECTURE.md`;
 produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`);
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
-Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
+Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; **bundle de entrada** (medição
+com `next experimental-analyze` — `build:analyze` é no-op sob Turbopack):
+§5.6.2 + `docs/data/bundle-entrada-performance.md`; Comunidade (feed/timeline/busca):
 `docs/data/modulo-comunidade-performance.md` (inclui **ganhos estimados por
 cenário %**, live UX: ping pós-fan-out / auto-refetch no topo, **engajamento
 overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
@@ -55,6 +57,11 @@ pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant p
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
+pnpm --filter @torcida/db coleta:api-football-times  # snapshot times BR (1 requisição da cota)
+pnpm --filter @torcida/db seed:api-football-ids      # Afiliacao.apiExternalId (offline; --apply grava)
+pnpm --filter @torcida/db test:api-football-match    # invariantes do casamento clube ↔ API
+pnpm --filter @torcida/web seed:partidas-sync        # sincroniza Partida e MANTÉM (para ver na tela)
+pnpm --filter @torcida/web audit:partidas-sync       # sync ponta a ponta (grava e reverte)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 pnpm --filter @torcida/db db:repair-carteirinha-espelho  # carteirinha do sócio Caso B nos dois níveis
 pnpm --filter @torcida/db db:repair-owner-heranca-promocao  # tira owner herdado da mãe em portal de unidade + o SaasMembro/canal fabricados junto (simula; --apply grava)
@@ -94,6 +101,12 @@ produção, onde app e banco dividem datacenter. Antes de "otimizar" uma rota
 lenta em dev, suba o banco local: agente `/setup` (ou
 `docs/ops/postgres-local-dev.md` + `scripts/dev-setup.ps1` /
 `scripts/dev-setup.sh`). Secrets do time: `docs/ops/dev-secrets.md`.
+**E o banco local é snapshot, não réplica (2026-08-12):** antes de investigar
+"post/dado não apareceu" em dev, confirme que as duas telas comparadas estão no
+**mesmo banco** — um relato de feed que "não propagou" era só o snapshot local
+parado 5 dias atrás. Ver `docs/ops/postgres-local-dev.md` § o snapshot congela.
+**Custo Railway** (fatura por projeto, ordem de corte, por que o HML fica, e o
+backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
 
 ## Convenções (obrigatórias)
 
@@ -129,6 +142,13 @@ lenta em dev, suba o banco local: agente `/setup` (ou
   Comunidade: feed TanStack atualizado no publish (não só RSC); chrome salas/chat
   no layout ao sair do feed. Dúvida de diagnóstico → agente `performance` antes de
   codar.
+  **Barrel no root layout (2026-08-12):** componente na cadeia do root layout
+  importa o **módulo direto** (`@torcida/types/design`), nunca o barrel
+  `@torcida/types` — ele é 37 `export *` e arrasta tudo para toda página.
+  `optimizePackageImports` **não** conserta isso (medido, zero efeito). Em
+  componente de rota o barrel está ok — estreitar lá piora o chunk. Config
+  herdada da era webpack (`build:analyze`, `treeshake` do Sentry) é no-op sob
+  Turbopack: meça antes de creditar ganho. Ver §5.6.2.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
@@ -272,6 +292,13 @@ lenta em dev, suba o banco local: agente `/setup` (ou
   `Partida` global por `Afiliacao`; série/waitlist/mapa/QR offline; ver
   `docs/data/modulo-eventos.md` e `ARCHITECTURE.md` §5.11. Fontes de jogos:
   `docs/knowledge/futebol-dados-publicos.md` (Google Sports ≠ API gratuita).
+  **Provedor de jogos (decisão #7, 2026-08-12):** API-Football **pago** — o free
+  trava em temporadas 2022–2024; sincronizar **por competição**, nunca por clube;
+  fonte única (não misturar `football-data.org`, duplica `Partida`). Sonda:
+  `pnpm apif:probe`. **Referência da API** (contrato, cota, status de partida,
+  pegadinhas, widgets, football-data.org): `docs/knowledge/api-football-referencia.md`;
+  decisão + implementação + **runbook de teste local**:
+  `docs/data/integracao-api-football.md` e §5.26.
 - **Sofascore Widgets** — embeds oficiais na comunidade (display only; não sync
   de `Partida`): por clube (`SOFASCORE_WIDGETS`) e classificação nacional por
   divisão A/B/C/D (`SOFASCORE_COMPETICOES` + `Afiliacao.serie`). Repair de série:

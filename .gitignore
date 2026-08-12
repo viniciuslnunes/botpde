@@ -86,6 +86,10 @@ apps/web/auditoria-*.txt
 apps/web/audit-*.txt
 apps/web/seed-jornadas.txt
 
+# Payload transitório do import de commits para o Jira (scripts/jira/import-commits.mjs
+# apaga no finally; sobra só quando a execução é interrompida)
+.tmp-jira-import-*.json
+
 # Atlassian CLI (binário local — ver docs/ops/acli-jira.md)
 acli
 acli.exe

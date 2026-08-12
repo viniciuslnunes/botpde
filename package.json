@@ -20,7 +20,9 @@
     "jira:create": "node scripts/jira/issue-create.mjs",
     "jira:edit": "node scripts/jira/issue-edit.mjs",
     "jira:transition": "node scripts/jira/issue-transition.mjs",
-    "jira:seed-kan": "node scripts/jira/seed-kan-structure.mjs"
+    "jira:seed-kan": "node scripts/jira/seed-kan-structure.mjs",
+    "jira:import-commits": "node scripts/jira/import-commits.mjs",
+    "apif:probe": "node scripts/api-football/probe.mjs"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

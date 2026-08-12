@@ -132,6 +132,11 @@ Homolog **sem** bot, **sem** Redis pago, **sem** LiveKit (salvo teste pontual).
 
 **Decisão:** 2× Postgres no Railway (Staging + Production) — mais simples.
 
+> **Revisitado em 2026-08-12** (a conta dobrou): o HML **fica**. Ele custa
+> ~$1,92/mês e é o único gate automatizado antes de prod. Fatura real por
+> projeto, ordem de corte e a alternativa Neon Free (se um dia o custo do HML
+> precisar ir a zero) em [`custo-railway-projetos.md`](./custo-railway-projetos.md).
+
 Mitigações de custo (sem Neon):
 
 - Staging **sem** bot, Redis, LiveKit

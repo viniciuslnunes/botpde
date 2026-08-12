@@ -52,11 +52,17 @@ Doc: [Behaviours](https://docs.adaptavist.com/sr4jc/latest/features/behaviours).
 4. Restringir ao projeto KAN no script (`issue.key` começa com `KAN-`)
 5. Salvar → smoke: editar label / prioridade num issue
 
-### Filtros JQL
+### Filtros JQL + Enhanced Search
 
-1. Filters → Create filter
-2. Colar queries de `jql-filters.md`
-3. Favoritar no board KAN
+1. Admin: Apps → **ScriptRunner Enhanced Search** → sync inicial de keywords
+   (obrigatório uma vez; com ~1k issues é rápido).
+2. Filters → Create filter → colar as queries **nativas** de
+   [`jql-filters.md`](../../scripts/jira/scriptrunner/jql-filters.md)
+3. Favoritar no board KAN (prioridade: backlog vivo, audit, schema, decisions)
+4. Na tela Enhanced Search, colar as queries com `issueFunction` / keywords
+   (`epicsOf`, `linkedIssuesOf`, `commentedOn`, `numberOfAttachments`, …)
+5. Não instalar o app standalone “Enhanced Search” se o ScriptRunner completo
+   já estiver no site (dados ficam separados)
 
 ## Smoke test (após colar)
 

@@ -607,6 +607,65 @@ checklist: **`docs/data/modulo-comunidade-performance.md`**.
 **Teto zero-custo:** ~85–95% do valor do plano capturado sem domínio. F4 CDN
 espera domínio (`docs/ops/cloudflare-cdn.md`). E/F só com métrica.
 
+### 5.6.2 Bundle de entrada — barrel do `@torcida/types` (2026-08-12)
+
+Método, números completos e backlog: **`docs/data/bundle-entrada-performance.md`**.
+
+Ferramenta certa é `next experimental-analyze -o` (Turbopack, nativo), **não**
+`build:analyze`: `@next/bundle-analyzer` é plugin de webpack e o Next 16 já
+constrói com Turbopack por padrão (`next/dist/lib/bundler.js`: sem flag →
+Turbopack), então o script é no-op.
+
+Medido no bundle de entrada compartilhado (o que todo usuário baixa):
+
+| | antes | depois |
+|---|---|---|
+| **Total client** | 445,9 KB gz | **397,4 KB gz** (−48,5, −10,9%) |
+| `@torcida/types` | 29,4 KB (30 módulos) | 7,6 KB (2 módulos) |
+| Sentry client | 78,2 KB | 51,7 KB |
+
+Causa: `packages/types/src/index.js` é barrel de 37 `export *` e o pacote só
+expunha `"."`. `ThemeProvider`/`PermissionProvider` (`packages/ui/src/services/`)
+estão no **root layout** — importar do barrel arrastava os 37 módulos para toda
+página. Correção: subpath export (`"./*": "./src/*.js"`) + import direto
+(`@torcida/types/design`, `/permissions`).
+
+**`optimizePackageImports` não resolve isso** — medido byte a byte, zero efeito:
+ele não reescreve barrel de `export *`. Em client component novo, importe o
+módulo direto, não o barrel. `zod` (14,7 KB gz) continua no bundle porque
+`design.js` o usa e `resolveTenantDesign` roda no `ThemeProvider`.
+
+**Sentry: tracing do client removido em build (−26,5 KB gz).** O
+`webpack: { treeshake: … }` passado a `withSentryConfig` só roda em
+`setupTreeshakingFromConfig` no caminho **webpack** — sob Turbopack é no-op, e
+filtrar integração em runtime não remove byte nenhum (o import é estático). O
+que funciona é `compiler.define` (next.config.ts), que o SWC/Turbopack aplica:
+`__SENTRY_TRACING__: false` derruba o guard em `@sentry/nextjs`
+(`client/index.js`) como código morto. Medido: **só o client** — tracing no
+servidor ficou intacto (111,9 KB gz antes e depois), então o APM de produção
+continua. `tracesSampleRate` saiu de `instrumentation-client.ts` por ter virado
+config morta.
+
+**Tentado e descartado — não repetir:** converter os 49 client components que
+importam o barrel `@torcida/types` para subpath (codemod, `tsc` e 1129 testes
+verdes) **não** melhorou nada: bundle de entrada ficou idêntico (397,4 KB) e o
+total emitido em `.next/static/chunks` **subiu** 182 KB (6,34 → 6,52 MB, 171 →
+174 arquivos) — imports estreitos fragmentam chunk e pioram o compartilhamento.
+O ganho do barrel está só onde o módulo entra no **root layout**; em rota,
+Turbopack já resolve. Revertido.
+
+Nota de método: `next build` no Next 16/Turbopack **não** imprime mais First
+Load JS por rota, e o `experimental-analyze` cobre o grafo de entrada (16
+arquivos client), não os chunks por rota. Para rota, medir bytes em
+`.next/static/chunks`.
+
+**Parar aqui é a decisão.** Dos 397,4 KB, 252,9 são Next/React 19 (piso). O que
+resta de controlável — Sentry erro/core (51,7), `globals.css` (28,6), `zod`
+(14,7), providers do root layout (33,9) — tem razão risco/ganho ruim. O gargalo
+do produto segue sendo query, não bundle: §5.6/§5.6.1 e
+`docs/data/modulo-comunidade-performance.md`. Próximo passo de infra é o CDN,
+que espera domínio (`docs/ops/cloudflare-cdn.md`).
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em
@@ -784,7 +843,8 @@ Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
   `partidaId`, `lat`/`lng`, `capacidade` (+ waitlist `LISTA_ESPERA` FIFO por
   `EventoRsvp.criadoEm`), `fotoUrl`.
 - **`Partida`:** global por `Afiliacao` (sem `tenantId`); mando/status enums;
-  cadastro manual / partida rápida. Sync API externo = decisão aberta #7.
+  cadastro manual / partida rápida. Sync API externo = **decisão #7 fechada**
+  (API-Football pago) — ver §5.26 e `docs/data/integracao-api-football.md`.
 - **Ops:** cron lembretes; ICS; mural `?eventoId=`; QR + fila offline
   (`checkin-offline.ts`); mapa OSM embutido.
 - **Não fazer:** scrapar SERP Google Sports; tratar widgets Sofascore como ingestão
@@ -1562,6 +1622,43 @@ Super Admin (card na visão geral + rodapé da sidebar).
 
 Runbook: `docs/ops/release.md`. Schema continua em `docs/ops/schema-deploy.md`
 (versão ≠ `db:push`).
+
+### 5.26 Provedor de jogos — API-Football pago, fonte única (2026-08-12)
+
+Decisão **#7 fechada** com medição contra a API real (sonda
+`scripts/api-football/probe.mjs` → `pnpm apif:probe`). Detalhe, evidências e
+mapeamento: `docs/data/integracao-api-football.md`.
+
+- **Provedor:** API-Football (`v3.football.api-sports.io`), **plano pago**. O
+  free trava em **temporadas 2022–2024** e bloqueia `next`/`last` — é limite de
+  temporada, não de volume.
+- **Custo real de cota:** sincronizar **por competição + janela de datas**
+  (~35–50 req/dia para o Brasil inteiro). Nunca iterar clube a clube.
+- **Fonte única.** `football-data.org` cobre no free só Série A (`BSA`,
+  TIER_ONE); Copa do Brasil/Libertadores são TIER_FOUR (€199/mês) e estaduais
+  **não existem** no catálogo deles. Duas fontes **duplicariam `Partida`** — o
+  unique por `fonteExternalId` não protege entre provedores.
+- **Contrato de provedor** em `lib/partidas/` (`isProvedorPartidasConfigured()`),
+  degradando para cadastro manual — convenção de dependência externa opcional.
+- **Imagens fora da cota:** `media.api-sports.io` cobre escudos do catálogo
+  nacional; rebater no Cloudinary. Matching de clube **exige revisão humana**
+  (busca devolve feminino/U20/homônimos estrangeiros).
+- **Não fazer:** widgets da API-Sports (expõem a API-KEY no HTML e gastam
+  requisição por visita); chamada em runtime de RSC/Server Action.
+- **Sync (Fase B, entregue):** `lib/partidas-sync/` (`contrato.ts` puro +
+  `api-football.ts` + `sync.ts`) e cron `/api/cron/partidas-sync`
+  (Bearer `CRON_SECRET`). `@@unique([afiliacaoId, fonteExternalId])` aplicado —
+  `NULL` não colide, então partida manual segue livre. Gate
+  `isProvedorPartidasConfigured()`; sem chave, Agenda fica no cadastro manual.
+  Erro do provedor (`errors` com HTTP 200) **falha alto** → 502, nunca sucesso
+  silencioso. Sem `AuditLog` (não há ator humano).
+- **Partida manual é adotada, não duplicada:** antes de inserir, o sync procura
+  jogo cadastrado à mão (±3h, adversário normalizado) e preenche o
+  `fonteExternalId` dele. Sem isso, o primeiro sync duplicaria a Agenda de todo
+  tenant que já a usava. Clássico entre dois clubes nossos = duas `Partida`
+  (uma por `Afiliacao`, mando espelhado).
+- **Temporada é variável** (`API_FOOTBALL_SEASON`): o free só libera 2022–2024,
+  então a Fase B foi construída e testada contra 2024.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

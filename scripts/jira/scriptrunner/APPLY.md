@@ -25,12 +25,18 @@ Issue de tracking: **KAN-25** (`[seed][smoke-sr] Aplicar Behaviours/Listeners Sc
 6. **Script Listeners → Create**
    - Events: Issue Created, Issue Updated
    - Script: `listener-critical-notify.groovy`
-7. Filters → criar os 4 JQL de `jql-filters.md`
-8. Smoke:
+7. **Enhanced Search** (admin, uma vez): Apps → ScriptRunner Enhanced Search →
+   sync inicial de JQL keywords (KAN ~centenas de issues; minutos).
+8. Filters → criar os JQL **nativos** de `jql-filters.md` (audit / schema /
+   decisions / me / backlog vivo / smoke).
+9. Apps → ScriptRunner Enhanced Search → colar as queries Enhanced do mesmo
+   arquivo (epicsOf, linkedIssuesOf, commentedOn, numberOfAttachments, …) e
+   favoritar as 3–4 que o time usar.
+10. Smoke:
    - Create História vazia em KAN → DoD deve aparecer
    - Em KAN-25: add label `audit-finding` → comentário do listener
    - Add label `schema` → na transição, description required + help text
-9. Marcar KAN-25 como Done e apagar labels `smoke-sr` de lixo
+11. Marcar KAN-25 como Done e apagar labels `smoke-sr` de lixo
 
 > ACLI não configura ScriptRunner na Cloud; a aplicação é **manual no UI**
 > com receitas versionadas no git.

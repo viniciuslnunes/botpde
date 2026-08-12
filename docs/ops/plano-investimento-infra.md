@@ -100,9 +100,20 @@ Gastar em infra só quando um **degrau mensurável** estiver bloqueado:
 custo fixo (LGE); chicken-egg CPM; sazonalidade dia de jogo; escala
 prematura (“% de 35M”) antes de retenção.
 
+## Corte de custo (o outro lado deste plano)
+
+Este doc responde **quando gastar mais**. O inverso — o que a Railway cobra
+hoje, projeto a projeto, e qual corte compensa — está em
+[`custo-railway-projetos.md`](./custo-railway-projetos.md) (medido 2026-08-12).
+Resumo: a conta dobrou por causa da **subida de produção**, não do HML; 33% do
+gasto é de bots Discord que não são deste produto; e matar o Postgres de
+homologação economizaria ~R$10/mês ao preço de perder o único gate antes de
+prod — decisão registrada como **rejeitada**.
+
 ## Fontes cruzadas
 
 - `ARCHITECTURE.md` §2.5 (deploy/custo), §5.4 (provedor DB), §5.6 / §5.6.1
+- `docs/ops/custo-railway-projetos.md` — fatura real por projeto + backlog Discord
 - `docs/data/modulo-comunidade-performance.md` — baseline, Fases E/F, ganhos %
 - `docs/ops/cloudflare-cdn.md` — Faixa A / F4
 - `docs/ops/deploy-multi-tenant.md` — domínio / `ROOT_DOMAIN` / OAuth
