@@ -30,18 +30,21 @@ export function usePersistBarVisibility(options: Options = {}): boolean {
   const idleHideMs = options.idleHideMs ?? 1800
   const thresholdPx = options.thresholdPx ?? 8
 
-  // Sem flash no load: só aparece após scroll ou quando locked.
+  // Sem flash no load: só aparece após scroll. `locked` some por cima disso no
+  // retorno — não precisa (nem deve) virar setState.
   const [visible, setVisible] = useState(false)
 
-  useEffect(() => {
-    if (locked) {
-      setVisible(true)
-      return
-    }
+  // Saiu do locked: esconde imediatamente. Sem isso a barra fica no visual
+  // “unlocked” (borda neutra, hint/atalho sumidos, CTAs disabled) até idle/clique.
+  // No render, porque um frame nesse estado já é o defeito que a regra descreve.
+  const [lockedAnterior, setLockedAnterior] = useState(locked)
+  if (locked !== lockedAnterior) {
+    setLockedAnterior(locked)
+    if (!locked) setVisible(false)
+  }
 
-    // Saiu do locked: esconde imediatamente. Sem isso a barra fica no visual
-    // “unlocked” (borda neutra, hint/atalho sumidos, CTAs disabled) até idle/clique.
-    setVisible(false)
+  useEffect(() => {
+    if (locked) return
 
     let lastY = window.scrollY
     let ticking = false

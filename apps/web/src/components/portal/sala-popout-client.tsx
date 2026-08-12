@@ -164,6 +164,8 @@ export function SalaPopoutClient({
     }
   }, [titulo, notificarFechamento])
 
+  // Continua em effect: `revelarChrome` mexe no timer de idle (ref), e escrever
+  // em ref durante o render é o mesmo defeito por outro nome.
   useEffect(() => {
     revelarChrome()
   }, [commentsOpen, membersOpen, revelarChrome])

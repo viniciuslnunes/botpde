@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useHidratado } from '@/lib/use-hidratado'
 
 type Options = {
   /** Distância mínima de scroll para considerar mudança de direção. */
@@ -23,6 +24,17 @@ export function useScrollChromeVisibility(options: Options = {}): boolean {
   const idleHideMs = options.idleHideMs ?? 900
 
   const [visible, setVisible] = useState(true)
+
+  // O SSR não conhece a posição do scroll, então o chrome nasce visível. Se a
+  // página já abre rolada (voltar do histórico, âncora), corrige no primeiro
+  // render pós-hidratação — antes isso era um setState no corpo do effect,
+  // que só aplicava depois de um frame com o chrome indevidamente visível.
+  const hidratado = useHidratado()
+  const [inicialAplicado, setInicialAplicado] = useState(false)
+  if (hidratado && !inicialAplicado) {
+    setInicialAplicado(true)
+    if (window.scrollY > topRevealPx) setVisible(false)
+  }
 
   useEffect(() => {
     let lastY = window.scrollY
@@ -73,9 +85,6 @@ export function useScrollChromeVisibility(options: Options = {}): boolean {
         scheduleIdleHide(y)
       })
     }
-
-    // Estado inicial (SSR = visível; sincroniza após hydrate).
-    if (window.scrollY > topRevealPx) setVisible(false)
 
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getCsrfToken } from 'next-auth/react'
 import { ArrowUpDown as ArrowsUpDown, Camera, Eye, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -86,21 +86,28 @@ export function PerfilEditarForm({
   const privacidadeInputRef = useRef<HTMLInputElement>(null)
   const posSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drag = useRef<{ startY: number; startPos: number; h: number } | null>(null)
-  const [destaquePrivacidade, setDestaquePrivacidade] = useState(false)
+  // `?foco=privacidade` é dado da URL, não estado: lendo pelo hook do Next o
+  // destaque já sai no primeiro render, sem o effect que o ligava depois.
+  // O estado local guarda só a dispensa (desmarcar "perfil privado" apaga o
+  // realce), não o valor em si.
+  const searchParams = useSearchParams()
+  const [destaqueDispensado, setDestaqueDispensado] = useState(false)
+  const destaquePrivacidade =
+    !destaqueDispensado &&
+    searchParams.get('foco') === 'privacidade' &&
+    !privacidadeBloqueada
 
   const displayAvatar = avatarUrl ?? avatarFallback
 
+  // Fica em effect só o efeito colateral (rolar até o bloco e focar o campo).
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('foco') !== 'privacidade' || privacidadeBloqueada) return
-    setDestaquePrivacidade(true)
+    if (!destaquePrivacidade) return
     const t = window.setTimeout(() => {
       privacidadeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       privacidadeInputRef.current?.focus({ preventScroll: true })
     }, 250)
     return () => window.clearTimeout(t)
-  }, [privacidadeBloqueada])
+  }, [destaquePrivacidade])
 
   const socialUnsaved = useMemo(() => {
     const list: string[] = []
@@ -516,7 +523,7 @@ export function PerfilEditarForm({
             disabled={privacidadeBloqueada}
             onChange={(e) => {
               setPerfilPrivado(e.target.checked)
-              if (!e.target.checked) setDestaquePrivacidade(false)
+              if (!e.target.checked) setDestaqueDispensado(true)
             }}
           />
           {privacidadeBloqueada
