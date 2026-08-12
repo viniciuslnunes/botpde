@@ -12,6 +12,7 @@ import {
   type GoogleMapsNamespace,
 } from '@/lib/google-maps'
 import type { SedeExplorerItem } from '@/components/portal/sede-explorer-types'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 type MapPoint = Pick<SedeExplorerItem, 'id' | 'nome' | 'lat' | 'lng'>
 
@@ -64,22 +65,30 @@ export function SedesMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<GoogleMapInstance | null>(null)
+  /**
+   * Markers vivos do Google Maps, por id de sede.
+   *
+   * Fica em ref de propósito: são objetos imperativos da API, criados e
+   * destruídos pelos effects, que precisam sobreviver entre renders sem
+   * disparar novo render. O `react-hooks/immutability` acusa a mutação
+   * (`m.map = null` na poda) — é limitação do React Compiler com interop
+   * imperativo, não bug. Tentar tirar daqui piora: em `useState` o compilador
+   * passa a acusar também "cannot modify local variables after render".
+   */
   const markersRef = useRef<Map<string, GoogleMarkerInstance>>(new Map())
   const userMarkerRef = useRef<GoogleMarkerInstance | null>(null)
   const gRef = useRef<GoogleMapsNamespace | null>(null)
   const markerLibRef = useRef<GoogleMapsMarkerLibrary | null>(null)
-  const onSelectRef = useRef(onSelect)
   const fittedKeyRef = useRef<string>('')
-  const selectedIdRef = useRef(selectedId)
-  const sedesRef = useRef(sedes)
   const prevSelectedRef = useRef<string | null>(selectedId)
   const [mapReady, setMapReady] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
 
-  onSelectRef.current = onSelect
-  selectedIdRef.current = selectedId
-  sedesRef.current = sedes
+  // Lidas dentro de effects e do handler de clique do marker, nunca no render.
+  const onSelectRef = useLatestRef(onSelect)
+  const selectedIdRef = useLatestRef(selectedId)
+  const sedesRef = useLatestRef(sedes)
 
   const configured = isGoogleMapsConfigured()
   const withCoords = sedes.filter((s) => s.lat != null && s.lng != null)
@@ -89,8 +98,7 @@ export function SedesMap({
     if (!configured || !containerRef.current) return
     let cancelled = false
     setMapLoading(true)
-    // Copiado no setup para o cleanup não ler `markersRef.current` depois —
-    // é sempre o mesmo Map (só sofre set/delete/clear, nunca reatribuição).
+    // Copiado no setup para o cleanup não reler a ref depois.
     const markers = markersRef.current
 
     async function init() {
@@ -192,7 +200,7 @@ export function SedesMap({
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, 48)
     }
-  }, [mapReady, sedes, coordsKey])
+  }, [mapReady, sedes, coordsKey, onSelectRef, selectedIdRef])
 
   // Só atualiza pin do anterior + selecionado
   useEffect(() => {
@@ -222,7 +230,7 @@ export function SedesMap({
       }
     }
     prevSelectedRef.current = selectedId
-  }, [mapReady, selectedId])
+  }, [mapReady, selectedId, sedesRef])
 
   // Pin da localização do usuário
   useEffect(() => {

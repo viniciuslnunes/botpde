@@ -67,6 +67,7 @@ import type { ConviteOnboarding, TorcidaMaeConvite } from '@/lib/convite'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
@@ -172,12 +173,9 @@ export function OnboardingWizard({
   const [unidadeId, setUnidadeId] = useState<string | null>(convite?.unidadeId ?? null)
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
 
-  const passoRef = useRef(passo)
-  const clubeRef = useRef(clube)
-  const torcidaRef = useRef(torcida)
-  passoRef.current = passo
-  clubeRef.current = clube
-  torcidaRef.current = torcida
+  const passoRef = useLatestRef(passo)
+  const clubeRef = useLatestRef(clube)
+  const torcidaRef = useLatestRef(torcida)
 
   const wizardDraftKey = useMemo(() => `onboarding:wizard-draft:${userId}`, [userId])
   const [wizardDraftRestored, setWizardDraftRestored] = useState(false)

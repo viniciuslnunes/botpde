@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@torcida/ui'
 import { ImageCropDialog } from '@/components/media/image-crop-dialog'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 type UploadPurpose =
   | 'comunidade'
@@ -33,8 +34,7 @@ export function useCroppedImageUpload(opts: Options) {
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const objectUrlRef = useRef<string | null>(null)
-  const optsRef = useRef(opts)
-  optsRef.current = opts
+  const optsRef = useLatestRef(opts)
 
   useEffect(() => {
     return () => {

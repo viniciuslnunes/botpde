@@ -13,6 +13,7 @@ import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
 import { deveExibirBadgeTorcidaNoFeed } from '@/lib/feed-live-refresh'
+import { useLatestRef } from '@/lib/use-latest-ref'
 import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
@@ -102,8 +103,7 @@ export function ComunidadeRedeInfinite({
   )
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
-  const loadMoreRef = useRef(loadMore)
-  loadMoreRef.current = loadMore
+  const loadMoreRef = useLatestRef(loadMore)
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -119,7 +119,7 @@ export function ComunidadeRedeInfinite({
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [loadMoreRef])
 
   // Um único retorno: o rodapé é dono da sentinela do observer e precisa ficar
   // montado em todos os estados, senão a paginação não volta depois do vazio.

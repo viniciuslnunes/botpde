@@ -26,6 +26,7 @@ import {
   type PostPublicadoEventDetail,
 } from '@/lib/feed-live-refresh'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 interface CurrentUser {
   id: string
@@ -196,8 +197,7 @@ export function ComunidadeFeedInfinite({
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   // Ref estável: recriar o observer a cada mudança de `loadMore` abortava
   // fetches em voo e deixava o skeleton "Carregando mais…" preso.
-  const loadMoreRef = useRef(loadMore)
-  loadMoreRef.current = loadMore
+  const loadMoreRef = useLatestRef(loadMore)
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -213,7 +213,7 @@ export function ComunidadeFeedInfinite({
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [loadMoreRef])
 
   return (
     <>

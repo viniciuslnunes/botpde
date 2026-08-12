@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { MapPin } from 'lucide-react'
+import { useLatestRef } from '@/lib/use-latest-ref'
 import {
   getGoogleMapsMapId,
   isGoogleMapsConfigured,
@@ -45,13 +46,12 @@ export function MapLocationPicker({ lat, lng, onPick, className }: Props) {
   const markerRef = useRef<GoogleMarkerInstance | null>(null)
   const gRef = useRef<GoogleMapsNamespace | null>(null)
   const markerLibRef = useRef<GoogleMapsMarkerLibrary | null>(null)
-  const onPickRef = useRef(onPick)
+  const onPickRef = useLatestRef(onPick)
   const draggingRef = useRef(false)
   const [mapReady, setMapReady] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
 
-  onPickRef.current = onPick
   const configured = isGoogleMapsConfigured()
   const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)
 
@@ -165,7 +165,7 @@ export function MapLocationPicker({ lat, lng, onPick, className }: Props) {
       const zoom = map.getZoom() ?? 12
       if (zoom < 14) map.setZoom(15)
     }
-  }, [mapReady, lat, lng])
+  }, [mapReady, lat, lng, onPickRef])
 
   // Contêiner com altura flexível (stretch no form): o Maps precisa de resize
   // quando o box muda após o layout inicial.

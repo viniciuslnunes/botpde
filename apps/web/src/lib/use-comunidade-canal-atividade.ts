@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { FEED_SSE_DEBOUNCE_MS, feedStreamEndpoint } from '@/lib/feed-live-refresh'
+import { useLatestRef } from '@/lib/use-latest-ref'
 import {
   calcularUnreadKeys,
   chaveAtividadeCanal,
@@ -52,10 +53,8 @@ export function useComunidadeCanalAtividade(opts: {
   const [optimistic, setOptimistic] = useState<Set<string>>(() => new Set())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bootstrappedRef = useRef(false)
-  const lastSeenRef = useRef(lastSeen)
-  lastSeenRef.current = lastSeen
-  const activeKeyRef = useRef(opts.activeKey)
-  activeKeyRef.current = opts.activeKey
+  const lastSeenRef = useLatestRef(lastSeen)
+  const activeKeyRef = useLatestRef(opts.activeKey)
 
   const alvosKey = useMemo(
     () =>
@@ -139,7 +138,7 @@ export function useComunidadeCanalAtividade(opts: {
     } catch {
       /* best-effort */
     }
-  }, [enabled, conversaIds, afiliacaoParaApi])
+  }, [enabled, conversaIds, afiliacaoParaApi, activeKeyRef, lastSeenRef])
 
   const scheduleSync = useCallback(() => {
     if (!enabled) return
@@ -189,7 +188,7 @@ export function useComunidadeCanalAtividade(opts: {
       return changed ? next : prev
     })
     scheduleSync()
-  }, [scheduleSync])
+  }, [scheduleSync, activeKeyRef])
 
   const onPingNacional = useCallback(() => {
     if (nacionalKey && activeKeyRef.current !== nacionalKey) {
@@ -201,7 +200,7 @@ export function useComunidadeCanalAtividade(opts: {
       })
     }
     scheduleSync()
-  }, [nacionalKey, scheduleSync])
+  }, [nacionalKey, scheduleSync, activeKeyRef])
 
   const streamTorcida = feedStreamEndpoint()
   const streamNacional = afiliacaoParaApi

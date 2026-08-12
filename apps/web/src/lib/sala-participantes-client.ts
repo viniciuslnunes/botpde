@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useVisibleBackoffInterval } from '@/lib/use-visible-interval'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 export type ParticipanteSala = {
   userId: string
@@ -80,8 +81,7 @@ export function useSalaParticipantes(
   enabled = true,
 ) {
   const [participantes, setParticipantes] = useState(initialParticipantes)
-  const onCountChangeRef = useRef(onCountChange)
-  onCountChangeRef.current = onCountChange
+  const onCountChangeRef = useLatestRef(onCountChange)
 
   const sync = useCallback(async (): Promise<boolean> => {
     const data = await fetchParticipantesSala(salaId)
@@ -94,14 +94,14 @@ export function useSalaParticipantes(
     })
     onCountChangeRef.current?.(data.total)
     return mudou
-  }, [salaId])
+  }, [salaId, onCountChangeRef])
 
   const { reset } = useVisibleBackoffInterval(sync, POLL_BASE_MS, POLL_MAX_MS, enabled)
 
   const aplicarTotal = useCallback((total: number) => {
     onCountChangeRef.current?.(total)
     reset()
-  }, [reset])
+  }, [reset, onCountChangeRef])
 
   return { participantes, sync, aplicarTotal, reset }
 }

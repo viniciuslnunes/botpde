@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { AtSign, Check, Loader2, X } from 'lucide-react'
 import { FieldError, Input } from '@torcida/ui'
 import { normalizarNickname } from '@torcida/types'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 export type NicknameStatus =
   | { kind: 'idle' }
@@ -60,8 +61,7 @@ export function NicknameField({
   const id = idProp ?? `nickname-${autoId}`
   const inputRef = useRef<HTMLInputElement>(null)
   const dirtyRef = useRef(Boolean(defaultValue && !suggestFromNome))
-  const onDisponivelChangeRef = useRef(onDisponivelChange)
-  onDisponivelChangeRef.current = onDisponivelChange
+  const onDisponivelChangeRef = useLatestRef(onDisponivelChange)
 
   const [checkValue, setCheckValue] = useState(() => sanitizarNick(defaultValue))
   const [status, setStatus] = useState<NicknameStatus>({ kind: 'idle' })
@@ -176,7 +176,7 @@ export function NicknameField({
 
   useEffect(() => {
     onDisponivelChangeRef.current?.(status.kind === 'available')
-  }, [status])
+  }, [status, onDisponivelChangeRef])
 
   const feedback =
     status.kind === 'checking' ? (

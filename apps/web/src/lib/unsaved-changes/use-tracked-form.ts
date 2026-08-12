@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 
 import { useUnsavedChangesContext } from './context'
 import { diffFormChanges, serializeFormValues } from './form-snapshot'
 import { useUnsavedChanges } from './use-unsaved-changes'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 type Options = {
   id?: string
@@ -49,8 +50,7 @@ export function useTrackedForm({
   // Inline `labels={{…}}` nos call sites cria objeto novo a cada render.
   // Se entrar nas deps do effect, com `enabled:false` vira loop:
   // effect → setChanges([]) → re-render → labels novo → effect… (menu admin morto).
-  const labelsRef = useRef(labels)
-  labelsRef.current = labels
+  const labelsRef = useLatestRef(labels)
 
   const setChangesIfChanged = useCallback((next: string[]) => {
     setChanges((prev) => (sameChangeList(prev, next) ? prev : next))
@@ -75,7 +75,7 @@ export function useTrackedForm({
       return
     }
     setChangesIfChanged(diffFormChanges(form, baselineRef.current, labelsRef.current))
-  }, [enabled, setChangesIfChanged])
+  }, [enabled, setChangesIfChanged, labelsRef])
 
   const markPristine = useCallback(() => {
     captureBaseline()

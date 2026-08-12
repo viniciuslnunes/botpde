@@ -13,6 +13,7 @@ import {
 } from '@/components/portal/notification-item-visual'
 import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 export interface NotificationItem {
   id: string
@@ -57,8 +58,7 @@ export function NotificationBell({
   const [pending, startTransition] = useTransition()
   const pathname = usePathname()
   const rootRef = useRef<HTMLDivElement>(null)
-  const itemsRef = useRef(items)
-  itemsRef.current = items
+  const itemsRef = useLatestRef(items)
 
   useEffect(() => {
     setOpen(false)

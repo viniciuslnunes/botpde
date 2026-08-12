@@ -45,6 +45,7 @@ import {
   useComunidadeCanalAtividade,
 } from '@/lib/use-comunidade-canal-atividade'
 import { useCanalSoftSwitch } from './canal-soft-switch'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 export type CanalAbertoOperadorTab = {
   slug: string
@@ -205,8 +206,7 @@ export function ComunidadeEscopoTabs({
 
   /** Ordem local unificada da zona móvel (4+): `o:slug` e `t:id`. */
   const [ordemMovel, setOrdemMovel] = useState<string[]>(() => ordemBarraMovelInicial)
-  const ordemMovelRef = useRef(ordemMovel)
-  ordemMovelRef.current = ordemMovel
+  const ordemMovelRef = useLatestRef(ordemMovel)
 
   const dragRef = useRef<{
     key: string

@@ -60,6 +60,7 @@ import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-chang
 import { ComunidadePrefetchLink } from './comunidade-prefetch-link'
 import { PedidoTicketBanner } from './pedido-ticket-banner'
 import { CanalDepartamentoAvatarField } from '@/app/portal/departamentos/_components/canal-departamento-avatar-field'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -166,8 +167,7 @@ export function MensagemThread({
   const prependingRef = useRef(false)
   const historicoSentinelRef = useRef<HTMLDivElement>(null)
   const carregandoHistoricoRef = useRef(false)
-  const textoRef = useRef(texto)
-  textoRef.current = texto
+  const textoRef = useLatestRef(texto)
 
   const [ticketFechado, setTicketFechado] = useState(false)
   const conversaId = conversa.id
@@ -266,7 +266,7 @@ export function MensagemThread({
     return () => {
       setMensagemDraft(conversaId, textoRef.current)
     }
-  }, [conversaId])
+  }, [conversaId, textoRef])
 
   useEffect(() => {
     if (!anexoMenuOpen) return
@@ -287,15 +287,18 @@ export function MensagemThread({
   }, [anexoMenuOpen])
 
   // Revoga blob URLs ao desmontar / trocar conversa (evita leak de memória).
-  const mediasRef = useRef(medias)
-  mediasRef.current = medias
+  const mediasRef = useLatestRef(medias)
   useEffect(() => {
     return () => {
+      // Lê no cleanup de propósito: revoga os blobs que existem no desmonte,
+      // não os que existiam na montagem. Copiar para uma const no setup (o que
+      // a regra sugere) vazaria tudo que foi anexado depois.
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- ver acima
       for (const m of mediasRef.current) {
         if (m.localUrl.startsWith('blob:')) URL.revokeObjectURL(m.localUrl)
       }
     }
-  }, [conversaId])
+  }, [conversaId, mediasRef])
 
   const marcarLida = useCallback(() => {
     void fetch(`/api/conversas/${conversaId}/ler`, { method: 'POST' }).then(() =>
