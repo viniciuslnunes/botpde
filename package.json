@@ -11,7 +11,16 @@
     "db:migrate": "turbo db:migrate",
     "db:push": "turbo db:push",
     "release:sync": "node scripts/release-sync.mjs",
-    "version:print": "node -e \"import('./scripts/lib/version-from-git.mjs').then(m => { const v = m.computeVersionFromGit(); console.log(v.version); console.error(JSON.stringify(v, null, 2)); })\""
+    "version:print": "node -e \"import('./scripts/lib/version-from-git.mjs').then(m => { const v = m.computeVersionFromGit(); console.log(v.version); console.error(JSON.stringify(v, null, 2)); })\"",
+    "sync:bitbucket": "node scripts/sync-bitbucket-main.mjs",
+    "acli:install": "node scripts/jira/install-acli.mjs",
+    "jira:auth": "node scripts/jira/auth.mjs",
+    "jira:status": "node scripts/jira/status.mjs",
+    "jira:view": "node scripts/jira/issue-view.mjs",
+    "jira:create": "node scripts/jira/issue-create.mjs",
+    "jira:edit": "node scripts/jira/issue-edit.mjs",
+    "jira:transition": "node scripts/jira/issue-transition.mjs",
+    "jira:seed-kan": "node scripts/jira/seed-kan-structure.mjs"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

@@ -85,3 +85,10 @@ apps/web/public/escudos/*.png
 apps/web/auditoria-*.txt
 apps/web/audit-*.txt
 apps/web/seed-jornadas.txt
+
+# Atlassian CLI (binário local — ver docs/ops/acli-jira.md)
+acli
+acli.exe
+tools/acli
+tools/acli.exe
+tools/acli*

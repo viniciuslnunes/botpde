@@ -16,6 +16,8 @@ com Postgres **local** (não proxy Railway). Idioma: PT-BR.
 - Script: `scripts/dev-setup.ps1` (Windows) / `scripts/dev-setup.sh` (Unix)
 - Postgres: `docs/ops/postgres-local-dev.md`
 - Secrets: `docs/ops/dev-secrets.md`
+- Jira CLI (opcional): `pnpm acli:install` + `pnpm jira:auth` — `docs/ops/acli-jira.md`; token pessoal, nunca no pacote do time
+- Remotes Git: `docs/ops/git-remotes.md` (GitHub canônico; Bitbucket só auxiliar)
 
 ## Protocolo
 

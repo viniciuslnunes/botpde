@@ -79,3 +79,5 @@ pnpm --filter @torcida/db db:generate
 - Senha seed: `m1k43l3n` (`packages/db/scripts/lib/senha-teste.js`)
 - Docs: `docs/ops/postgres-local-dev.md`, `docs/ops/dev-secrets.md`
 - Compilação a frio do `next dev` (~5s) é normal; lentidão crônica = banco remoto
+- Opcional Jira CLI: `pnpm acli:install` → `cp docs/ops/jira.env.example .env.jira` → `pnpm jira:auth` — ver `docs/ops/acli-jira.md` / `docs/ops/jira-kan.md` (token pessoal, fora do pacote do time)
+- Remotes: GitHub canônico; Bitbucket auxiliar — `docs/ops/git-remotes.md`

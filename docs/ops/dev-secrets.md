@@ -12,8 +12,12 @@ nos `.env` locais.
 | Cloudinary / LiveKit de **dev** | `CLOUDINARY_*`, `LIVEKIT_*` | Sim, se o time usa sandbox compartilhado |
 | URL do Postgres Railway (só sync) | `DATABASE_URL_RAILWAY` | Sim (proxy público de leitura/dump) |
 | `AUTH_SECRET` de dev compartilhado | um secret estável do time | Opcional — ou cada um gera com `openssl rand -base64 32` |
-| Credenciais pessoais | senha do GitHub, tokens pessoais | **Não** |
+| Credenciais pessoais | senha do GitHub, tokens pessoais, **API token Jira/acli** | **Não** |
 | Produção | qualquer DSN/chave de prod | **Nunca** |
+
+Jira/`acli`: autenticação é por conta (OAuth `pnpm jira:auth` ou token).
+Não coloque `ATLASSIAN_API_TOKEN` no `torcida-dev.secrets.env`. Ver
+[`acli-jira.md`](acli-jira.md) e o template [`jira.env.example`](jira.env.example).
 
 Template de chaves (sem valores): [`apps/web/.env.team.example`](../apps/web/.env.team.example).
 
