@@ -49,6 +49,7 @@ import {
   type CanalItem,
 } from '@/lib/canais-shared'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
+import { useHidratado } from '@/lib/use-hidratado'
 
 /** Mesma chave do explorer de sedes — localização persiste entre telas do portal. */
 const GEO_STORAGE_KEY = 'portal:sedes:geo'
@@ -148,13 +149,21 @@ export function CanaisClient({
   const [localizacao, setLocalizacao] = useState<LocalizacaoOnboarding | null>(null)
   const [geoStatus, setGeoStatus] = useState<'idle' | 'loading' | 'error'>('idle')
 
-  useEffect(() => {
+  // Localização salva vem do storage — só existe no cliente, então restaura no
+  // primeiro render pós-hidratação. Em effect, a lista aparecia ordenada por
+  // relevância e se reordenava para proximidade no frame seguinte.
+  const hidratado = useHidratado()
+  const [geoRestaurada, setGeoRestaurada] = useState(false)
+  if (hidratado && !geoRestaurada) {
+    setGeoRestaurada(true)
     const salva = lerGeoSalva()
     if (salva) {
       setLocalizacao(salva)
       setOrdenacao((prev) => (prev === 'relevancia' ? 'proximidade' : prev))
     }
+  }
 
+  useEffect(() => {
     let cancelled = false
     function aplicarPosicao(pos: GeolocationPosition) {
       if (cancelled) return

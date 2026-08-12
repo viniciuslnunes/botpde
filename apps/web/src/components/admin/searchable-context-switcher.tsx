@@ -1,7 +1,6 @@
 'use client'
 
 import {
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -13,6 +12,7 @@ import { Clock, Loader2, Search } from 'lucide-react'
 import { HoverTip, hoverTipFromElement, type HoverTipAnchor } from '@/components/ui/hover-tip'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { lerRecentes, registrarRecente } from '@/lib/context-switcher-recentes'
+import { useHidratado } from '@/lib/use-hidratado'
 
 const MAX_SUGESTOES = 40
 
@@ -121,9 +121,15 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     setAberto(false)
   }
 
-  useEffect(() => {
+  // Os recentes vivem no storage do cliente: carrega no primeiro render
+  // pós-hidratação (e ao trocar de namespace), em vez de um effect que
+  // reordenava a lista um frame depois de ela aparecer.
+  const hidratado = useHidratado()
+  const [namespaceCarregado, setNamespaceCarregado] = useState<string | null>(null)
+  if (hidratado && namespaceCarregado !== recentNamespace) {
+    setNamespaceCarregado(recentNamespace)
     setRecentesIds(lerRecentes(recentNamespace))
-  }, [recentNamespace])
+  }
 
   const porId = useMemo(() => {
     const map = new Map<string, T>()
