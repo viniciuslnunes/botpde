@@ -98,9 +98,23 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_PUBLISHED_AT: appPublishedAt,
     NEXT_PUBLIC_APP_REPO: appRepo,
   },
+  compiler: {
+    // Tree-shaking do Sentry. O `webpack.treeshake` de withSentryConfig só roda
+    // no caminho webpack (setupTreeshakingFromConfig) e o build é Turbopack —
+    // lá aquilo é no-op. Aqui as flags viram literal em tempo de compilação e o
+    // guard `typeof __SENTRY_TRACING__ === 'undefined' || __SENTRY_TRACING__`
+    // (@sentry/nextjs client/index.js) cai como código morto.
+    define: {
+      __SENTRY_TRACING__: false,
+      __SENTRY_DEBUG__: false,
+    },
+  },
   experimental: {
     // Sem @torcida/ui: optimizePackageImports no barrel quebra o singleton do Sonner
     // (toast() e <Toaster /> em grafos distintos → toasts silenciosos).
+    // Sem @torcida/types: medido, não tem efeito — optimizePackageImports não
+    // reescreve barrel de `export *`. O corte ali é subpath export
+    // (@torcida/types/design) no import, não flag. Ver packages/types/package.json.
     optimizePackageImports: ['lucide-react'],
     staleTimes: {
       dynamic: 120,

@@ -5,7 +5,8 @@ import {
   calculateEffectivePermissions,
   hasPermission,
   type PERMISSIONS,
-} from '@torcida/types'
+  // Import direto do módulo — ver nota em services/theme.tsx.
+} from '@torcida/types/permissions'
 
 type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
 

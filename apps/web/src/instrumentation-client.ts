@@ -9,7 +9,10 @@ Sentry.init({
   // DSN não é segredo (só permite enviar eventos, não lê-los) — mesma
   // variável é reaproveitada no client, server e edge config.
   dsn,
-  tracesSampleRate: 0.1,
+  // Sem tracesSampleRate: o tracing do client é removido em tempo de build por
+  // `compiler.define.__SENTRY_TRACING__ = false` (next.config.ts) — custava
+  // 26,5 KB gz em toda página. Erro/core continua, e o tracing do SERVIDOR
+  // (sentry.server.config.ts) não é afetado. Ver ARCHITECTURE §5.6.2.
   debug: false,
   beforeSend,
 })

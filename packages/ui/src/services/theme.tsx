@@ -21,7 +21,9 @@ import {
   resolveTenantDesign,
   SURFACE_CSS_VARS,
   SURFACE_TOKEN_KEYS,
-} from '@torcida/types'
+  // Import direto do módulo, não do barrel: ThemeProvider está no root layout, e
+  // '@torcida/types' (37 `export *`) arrastaria os 37 módulos para toda página.
+} from '@torcida/types/design'
 
 /** Espelha TenantDesign de @torcida/types (JS) para tipagem no pacote UI. */
 export type TenantDesign = {

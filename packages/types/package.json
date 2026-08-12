@@ -5,7 +5,8 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./*": "./src/*.js"
   },
   "type": "module",
   "dependencies": {
