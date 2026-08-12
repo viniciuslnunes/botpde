@@ -57,10 +57,15 @@ export function StickyPersistBar({
   }, [])
 
   // Sem alterações pendentes: solta o foco-lock para a barra poder sumir
-  // (ex.: Descartar / reverter campos com o botão ainda focado).
-  useEffect(() => {
+  // (ex.: Descartar / reverter campos com o botão ainda focado). Só na
+  // TRANSIÇÃO para não-locked — focar a barra sem nada a salvar continua
+  // segurando ela aberta. No render, senão fica um frame cinza com os botões
+  // desabilitados, que é justamente o que a barra não pode fazer.
+  const [lockedAnterior, setLockedAnterior] = useState(locked)
+  if (locked !== lockedAnterior) {
+    setLockedAnterior(locked)
     if (!locked) setFocusLocked(false)
-  }, [locked])
+  }
 
   // Ctrl/Cmd+S → dispara o submit da barra quando há algo a salvar.
   useEffect(() => {

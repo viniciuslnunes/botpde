@@ -59,16 +59,24 @@ export function VideosReelsFeed({
     return () => window.clearTimeout(timer)
   }, [])
 
-  useEffect(() => {
+  // Abrir noutro reel reposiciona a lista; trocar de reel zera os overlays.
+  // No render: em effect o vídeo novo herdava por um frame o progresso e o
+  // coração do anterior.
+  const alvoInicial = `${initialIndex}|${reels.length}`
+  const [alvoSincronizado, setAlvoSincronizado] = useState(alvoInicial)
+  if (alvoInicial !== alvoSincronizado) {
+    setAlvoSincronizado(alvoInicial)
     setActiveIdx(Math.min(Math.max(0, initialIndex), Math.max(0, reels.length - 1)))
-  }, [initialIndex, reels.length])
+  }
 
-  useEffect(() => {
+  const [idxSincronizado, setIdxSincronizado] = useState(activeIdx)
+  if (activeIdx !== idxSincronizado) {
+    setIdxSincronizado(activeIdx)
     setLikePulse(0)
     setHeartBurst(false)
     setPaused(false)
     setProgress(0)
-  }, [activeIdx])
+  }
 
   const playActive = useCallback(() => {
     videoRefs.current.forEach((video, idx) => {

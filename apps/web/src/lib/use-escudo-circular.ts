@@ -21,44 +21,33 @@ export function useEscudoCircular(
   src: string | null | undefined,
   shape: EscudoCircularShape = 'auto',
 ): { circular: boolean; pronto: boolean } {
-  const [circular, setCircular] = useState(shape === 'circle')
-  const [pronto, setPronto] = useState(shape !== 'auto' || !src)
+  // Resposta imediata quando não depende de detecção: sem src, shape fixo, ou
+  // cache já quente. Antes isso era decidido dentro do layout effect, o que
+  // custava um render extra e caía em `react-hooks/set-state-in-effect`.
+  const imediato: { circular: boolean; pronto: boolean } | null = !src
+    ? { circular: false, pronto: true }
+    : shape === 'circle'
+      ? { circular: true, pronto: true }
+      : shape === 'rounded'
+        ? { circular: false, pronto: true }
+        : null
+
+  /** Resultado da detecção assíncrona, carimbado com a URL que o gerou. */
+  const [detectado, setDetectado] = useState<{ src: string; circular: boolean } | null>(null)
 
   useLayoutEffect(() => {
-    if (!src) {
-      setCircular(false)
-      setPronto(true)
-      return
-    }
-    if (shape === 'circle') {
-      setCircular(true)
-      setPronto(true)
-      return
-    }
-    if (shape === 'rounded') {
-      setCircular(false)
-      setPronto(true)
-      return
-    }
+    if (!src || shape !== 'auto') return
 
     let ativo = true
     const unsub = subscribeEscudoCircular((url, valor) => {
       if (!ativo || url !== src) return
-      setCircular(valor)
-      setPronto(true)
+      setDetectado({ src, circular: valor })
     })
 
-    const hit = lerCacheEscudoCircular(src)
-    if (hit !== null) {
-      setCircular(hit)
-      setPronto(true)
-    } else {
-      setCircular(false)
-      setPronto(false)
+    if (lerCacheEscudoCircular(src) === null) {
       void detectarEscudoCircular(src).catch(() => {
         if (!ativo) return
-        setCircular(false)
-        setPronto(true)
+        setDetectado({ src, circular: false })
       })
     }
 
@@ -68,5 +57,14 @@ export function useEscudoCircular(
     }
   }, [src, shape])
 
-  return { circular, pronto }
+  if (imediato) return imediato
+
+  // Cache quente é lido no render: `detectarEscudoCircular` avisa pela
+  // assinatura quando termina, e o cache é o mesmo módulo em memória.
+  const cache = src ? lerCacheEscudoCircular(src) : null
+  if (cache !== null) return { circular: cache, pronto: true }
+  if (detectado && detectado.src === src) {
+    return { circular: detectado.circular, pronto: true }
+  }
+  return { circular: false, pronto: false }
 }

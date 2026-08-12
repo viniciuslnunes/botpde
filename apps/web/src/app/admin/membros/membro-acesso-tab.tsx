@@ -18,10 +18,18 @@ export function TabAcesso({ membroId }: { membroId: string }) {
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
 
-  useEffect(() => {
-    let ativo = true
+  // Trocar de membro (ou pedir recarga) volta ao estado de carregando já no
+  // render — em effect a aba mostrava por um frame os dados do membro anterior.
+  const alvo = `${membroId}|${versao}`
+  const [alvoSincronizado, setAlvoSincronizado] = useState(alvo)
+  if (alvo !== alvoSincronizado) {
+    setAlvoSincronizado(alvo)
     setDados(null)
     setErro(null)
+  }
+
+  useEffect(() => {
+    let ativo = true
     carregarAcessoMembro(membroId)
       .then((r) => {
         if (!ativo) return
