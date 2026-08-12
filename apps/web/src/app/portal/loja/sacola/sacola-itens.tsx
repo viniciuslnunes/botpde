@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { useRouter } from 'next/navigation'
 import { atualizarItemCarrinho, removerDoCarrinho, adicionarAoCarrinho } from '../actions'
@@ -34,9 +34,12 @@ export function SacolaItens({
   const [itens, setItens] = useState(itensIniciais)
   const [pending, startTransition] = useTransition()
 
-  useEffect(() => {
+  // Reconcilia com o servidor no render (o RSC revalida sem desmontar).
+  const [itensSincronizados, setItensSincronizados] = useState(itensIniciais)
+  if (itensIniciais !== itensSincronizados) {
+    setItensSincronizados(itensIniciais)
     setItens(itensIniciais)
-  }, [itensIniciais])
+  }
 
   const lojaNome = useMemo(() => {
     const map = new Map(lojas.map((l) => [l.tenantId, l.nome]))

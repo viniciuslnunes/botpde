@@ -107,10 +107,26 @@ export function CanalFeedComposition({
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const verMural = souMembro || leituraOperador
 
-  useEffect(() => {
+  // Reconcilia com o servidor no render: o RSC revalida sem desmontar este
+  // componente, e em effect os botões piscam no estado anterior.
+  const [canalSincronizado, setCanalSincronizado] = useState({
+    id: canal.id,
+    silenciada: canal.silenciada,
+    souMembro: canal.souMembro,
+  })
+  if (
+    canal.id !== canalSincronizado.id ||
+    canal.silenciada !== canalSincronizado.silenciada ||
+    canal.souMembro !== canalSincronizado.souMembro
+  ) {
+    setCanalSincronizado({
+      id: canal.id,
+      silenciada: canal.silenciada,
+      souMembro: canal.souMembro,
+    })
     setSilenciada(canal.silenciada)
     setSouMembro(canal.souMembro)
-  }, [canal.id, canal.silenciada, canal.souMembro])
+  }
 
   function inscrever() {
     startTransition(async () => {

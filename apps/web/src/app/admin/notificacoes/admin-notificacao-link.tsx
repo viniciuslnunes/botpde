@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
@@ -36,10 +36,13 @@ export function AdminNotificacaoLink({
 
   // `router.refresh()` (ex.: auto-read da central) não desmonta este
   // componente — só troca props. Sincroniza o estado visual quando o
-  // servidor manda `lida` atualizado.
-  useEffect(() => {
+  // servidor manda `lida` atualizado, no render (em effect o item pisca
+  // com o estado antigo por um frame).
+  const [lidaSincronizada, setLidaSincronizada] = useState(lidaInicial)
+  if (lidaInicial !== lidaSincronizada) {
+    setLidaSincronizada(lidaInicial)
     setLida(lidaInicial)
-  }, [lidaInicial])
+  }
 
   function abrir() {
     if (lida) return

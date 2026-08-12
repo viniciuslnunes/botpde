@@ -31,42 +31,50 @@ export function ClubeRivais({ clubeId, rivais }: { clubeId: string; rivais: Riva
   const router = useRouter()
   const [lista, setLista] = useState<RivalOpcao[]>(rivais)
   const [termo, setTermo] = useState('')
-  const [sugestoes, setSugestoes] = useState<ClubeSugestao[]>([])
-  const [buscando, setBuscando] = useState(false)
+  /** Última busca concluída. O termo vem junto para derivar "carregando". */
+  const [busca, setBusca] = useState<{ termo: string; itens: ClubeSugestao[] }>({
+    termo: '',
+    itens: [],
+  })
   const [, iniciar] = useTransition()
   const pedido = useRef(0)
 
   // Reconcilia com o servidor quando o RSC revalida (outra aba, outro operador).
-  useEffect(() => {
+  // No render, não em effect: em effect a lista pisca com o valor anterior.
+  const [rivaisSincronizados, setRivaisSincronizados] = useState(rivais)
+  if (rivais !== rivaisSincronizados) {
+    setRivaisSincronizados(rivais)
     setLista(rivais)
-  }, [rivais])
+  }
+
+  // Tudo derivado do par (termo pedido, termo já carregado): nenhum estado é
+  // zerado ou ligado dentro do effect. "Carregando" é simplesmente o termo
+  // atual ainda não ter resultado, e termo curto não mostra nada.
+  const termoBusca = termo.trim().length >= 2 ? termo.trim() : ''
+  const sugestoesVisiveis = busca.termo === termoBusca ? busca.itens : []
+  const buscandoVisivel = termoBusca !== '' && busca.termo !== termoBusca
 
   useEffect(() => {
-    const q = termo.trim()
-    if (q.length < 2) {
-      setSugestoes([])
-      setBuscando(false)
-      return
-    }
-    setBuscando(true)
+    if (!termoBusca) return
     const atual = ++pedido.current
     const timer = window.setTimeout(async () => {
+      let itens: ClubeSugestao[] = []
       try {
-        const resultado = await buscarClubesAction(q, clubeId)
-        // Resposta fora de ordem não pode sobrescrever a busca mais recente.
-        if (pedido.current === atual) setSugestoes(resultado)
+        itens = await buscarClubesAction(termoBusca, clubeId)
       } finally {
-        if (pedido.current === atual) setBuscando(false)
+        // Resposta fora de ordem não pode sobrescrever a busca mais recente.
+        // Grava mesmo em falha: sem isso o "carregando" ficaria eterno.
+        if (pedido.current === atual) setBusca({ termo: termoBusca, itens })
       }
     }, DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [termo, clubeId])
+  }, [termoBusca, clubeId])
 
   function alternar(rival: RivalOpcao, adicionar: boolean) {
     const anterior = lista
     setLista(adicionar ? [...lista, rival] : lista.filter((r) => r.id !== rival.id))
+    // Limpar o termo já esconde as sugestões (`sugestoesVisiveis` é derivado).
     setTermo('')
-    setSugestoes([])
 
     iniciar(async () => {
       const resultado = await alternarRivalidadeAction(clubeId, rival.id, adicionar)
@@ -117,22 +125,22 @@ export function ClubeRivais({ clubeId, rivais }: { clubeId: string; rivais: Riva
           aria-label="Buscar clube para marcar como rival"
           className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--color-primary))]"
         />
-        {buscando ? (
+        {buscandoVisivel ? (
           <Loader2
             className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-[rgb(var(--foreground-muted))]"
             aria-hidden
           />
         ) : null}
 
-        {termo.trim().length >= 2 && !buscando && sugestoes.length === 0 ? (
+        {termoBusca && !buscandoVisivel && sugestoesVisiveis.length === 0 ? (
           <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-            Nenhum clube encontrado para “{termo.trim()}”.
+            Nenhum clube encontrado para “{termoBusca}”.
           </p>
         ) : null}
 
-        {sugestoes.length > 0 ? (
+        {sugestoesVisiveis.length > 0 ? (
           <ul className="mt-2 space-y-1">
-            {sugestoes.map((sugestao) => {
+            {sugestoesVisiveis.map((sugestao) => {
               const marcado = jaRival(sugestao.id)
               return (
                 <li key={sugestao.id}>

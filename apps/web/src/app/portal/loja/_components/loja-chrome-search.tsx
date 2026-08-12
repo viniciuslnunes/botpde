@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useTransition, useState, type FormEvent } from 'react'
+import { useTransition, useState, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
 
 /** Busca rápida no chrome — GET no catálogo da loja atual. */
@@ -11,10 +11,14 @@ export function LojaChromeSearch({ tenantId }: { tenantId: string }) {
   const [pending, startTransition] = useTransition()
   const urlQ = sp.get('q') ?? ''
   const [q, setQ] = useState(urlQ)
-
-  useEffect(() => {
+  // Ressincroniza com a URL durante o render (padrão oficial do React para
+  // "ajustar estado quando uma prop muda"): em effect, o input pisca com o
+  // termo antigo por um frame depois de navegar.
+  const [urlQSincronizado, setUrlQSincronizado] = useState(urlQ)
+  if (urlQ !== urlQSincronizado) {
+    setUrlQSincronizado(urlQ)
     setQ(urlQ)
-  }, [urlQ])
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
