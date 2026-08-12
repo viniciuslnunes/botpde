@@ -26,6 +26,7 @@ import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmDialog } from '@/lib/confirm-action'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 
 export interface AccessRoleOpt {
   id: string
@@ -552,9 +553,9 @@ export function AccessUserPanel({
         <div className="flex items-start gap-3 sm:gap-4">
           {!embutido &&
             (usuario.avatarUrl ? (
-              <img
+              <AvatarFoto
                 src={usuario.avatarUrl}
-                alt=""
+                px={56}
                 className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
               />
             ) : (

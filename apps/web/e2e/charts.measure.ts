@@ -130,7 +130,6 @@ test('charts no mobile — overflow e colunas', async ({ page }) => {
       barras,
     })
 
-    // eslint-disable-next-line no-console
     console.log(
       JSON.stringify({
         rota: rota.nome,
@@ -148,7 +147,6 @@ test('charts no mobile — overflow e colunas', async ({ page }) => {
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2))
 
   const broken = report.filter((r) => r.pageOverflow > 2)
-  // eslint-disable-next-line no-console
   console.log(
     `Overflow pages: ${broken.map((b) => `${b.nome}(+${b.pageOverflow})`).join(', ') || 'none'}`,
   )

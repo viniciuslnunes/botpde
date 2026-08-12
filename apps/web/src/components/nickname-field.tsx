@@ -74,6 +74,8 @@ export function NicknameField({
   }
 
   // Sugestão automática a partir do nome (só se o usuário ainda não editou o @).
+  // Deps só com `suggestFromNome`: o efeito reage ao nome, não a `escreverInput`
+  // nem ao valor atual do campo — reagir a eles reescreveria o @ do usuário.
   useEffect(() => {
     if (suggestFromNome === undefined) return
     if (dirtyRef.current) return
@@ -106,7 +108,6 @@ export function NicknameField({
       clearTimeout(timer)
       ctrl.abort()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage ao nome
   }, [suggestFromNome])
 
   // Checagem de disponibilidade do valor atual.

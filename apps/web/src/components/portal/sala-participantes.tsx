@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Crown, User, Users } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { ParticipanteSala } from '@/lib/sala-participantes-client'
 
@@ -23,11 +24,11 @@ const Avatar = memo(function Avatar({
 }) {
   if (avatarUrl) {
     return (
-      <img
+      <AvatarFoto
         src={avatarUrl}
         alt={nome ?? 'Membro'}
+        px={36}
         referrerPolicy="no-referrer"
-        decoding="async"
         className="h-9 w-9 rounded-full object-cover ring-2 ring-[rgb(var(--border))]"
       />
     )

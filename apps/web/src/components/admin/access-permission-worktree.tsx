@@ -202,6 +202,8 @@ export function AccessPermissionWorktree({
               key={group.label}
               role="treeitem"
               aria-expanded={open}
+              // O nó de grupo só expande/colapsa; quem é marcável são os itens.
+              aria-selected={false}
               className="border-b border-[rgb(var(--border)_/_0.7)] last:border-b-0"
             >
               <div
@@ -267,7 +269,7 @@ export function AccessPermissionWorktree({
                     const isRevogada = origem === 'revogada'
 
                     return (
-                      <li key={item.key} role="treeitem">
+                      <li key={item.key} role="treeitem" aria-selected={on}>
                         <div
                           className={[
                             'relative ml-7 flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 transition-colors',

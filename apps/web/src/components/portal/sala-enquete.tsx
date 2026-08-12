@@ -6,6 +6,7 @@ import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { toast } from '@torcida/ui'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { collapsePanel, springGentle, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
@@ -301,9 +302,9 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                                   className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--surface))] px-2 py-0.5 text-xs text-[rgb(var(--foreground))]"
                                 >
                                   {v.avatarUrl ? (
-                                    <img
+                                    <AvatarFoto
                                       src={v.avatarUrl}
-                                      alt=""
+                                      px={16}
                                       className="h-4 w-4 rounded-full object-cover"
                                     />
                                   ) : (

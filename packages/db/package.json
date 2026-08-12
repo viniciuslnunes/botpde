@@ -93,8 +93,5 @@
     ".": "./src/index.js"
   },
   "main": "./src/index.js",
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
   "type": "module"
 }

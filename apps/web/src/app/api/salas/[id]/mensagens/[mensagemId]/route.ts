@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
-import { assertSalaAnfitriao, assertSalaMembro } from '@/lib/salas-api'
+import { assertSalaAnfitriao } from '@/lib/salas-api'
 
 const editarSchema = z.object({
   conteudo: z.string().trim().min(1).max(800).optional(),

@@ -144,7 +144,6 @@ test('mobile audit screenshots + overflow', async ({ page }) => {
         pageOverflow: metrics.pageOverflow,
         offenders: metrics.offenders,
       })
-      // eslint-disable-next-line no-console
       console.log(
         JSON.stringify({
           largura,
@@ -161,7 +160,6 @@ test('mobile audit screenshots + overflow', async ({ page }) => {
   const broken = report.filter((r) => r.pageOverflow > 2)
   // Não falha o teste — o relatório guia os fixes. Só asserta que rodou.
   expect(report.length).toBe(ROTAS.length * 2)
-  // eslint-disable-next-line no-console
   console.log(
     `Overflow pages: ${broken.map((b) => `${b.largura}:${b.nome}`).join(', ') || 'none'}`,
   )

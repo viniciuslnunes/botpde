@@ -143,8 +143,6 @@ export async function resolveTenantLogoUrl(
   const semIO = resolveLogoTenantSemIO(sedesDoTenant, tenantLogoUrl)
   if (semIO) return semIO
 
-  const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
-
   // Mesma ordem de getOrCreateCanalOficial: SEDE com ponteiro → única sede
   // com canal (unidade Caso B / PDE promovida) → canal nativo do tenant.
   const sedesComCanal = sedesDoTenant.filter((s) => s.canalConversaId)

@@ -169,8 +169,9 @@ function Slide({
       />
     )
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // Fallback de URL que o next/image não otimiza (canOptimizeImageUrl false).
+    // eslint-disable-next-line @next/next/no-img-element -- <Image /> aqui quebraria
     <img
       src={item.url}
       alt=""

@@ -138,7 +138,6 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
     }, NOTIFICATION_AUTO_READ_DELAY_MS)
 
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itens])
 
   const naoLidas = itens.filter((n) => !n.lida).length

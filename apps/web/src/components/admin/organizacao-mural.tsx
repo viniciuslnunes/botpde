@@ -18,6 +18,7 @@ import {
   EyeOff,
 } from 'lucide-react'
 import type { OrgDepartamentoBranch, OrgPerson, OrganizacaoTree } from '@/lib/organizacao-tree'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 
 const BASE_PREVIEW = 8
 
@@ -79,9 +80,9 @@ function PersonNode({
       style={accent && !highlighted ? { borderColor: `${accent}66` } : undefined}
     >
       {person.avatarUrl ? (
-        <img
+        <AvatarFoto
           src={person.avatarUrl}
-          alt=""
+          px={36}
           className="h-9 w-9 shrink-0 rounded-full object-cover"
         />
       ) : (

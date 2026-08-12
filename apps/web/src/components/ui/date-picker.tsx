@@ -421,6 +421,10 @@ export function DatePicker({
         id={triggerId}
         disabled={disabled}
         aria-label={ariaLabel ?? 'Escolher data'}
+        // `button` não suporta aria-invalid/aria-required; combobox suporta, e
+        // é o que este gatilho é de fato — abre a lista de datas (aria-controls
+        // aponta para o listbox) e carrega o valor escolhido.
+        role="combobox"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}

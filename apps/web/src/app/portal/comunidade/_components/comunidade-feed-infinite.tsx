@@ -93,7 +93,6 @@ export function ComunidadeFeedInfinite({
     pageInfo,
     loadingMore,
     loadingInicial,
-    isRefreshing,
     error,
     loadMore,
     refreshCurrentPage,
@@ -126,7 +125,7 @@ export function ComunidadeFeedInfinite({
 
   const { pullProgress, isPullRefreshing, triggerRefresh } = useFeedPullRefresh(refreshTopo)
 
-  const showRefreshIndicator = isRefreshing || isPullRefreshing || pullProgress > 0.08
+  const showRefreshIndicator = isPullRefreshing || pullProgress > 0.08
 
   useFeedStream(() => {
     if (!isComunidadeFeedNearTop()) return
@@ -220,7 +219,7 @@ export function ComunidadeFeedInfinite({
     <>
       <FeedRefreshIndicator
         visible={pullProgress > 0.08}
-        refreshing={isRefreshing || isPullRefreshing}
+        refreshing={isPullRefreshing}
         pullProgress={pullProgress}
       />
 

@@ -120,6 +120,9 @@ export function SearchableSelect({
                 setQuery('')
               }
             }}
+            // Sem role explícito o input é `textbox`, que não suporta
+            // aria-expanded — o par input + listbox é um combobox.
+            role="combobox"
             aria-expanded={open}
             aria-controls={listId}
             className="min-w-0 flex-1 bg-transparent text-sm text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] disabled:opacity-50"

@@ -183,6 +183,9 @@ export function LiderancasBuscaInteligente({
           placeholder={spec.buscaPlaceholder ?? 'Buscar…'}
           aria-label={spec.buscaPlaceholder ?? 'Buscar lideranças'}
           aria-autocomplete="list"
+          // Sem role explícito o input é `textbox`, que não suporta
+          // aria-expanded — o par input + listbox é um combobox.
+          role="combobox"
           aria-controls={listId}
           aria-expanded={mostrarLista}
           autoComplete="off"

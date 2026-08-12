@@ -1,6 +1,5 @@
 import 'server-only'
 
-import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 
 /**

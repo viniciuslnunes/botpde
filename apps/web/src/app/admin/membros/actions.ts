@@ -23,7 +23,6 @@ import {
   emitNotificacaoPingCnDoSolicitante,
   reconciliarNotificacoesDoEvento,
 } from '@/lib/notificacoes'
-import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'

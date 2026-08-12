@@ -97,7 +97,6 @@ test('medir nav-back Buscar e Classificação → Feed', async ({ page }) => {
     classificacao,
   }
 
-  // eslint-disable-next-line no-console
   console.log('\n[feed-nav-back]\n' + JSON.stringify(report, null, 2) + '\n')
 
   expect(Number(busca.firstPostMs)).toBeLessThan(20_000)

@@ -12,6 +12,7 @@ import {
 } from '@/app/portal/departamentos/actions'
 import { useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 
 export type MembroEquipe = {
   userId: string
@@ -79,9 +80,9 @@ function PessoaCard({
     >
       <div className="flex items-center gap-2.5">
         {membro.avatarUrl ? (
-          <img
+          <AvatarFoto
             src={membro.avatarUrl}
-            alt=""
+            px={36}
             className="h-9 w-9 shrink-0 rounded-full object-cover"
           />
         ) : (

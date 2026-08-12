@@ -22,6 +22,7 @@ import { abrirCampanhaDoAno } from '@/app/portal/departamentos/projetos-actions'
 import { isRedirectError, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { AvatarFoto } from '@/components/media/avatar-foto'
 import type { AreaAcesso } from '@/lib/departamentos-portal-access'
 import { toast } from '@torcida/ui/services/toast'
 import { CanalDepartamentoAvatarField } from '../../_components/canal-departamento-avatar-field'
@@ -69,9 +70,9 @@ function Avatar({
   const dim = `${size / 4}rem`
   if (avatarUrl) {
     return (
-      <img
+      <AvatarFoto
         src={avatarUrl}
-        alt=""
+        px={size * 4}
         className="shrink-0 rounded-full object-cover"
         style={{ width: dim, height: dim }}
       />

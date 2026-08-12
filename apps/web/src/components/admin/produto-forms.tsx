@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useTransition, useRef, useState, useId, useCallback } from 'react'
+import { useActionState, useTransition, useState, useId, useCallback } from 'react'
 import { criarProduto, editarProduto, alterarStatusProduto, atualizarStatusPedido } from '@/app/admin/loja/actions'
 import type { ProdutoState } from '@/app/admin/loja/actions'
 import { FieldError } from '@torcida/ui'

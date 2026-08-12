@@ -45,12 +45,7 @@ import { Avatar } from '@/components/portal/avatar'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { springSnappy } from '@/lib/motion-presets'
-import {
-  criarPreviewOtimista,
-  emitirPostPublicado,
-  novoIdOtimista,
-  previewParaPostSocial,
-} from '@/lib/feed-live-refresh'
+import { previewParaPostSocial } from '@/lib/feed-live-refresh'
 import type {
   GrupoDetalheItem,
   MembroGrupoItem,

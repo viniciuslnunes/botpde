@@ -380,7 +380,6 @@ export type GoogleLatLngBounds = {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var google: GoogleMapsNamespace | undefined
 }
 

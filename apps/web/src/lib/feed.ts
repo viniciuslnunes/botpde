@@ -33,7 +33,6 @@ import { compactOr } from '@/lib/prisma-filters'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 import {
-  escopoFeedComGrupos,
   escopoFeedSemConversa,
   escopoFeedSomenteGrupos,
   filtroMembroGrupoAtivo,
@@ -1999,27 +1998,6 @@ export interface MembroGrupoPendenteItem {
   nome: string | null
   avatarUrl: string | null
   pediuEm: Date
-}
-
-/** Posts recentes dos murais dos grupos do viewer (merge no Descobrir). */
-async function getPostsRecentesDosMeusGrupos(
-  tenantId: string,
-  userId: string,
-  take: number,
-): Promise<PostSocialItem[]> {
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
-  const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      tipo: 'MEMBRO',
-      oculto: false,
-      ...escopoFeedSomenteGrupos(userId),
-    },
-    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-    take,
-    include: postInclude(userId),
-  })) as PostRaw[]
-  return postsRaw.map(projetarPost)
 }
 
 export async function getGruposDoTenant(

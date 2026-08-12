@@ -23,6 +23,18 @@ const eslintConfig = defineConfig([
       "react-hooks/refs": "warn",
       "react-hooks/static-components": "warn",
       "react-hooks/immutability": "warn",
+      // `_` no início marca descarte intencional — assinatura que precisa do
+      // parâmetro na posição (mock, handler, destructuring) sem usar o valor.
+      // A convenção já era usada no código; a regra passa a reconhecê-la.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);

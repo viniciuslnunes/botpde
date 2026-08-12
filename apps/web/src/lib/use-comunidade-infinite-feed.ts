@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
@@ -167,7 +167,6 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   } = options
 
   const queryClient = useQueryClient()
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const queryKey = useMemo(
     () =>
       comunidadeFeedQueryKey(
@@ -421,7 +420,6 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
      * Sem isso a lista vazia cai no empty state enquanto o fetch acontece.
      */
     loadingInicial: isPending,
-    isRefreshing,
     error: queryError instanceof Error ? queryError.message : null,
     loadMore,
     refreshCurrentPage,

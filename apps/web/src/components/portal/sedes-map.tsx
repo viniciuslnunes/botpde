@@ -89,6 +89,9 @@ export function SedesMap({
     if (!configured || !containerRef.current) return
     let cancelled = false
     setMapLoading(true)
+    // Copiado no setup para o cleanup não ler `markersRef.current` depois —
+    // é sempre o mesmo Map (só sofre set/delete/clear, nunca reatribuição).
+    const markers = markersRef.current
 
     async function init() {
       try {
@@ -123,10 +126,10 @@ export function SedesMap({
     void init()
     return () => {
       cancelled = true
-      for (const m of markersRef.current.values()) {
+      for (const m of markers.values()) {
         m.map = null
       }
-      markersRef.current.clear()
+      markers.clear()
       if (userMarkerRef.current) userMarkerRef.current.map = null
       userMarkerRef.current = null
       mapRef.current = null

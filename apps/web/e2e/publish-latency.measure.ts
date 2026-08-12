@@ -56,7 +56,6 @@ test('medir latência de publicação no feed', async ({ page }) => {
     deltaCardAfterActionMs: 0,
   }
 
-  // eslint-disable-next-line no-console
   console.log('\n[publish-latency]\n' + JSON.stringify(report, null, 2) + '\n')
 
   expect(actionMs).toBeLessThan(30_000)
