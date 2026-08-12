@@ -149,17 +149,18 @@ export function SedesMap({
     const points = sedes.filter((s) => s.lat != null && s.lng != null)
     const alive = new Set(points.map((s) => s.id))
     const selected = selectedIdRef.current
+    const markers = markersRef.current
 
-    for (const [id, m] of markersRef.current) {
+    for (const [id, m] of markers) {
       if (!alive.has(id)) {
         m.map = null
-        markersRef.current.delete(id)
+        markers.delete(id)
       }
     }
 
     for (const sede of points) {
       const pos = { lat: sede.lat!, lng: sede.lng! }
-      let m = markersRef.current.get(sede.id)
+      let m = markers.get(sede.id)
       if (!m) {
         const selectedNow = sede.id === selected
         m = new markerLib.AdvancedMarkerElement({
@@ -170,7 +171,7 @@ export function SedesMap({
           zIndex: selectedNow ? 10 : 1,
         })
         m.addEventListener('gmp-click', () => onSelectRef.current(sede.id))
-        markersRef.current.set(sede.id, m)
+        markers.set(sede.id, m)
       }
     }
 

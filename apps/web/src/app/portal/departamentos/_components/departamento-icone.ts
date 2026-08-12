@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Briefcase,
@@ -31,4 +32,17 @@ export const DEPARTAMENTO_ICONE: Record<string, LucideIcon> = {
 
 export function iconeDepartamento(slug: string): LucideIcon {
   return DEPARTAMENTO_ICONE[slug] ?? Briefcase
+}
+
+/**
+ * Ícone do departamento como componente.
+ *
+ * Preferir a `iconeDepartamento` no JSX: guardar o retorno numa variável
+ * (`const Icon = iconeDepartamento(slug)`) e usá-la como tag faz o React
+ * Compiler ler aquilo como componente criado durante o render — ele não
+ * enxerga que a origem é um mapa estático. Aqui o elemento sai de
+ * `createElement`, sem binding de componente no render de quem chama.
+ */
+export function DepartamentoIcone({ slug, className }: { slug: string; className?: string }) {
+  return createElement(iconeDepartamento(slug), { className, 'aria-hidden': true })
 }

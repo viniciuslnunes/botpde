@@ -24,7 +24,7 @@ import {
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { ArrowRight, Briefcase, Eye, Layers, LayoutGrid, Settings2 } from 'lucide-react'
-import { iconeDepartamento } from './departamento-icone'
+import { DepartamentoIcone } from './departamento-icone'
 import { DepartamentoCorPicker } from './departamento-cor-picker'
 
 interface MembershipLite {
@@ -88,7 +88,6 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
   const homeHref = hrefHomeDepartamento(depto.slug)
   const moduloHref = hrefModuloPortal(moduloKey)
   const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
-  const Icon = iconeDepartamento(depto.slug)
   // Atualhos de módulo/gestão: quem tem isGestor (row ou roles:manage) opera;
   // visão Diretoria só-leitura fica sem esses CTAs.
   const mostraModulo = Boolean(moduloHref) && (depto.isAtuacao || depto.isGestor)
@@ -122,7 +121,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
               style={{ backgroundColor: depto.cor }}
             >
-              <Icon className="h-5 w-5" aria-hidden />
+              <DepartamentoIcone slug={depto.slug} className="h-5 w-5" />
             </div>
           )}
           <div className="min-w-0 flex-1">

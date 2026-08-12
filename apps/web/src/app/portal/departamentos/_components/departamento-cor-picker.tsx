@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import { Loader2 } from 'lucide-react'
 import { atualizarCorDepartamento } from '../actions'
 import { runPersistAction } from '@/lib/toast-action'
-import { iconeDepartamento } from './departamento-icone'
+import { DepartamentoIcone } from './departamento-icone'
 
 const HEX_COR = /^#[0-9a-fA-F]{6}$/
 
@@ -20,7 +20,6 @@ export function DepartamentoCorPicker({
   /** Resolve o ícone no client — não passar componente Lucide do Server Component. */
   slug: string
 }) {
-  const Icon = iconeDepartamento(slug)
   const inputRef = useRef<HTMLInputElement>(null)
   const [corAtual, setCorAtual] = useState(cor)
   const [pending, startTransition] = useTransition()
@@ -55,7 +54,7 @@ export function DepartamentoCorPicker({
         {pending ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         ) : (
-          <Icon className="h-5 w-5" aria-hidden />
+          <DepartamentoIcone slug={slug} className="h-5 w-5" />
         )}
       </button>
       <input

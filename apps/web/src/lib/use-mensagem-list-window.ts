@@ -9,6 +9,12 @@ const DEFAULT_THRESHOLD = 48
 /**
  * Windowing da thread de mensagens (scroll do container, não da janela).
  * Abaixo do threshold renderiza a lista completa.
+ *
+ * O lint acusa "Compilation Skipped: Use of incompatible library" aqui: o
+ * `useVirtualizer` do @tanstack/react-virtual mede e muta durante o render, e o
+ * React Compiler desiste de otimizar este hook. É bailout informativo, não bug
+ * — o hook funciona igual, só não é memoizado pelo compilador. Não silenciar:
+ * some sozinho quando a lib for compatível (ou quando trocarmos o windowing).
  */
 export function useMensagemListWindow(
   itemCount: number,

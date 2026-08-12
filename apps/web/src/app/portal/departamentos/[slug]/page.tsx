@@ -66,7 +66,7 @@ import {
   CarnavalBarracaoSkeleton,
 } from '../_components/carnaval-barracao-aside'
 import { DepartamentoCanalBlock } from '../_components/departamento-canal-block'
-import { iconeDepartamento } from '../_components/departamento-icone'
+import { DepartamentoIcone } from '../_components/departamento-icone'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import { getDepartamentoContexto } from './_lib/contexto'
 import { DepartamentoSectionCard } from './_components/departamento-section-card'
@@ -407,7 +407,6 @@ export default async function DepartamentoHomePage({
     { id: 'projetos', label: 'Projetos', feature: 'equipe' as const },
   ]
   const panel = capability?.portalPanel ?? 'generico'
-  const Icon = iconeDepartamento(depto.slug)
 
   let pendentes: PendenteLite[] = []
   let totalPendentes = 0
@@ -601,7 +600,7 @@ export default async function DepartamentoHomePage({
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white"
             style={{ backgroundColor: depto.cor }}
           >
-            <Icon className="h-6 w-6" aria-hidden />
+            <DepartamentoIcone slug={depto.slug} className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">
