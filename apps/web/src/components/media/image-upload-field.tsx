@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FieldError, Input } from '@torcida/ui'
 import {
   formatImageFileBytes,
@@ -48,8 +48,13 @@ export function ImageUploadField({
   className,
   cropTitle = 'Ajustar e redimensionar',
 }: Props) {
-  const lastNameRef = useRef('imagem.jpg')
-  const lastSizeRef = useRef<string | undefined>(undefined)
+  // Estado, não ref: o nome/tamanho do último arquivo escolhido é lido no render
+  // (monta o `fileMeta` da drop zone). Em ref, a tela não re-renderizava ao
+  // trocar de arquivo — só pegava carona no render seguinte.
+  const [ultimoArquivo, setUltimoArquivo] = useState<{
+    nome: string
+    tamanho: string | undefined
+  }>({ nome: 'imagem.jpg', tamanho: undefined })
 
   const crop = useCroppedImageUpload({
     aspect,
@@ -58,8 +63,10 @@ export function ImageUploadField({
     title: cropTitle,
     onDone: ({ url, file }) => {
       if (file) {
-        lastNameRef.current = file.name || 'imagem.jpg'
-        lastSizeRef.current = formatImageFileBytes(file.size)
+        setUltimoArquivo({
+          nome: file.name || 'imagem.jpg',
+          tamanho: formatImageFileBytes(file.size),
+        })
       }
       if (url) onChange(url)
     },
@@ -67,15 +74,15 @@ export function ImageUploadField({
 
   const fileMeta: ImageDropFileMeta | null = value
     ? {
-        name: lastNameRef.current,
-        sizeLabel: lastSizeRef.current,
+        name: ultimoArquivo.nome,
+        sizeLabel: ultimoArquivo.tamanho,
         status: crop.busy ? 'uploading' : 'done',
         previewUrl: value,
       }
     : crop.busy
       ? {
-          name: lastNameRef.current,
-          sizeLabel: lastSizeRef.current,
+          name: ultimoArquivo.nome,
+          sizeLabel: ultimoArquivo.tamanho,
           status: 'uploading',
         }
       : null
@@ -91,8 +98,7 @@ export function ImageUploadField({
         file={fileMeta}
         onClear={value ? () => onChange('') : undefined}
         onFile={(file) => {
-          lastNameRef.current = file.name
-          lastSizeRef.current = formatImageFileBytes(file.size)
+          setUltimoArquivo({ nome: file.name, tamanho: formatImageFileBytes(file.size) })
           crop.open(file)
         }}
       />

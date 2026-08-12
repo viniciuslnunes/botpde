@@ -77,10 +77,14 @@ export function useComunidadeCanalAtividade(opts: {
   }, [opts.alvos, opts.afiliacaoId])
 
   const nacionalKey = afiliacaoParaApi ? chaveAtividadeNacional(afiliacaoParaApi) : null
-  const canalKeysRef = useRef<string[]>([])
-  canalKeysRef.current = opts.alvos
-    .filter((a): a is Extract<AlvoAtividadeBarra, { kind: 'canal' }> => a.kind === 'canal')
-    .map((a) => a.chave)
+  const canalKeys = useMemo(
+    () =>
+      opts.alvos
+        .filter((a): a is Extract<AlvoAtividadeBarra, { kind: 'canal' }> => a.kind === 'canal')
+        .map((a) => a.chave),
+    [opts.alvos],
+  )
+  const canalKeysRef = useLatestRef(canalKeys)
 
   const syncHeads = useCallback(async () => {
     if (!enabled) return
@@ -188,7 +192,7 @@ export function useComunidadeCanalAtividade(opts: {
       return changed ? next : prev
     })
     scheduleSync()
-  }, [scheduleSync, activeKeyRef])
+  }, [scheduleSync, activeKeyRef, canalKeysRef])
 
   const onPingNacional = useCallback(() => {
     if (nacionalKey && activeKeyRef.current !== nacionalKey) {

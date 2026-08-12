@@ -64,6 +64,7 @@ import {
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 import { useUnsavedChanges, useOptionalUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { useConfirmDialog } from '@/lib/confirm-action'
+import { useMediaQuery } from '@/lib/use-media-query'
 
 const INITIAL_STATE: PublicarPostState = {}
 const INITIAL_COMUNICADO_STATE: ComunicadoComposerState = {}
@@ -546,6 +547,11 @@ function ComposerBody({
   const stickerDesktopRef = useRef<HTMLDivElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
   const alcanceRef = useRef<HTMLDivElement>(null)
+  // O gatilho "+" só existe abaixo de `sm` (o container é `sm:hidden`). Antes
+  // isso era medido lendo o DOM no render (`getClientRects()` da ref), que é
+  // acesso a ref durante o render e ainda erra no primeiro paint. A condição
+  // real é a media query — mesmo breakpoint do Tailwind.
+  const extrasVisivel = useMediaQuery('(max-width: 639px)')
   const [, startTransition] = useTransition()
   const router = useRouter()
   const confirmDialog = useConfirmDialog()
@@ -1458,7 +1464,7 @@ function ComposerBody({
                 {emojiOpen && (
                   <EmojiPicker
                     anchorRef={
-                      extrasRef.current && extrasRef.current.getClientRects().length > 0
+                      extrasVisivel
                         ? extrasRef
                         : emojiDesktopRef
                     }
@@ -1469,7 +1475,7 @@ function ComposerBody({
                 {stickerOpen && (
                   <StickerPicker
                     anchorRef={
-                      extrasRef.current && extrasRef.current.getClientRects().length > 0
+                      extrasVisivel
                         ? extrasRef
                         : stickerDesktopRef
                     }

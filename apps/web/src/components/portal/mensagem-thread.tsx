@@ -163,7 +163,6 @@ export function MensagemThread({
   const lastCriadoEmRef = useRef<string | null>(null)
   const oldestCriadoEmRef = useRef<string | null>(null)
   const nearBottomRef = useRef(true)
-  const pollResetRef = useRef<() => void>(() => {})
   const prependingRef = useRef(false)
   const historicoSentinelRef = useRef<HTMLDivElement>(null)
   const carregandoHistoricoRef = useRef(false)
@@ -425,7 +424,7 @@ export function MensagemThread({
     90_000,
     active,
   )
-  pollResetRef.current = resetPoll
+  const pollResetRef = useLatestRef(resetPoll)
   useConversaStream(
     conversaId,
     () => {

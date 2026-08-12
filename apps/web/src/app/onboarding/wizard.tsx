@@ -1138,8 +1138,7 @@ function PassoUnidade({
     torcida.sedes.some((s) => s.lat == null || s.lng == null),
   )
 
-  const pollSedesRef = useRef<() => void>(() => {})
-  pollSedesRef.current = () => {
+  const pollSedesRef = useLatestRef<() => void>(() => {
     void (async () => {
       const sedes = await buscarSedesDaTorcida(torcida.id)
       const idsNovos = new Set(sedes.map((s) => s.id))
@@ -1164,12 +1163,12 @@ function PassoUnidade({
         setGeoSedesPend(false)
       }
     })()
-  }
+  })
 
   // Polling: detecta PDE/subsede aprovada enquanto o usuário espera no passo.
   const pollSedesTick = useCallback(() => {
     pollSedesRef.current()
-  }, [])
+  }, [pollSedesRef])
   useEffect(() => {
     pollSedesTick()
   }, [pollSedesTick])
