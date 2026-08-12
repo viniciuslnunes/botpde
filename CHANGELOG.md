@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.769.772] — 2026-08-12
+
+### Changed
+
+- Versão sincronizada com o histórico Git (`1.<commits_main>.<commits_all>`).
+
 Todas as mudanças notáveis deste projeto são documentadas neste arquivo.
 
 A versão do produto segue `1.<commits_em_main>.<commits_totais>`
