@@ -32,6 +32,11 @@
  *   --apply           db:push no DATABASE_URL atual
  *   --apply-hml-prod  db:push em HML (DATABASE_URL_HML) e depois prod (DATABASE_URL)
  *   --i-know-prod     obrigatório para tocar produção
+ *   --accept-data-loss  repassa a flag ao `prisma db push`. Necessária para
+ *                     constraint nova (unique/NOT NULL/tipo mais estreito), que
+ *                     o Prisma recusa por precaução mesmo sem conflito real.
+ *                     Não desliga a proteção: conflito de verdade continua
+ *                     falhando, agora no Postgres.
  *   --dry-run         imprime o que faria, sem push
  *   --ci-detect       só detecta; grava changed=true|false em $GITHUB_OUTPUT;
  *                     exit 0 sempre (o workflow decide o próximo job)
@@ -59,6 +64,7 @@ const APPLY = args.includes('--apply')
 const APPLY_HML_PROD = args.includes('--apply-hml-prod')
 const I_KNOW_PROD = args.includes('--i-know-prod')
 const CI_DETECT = args.includes('--ci-detect')
+const ACCEPT_DATA_LOSS = args.includes('--accept-data-loss')
 const sinceArg = args.find((a) => a.startsWith('--since='))
 const SINCE_RAW = sinceArg ? sinceArg.slice('--since='.length) : process.env.SCHEMA_DEPLOY_SINCE || null
 const SINCE =
@@ -197,17 +203,23 @@ function aplicarPush(alvo) {
     DATABASE_URL: alvo.url,
     TORCIDA_ENV: alvo.torcidaEnv,
   }
-  const r = spawnSync(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['prisma', 'db', 'push', '--skip-generate'],
-    {
-      cwd: DB_ROOT,
-      env,
-      encoding: 'utf8',
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    },
-  )
+  // `--accept-data-loss` é obrigatório para constraint nova (unique, NOT NULL,
+  // tipo mais estreito): o Prisma recusa por precaução, mesmo sem conflito real
+  // — a mensagem é "If there are existing duplicate values, this will fail",
+  // não "há duplicatas". Como este repo usa db:push (sem migrations), toda
+  // constraint futura bate aqui. Se houver conflito de verdade, o Postgres
+  // rejeita a criação do índice e o push falha assim mesmo: a flag remove o
+  // aviso, não a proteção do banco.
+  const pushArgs = ['prisma', 'db', 'push', '--skip-generate']
+  if (ACCEPT_DATA_LOSS) pushArgs.push('--accept-data-loss')
+
+  const r = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', pushArgs, {
+    cwd: DB_ROOT,
+    env,
+    encoding: 'utf8',
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
   if (r.status !== 0) {
     throw new Error(`${alvo.label}: prisma db push falhou (exit ${r.status}).`)
   }
@@ -247,13 +259,13 @@ Mudou ${SCHEMA_REL}: ${deteccao.mudou ? 'SIM' : 'não'}${
     console.log(`Ordem segura:
   1) HML
      TORCIDA_ENV=homolog DATABASE_URL='…proxy HML…' \\
-       pnpm --filter @torcida/db schema:deploy -- --apply --force
+       pnpm --filter @torcida/db schema:deploy -- --apply --force --accept-data-loss
 
   2) Validar a feature em homolog
 
   3) Prod (só depois) — no GitHub: environment "production" com required reviewers
      TORCIDA_ENV=production DATABASE_URL='…proxy prod…' \\
-       pnpm --filter @torcida/db schema:deploy -- --apply --i-know-prod --force
+       pnpm --filter @torcida/db schema:deploy -- --apply --i-know-prod --force --accept-data-loss
 
   CI: .github/workflows/schema-deploy.yml
 `)

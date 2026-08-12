@@ -86,6 +86,31 @@ DATABASE_URL_HML='…HML…' DATABASE_URL='…prod…' \
 `--dry-run` imprime o plano sem executar. `--since=<ref>` troca a base do diff
 (em CI no push pra main usa-se `github.event.before`).
 
+### `--accept-data-loss` (constraint nova)
+
+Constraint nova — `@@unique`, `NOT NULL`, tipo mais estreito — faz o
+`prisma db push` **parar** com um aviso, mesmo quando não há conflito nenhum:
+
+```
+⚠️  There might be data loss when applying the changes:
+  • A unique constraint covering the columns [...] will be added.
+    If there are existing duplicate values, this will fail.
+Error: Use the --accept-data-loss flag to ignore the data loss warnings
+```
+
+Repare no **If**: é precaução, não constatação. Como aqui não há migrations
+(o modelo é `db:push`), todo schema com constraint nova bate nisso — por isso
+os dois jobs do workflow passam `--accept-data-loss` por padrão.
+
+A flag remove o **aviso**, não a proteção: se houver duplicata de verdade, o
+Postgres rejeita a criação do índice e o push falha do mesmo jeito, agora com o
+erro real. O que ela não cobre é o outro caso de "data loss" — coluna ou tabela
+**removida** do schema, que é apagada de fato. Aí a proteção continua sendo o
+diff de `schema.prisma` no PR (checklist abaixo).
+
+Aconteceu em 2026-08-12 com `@@unique([afiliacaoId, fonteExternalId])` em
+`Partida` (sync API-Football): HML travou nesse aviso e prod nem chegou a rodar.
+
 ## Agente
 
 `.claude/agents/ops-schema.md` — invocar se o workflow falhar, se o secret

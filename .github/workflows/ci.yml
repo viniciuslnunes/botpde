@@ -41,8 +41,11 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # Pelo pacote, não pelo root: `prisma` é devDependency só de @torcida/db e
+      # o node_modules isolado do pnpm não expõe o bin na raiz — `pnpm exec
+      # prisma` ali dá "Command not found".
       - name: Gerar Prisma Client
-        run: pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
+        run: pnpm --filter @torcida/db db:generate
 
       - name: Typecheck apps/web
         run: pnpm --filter @torcida/web exec tsc --noEmit
@@ -68,8 +71,11 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # Pelo pacote, não pelo root: `prisma` é devDependency só de @torcida/db e
+      # o node_modules isolado do pnpm não expõe o bin na raiz — `pnpm exec
+      # prisma` ali dá "Command not found".
       - name: Gerar Prisma Client
-        run: pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
+        run: pnpm --filter @torcida/db db:generate
 
       - name: Lint apps/web
         run: pnpm --filter @torcida/web lint

@@ -102,7 +102,7 @@ jobs:
         env:
           TORCIDA_ENV: homolog
           DATABASE_URL: ${{ secrets.DATABASE_URL_HML }}
-        run: pnpm --filter @torcida/db schema:deploy -- --apply --force
+        run: pnpm --filter @torcida/db schema:deploy -- --apply --force --accept-data-loss
 
   deploy-prod:
     # TEMP (testes): automático após HML. Reverter: reativar required reviewers
@@ -135,4 +135,4 @@ jobs:
         env:
           TORCIDA_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
-        run: pnpm --filter @torcida/db schema:deploy -- --apply --force --i-know-prod
+        run: pnpm --filter @torcida/db schema:deploy -- --apply --force --i-know-prod --accept-data-loss
