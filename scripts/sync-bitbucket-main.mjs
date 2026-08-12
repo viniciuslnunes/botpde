@@ -7,10 +7,11 @@
  *   node scripts/sync-bitbucket-main.mjs
  *   node scripts/sync-bitbucket-main.mjs --no-push
  *
- * Pré-requisitos: remote `bitbucket` e acesso de leitura ao workspace.
+ * Pré-requisitos: remote `bitbucket` + leitura no workspace.
+ * Auth: GCM / prompt, ou `BITBUCKET_API_TOKEN` em `.env.jira` (ver docs/ops/git-remotes.md).
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,18 +20,39 @@ const argv = process.argv.slice(2).filter((a) => a !== '--');
 const dryRun = argv.includes('--dry-run');
 const noPush = argv.includes('--no-push');
 
+function loadEnvJira() {
+  const file = path.join(root, '.env.jira');
+  if (!existsSync(file)) return;
+  for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const i = line.indexOf('=');
+    if (i <= 0) continue;
+    const key = line.slice(0, i).trim();
+    let val = line.slice(i + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+
 function git(args, opts = {}) {
   return execFileSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     stdio: opts.stdio ?? ['ignore', 'pipe', 'pipe'],
+    env: opts.env ?? process.env,
     ...opts,
   }).trim();
 }
 
-function gitOk(args) {
+function gitOk(args, opts = {}) {
   try {
-    return git(args);
+    return git(args, opts);
   } catch (err) {
     const stderr = err?.stderr?.toString?.() ?? String(err);
     throw new Error(stderr || String(err));
@@ -54,7 +76,26 @@ function ensureBitbucketRemote() {
   }
 }
 
+/** Fetch HTTPS com API token Atlassian (scopes Bitbucket). */
+function fetchBitbucket() {
+  const token = process.env.BITBUCKET_API_TOKEN?.trim();
+  if (!token) {
+    gitOk(['fetch', 'bitbucket']);
+    return;
+  }
+  const basic = Buffer.from(`x-bitbucket-api-token-auth:${token}`).toString('base64');
+  console.log('fetch bitbucket (BITBUCKET_API_TOKEN)…');
+  gitOk([
+    '-c',
+    `http.https://bitbucket.org/.extraheader=Authorization: Basic ${basic}`,
+    'fetch',
+    'bitbucket',
+  ]);
+}
+
 function main() {
+  loadEnvJira();
+
   if (!existsSync(path.join(root, '.git'))) {
     console.error('Não é um repositório git.');
     process.exit(1);
@@ -72,11 +113,12 @@ function main() {
 
   console.log('fetch bitbucket…');
   try {
-    gitOk(['fetch', 'bitbucket']);
+    fetchBitbucket();
   } catch (err) {
     console.error('Falha no fetch bitbucket:', err.message);
     console.error(
-      '\nSem acesso ao workspace setorize-torcidas? Peça membership/App Password\n' +
+      '\nSem acesso? Crie API token Atlassian com scopes Bitbucket\n' +
+        '(read:repository:bitbucket), coloque BITBUCKET_API_TOKEN no .env.jira\n' +
         'e veja docs/ops/git-remotes.md.',
     );
     process.exit(1);
@@ -128,12 +170,24 @@ function main() {
 
   console.log('\nmerge bitbucket/main…');
   try {
-    execFileSync('git', ['merge', '--no-ff', 'bitbucket/main', '-m', 'merge: herdar main do Bitbucket (setorize-torcidas)'], {
-      cwd: root,
-      stdio: 'inherit',
-    });
+    execFileSync(
+      'git',
+      [
+        'merge',
+        '--no-ff',
+        'bitbucket/main',
+        '-m',
+        'merge: herdar main do Bitbucket (setorize-torcidas)',
+      ],
+      {
+        cwd: root,
+        stdio: 'inherit',
+      },
+    );
   } catch {
-    console.error('Merge falhou (conflitos?). Resolva e rode de novo ou finalize o merge à mão.');
+    console.error(
+      'Merge falhou (conflitos?). Resolva e rode de novo ou finalize o merge à mão.',
+    );
     process.exit(1);
   }
 

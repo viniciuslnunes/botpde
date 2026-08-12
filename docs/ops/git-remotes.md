@@ -38,13 +38,20 @@ Acesso: conta no workspace `setorize-torcidas` + **API token** Atlassian
    - `read:repository:bitbucket` (fetch/pull)
    - `write:repository:bitbucket` (só se for push no Bitbucket)
 3. Copie o token (aparece uma vez).
-4. No próximo `git fetch bitbucket` / `pnpm sync:bitbucket`, quando o Git Credential
-   Manager pedir senha:
-   - **Username:** `x-bitbucket-api-token-auth` (recomendado) **ou** seu username
-     Bitbucket (case-sensitive, em
-     [Personal settings](https://bitbucket.org/account/settings/))
+4. Preferência no monorepo: coloque no `.env.jira` (gitignored):
+
+   ```bash
+   BITBUCKET_API_TOKEN=...seu_token...
+   ```
+
+   O `pnpm sync:bitbucket` usa esse token automaticamente (username fixo
+   `x-bitbucket-api-token-auth`).
+
+5. Alternativa via Git Credential Manager, no próximo `git fetch bitbucket`:
+   - **Username:** `x-bitbucket-api-token-auth`
    - **Password:** o API token (não a senha da conta)
-5. Depois: `pnpm sync:bitbucket -- --dry-run` e, se ok, `pnpm sync:bitbucket`.
+
+6. Depois: `pnpm sync:bitbucket -- --dry-run` e, se ok, `pnpm sync:bitbucket`.
 
 Doc oficial: [Using API tokens](https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/).
 
