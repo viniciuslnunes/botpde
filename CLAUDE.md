@@ -152,6 +152,17 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
+- **Estado em client component (React Compiler, 2026-08-12):** não sincronize
+  estado com prop/URL em `useEffect` — ajuste **no render** comparando com o
+  último valor sincronizado; e se o effect só corrige algo que já é função de
+  outros valores, aquilo não é estado, é derivação. Busca com debounce guarda o
+  par `(termo, itens)` da última busca concluída. Antes de inventar hook, use
+  `useLatestRef` / `useHidratado` / `useMediaQuery` / `useOnline` (`lib/`).
+  Trocar `setState` em effect por escrita em ref no render **não** resolve — só
+  troca o aviso de nome. As regras do compilador são **aviso de propósito** em
+  `eslint.config.mjs` (limpeza gradual, sem bloquear o build); passivo hoje:
+  19. Receitas, armadilhas e o que sobrou: `docs/frontend/react-compiler.md` +
+  `ARCHITECTURE.md` §5.27.
 - **Área admin (2026-07-22):** páginas admin novas usam o kit de
  `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
  `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts

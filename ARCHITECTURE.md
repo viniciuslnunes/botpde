@@ -1660,6 +1660,39 @@ mapeamento: `docs/data/integracao-api-football.md`.
 - **Temporada é variável** (`API_FOOTBALL_SEASON`): o free só libera 2022–2024,
   então a Fase B foi construída e testada contra 2024.
 
+### 5.27 React Compiler — estado no render, não em effect (2026-08-12)
+
+As regras do React Compiler seguem como **aviso** em `eslint.config.mjs`
+(não silenciar, não bloquear). O passivo caiu de **100 → 19** numa campanha
+medida; guia com receitas e armadilhas: `docs/frontend/react-compiler.md`.
+
+- **As regras apontam defeito visível, não estilo.** `setState` em effect aplica
+  o valor um frame depois: menu que sobrevive à navegação, busca com o termo
+  antigo, lista ordenada errado, barra de persistência cinza com CTAs
+  desabilitados (que o § UX proíbe). Escrita em ref durante o render quebra com
+  render concorrente.
+- **Padrão de correção:** ajustar estado **no render**, comparando com o último
+  valor sincronizado (padrão oficial do React, já usado em
+  `searchable-context-switcher`); ou eliminar o estado quando ele era só
+  derivação (o `viewport` dos mapas do Brasil, a aba do painel em `sede-forms`).
+- **Busca com debounce** guarda o par `(termo, itens)` da última busca
+  concluída — "carregando" e "lista visível" viram derivação, e resultado de
+  termo antigo para de aparecer sob o termo novo.
+- **Primitivas** (preferir a inventar): `useLatestRef` (escreve em
+  `useInsertionEffect`, ver ordem de execução no guia), `useHidratado`,
+  `useMediaQuery`, `useOnline` — as três últimas sobre `useSyncExternalStore`.
+- **Trocar `setState` em effect por escrita em ref no render não resolve**: só
+  troca o aviso de nome. Em `post-media` a ref passou a guardar *qual* versão do
+  embed foi montada, em vez de um booleano que precisava ser zerado.
+- **Não fazer:** chamar callback do pai durante o render (`onCriado?.()` fica em
+  effect — seria render aninhado); tratar todo aviso como defeito (medição em
+  `useLayoutEffect` é o uso correto do padrão).
+- **Passivo restante (19):** 2 sem correção viável — `immutability` no
+  `sedes-map` (interop imperativo do Google Maps; em `useState` piora) e o
+  bailout do `useVirtualizer` — e 17 `set-state-in-effect` onde a reescrita mexe
+  em fluxo de verdade (restauração de rascunho do `wizard`, medição do
+  `anchored-popover`). Atacar **um por vez**, com conferência de tela.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o
