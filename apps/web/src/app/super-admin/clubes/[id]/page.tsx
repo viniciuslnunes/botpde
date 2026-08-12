@@ -108,6 +108,9 @@ export default async function ClubeDadosPage({
     maePorFilho,
   )
   const raizSet = new Set(raizIds)
+  // A lista mostra também a torcida suspensa (com o selo "Suspensa"), mas o KPI
+  // conta só quem está no ar — tenant inativo é erro de registro/baixa, não torcida.
+  const raizesAtivas = tenantsRaw.filter((t) => raizSet.has(t.id) && t.ativo)
   const torcidas = tenantsRaw.filter((t) => raizSet.has(t.id)).slice(0, 25)
 
   const rivais: RivalOpcao[] = rivalidades.map((r) =>
@@ -132,7 +135,7 @@ export default async function ClubeDadosPage({
   }
 
   const uso = [
-    { label: 'Torcidas na plataforma', valor: raizIds.length },
+    { label: 'Torcidas na plataforma', valor: raizesAtivas.length },
     { label: 'Torcedores globais', valor: clube._count.torcedores },
     { label: 'Partidas', valor: clube._count.partidas },
     { label: 'Notícias', valor: clube._count.noticias },

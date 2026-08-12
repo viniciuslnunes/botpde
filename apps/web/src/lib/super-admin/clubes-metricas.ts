@@ -423,6 +423,8 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
   )
   const raizSet = new Set(raizIds)
   const raizesTodas = tenantsDoClube.filter((t) => raizSet.has(t.id))
+  // KPI "torcidas" conta só raiz ativa: suspensa segue na lista, com o selo.
+  const raizesAtivas = raizesTodas.filter((t) => t.ativo)
   const raizes = raizesTodas.slice(0, 40)
   const unidadesPorRaiz = await contarUnidadesPorRaiz(
     raizes.map((t) => t.id),
@@ -452,8 +454,8 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
     id: clube.id,
     nome: clube.nome,
     apelido: clube.apelido,
-    // Contagem real de raízes (não o preview limitado a 40 na lista).
-    torcidas: raizesTodas.length,
+    // Contagem real de raízes ativas (não o preview limitado a 40 na lista).
+    torcidas: raizesAtivas.length,
     socios,
     torcedoresPerfil,
     torcedoresMembro,

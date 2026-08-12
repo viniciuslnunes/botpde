@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { db } from '@torcida/db'
 
 /**
@@ -39,6 +41,34 @@ export function filtrarTenantsRaiz(
 ): string[] {
   return ids.filter((id) => !maePorFilho.has(id))
 }
+
+/**
+ * Torcidas do clube na plataforma — **fonte única** de "quantas torcidas há".
+ *
+ * Uma torcida é um tenant que, ao mesmo tempo:
+ * - é **raiz** (portal de unidade Caso B é unidade de uma torcida, não torcida);
+ * - **não** é sintético (o container da Comunidade Nacional não é torcida);
+ * - está **ativo** (tenant suspenso/erro de registro não conta).
+ *
+ * Nunca contar `tenant.findMany({ afiliacaoId })` cru: o resultado infla com
+ * unidades promovidas, com o container da CN e com tenants suspensos.
+ */
+export const listarTorcidasDoClube = cache(async function listarTorcidasDoClube(
+  afiliacaoId: string,
+): Promise<string[]> {
+  const [tenants, maePorFilho]: [{ id: string }[], Map<string, string>] = await Promise.all([
+    db.tenant.findMany({
+      where: { afiliacaoId, ativo: true, sintetico: false },
+      select: { id: true },
+      orderBy: { nome: 'asc' },
+    }),
+    carregarMapaPortalMae(),
+  ])
+  return filtrarTenantsRaiz(
+    tenants.map((t) => t.id),
+    maePorFilho,
+  )
+})
 
 /** Resolve a raiz de um tenant (ele próprio se não for portal filho). */
 export function paraTenantRaiz(

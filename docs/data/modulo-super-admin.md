@@ -105,6 +105,18 @@ padrão; exclusão definitiva só com vínculos zerados (Cascade em
 para excluir portais de unidade promovida. Feeds/CN por `afiliacaoId` continuam
 incluindo todos os tenants do clube.
 
+**Quantas torcidas o clube tem (2026-08-12):** fonte única
+`listarTorcidasDoClube(afiliacaoId)` — raiz + `ativo: true` + `sintetico: false`.
+As três exclusões são independentes e cada uma já inflou um número em produção:
+o container sintético da CN (12 clubes), portal de unidade Caso B e tenant
+suspenso (Corinthians exibia 10 na CN e 7 no super-admin; são 6 — a "FIEL
+CUBATÃO" é erro de registro, arquivada). **Nunca** derivar a contagem de
+`getTenantIdsPorAfiliacao().length`: aquele conjunto é o *escopo do feed*
+nacional, e sintético + Caso B publicam ali sem serem torcidas — a CN conta por
+`contarTorcidasDoClubeNaCN` (mesma fonte + corte R5). Listagem admin segue
+mostrando a torcida arquivada com o selo **Suspensa**; só o KPI a exclui.
+Invariante em `lib/__tests__/tenant-hierarquia-plataforma.test.ts`.
+
 A fila de **unidades** (subsede/PDE) ficou em `/super-admin/unidades` — o menu
 não chama mais as duas coisas de "Afiliações".
 
