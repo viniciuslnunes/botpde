@@ -1,23 +1,42 @@
-# Remotes Git — GitHub canônico + Bitbucket auxiliar
+# Remotes Git — pair sync GitHub ↔ Bitbucket
 
-## Fonte da verdade
+## Fonte da verdade operacional
 
 | Remote | URL | Papel |
 | --- | --- | --- |
-| `origin` | `https://github.com/viniciuslnunes/botpde` | **Canônico** — CI, release, Railway |
-| `bitbucket` | `https://bitbucket.org/setorize-torcidas/botpde.git` | Auxiliar — puxar commits feitos só no Bitbucket |
+| `origin` | `https://github.com/viniciuslnunes/botpde` | **Deploy** — CI, release, Railway |
+| `bitbucket` | `https://bitbucket.org/setorize-torcidas/botpde.git` | **Pair** — mesmo tip de `main` que o GitHub |
 
-Push de feature/release e merge em `main` devem ir para **GitHub** (`origin`).
-O Railway e os workflows em `.github/workflows/` só veem o GitHub.
+Os dois devem ficar **no mesmo commit** em `main`. Quem publica só num dos
+lados deixa o pair desalinhado até rodar o sync.
 
-## Por que o push do Bitbucket não deployou
+O Railway e `.github/workflows/` **só** veem o GitHub. Push só no Bitbucket
+não deploya — o sync empurra o tip unificado para `origin` quando falta lá.
 
-O serviço no Railway está ligado ao repositório **GitHub**. Um `git push` só no
-Bitbucket atualiza `bitbucket/main`, não `origin/main` — então:
+## Fluxo único (pair programming)
 
-1. Quem clona pelo GitHub **não vê** esses commits.
-2. O Railway **não** dispara deploy.
-3. O workflow de release em `main` também não roda.
+```bash
+# Antes de começar / ao trocar de máquina / depois de push do par
+pnpm sync:bitbucket -- --dry-run   # ver o plano
+pnpm sync:bitbucket                # unir tips + push nos dois remotes
+```
+
+O script:
+
+1. `fetch` origin + bitbucket  
+2. Une o que estiver só de um lado (merge sem force-push)  
+3. Faz push de `main` nos **dois** remotes até os tips coincidirem  
+
+Prioridade = **o tip mais completo** (união dos commits), não “quem gritou
+mais alto”. Divergência real vira merge commit; conflitos pedem resolução
+manual e novo `pnpm sync:bitbucket`.
+
+### Hábitos do pair
+
+1. Preferir `git push origin main` no dia a dia (dispara Railway).  
+2. Se alguém commitou só no Bitbucket: rode o sync (ou peça a quem tem token).  
+3. No fim da sessão: `pnpm sync:bitbucket` — garante espelho.  
+4. Feature branches: ok em qualquer remote; `main` é o que o sync alinha.
 
 ## Configurar o remote Bitbucket
 
@@ -27,70 +46,44 @@ git remote add bitbucket https://bitbucket.org/setorize-torcidas/botpde.git
 git remote set-url bitbucket https://bitbucket.org/setorize-torcidas/botpde.git
 ```
 
-Acesso: conta no workspace `setorize-torcidas` + **API token** Atlassian
-(com scopes Bitbucket). App Passwords foram descontinuados — a URL antiga
-`/account/settings/app-passwords/` retorna *Resource not found*.
-
 ### Auth Git (API token)
 
 1. Abra [Create and manage API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-2. **Create API token with scopes** → app **Bitbucket** → marque pelo menos:
-   - `read:repository:bitbucket` (fetch/pull)
-   - `write:repository:bitbucket` (só se for push no Bitbucket)
+2. **Create API token with scopes** → app **Bitbucket** → marque:
+   - `read:repository:bitbucket` (fetch)
+   - `write:repository:bitbucket` (**obrigatório** para o push do espelho)
 3. Copie o token (aparece uma vez).
-4. Preferência no monorepo: coloque no `.env.jira` (gitignored):
+4. No `.env.jira` (gitignored):
 
    ```bash
    BITBUCKET_API_TOKEN=...seu_token...
    ```
 
-   O `pnpm sync:bitbucket` usa esse token automaticamente (username fixo
-   `x-bitbucket-api-token-auth`).
+   O `pnpm sync:bitbucket` usa username fixo `x-bitbucket-api-token-auth`.
 
-5. Alternativa via Git Credential Manager, no próximo `git fetch bitbucket`:
+5. Alternativa GCM no `git fetch/push bitbucket`:
    - **Username:** `x-bitbucket-api-token-auth`
-   - **Password:** o API token (não a senha da conta)
+   - **Password:** o API token
 
-6. Depois: `pnpm sync:bitbucket -- --dry-run` e, se ok, `pnpm sync:bitbucket`.
+App Passwords foram descontinuados. Doc:
+[Using API tokens](https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/).
 
-Doc oficial: [Using API tokens](https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/).
+## Por que push só no Bitbucket “não subiu”
 
-Alternativa sem Bitbucket: Samuel faz push da mesma `main` no **GitHub**
-(`origin`) — Railway sobe a partir daí.
+1. Quem clona pelo GitHub não vê esses commits.  
+2. O Railway não dispara.  
+3. O release em `main` no GitHub não roda.  
 
-## Herdar commits do Bitbucket na main do GitHub
+Mitigação: `pnpm sync:bitbucket` (não “esperar o deploy do Bitbucket”).
 
-```bash
-# 1) Comparar
-pnpm sync:bitbucket -- --dry-run
+## Schema
 
-# 2) Merge local + push origin (dispara Railway)
-pnpm sync:bitbucket
-```
-
-Equivalente manual:
-
-```bash
-git fetch origin
-git fetch bitbucket
-git checkout main
-git merge bitbucket/main   # resolve conflitos se houver divergência
-git push origin main
-```
-
-Se `packages/db/prisma/schema.prisma` mudou no merge, seguir
+Se o merge unificar mudança em `packages/db/prisma/schema.prisma`, seguir
 [`schema-deploy.md`](schema-deploy.md).
-
-## Orientação para quem usa Bitbucket
-
-1. Preferir clone/push no **GitHub** (pedir acesso ao repo).
-2. Se já commitou só no Bitbucket: rode `pnpm sync:bitbucket` (ou peça a quem
-   tem acesso nos dois remotes).
-3. Bitbucket pode ficar como mirror de leitura; não é o gatilho de deploy.
 
 ## Jira (KAN)
 
-Issues e priorização: [`jira-kan.md`](jira-kan.md). Commits: `feat(scope): … (KAN-42)`.
+Issues: [`jira-kan.md`](jira-kan.md). Commits: `feat(scope): … (KAN-42)`.
 ScriptRunner: [`jira-scriptrunner.md`](jira-scriptrunner.md).
 
 ## Ver remotes

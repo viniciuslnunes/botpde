@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 /**
- * Traz bitbucket/main para a main local e (opcionalmente) faz push em origin.
+ * Alinha `main` entre GitHub (`origin`) e Bitbucket — fluxo único de pair programming.
+ *
+ * - O Railway/CI só veem o GitHub; os dois remotes devem ficar no mesmo tip.
+ * - Prioridade: o tip mais avançado (união dos dois). Nunca force-push.
  *
  * Uso:
- *   node scripts/sync-bitbucket-main.mjs --dry-run
- *   node scripts/sync-bitbucket-main.mjs
- *   node scripts/sync-bitbucket-main.mjs --no-push
+ *   pnpm sync:bitbucket -- --dry-run
+ *   pnpm sync:bitbucket
+ *   pnpm sync:bitbucket -- --no-push
  *
- * Pré-requisitos: remote `bitbucket` + leitura no workspace.
- * Auth: GCM / prompt, ou `BITBUCKET_API_TOKEN` em `.env.jira` (ver docs/ops/git-remotes.md).
+ * Auth Bitbucket: `BITBUCKET_API_TOKEN` em `.env.jira`
+ * (scopes: read:repository:bitbucket + write:repository:bitbucket).
+ * Ver docs/ops/git-remotes.md.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -59,6 +63,14 @@ function gitOk(args, opts = {}) {
   }
 }
 
+function gitInherit(args, opts = {}) {
+  execFileSync('git', args, {
+    cwd: root,
+    stdio: 'inherit',
+    env: opts.env ?? process.env,
+  });
+}
+
 function hasRemote(name) {
   try {
     gitOk(['remote', 'get-url', name]);
@@ -76,21 +88,65 @@ function ensureBitbucketRemote() {
   }
 }
 
-/** Fetch HTTPS com API token Atlassian (scopes Bitbucket). */
-function fetchBitbucket() {
+function bitbucketAuthArgs() {
   const token = process.env.BITBUCKET_API_TOKEN?.trim();
-  if (!token) {
-    gitOk(['fetch', 'bitbucket']);
-    return;
-  }
+  if (!token) return [];
   const basic = Buffer.from(`x-bitbucket-api-token-auth:${token}`).toString('base64');
-  console.log('fetch bitbucket (BITBUCKET_API_TOKEN)…');
-  gitOk([
+  return [
     '-c',
     `http.https://bitbucket.org/.extraheader=Authorization: Basic ${basic}`,
-    'fetch',
-    'bitbucket',
-  ]);
+  ];
+}
+
+function fetchBitbucket() {
+  const auth = bitbucketAuthArgs();
+  if (auth.length) console.log('fetch bitbucket (BITBUCKET_API_TOKEN)…');
+  else console.log('fetch bitbucket…');
+  gitOk([...auth, 'fetch', 'bitbucket']);
+}
+
+function pushBitbucket() {
+  const auth = bitbucketAuthArgs();
+  if (auth.length) console.log('push bitbucket main (BITBUCKET_API_TOKEN)…');
+  else console.log('push bitbucket main…');
+  gitInherit([...auth, 'push', 'bitbucket', 'main']);
+}
+
+function count(range) {
+  return gitOk(['rev-list', '--count', range]);
+}
+
+function shortLog(range) {
+  try {
+    return gitOk(['log', '--oneline', range]);
+  } catch {
+    return '';
+  }
+}
+
+function assertCleanMain() {
+  const branch = gitOk(['branch', '--show-current']);
+  if (branch !== 'main') {
+    console.error(`Checkout em '${branch}'. Mude para main antes do sync.`);
+    process.exit(1);
+  }
+  const dirty = gitOk(['status', '--porcelain']);
+  if (dirty) {
+    console.error('Working tree suja. Commit/stash antes do sync.');
+    process.exit(1);
+  }
+}
+
+function mergeRef(ref, message) {
+  console.log(`merge ${ref}…`);
+  try {
+    gitInherit(['merge', '--no-ff', ref, '-m', message]);
+  } catch {
+    console.error(
+      'Merge falhou (conflitos?). Resolva, finalize o merge e rode o sync de novo.',
+    );
+    process.exit(1);
+  }
 }
 
 function main() {
@@ -111,94 +167,148 @@ function main() {
     process.exit(1);
   }
 
-  console.log('fetch bitbucket…');
   try {
     fetchBitbucket();
   } catch (err) {
     console.error('Falha no fetch bitbucket:', err.message);
     console.error(
-      '\nSem acesso? Crie API token Atlassian com scopes Bitbucket\n' +
-        '(read:repository:bitbucket), coloque BITBUCKET_API_TOKEN no .env.jira\n' +
-        'e veja docs/ops/git-remotes.md.',
+      '\nPrecisa de BITBUCKET_API_TOKEN no .env.jira com scopes\n' +
+        'read:repository:bitbucket e write:repository:bitbucket.\n' +
+        'Ver docs/ops/git-remotes.md.',
     );
     process.exit(1);
   }
 
   let bbMain;
+  let originMain;
   try {
     bbMain = gitOk(['rev-parse', 'bitbucket/main']);
+    originMain = gitOk(['rev-parse', 'origin/main']);
   } catch {
-    console.error('Ref bitbucket/main não encontrada após o fetch.');
+    console.error('Refs origin/main ou bitbucket/main ausentes após o fetch.');
     process.exit(1);
   }
 
-  const originMain = gitOk(['rev-parse', 'origin/main']);
   const localMain = gitOk(['rev-parse', 'main']);
+  const bbOnly = count('origin/main..bitbucket/main');
+  const ghOnly = count('bitbucket/main..origin/main');
 
   console.log(`origin/main     ${originMain.slice(0, 8)}`);
   console.log(`bitbucket/main  ${bbMain.slice(0, 8)}`);
   console.log(`main (local)    ${localMain.slice(0, 8)}`);
+  console.log(`\nvs: bitbucket +${bbOnly} commits só nele · github +${ghOnly} commits só nele`);
 
-  const ahead = gitOk(['rev-list', '--count', 'origin/main..bitbucket/main']);
-  const behind = gitOk(['rev-list', '--count', 'bitbucket/main..origin/main']);
-  console.log(`\nbitbucket está +${ahead} / -${behind} vs origin/main`);
+  const equal = originMain === bbMain;
+  const needMergeBb = bbOnly !== '0';
+  const needPushBb = ghOnly !== '0' || needMergeBb;
+  const needPushGh = needMergeBb;
 
-  if (ahead === '0') {
-    console.log('Nada a herdar: bitbucket/main não está à frente de origin/main.');
+  if (equal) {
+    console.log('\nRemotes já alinhados (mesmo tip).');
+    if (localMain !== originMain) {
+      console.log('Local main difere do tip remoto — fast-forward local sugerido.');
+      if (!dryRun) {
+        assertCleanMain();
+        try {
+          gitInherit(['merge', '--ff-only', 'origin/main']);
+        } catch {
+          console.error(
+            'Não deu ff-only em origin/main. Faça merge/rebase local e rode de novo.',
+          );
+          process.exit(1);
+        }
+      }
+    }
+    if (dryRun) console.log('\n--dry-run: nada a fazer nos remotes.');
+    else console.log('Pronto — pair sync ok.');
     process.exit(0);
   }
 
-  console.log('\nCommits só no Bitbucket:');
-  console.log(gitOk(['log', '--oneline', 'origin/main..bitbucket/main']));
+  if (bbOnly !== '0') {
+    console.log('\nSó no Bitbucket:');
+    console.log(shortLog('origin/main..bitbucket/main') || '(vazio)');
+  }
+  if (ghOnly !== '0') {
+    console.log('\nSó no GitHub:');
+    console.log(shortLog('bitbucket/main..origin/main') || '(vazio)');
+  }
+
+  const plan = [];
+  if (needMergeBb) {
+    plan.push('1) atualizar local main com origin/main (ff se possível)');
+    plan.push('2) merge bitbucket/main → main (união; tip mais completo)');
+  } else {
+    plan.push('1) garantir local main = origin/main');
+  }
+  if (needPushGh && !noPush) plan.push('3) push origin main (Railway/CI)');
+  if (needPushBb && !noPush) plan.push('4) push bitbucket main (espelho pair)');
+
+  console.log('\nPlano:');
+  for (const step of plan) console.log(`  ${step}`);
 
   if (dryRun) {
     console.log('\n--dry-run: sem merge/push.');
     process.exit(0);
   }
 
-  const branch = gitOk(['branch', '--show-current']);
-  if (branch !== 'main') {
-    console.error(`Checkout em '${branch}'. Mude para main antes do sync.`);
-    process.exit(1);
+  assertCleanMain();
+
+  // Trazer local para origin antes de unir o Bitbucket
+  if (localMain !== originMain) {
+    console.log('alinhar local → origin/main…');
+    try {
+      gitInherit(['merge', '--ff-only', 'origin/main']);
+    } catch {
+      // divergiu localmente: merge sem ff
+      mergeRef('origin/main', 'merge: alinhar main local com origin (pair sync)');
+    }
   }
 
-  const dirty = gitOk(['status', '--porcelain']);
-  if (dirty) {
-    console.error('Working tree suja. Commit/stash antes do sync.');
-    process.exit(1);
-  }
-
-  console.log('\nmerge bitbucket/main…');
-  try {
-    execFileSync(
-      'git',
-      [
-        'merge',
-        '--no-ff',
-        'bitbucket/main',
-        '-m',
-        'merge: herdar main do Bitbucket (setorize-torcidas)',
-      ],
-      {
-        cwd: root,
-        stdio: 'inherit',
-      },
+  if (needMergeBb) {
+    mergeRef(
+      'bitbucket/main',
+      'merge: unir Bitbucket ↔ GitHub (pair sync setorize-torcidas)',
     );
-  } catch {
-    console.error(
-      'Merge falhou (conflitos?). Resolva e rode de novo ou finalize o merge à mão.',
-    );
-    process.exit(1);
   }
 
   if (noPush) {
-    console.log('Merge local ok. --no-push: faça `git push origin main` quando quiser.');
+    console.log(
+      'Merge local ok. --no-push: rode sem a flag (ou push origin + bitbucket à mão).',
+    );
     process.exit(0);
   }
 
-  console.log('push origin main…');
-  execFileSync('git', ['push', 'origin', 'main'], { cwd: root, stdio: 'inherit' });
-  console.log('Pronto — Railway / Actions devem ver o push em origin/main.');
+  const tip = gitOk(['rev-parse', 'main']);
+  if (tip !== originMain) {
+    console.log('push origin main…');
+    gitInherit(['push', 'origin', 'main']);
+  } else {
+    console.log('origin/main já no tip — skip push GitHub.');
+  }
+
+  if (tip !== bbMain || needMergeBb || ghOnly !== '0') {
+    try {
+      pushBitbucket();
+    } catch (err) {
+      console.error(
+        '\nPush no Bitbucket falhou. Confirme write:repository:bitbucket no token.\n' +
+          String(err?.message || err),
+      );
+      process.exit(1);
+    }
+  }
+
+  // Re-fetch e confirmar igualdade
+  gitOk(['fetch', 'origin']);
+  fetchBitbucket();
+  const o2 = gitOk(['rev-parse', 'origin/main']);
+  const b2 = gitOk(['rev-parse', 'bitbucket/main']);
+  console.log(`\nTips finais: origin=${o2.slice(0, 8)} bitbucket=${b2.slice(0, 8)}`);
+  if (o2 !== b2) {
+    console.error('Ainda divergentes após o sync — investigue permissões/proteção de branch.');
+    process.exit(1);
+  }
+  console.log('Pronto — GitHub e Bitbucket alinhados. Railway só reage ao push no GitHub.');
 }
 
 main();

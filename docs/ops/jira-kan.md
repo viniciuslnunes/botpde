@@ -87,7 +87,7 @@ Branch: feat/KAN-42-live-indicator
 PR:     [KAN-42] …
 ```
 
-GitHub = remoto canônico (Railway). Bitbucket só auxiliar (`git-remotes.md`).
+GitHub = deploy (Railway). Bitbucket = espelho pair — `pnpm sync:bitbucket` ([`git-remotes.md`](git-remotes.md)).
 
 ## O que migrar (ordem)
 
