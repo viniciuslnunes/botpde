@@ -86,16 +86,30 @@ export function MensagensShell({
 
   const atualizarInbox = useCallback(async () => {
     try {
-      const res = await fetch('/api/conversas', { cache: 'no-store' })
+      // Mantém deep-link de ticket (?c=) no refresh — staff pode não ser membro.
+      const qs = initialSelecionadaId
+        ? `?c=${encodeURIComponent(initialSelecionadaId)}`
+        : ''
+      const res = await fetch(`/api/conversas${qs}`, { cache: 'no-store' })
       if (!res.ok) return
       const data = (await res.json()) as { conversas?: InboxItemDto[] }
       if (data.conversas) {
         startTransition(() => {
-          setConversas(data.conversas!)
-          onInboxChange?.(data.conversas!)
-          if (initialSelecionadaId && data.conversas!.some((c) => c.id === initialSelecionadaId)) {
-            setSelecionadaId(initialSelecionadaId)
-          }
+          setConversas((prev) => {
+            const fromApi = data.conversas!
+            const ids = new Set(fromApi.map((c) => c.id))
+            // Rede de segurança se a API não devolveu o item sintético.
+            let merged = fromApi
+            if (initialSelecionadaId && !ids.has(initialSelecionadaId)) {
+              const local = prev.find((c) => c.id === initialSelecionadaId)
+              if (local) merged = [local, ...fromApi]
+            }
+            onInboxChange?.(merged)
+            if (initialSelecionadaId && merged.some((c) => c.id === initialSelecionadaId)) {
+              setSelecionadaId(initialSelecionadaId)
+            }
+            return merged
+          })
         })
       }
     } catch {

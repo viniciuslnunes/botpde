@@ -15,7 +15,9 @@ import {
   hasPermission,
 } from '@torcida/types'
 import { criarMensagem } from '@/lib/mensageria'
+import type { InboxItemDto } from '@/lib/mensageria-client'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 export type PedidoTicketStatus = 'ABERTO' | 'ATENDENDO' | 'FECHADO'
 export type PedidoTicketMotivoFecho = 'ENTREGUE' | 'MANUAL' | 'CANCELADO'
@@ -61,17 +63,56 @@ export type TicketFilaItem = TicketLite & {
   atendente: { id: string; nome: string | null } | null
 }
 
-/** Staff da loja no tenant do pedido (view_orders ou manage). */
+/** Staff da loja no tenant do pedido (view_orders ou manage). Super-admin opera fora do RBAC. */
 export async function userTemPermissaoLojaTicket(
   userId: string,
   tenantId: string,
 ): Promise<{ podeVer: boolean; podeGerir: boolean }> {
+  const user: { email: string | null } | null = await db.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  })
+  if (isSuperAdminEmail(user?.email)) {
+    return { podeVer: true, podeGerir: true }
+  }
+
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
   const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
   const podeGerir = hasPermission(efetivas, PERMISSIONS.STORE_MANAGE)
   const podeVer =
     podeGerir || hasPermission(efetivas, PERMISSIONS.STORE_VIEW_ORDERS)
   return { podeVer, podeGerir }
+}
+
+/** Entra (ou reabre) o staff na conversa do ticket — claim e super-admin. */
+export async function garantirMembroConversaTicket(
+  conversaId: string,
+  userId: string,
+): Promise<void> {
+  const membroExistente: { id: string; saiuEm: Date | null } | null =
+    await db.membroConversa.findUnique({
+      where: { conversaId_userId: { conversaId, userId } },
+      select: { id: true, saiuEm: true },
+    })
+
+  if (!membroExistente) {
+    await db.membroConversa.create({
+      data: {
+        conversaId,
+        userId,
+        papel: 'ADMIN',
+        status: 'ATIVO',
+      },
+    })
+    return
+  }
+
+  if (membroExistente.saiuEm) {
+    await db.membroConversa.update({
+      where: { id: membroExistente.id },
+      data: { saiuEm: null, status: 'ATIVO', papel: 'ADMIN' },
+    })
+  }
 }
 
 export function ticketPermiteEnvioStatus(status: PedidoTicketStatus | null | undefined): boolean {
@@ -215,27 +256,7 @@ export async function atenderTicket(
     throw new Error('Este ticket já foi atendido por outra pessoa.')
   }
 
-  const membroExistente: { id: string; saiuEm: Date | null } | null =
-    await db.membroConversa.findUnique({
-      where: { conversaId_userId: { conversaId: ticket.conversaId, userId: atendenteId } },
-      select: { id: true, saiuEm: true },
-    })
-
-  if (!membroExistente) {
-    await db.membroConversa.create({
-      data: {
-        conversaId: ticket.conversaId,
-        userId: atendenteId,
-        papel: 'ADMIN',
-        status: 'ATIVO',
-      },
-    })
-  } else if (membroExistente.saiuEm) {
-    await db.membroConversa.update({
-      where: { id: membroExistente.id },
-      data: { saiuEm: null, status: 'ATIVO', papel: 'ADMIN' },
-    })
-  }
+  await garantirMembroConversaTicket(ticket.conversaId, atendenteId)
 
   const atendente: { nome: string | null } | null = await db.user.findUnique({
     where: { id: atendenteId },
@@ -345,6 +366,65 @@ export async function staffPodeLerTicketConversa(
   if (!ticket) return false
   const { podeVer } = await userTemPermissaoLojaTicket(userId, ticket.tenantId)
   return podeVer
+}
+
+/**
+ * Item de inbox sintético para staff abrir `/portal/mensagens?c=<ticket>`
+ * sem ser `MembroConversa` (ex.: gestor que não claimou).
+ * Super-admin sem vínculo na torcida entra na conversa para poder responder.
+ */
+export async function montarInboxItemTicketStaff(
+  conversaId: string,
+  userId: string,
+): Promise<InboxItemDto | null> {
+  const pode = await staffPodeLerTicketConversa(conversaId, userId)
+  if (!pode) return null
+
+  const user: { email: string | null } | null = await db.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  })
+  if (isSuperAdminEmail(user?.email)) {
+    await garantirMembroConversaTicket(conversaId, userId)
+  }
+
+  const conversa: {
+    id: string
+    tipo: 'DIRETA' | 'GRUPO' | 'CANAL'
+    nome: string | null
+    avatarUrl: string | null
+    atualizadoEm: Date
+    _count: { membros: number }
+  } | null = await db.conversa.findUnique({
+    where: { id: conversaId },
+    select: {
+      id: true,
+      tipo: true,
+      nome: true,
+      avatarUrl: true,
+      atualizadoEm: true,
+      _count: { select: { membros: { where: { saiuEm: null } } } },
+    },
+  })
+  if (!conversa) return null
+
+  return {
+    id: conversa.id,
+    tipo: conversa.tipo,
+    nome: conversa.nome,
+    avatarUrl: conversa.avatarUrl,
+    atualizadoEm: conversa.atualizadoEm.toISOString(),
+    meuPapel: 'MEMBRO',
+    meuStatus: 'ATIVO',
+    solicitacaoRecebida: false,
+    aguardandoAprovacao: false,
+    silenciada: false,
+    totalMembros: conversa._count.membros,
+    ehCanalDepartamento: false,
+    outroMembro: null,
+    ultimaMensagem: null,
+    naoLidas: 0,
+  }
 }
 
 export async function assertTicketPermiteEnvio(conversaId: string): Promise<void> {

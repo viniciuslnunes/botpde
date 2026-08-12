@@ -14,15 +14,16 @@ export type StatusInboxMensageria =
   | { podeListar: false; motivo: MotivoInboxBloqueado }
 
 /**
- * Quem pode ver a inbox: membro APROVADO ou quem tem cargo no tenant
- * (owner/admin legado sem linha em SaasMembro). Torcedor global e
- * PENDENTE recebem lista vazia com flag — nunca 403 no GET.
+ * Quem pode ver a inbox: membro APROVADO, quem tem cargo no tenant
+ * (owner/admin legado sem linha em SaasMembro), ou super-admin da plataforma
+ * (opera sem vínculo na torcida). Torcedor global e PENDENTE recebem lista
+ * vazia com flag — nunca 403 no GET.
  */
 export async function getStatusInboxMensageria(
   userId: string,
   tenantId: string,
 ): Promise<StatusInboxMensageria> {
-  const [membro, cargo] = await Promise.all([
+  const [membro, cargo, user] = await Promise.all([
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
       select: { status: true },
@@ -31,8 +32,14 @@ export async function getStatusInboxMensageria(
       where: { userId, tenantId },
       select: { id: true },
     }),
+    db.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    }),
   ])
 
+  const { isSuperAdminEmail } = await import('@/lib/tenant-context')
+  if (isSuperAdminEmail(user?.email)) return { podeListar: true, via: 'cargo' }
   if (cargo) return { podeListar: true, via: 'cargo' }
   if (!membro) return { podeListar: false, motivo: 'sem_vinculo' }
   if (membro.status === 'PENDENTE') return { podeListar: false, motivo: 'cadastro_pendente' }
@@ -104,9 +111,26 @@ export async function assertConversaAccess(conversaId: string) {
       via: 'membro' as const,
     }
   } catch {
-    const { staffPodeLerTicketConversa, getTicketPorConversaId } = await import('@/lib/loja-ticket')
+    const { staffPodeLerTicketConversa, getTicketPorConversaId, garantirMembroConversaTicket } =
+      await import('@/lib/loja-ticket')
+    const { isSuperAdminEmail } = await import('@/lib/tenant-context')
     const pode = await staffPodeLerTicketConversa(conversaId, session.user.id)
     if (!pode) throw new Error('Você não participa desta conversa.')
+
+    // Super-admin sem vínculo: entra na conversa e segue o caminho de membro
+    // (ler + enviar enquanto o ticket estiver aberto).
+    if (isSuperAdminEmail(session.user.email)) {
+      await garantirMembroConversaTicket(conversaId, session.user.id)
+      const membro = await assertMembroConversa(conversaId, session.user.id)
+      return {
+        session,
+        tenant: { id: membro.conversa.tenantId },
+        userId: session.user.id,
+        membro,
+        conversa: membro.conversa,
+        via: 'membro' as const,
+      }
+    }
 
     const ticket = await getTicketPorConversaId(conversaId)
     const conversa: {
