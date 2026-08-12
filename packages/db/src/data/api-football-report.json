@@ -1,0 +1,536 @@
+{
+  "geradoEm": "2026-08-12T07:35:36.585Z",
+  "revisar": [
+    {
+      "afiliacaoId": "163e321f-62f0-4865-b1ba-a000e2ecc722",
+      "nome": "América-AM",
+      "cidade": "Manaus",
+      "estado": "AM",
+      "motivo": "7 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 2233,
+          "nome": "America-RN",
+          "cidade": "Natal, Rio Grande do Norte",
+          "logo": "https://media.api-sports.io/football/teams/2233.png"
+        },
+        {
+          "id": 7819,
+          "nome": "América PE",
+          "cidade": "Paulista, Pernambuco",
+          "logo": "https://media.api-sports.io/football/teams/7819.png"
+        },
+        {
+          "id": 13104,
+          "nome": "América RJ",
+          "cidade": "Mesquita, Rio de Janeiro",
+          "logo": "https://media.api-sports.io/football/teams/13104.png"
+        },
+        {
+          "id": 18298,
+          "nome": "América SE",
+          "cidade": "Propriá, Sergipe",
+          "logo": "https://media.api-sports.io/football/teams/18298.png"
+        },
+        {
+          "id": 22945,
+          "nome": "America SP",
+          "cidade": "São José do Rio Preto, São Paulo",
+          "logo": "https://media.api-sports.io/football/teams/22945.png"
+        },
+        {
+          "id": 24764,
+          "nome": "America GO",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/24764.png"
+        },
+        {
+          "id": 24916,
+          "nome": "America TO",
+          "cidade": "Teófilo Otoni, Minas Gerais",
+          "logo": "https://media.api-sports.io/football/teams/24916.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "a0f9ec10-78ff-45a7-9a25-77f3ec3b7096",
+      "nome": "Caxias Futebol Clube",
+      "cidade": "Joinvile",
+      "estado": "SC",
+      "motivo": "UF divergente (nossa: SC · API: Caxias do Sul, Rio Grande do Sul)",
+      "candidatos": [
+        {
+          "id": 7770,
+          "nome": "Caxias",
+          "cidade": "Caxias do Sul, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/7770.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "141cee0c-5478-4db7-b6a5-e6061883ab3a",
+      "nome": "Clube Esportivo Sete de Setembro",
+      "cidade": "Portão B13",
+      "estado": "MS",
+      "motivo": "UF divergente (nossa: MS · API: Garanhuns, Pernambuco)",
+      "candidatos": [
+        {
+          "id": 9129,
+          "nome": "Sete de Setembro",
+          "cidade": "Garanhuns, Pernambuco",
+          "logo": "https://media.api-sports.io/football/teams/9129.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "9d6a6b8e-2d84-45cf-9928-30db581ccd5a",
+      "nome": "Clube Náutico Capiberibe",
+      "cidade": "Recife",
+      "estado": "PE",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 7876,
+          "nome": "Náutico RR",
+          "cidade": "Boa Vista, Roraima",
+          "logo": "https://media.api-sports.io/football/teams/7876.png"
+        },
+        {
+          "id": 20719,
+          "nome": "Náutico MS",
+          "cidade": "Naviraí, Mato Grosso do Sul",
+          "logo": "https://media.api-sports.io/football/teams/20719.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "bdf78fb1-1660-4198-93cc-39f941f5f64e",
+      "nome": "Goytacaz Futebol Clube",
+      "cidade": "Campos dos Goytacazes",
+      "estado": "RJ",
+      "motivo": "UF divergente (nossa: RJ · API: Campos de Goytacaz)",
+      "candidatos": [
+        {
+          "id": 13112,
+          "nome": "Goytacaz",
+          "cidade": "Campos de Goytacaz",
+          "logo": "https://media.api-sports.io/football/teams/13112.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "c44787f6-0952-4801-a8d9-b1ee457ca509",
+      "nome": "Guarani",
+      "cidade": "Campinas",
+      "estado": "SP",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 10048,
+          "nome": "Guarani RS",
+          "cidade": "Venâncio Aires, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/10048.png"
+        },
+        {
+          "id": 12296,
+          "nome": "Guarani MG",
+          "cidade": "Divinópolis, Minas Gerais",
+          "logo": "https://media.api-sports.io/football/teams/12296.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "2abfba04-73a9-4685-b240-10249f9d9dc0",
+      "nome": "Internacional Esporte Clube",
+      "cidade": "Campo Largo",
+      "estado": "PR",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 119,
+          "nome": "Internacional",
+          "cidade": "Porto Alegre, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/119.png"
+        },
+        {
+          "id": 7844,
+          "nome": "Internacional SC",
+          "cidade": "Lages, Santa Catarina",
+          "logo": "https://media.api-sports.io/football/teams/7844.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "68af384b-464e-40a6-8f1a-bddd9161054e",
+      "nome": "Juventude Esporte Clube",
+      "cidade": "Dianópolis",
+      "estado": "TO",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 152,
+          "nome": "Juventude",
+          "cidade": "Caxias do Sul, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/152.png"
+        },
+        {
+          "id": 10676,
+          "nome": "Juventude MA",
+          "cidade": "São Mateus, Maranhão",
+          "logo": "https://media.api-sports.io/football/teams/10676.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "4c54631d-a6f8-48f8-9afa-a9339431a2bc",
+      "nome": "Operário Futebol Clube",
+      "cidade": "Campo Grande",
+      "estado": "MS",
+      "motivo": "4 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 1223,
+          "nome": "Operario-PR",
+          "cidade": "Ponta Grossa, Paraná",
+          "logo": "https://media.api-sports.io/football/teams/1223.png"
+        },
+        {
+          "id": 10688,
+          "nome": "Operário MT",
+          "cidade": "Campo Verde, Mato Grosso",
+          "logo": "https://media.api-sports.io/football/teams/10688.png"
+        },
+        {
+          "id": 18309,
+          "nome": "Operário AM",
+          "cidade": "Manacapuru, Amazonas",
+          "logo": "https://media.api-sports.io/football/teams/18309.png"
+        },
+        {
+          "id": 20720,
+          "nome": "Operário AC MS",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/20720.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "f5ba8e46-4dc1-49bb-b26d-49c6fd0e0e41",
+      "nome": "Santa Cruz-RN",
+      "cidade": "Natal",
+      "estado": "RN",
+      "motivo": "8 homônimos; nome exato bate com id 2222 — confirmar",
+      "candidatos": [
+        {
+          "id": 753,
+          "nome": "Santa Cruz",
+          "cidade": "Recife, Pernambuco",
+          "logo": "https://media.api-sports.io/football/teams/753.png"
+        },
+        {
+          "id": 2222,
+          "nome": "Santa Cruz RN",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/2222.png"
+        },
+        {
+          "id": 13974,
+          "nome": "Santa Cruz",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/13974.png"
+        },
+        {
+          "id": 16479,
+          "nome": "Santa Cruz RS",
+          "cidade": "Santa Cruz do Sul, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/16479.png"
+        },
+        {
+          "id": 23566,
+          "nome": "Santa Cruz MT",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/23566.png"
+        },
+        {
+          "id": 23640,
+          "nome": "Santa Cruz RJ",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/23640.png"
+        },
+        {
+          "id": 24816,
+          "nome": "Santa Cruz SE",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/24816.png"
+        },
+        {
+          "id": 27283,
+          "nome": "Santa Cruz AC",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/27283.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "8e639360-b7b7-471a-a7da-332caff1ee12",
+      "nome": "São Bernardo Futebol Clube",
+      "cidade": "São Bernardo do Campo",
+      "estado": "SP",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 7865,
+          "nome": "São Bernardo",
+          "cidade": "São Bernardo do Campo, São Paulo",
+          "logo": "https://media.api-sports.io/football/teams/7865.png"
+        },
+        {
+          "id": 10033,
+          "nome": "EC São Bernardo",
+          "cidade": "São Bernardo do Campo, São Paulo",
+          "logo": "https://media.api-sports.io/football/teams/10033.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "3532d9f2-c309-47ae-8eb4-bf2cf7dba5ef",
+      "nome": "Tupí Futebol Clube",
+      "cidade": "Tupã",
+      "estado": "SP",
+      "motivo": "2 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 796,
+          "nome": "Tupi",
+          "cidade": "Juiz de Fora, Minas Gerais",
+          "logo": "https://media.api-sports.io/football/teams/796.png"
+        },
+        {
+          "id": 10055,
+          "nome": "Tupi RS",
+          "cidade": "Crissiumal, Rio Grando do Sul",
+          "logo": "https://media.api-sports.io/football/teams/10055.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "3ca47fe8-fd8b-4aa4-9806-f65f3dc1b610",
+      "nome": "União",
+      "cidade": "Rondonópolis",
+      "estado": "MT",
+      "motivo": "3 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 10056,
+          "nome": "União RS",
+          "cidade": "Frederico Westphalen, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/10056.png"
+        },
+        {
+          "id": 12915,
+          "nome": "União PR",
+          "cidade": "Francisco Beltrão, Paraná",
+          "logo": "https://media.api-sports.io/football/teams/12915.png"
+        },
+        {
+          "id": 13091,
+          "nome": "União CE",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/13091.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "8186066e-78e3-47d4-bb46-7fbe25a37f1e",
+      "nome": "União Futebol Clube",
+      "cidade": "Mogi das Cruzes",
+      "estado": "SP",
+      "motivo": "3 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 10056,
+          "nome": "União RS",
+          "cidade": "Frederico Westphalen, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/10056.png"
+        },
+        {
+          "id": 12915,
+          "nome": "União PR",
+          "cidade": "Francisco Beltrão, Paraná",
+          "logo": "https://media.api-sports.io/football/teams/12915.png"
+        },
+        {
+          "id": 13091,
+          "nome": "União CE",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/13091.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "ba0bf0cd-56e7-4dac-80e4-1a8e3740b44e",
+      "nome": "União Futebol Clube",
+      "cidade": "União dos Palmares",
+      "estado": "AL",
+      "motivo": "3 homônimos sem desempate",
+      "candidatos": [
+        {
+          "id": 10056,
+          "nome": "União RS",
+          "cidade": "Frederico Westphalen, Rio Grande do Sul",
+          "logo": "https://media.api-sports.io/football/teams/10056.png"
+        },
+        {
+          "id": 12915,
+          "nome": "União PR",
+          "cidade": "Francisco Beltrão, Paraná",
+          "logo": "https://media.api-sports.io/football/teams/12915.png"
+        },
+        {
+          "id": 13091,
+          "nome": "União CE",
+          "cidade": null,
+          "logo": "https://media.api-sports.io/football/teams/13091.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "34f23029-8212-432e-9ade-b7298a653123",
+      "nome": "Gama",
+      "cidade": "Gama",
+      "estado": "DF",
+      "motivo": "id externo 1222 disputado por 2 afiliações — provável duplicata do catálogo: Gama (DF) | Sociedade Esportiva Gama (DF)",
+      "candidatos": [
+        {
+          "id": 1222,
+          "nome": "Gama",
+          "cidade": "Gama, Distrito Federal",
+          "logo": "https://media.api-sports.io/football/teams/1222.png"
+        }
+      ]
+    },
+    {
+      "afiliacaoId": "4a6ebbca-6403-4396-ae47-841bffa9bec8",
+      "nome": "Sociedade Esportiva Gama",
+      "cidade": "Distrito Federal",
+      "estado": "DF",
+      "motivo": "id externo 1222 disputado por 2 afiliações — provável duplicata do catálogo: Gama (DF) | Sociedade Esportiva Gama (DF)",
+      "candidatos": [
+        {
+          "id": 1222,
+          "nome": "Gama",
+          "cidade": "Gama, Distrito Federal",
+          "logo": "https://media.api-sports.io/football/teams/1222.png"
+        }
+      ]
+    }
+  ],
+  "semMatch": [
+    "Alagoinhas Atlético Clube (BA)",
+    "Alfenense Futebol Clube (MG)",
+    "América Futebol Clube de Natal (RN)",
+    "America Futebol Clube de Teófilo Ottoni (MG)",
+    "Americano (RJ)",
+    "Aracati Esporte Clube (CE)",
+    "Araguaína Futebol e Regatas (TO)",
+    "Associação Atlética Batel (PR)",
+    "Associação Atlética caldense (MG)",
+    "Associação Atlética Coruripe (AL)",
+    "Associação Atlética Flamengo (SP)",
+    "Associação Atlética Francana (SP)",
+    "Associação Atlética Internacional de Limeira (SP)",
+    "Associação Atletica Luziânia (DF)",
+    "Associação Atlética São Mateus (ES)",
+    "Associação Cultural Esporte Clube Baraúnas (RN)",
+    "Associação Desportiva Atlética do Paraná - ADAP (PR)",
+    "Associação Desportiva São Benedito (CE)",
+    "Associação Desportiva São Caetano (SP)",
+    "Associação Esportiva Araçatuba (SP)",
+    "Associação Esportiva Catuense (BA)",
+    "Associação Ferroviária de Esportes (SP)",
+    "Associação Sportiva Sociedade Unida (RN)",
+    "Associação Trairiense de Futebol (CE)",
+    "Atlético Clube Corintians (RN)",
+    "Atlético de Ibirama (SC)",
+    "Atlético Rio Negro Clube (AM)",
+    "Barra do Garças Futebol Clube (MT)",
+    "Blumenal Esporte Clube (SC)",
+    "Campinas Futebol Clube (SP)",
+    "Campo Grande Atlético Clube (RJ)",
+    "Cascavel Clube Recreativo (PR)",
+    "Cia Norte (PR)",
+    "Clube Atlético Bragantino (SP)",
+    "Clube Atlético Colatinense (ES)",
+    "Clube Atlético do Porto (PE)",
+    "Clube Atlético Juventus (SP)",
+    "Clube Atlético Lages (SC)",
+    "Clube Atlético Lemense (SP)",
+    "Clube Atlético Linense (SP)",
+    "Clube Atlético Metropolitano (SC)",
+    "Clube Atlético Penapolense (SP)",
+    "Clube Atlético Sorocaba (SP)",
+    "Clube Atlético Taboão da Serra (SP)",
+    "Clube Atlético Taquaritinga (SP)",
+    "Clube Atlético Tricordiano (MG)",
+    "Clube Atlético Tubarão (SC)",
+    "Clube Atlético Votuporanguense (SP)",
+    "Clube Esportivo de Bento Gonçalves (RS)",
+    "Clube Náutico Marcílio Dias (SC)",
+    "Clube Recreativo e Atlético Catalano (GO)",
+    "Colo Colo Futebol e Regatas (BA)",
+    "Cotia Futebol Clube (SP)",
+    "Democrata (MG)",
+    "Desportiva Ferroviária (ES)",
+    "ECPP Vitória da Conquista (BA)",
+    "Esporte Clube Internacional de Santa Maria (RS)",
+    "Esporte Clube XV de Novembro (SP)",
+    "Ferroviário Esporte Clube do Cabo (PE)",
+    "Formiga Esporte Clube (MG)",
+    "Francisco Beltrão Futebol Clube (PR)",
+    "Gremio Atlético Farroupilha (RS)",
+    "Grêmio Esportivo Juventus (SC)",
+    "Grêmio Novorizontino (SP)",
+    "Guarany Futebol Clube de Camaquã (RS)",
+    "Internacional de Lages (SC)",
+    "Ipanema Atletico clube (AL)",
+    "Itabaiana (SE)",
+    "Itapajé Futebol Clube (CE)",
+    "Itaperuna Esporte Clube (RJ)",
+    "Ituiutaba Futebol Clube (MG)",
+    "Jabaquara Atlético clube (SP)",
+    "Jaboticabal Atlético (SP)",
+    "Marilia Atlético Clube (SP)",
+    "Moto Club de São Luís (MA)",
+    "Nacional Atlético Clube (PB)",
+    "Olinda Futebol Clube (PE)",
+    "Operário de Varzea Grande (MT)",
+    "Operário-VG (MT)",
+    "Palmas Futebol e Regatas (TO)",
+    "Quatro de Julho Esporte Clube (PI)",
+    "Rio Branco Atlético Clube (ES)",
+    "Rio Branco Football Club (AC)",
+    "Rio Branco Sport Club (PR)",
+    "River Atlético Clube (PI)",
+    "Serra (ES)",
+    "Serrano Sport Club (BA)",
+    "Sociedade Atletico Ceilandense (DF)",
+    "Sociedade Desportiva Serra Futebol Clube (ES)",
+    "Sociedade Esportiva River Plate (SE)",
+    "Sociedade Esportiva Vila Aurora (MT)",
+    "Sociedade Imperatriz de Desportos (MA)",
+    "Sport Clube Corinthians Alagoano (AL)",
+    "Sport Clube Santa Cruz (RN)",
+    "Sport Club Genus de Porto Velho (RO)",
+    "Sport Club Juiz de Fora (MG)",
+    "Sport Club São José Ltda (PR)",
+    "Sport Club São Paulo (RS)",
+    "Sport Club Ulbra (RS)",
+    "Toledo Colônia Work (PR)",
+    "Uberaba Sporte Clube (MG)",
+    "União Recreativa dos Trabalhadores (MG)",
+    "União São João de Araras (SP)",
+    "URT (MG)",
+    "Viçosa Esporte Clube (CE)",
+    "Villa Nova Atlético Clube (MG)"
+  ]
+}

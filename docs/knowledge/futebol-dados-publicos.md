@@ -105,7 +105,8 @@ Para popular `Partida` (global por `Afiliacao`) e enriquecer Agenda:
 | Camada | Uso no produto | Notas |
 |--------|----------------|-------|
 | Cadastro manual / “partida rápida” | Já entregue (2026-07-17) | Form admin + vínculo `Evento.partidaId` |
-| API de futebol (ex. API-Football / equivalentes) | Sync futuro de calendário/placar | Decisão aberta #7 — avaliar plano free/pago |
+| **API-Football** (`v3.football.api-sports.io`) | Sync de calendário/placar → `Partida` | **Decisão #7 fechada (2026-08-12): plano pago.** Free só 2022–2024. Referência: `docs/knowledge/api-football-referencia.md`; integração: `docs/data/integracao-api-football.md` |
+| `football-data.org` | Descartado como fonte | Free cobre só Série A; sem estaduais em plano nenhum |
 | Wikidata / dados abertos | Spike opcional (fixtures limitados) | Cobertura desigual BR |
 | RSS / imprensa | Notícias (`Noticia`), não jogos | Curadoria via `news-curator` |
 | Sofascore **widgets** oficiais | Display na Comunidade | Embed iframe — **não** alimenta `Partida` |

@@ -57,6 +57,13 @@ const serverSchema = z.object({
     }),
   NOTICIAS_INGEST_KEY: z.string().optional(),
 
+  // API-Football (decisão #7) — opcional; sem chave, Agenda segue no cadastro
+  // manual de Partida. `API_FOOTBALL_SEASON` existe porque o plano free só
+  // libera 2022–2024: fixa a temporada de teste sem tocar no código.
+  // Ver docs/data/integracao-api-football.md.
+  API_FOOTBALL_KEY: z.string().min(1).optional(),
+  API_FOOTBALL_SEASON: z.coerce.number().int().min(2010).max(2100).optional(),
+
   // Runtime
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -98,6 +105,8 @@ function validateEnv() {
       LIVEKIT_URL: undefined,
       REDIS_URL: undefined,
       NOTICIAS_INGEST_KEY: undefined,
+      API_FOOTBALL_KEY: undefined,
+      API_FOOTBALL_SEASON: undefined,
       NODE_ENV: 'development' as const,
       PORT: 3000,
       HOSTNAME: '0.0.0.0',
@@ -168,6 +177,15 @@ export function isLiveKitConfigured(): boolean {
   const secret = env.LIVEKIT_API_SECRET?.trim()
   const url = env.LIVEKIT_URL?.trim()
   return Boolean(key && secret && url)
+}
+
+/**
+ * Provedor de jogos (API-Football) configurado. Sem isso, o sync de `Partida`
+ * fica desligado e a Agenda continua com cadastro manual — dependência externa
+ * opcional, nunca quebra a página. Ver `lib/partidas-sync/provedor.ts`.
+ */
+export function isProvedorPartidasConfigured(): boolean {
+  return Boolean(env.API_FOOTBALL_KEY?.trim())
 }
 
 /** Redis opcional para SSE cross-réplica (Upstash Free / Redis protocol). */

@@ -77,7 +77,10 @@
     "seed:nacional-teste": "node scripts/seed-nacional-teste.js",
     "reset:nacional-teste": "node scripts/reset-nacional-teste.js",
     "reset:jornadas": "node scripts/reset-jornadas.js",
-    "db:repair-carteirinha-orfa": "node scripts/repair-carteirinha-orfa-promocao.js"
+    "db:repair-carteirinha-orfa": "node scripts/repair-carteirinha-orfa-promocao.js",
+    "coleta:api-football-times": "node --use-system-ca scripts/coleta-api-football-times.js",
+    "seed:api-football-ids": "node scripts/seed-api-football-ids.js",
+    "test:api-football-match": "node scripts/test-api-football-match.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",

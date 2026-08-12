@@ -4456,6 +4456,11 @@ model Partida {
 
   @@index([afiliacaoId, status, dataHora])
 
+  /// Idempotência do sync externo (decisão #7): o mesmo fixture nunca vira duas
+  /// Partidas do mesmo clube. NÃO protege contra duas Afiliacao apontando para o
+  /// mesmo time — isso é duplicata de catálogo, barrada no seed de ids.
+  @@unique([afiliacaoId, fonteExternalId])
+
   @@map("saas_partidas")
 
 }
