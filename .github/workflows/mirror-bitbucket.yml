@@ -66,6 +66,14 @@ jobs:
             exit 0
           fi
 
+          # Bitbucket à frente não é divergência: ele já contém este tip e
+          # seguiu (push do Samuel entre o nosso push e este job). Quem espelha
+          # de volta é o pipeline de lá; aqui não há nada a fazer.
+          if git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then
+            echo "Bitbucket já está à frente e contém $LOCAL_SHA — nada a espelhar."
+            exit 0
+          fi
+
           if git merge-base --is-ancestor "$REMOTE_SHA" "$LOCAL_SHA"; then
             echo "Fast-forward push Bitbucket main…"
             git -c "http.https://bitbucket.org/.extraheader=Authorization: Basic ${AUTH}" push bitbucket HEAD:main

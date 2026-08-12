@@ -44,6 +44,15 @@ pipelines:
                 exit 0
               fi
 
+              # GitHub à frente NÃO é divergência: ele já contém este tip e
+              # seguiu (o workflow Release cria o commit chore(release) logo
+              # depois do push). Sem este caso, o ramo de ff abaixo dá falso e
+              # o pipeline falha como "Diverged" em todo push que gera bump.
+              if git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then
+                echo "GitHub já está à frente e contém $LOCAL_SHA — nada a espelhar."
+                exit 0
+              fi
+
               # Só avança se o tip local for ancestral+ahead (ff). Divergência = falha explícita.
               if git merge-base --is-ancestor "$REMOTE_SHA" "$LOCAL_SHA"; then
                 echo "Fast-forward push GitHub main…"

@@ -26,8 +26,19 @@ flowchart LR
 | Samuel | Bitbucket | Pipeline espelha → GitHub → Railway + Actions |
 | Você | GitHub | Action espelha → Bitbucket (Samuel vê o tip) |
 
-Anti-loop: se o destino já tem o mesmo SHA, o job sai 0 sem push.
-Sem force-push: tip divergente falha e pede o fallback local.
+Anti-loop, em três casos (os dois lados usam a mesma regra):
+
+| Destino em relação ao tip local | O que o job faz |
+| --- | --- |
+| mesmo SHA | sai 0 sem push |
+| **à frente**, e já contém o tip local | sai 0 sem push — quem espelha de volta é o outro lado |
+| atrás (ff) | empurra |
+| divergente de verdade | falha e pede o fallback local (nunca force-push) |
+
+O caso "à frente" existe porque o workflow **Release** cria o commit
+`chore(release)` logo depois do push: quando o pipeline do Bitbucket acorda, o
+GitHub já andou. Sem esse caso ele lia descendente como divergência e falhava
+em **todo** push que gerasse bump (corrigido em 2026-08-12).
 Commits `chore(release)` feitos pelo Actions (GITHUB_TOKEN) não re-disparam
 `push` em outros workflows — o mirror também escuta o workflow **Release**.
 
