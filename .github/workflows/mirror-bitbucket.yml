@@ -1,0 +1,66 @@
+# Espelho automático: GitHub main → Bitbucket main
+# Push seu no GitHub espelha no Bitbucket para o Samuel ver o mesmo tip.
+# Anti-loop: no-op se Bitbucket já tem o SHA (ex.: push que veio do Pipeline).
+#
+# Secret: BITBUCKET_API_TOKEN (Atlassian API token with
+#   read:repository:bitbucket + write:repository:bitbucket)
+# Doc: docs/ops/git-remotes.md
+
+name: Mirror → Bitbucket
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: mirror-bitbucket-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: push-main-to-bitbucket
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mirror main → Bitbucket
+        env:
+          BITBUCKET_API_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BITBUCKET_API_TOKEN:-}" ]; then
+            echo "Missing secret BITBUCKET_API_TOKEN — see docs/ops/git-remotes.md"
+            exit 1
+          fi
+
+          AUTH="$(printf '%s' "x-bitbucket-api-token-auth:${BITBUCKET_API_TOKEN}" | base64 -w0 2>/dev/null || printf '%s' "x-bitbucket-api-token-auth:${BITBUCKET_API_TOKEN}" | base64)"
+          git remote remove bitbucket 2>/dev/null || true
+          git remote add bitbucket "https://bitbucket.org/setorize-torcidas/botpde.git"
+          git -c "http.https://bitbucket.org/.extraheader=Authorization: Basic ${AUTH}" fetch bitbucket main:refs/remotes/bitbucket/main
+
+          LOCAL_SHA="$(git rev-parse HEAD)"
+          REMOTE_SHA="$(git rev-parse refs/remotes/bitbucket/main)"
+
+          echo "github    HEAD=$LOCAL_SHA"
+          echo "bitbucket main=$REMOTE_SHA"
+
+          if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
+            echo "Already mirrored — skip (anti-loop)."
+            exit 0
+          fi
+
+          if git merge-base --is-ancestor "$REMOTE_SHA" "$LOCAL_SHA"; then
+            echo "Fast-forward push Bitbucket main…"
+            git -c "http.https://bitbucket.org/.extraheader=Authorization: Basic ${AUTH}" push bitbucket HEAD:main
+            echo "Mirrored $LOCAL_SHA → Bitbucket."
+          else
+            echo "Diverged from Bitbucket — refuse force-push."
+            echo "Resolve with pnpm sync:bitbucket locally (fallback), then re-push."
+            git log --oneline --left-right --cherry-pick "$REMOTE_SHA"..."$LOCAL_SHA" | head -40
+            exit 1
+          fi

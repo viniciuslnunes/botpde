@@ -1,90 +1,99 @@
-# Remotes Git — pair sync GitHub ↔ Bitbucket
+# Remotes Git — um repo lógico (GitHub ↔ Bitbucket)
 
-## Fonte da verdade operacional
+Pair programming com **dois remotes espelhados automaticamente**. Samuel não
+precisa ser colaborador no GitHub privado: ele publica no Bitbucket; o espelho
+leva o tip ao GitHub e o Railway sobe.
 
-| Remote | URL | Papel |
-| --- | --- | --- |
-| `origin` | `https://github.com/viniciuslnunes/botpde` | **Deploy** — CI, release, Railway |
-| `bitbucket` | `https://bitbucket.org/setorize-torcidas/botpde.git` | **Pair** — mesmo tip de `main` que o GitHub |
-
-Os dois devem ficar **no mesmo commit** em `main`. Quem publica só num dos
-lados deixa o pair desalinhado até rodar o sync.
-
-O Railway e `.github/workflows/` **só** veem o GitHub. Push só no Bitbucket
-não deploya — o sync empurra o tip unificado para `origin` quando falta lá.
-
-## Fluxo único (pair programming)
-
-```bash
-# Antes de começar / ao trocar de máquina / depois de push do par
-pnpm sync:bitbucket -- --dry-run   # ver o plano
-pnpm sync:bitbucket                # unir tips + push nos dois remotes
+```mermaid
+flowchart LR
+  Samuel["Samuel push main"] --> BB["Bitbucket main"]
+  You["Você push main"] --> GH["GitHub origin/main"]
+  BB -->|"Pipeline"| GH
+  GH -->|"Action"| BB
+  GH --> Railway["Railway"]
+  GH --> GHA["GitHub Actions"]
 ```
 
-O script:
+| Remote | URL | Quem usa no dia a dia |
+| --- | --- | --- |
+| `origin` | `https://github.com/viniciuslnunes/botpde` | Você — CI, release, **Railway** |
+| `bitbucket` | `https://bitbucket.org/setorize-torcidas/botpde.git` | Samuel — mesmo tip de `main` |
 
-1. `fetch` origin + bitbucket  
-2. Une o que estiver só de um lado (merge sem force-push)  
-3. Faz push de `main` nos **dois** remotes até os tips coincidirem  
+## Fluxo do pair (sem comando manual)
 
-Prioridade = **o tip mais completo** (união dos commits), não “quem gritou
-mais alto”. Divergência real vira merge commit; conflitos pedem resolução
-manual e novo `pnpm sync:bitbucket`.
+| Quem | Onde publica `main` | O que acontece |
+| --- | --- | --- |
+| Samuel | Bitbucket | Pipeline espelha → GitHub → Railway + Actions |
+| Você | GitHub | Action espelha → Bitbucket (Samuel vê o tip) |
 
-### Hábitos do pair
+Anti-loop: se o destino já tem o mesmo SHA, o job sai 0 sem push.
+Sem force-push: tip divergente falha e pede o fallback local.
 
-1. Preferir `git push origin main` no dia a dia (dispara Railway).  
-2. Se alguém commitou só no Bitbucket: rode o sync (ou peça a quem tem token).  
-3. No fim da sessão: `pnpm sync:bitbucket` — garante espelho.  
-4. Feature branches: ok em qualquer remote; `main` é o que o sync alinha.
+Arquivos:
 
-## Configurar o remote Bitbucket
+- [`bitbucket-pipelines.yml`](../../bitbucket-pipelines.yml) — Bitbucket → GitHub
+- [`.github/workflows/mirror-bitbucket.yml`](../../.github/workflows/mirror-bitbucket.yml) — GitHub → Bitbucket
+
+## Setup 1× (secrets)
+
+### A) Bitbucket Pipelines → GitHub
+
+1. No Bitbucket: **Repository settings → Pipelines → Settings** → Enable Pipelines.
+2. Crie um **Fine-grained PAT** GitHub (sua conta):
+   - [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens)
+   - Resource owner: você · Repository access: só `viniciuslnunes/botpde`
+   - Permissions: **Contents** Read and write · **Metadata** Read
+3. Bitbucket → **Repository settings → Repository variables**:
+   - Nome: `GITHUB_MIRROR_TOKEN`
+   - Valor: o PAT
+   - **Secured** = on
+
+### B) GitHub Actions → Bitbucket
+
+1. API token Atlassian com scopes Bitbucket:
+   - [Create API token](https://id.atlassian.com/manage-profile/security/api-tokens)
+   - App **Bitbucket**: `read:repository:bitbucket` + `write:repository:bitbucket`
+2. GitHub → repo **Settings → Secrets and variables → Actions**:
+   - Nome: `BITBUCKET_API_TOKEN`
+   - Valor: o token (pode ser o mesmo do `.env.jira` local; **nunca** commitado)
+
+### Smoke test
+
+1. Push doc-only / commit vazio no **Bitbucket** `main` → Pipeline verde → tip no GitHub → Railway.
+2. Push seu no **GitHub** `main` → workflow **Mirror → Bitbucket** verde → tip no Bitbucket.
+3. O hop de volta deve ser no-op (“Already mirrored”).
+
+## Fallback local (só emergência / divergência)
+
+```bash
+pnpm sync:bitbucket -- --dry-run
+pnpm sync:bitbucket
+```
+
+Une tips e empurra nos dois remotes (ff / merge, sem force). Auth local:
+`BITBUCKET_API_TOKEN` no `.env.jira` — ver também [`jira.env.example`](jira.env.example).
 
 ```bash
 git remote add bitbucket https://bitbucket.org/setorize-torcidas/botpde.git
-# se já existir:
+# ou:
 git remote set-url bitbucket https://bitbucket.org/setorize-torcidas/botpde.git
 ```
 
-### Auth Git (API token)
+## Por que Samuel não usa o GitHub
 
-1. Abra [Create and manage API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-2. **Create API token with scopes** → app **Bitbucket** → marque:
-   - `read:repository:bitbucket` (fetch)
-   - `write:repository:bitbucket` (**obrigatório** para o push do espelho)
-3. Copie o token (aparece uma vez).
-4. No `.env.jira` (gitignored):
-
-   ```bash
-   BITBUCKET_API_TOKEN=...seu_token...
-   ```
-
-   O `pnpm sync:bitbucket` usa username fixo `x-bitbucket-api-token-auth`.
-
-5. Alternativa GCM no `git fetch/push bitbucket`:
-   - **Username:** `x-bitbucket-api-token-auth`
-   - **Password:** o API token
-
-App Passwords foram descontinuados. Doc:
-[Using API tokens](https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/).
-
-## Por que push só no Bitbucket “não subiu”
-
-1. Quem clona pelo GitHub não vê esses commits.  
-2. O Railway não dispara.  
-3. O release em `main` no GitHub não roda.  
-
-Mitigação: `pnpm sync:bitbucket` (não “esperar o deploy do Bitbucket”).
+Repo privado sem colaborador para o par. O espelho **é** o acesso dele ao
+mesmo histórico que o Railway vê. Não espere deploy a partir do Bitbucket
+sozinho — o gatilho continua sendo o push espelhado no GitHub.
 
 ## Schema
 
-Se o merge unificar mudança em `packages/db/prisma/schema.prisma`, seguir
+Se o tip espelhado mudar `packages/db/prisma/schema.prisma`, seguir
 [`schema-deploy.md`](schema-deploy.md).
 
 ## Jira (KAN)
 
-Issues: [`jira-kan.md`](jira-kan.md). Commits: `feat(scope): … (KAN-42)`.
-ScriptRunner: [`jira-scriptrunner.md`](jira-scriptrunner.md).
+[`jira-kan.md`](jira-kan.md) · commits `feat(scope): … (KAN-42)` ·
+ScriptRunner [`jira-scriptrunner.md`](jira-scriptrunner.md).
 
 ## Ver remotes
 

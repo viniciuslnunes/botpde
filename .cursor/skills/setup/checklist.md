@@ -80,4 +80,4 @@ pnpm --filter @torcida/db db:generate
 - Docs: `docs/ops/postgres-local-dev.md`, `docs/ops/dev-secrets.md`
 - Compilação a frio do `next dev` (~5s) é normal; lentidão crônica = banco remoto
 - Opcional Jira CLI: `pnpm acli:install` → `cp docs/ops/jira.env.example .env.jira` → `pnpm jira:auth` — ver `docs/ops/acli-jira.md` / `docs/ops/jira-kan.md` (token pessoal, fora do pacote do time)
-- Remotes (pair): `pnpm sync:bitbucket` alinha GitHub↔Bitbucket — `docs/ops/git-remotes.md`
+- Remotes (pair): espelho auto Bitbucket↔GitHub — secrets em `docs/ops/git-remotes.md`; fallback `pnpm sync:bitbucket`

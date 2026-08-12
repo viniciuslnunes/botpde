@@ -17,7 +17,7 @@ com Postgres **local** (não proxy Railway). Idioma: PT-BR.
 - Postgres: `docs/ops/postgres-local-dev.md`
 - Secrets: `docs/ops/dev-secrets.md`
 - Jira CLI (opcional): `pnpm acli:install` + `pnpm jira:auth` — `docs/ops/acli-jira.md`; token pessoal, nunca no pacote do time
-- Remotes Git: `docs/ops/git-remotes.md` — pair sync `pnpm sync:bitbucket` (GitHub=deploy, Bitbucket=espelho)
+- Remotes Git: `docs/ops/git-remotes.md` — espelho auto Bitbucket↔GitHub (Railway via GitHub; Samuel só no Bitbucket)
 
 ## Protocolo
 

@@ -87,7 +87,7 @@ Branch: feat/KAN-42-live-indicator
 PR:     [KAN-42] …
 ```
 
-GitHub = deploy (Railway). Bitbucket = espelho pair — `pnpm sync:bitbucket` ([`git-remotes.md`](git-remotes.md)).
+GitHub = deploy (Railway). Bitbucket = entrada do Samuel — espelho auto (`docs/ops/git-remotes.md`); fallback `pnpm sync:bitbucket`.
 
 ## O que migrar (ordem)
 
