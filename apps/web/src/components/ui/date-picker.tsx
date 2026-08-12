@@ -21,6 +21,7 @@ import {
   type CalendarParts,
 } from '@/lib/format-datetime'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
+import { useHidratado } from '@/lib/use-hidratado'
 
 const MESES_CURTOS = [
   'Jan',
@@ -112,7 +113,7 @@ export function DatePicker({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHidratado()
   const [position, setPosition] = useState({ top: 0, left: 0, width: 308 })
   const [uncontrolled, setUncontrolled] = useState(defaultValue)
   const controlled = valueProp !== undefined
@@ -136,12 +137,13 @@ export function DatePicker({
     selected ?? clampParts(today, minParts, maxParts),
   )
 
-  useEffect(() => setMounted(true), [])
-
-  useEffect(() => {
-    if (!open) return
-    setView(selected ?? clampParts(today, minParts, maxParts))
-  }, [open, selected, today, minParts, maxParts])
+  // Abrir o painel reposiciona o calendário no mês do valor atual. No render:
+  // em effect o calendário abria no mês anterior e pulava no frame seguinte.
+  const [abertoSincronizado, setAbertoSincronizado] = useState(open)
+  if (open !== abertoSincronizado) {
+    setAbertoSincronizado(open)
+    if (open) setView(selected ?? clampParts(today, minParts, maxParts))
+  }
 
   const placePanel = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect()

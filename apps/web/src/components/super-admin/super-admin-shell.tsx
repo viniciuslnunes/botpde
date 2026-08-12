@@ -11,6 +11,7 @@ import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-conte
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
 import { AppBuildMetaSidebar } from '@/components/super-admin/app-build-meta'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
+import { useHidratado } from '@/lib/use-hidratado'
 
 interface SuperAdminBadges {
   afiliacoes: number
@@ -75,9 +76,13 @@ function SuperAdminTopbar({
   const pathname = usePathname()
   const firstName = userName?.split(' ')[0] ?? 'Operador'
 
-  useEffect(() => {
+  // Fecha o dropdown ao navegar, no render — em effect o backdrop invisível
+  // sobrevive um frame sobre a página nova.
+  const [pathnameSincronizado, setPathnameSincronizado] = useState(pathname)
+  if (pathname !== pathnameSincronizado) {
+    setPathnameSincronizado(pathname)
     setUserDropOpen(false)
-  }, [pathname])
+  }
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -180,11 +185,7 @@ function SuperAdminSidebar({
   unidades: UnidadeOpcao[]
   badges?: SuperAdminBadges
 }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useHidratado()
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -254,9 +255,13 @@ export function SuperAdminShell({
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  useEffect(() => {
+  // Fecha o drawer ao navegar, no render (em effect ele fica aberto por um
+  // frame sobre a página nova).
+  const [pathnameDrawer, setPathnameDrawer] = useState(pathname)
+  if (pathname !== pathnameDrawer) {
+    setPathnameDrawer(pathname)
     setMobileOpen(false)
-  }, [pathname])
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
