@@ -151,26 +151,49 @@ async function criarDmOuSolicitacao(opts: {
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+/** Inclui conversa de ticket de loja via `?c=` quando staff pode ler sem ser membro. */
+async function comTicketDeepLink(
+  userId: string,
+  conversas: ReturnType<typeof serializeConversasInbox>,
+  conversaId: string | null,
+): Promise<ReturnType<typeof serializeConversasInbox>> {
+  if (!conversaId || conversas.some((c) => c.id === conversaId)) return conversas
+  const { montarInboxItemTicketStaff } = await import('@/lib/loja-ticket')
+  const sintetica = await montarInboxItemTicketStaff(conversaId, userId)
+  if (!sintetica) return conversas
+  return [sintetica, ...conversas]
+}
+
+export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
+    const deepLinkId = request.nextUrl.searchParams.get('c')
+
     const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
     if (tenant) {
       const status = await getStatusInboxMensageria(session.user.id, tenant.id)
       if (status.podeListar) {
-        const conversas = await listConversas(session.user.id)
-        return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
+        const conversas = await comTicketDeepLink(
+          session.user.id,
+          serializeConversasInbox(await listConversas(session.user.id)),
+          deepLinkId,
+        )
+        return NextResponse.json({ conversas })
       }
     }
 
     const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
     if (ctx?.tenantSintetico || ctx?.modo === 'nacional') {
-      const conversas = await listConversas(session.user.id)
-      return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
+      const conversas = await comTicketDeepLink(
+        session.user.id,
+        serializeConversasInbox(await listConversas(session.user.id)),
+        deepLinkId,
+      )
+      return NextResponse.json({ conversas })
     }
 
     if (!tenant) {
@@ -182,8 +205,20 @@ export async function GET() {
 
     const statusBloqueado = await getStatusInboxMensageria(session.user.id, tenant.id)
     if (statusBloqueado.podeListar) {
-      const conversas = await listConversas(session.user.id)
-      return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
+      const conversas = await comTicketDeepLink(
+        session.user.id,
+        serializeConversasInbox(await listConversas(session.user.id)),
+        deepLinkId,
+      )
+      return NextResponse.json({ conversas })
+    }
+
+    // Staff sem inbox “normal” ainda pode abrir ticket via deep-link.
+    if (deepLinkId) {
+      const conversas = await comTicketDeepLink(session.user.id, [], deepLinkId)
+      if (conversas.length > 0) {
+        return NextResponse.json({ conversas })
+      }
     }
 
     return NextResponse.json({
