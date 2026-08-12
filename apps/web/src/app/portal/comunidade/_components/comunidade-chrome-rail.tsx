@@ -63,6 +63,9 @@ export function ComunidadeChromeRail({
     { tenantAtivoEhUnidade },
   )
   const modoNacional = escopo === 'nacional'
+  // Mesma regra do `ComunidadeFeedShell`: sub-rota só carrega `?escopo=` quando
+  // o escopo ativo não é o default do contexto.
+  const sufixoEscopo = escopo === modoContexto ? '' : `?escopo=${escopo}`
 
   const salas = modoNacional ? salasNacional : salasTorcida
   const canaisSugeridos = modoNacional ? canaisNacional : canaisTorcida
@@ -70,7 +73,7 @@ export function ComunidadeChromeRail({
 
   return (
     <div className={COMUNIDADE_RAIL_SCROLL}>
-      <ComunidadeSalasAside salas={salas} />
+      <ComunidadeSalasAside salas={salas} sufixoEscopo={sufixoEscopo} />
       {tenantAtualId && canaisSugeridos.length > 0 ? (
         <CanaisSugeridosAside canais={canaisSugeridos} tenantAtualId={tenantAtualId} />
       ) : null}

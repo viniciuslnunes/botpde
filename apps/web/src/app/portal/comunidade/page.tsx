@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { resolverContextoComunidade, resolverEscopoComunidade, getTenantIdsPorAfiliacao } from '@/lib/comunidade-contexto'
+import { resolverContextoComunidade, resolverEscopoComunidade, contarTorcidasDoClubeNaCN } from '@/lib/comunidade-contexto'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
@@ -124,11 +124,11 @@ export default async function ComunidadePage({
       atualSlug,
     })
 
-    const [salasAtivas, solicitacaoPendente, tenantIdsClube, canaisAbertosNacional, canaisTematicosNacional] =
+    const [salasAtivas, solicitacaoPendente, torcidasDoClube, canaisAbertosNacional, canaisTematicosNacional] =
       await Promise.all([
         listSalasNacionais(afiliacao.id),
         getSolicitacaoSocioPendente(session.user.id),
-        getTenantIdsPorAfiliacao(afiliacao.id),
+        contarTorcidasDoClubeNaCN(afiliacao.id),
         superAdminNacional
           ? carregarCanaisAbertosOperador(await lerSlugsCanaisAbertosOperador())
           : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
@@ -174,7 +174,7 @@ export default async function ComunidadePage({
           currentUser={currentUser}
           filtro={filtro}
           clubeNacional={afiliacao}
-          torcidasNacionalCount={tenantIdsClube.length}
+          torcidasNacionalCount={torcidasDoClube}
           salasAtivas={salasAtivas}
           eventoIdInicial={eventoIdComposer}
           escopo="nacional"

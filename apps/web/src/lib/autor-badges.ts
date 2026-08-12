@@ -1,17 +1,24 @@
 import { db } from '@torcida/db'
 import { unstable_cache } from 'next/cache'
 import { tagAutorBadgesTenant } from './comunidade-cache'
-import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema } from '@torcida/types'
+import {
+  SYSTEM_ROLES,
+  formatNomeTorcida,
+  nomeExibicaoAfiliacao,
+  rotuloCargoSistema,
+} from '@torcida/types'
 import type { PostSocialItem } from './feed'
 
 export type TorcidaRealAutor = { tenantId: string; tenantNome: string }
 
 export {
+  CARGO_TORCEDOR,
   formatAutorCargoBadge,
   formatCargoComNumeroSocio,
   parseNumeroAssociado,
 } from './autor-badges-format'
 import {
+  CARGO_TORCEDOR,
   formatAutorCargoBadge,
   formatCargoComNumeroSocio,
   parseNumeroAssociado,
@@ -382,20 +389,19 @@ export async function resolverTorcidaRealPorAutor(
 }
 
 /**
- * Quem ainda não é sócio de TO real não exibe torcida/unidade do convite —
- * a identidade pública é a Comunidade Nacional do clube (ex.: "TIMÃO —
- * COMUNIDADE NACIONAL"), até `SaasMembro.tipo === SOCIO`. Sócio no sintético
- * sobe a torcida real (caminho inverso, já existente).
+ * Quem ainda não é sócio de TO real não exibe torcida/unidade do convite: a
+ * identidade pública é "clube + Torcedor" (ex.: `TIMÃO` · `Torcedor`), até
+ * `SaasMembro.tipo === SOCIO`. Vale igual no tenant sintético da CN e na
+ * torcida real — antes o sintético caía num rótulo longo e sem pill
+ * ("TIMÃO — COMUNIDADE NACIONAL"), divergindo do preview pós-publicação.
+ * Sócio no sintético sobe a torcida real (caminho inverso, já existente).
  */
-export function deveMascararAutorComoComunidadeNacional(args: {
+export function deveExibirIdentidadeTorcedor(args: {
   tipoPost: string
-  emTenantSintetico: boolean
   ehSocioDeTorcidaReal: boolean
 }): boolean {
   if (args.tipoPost !== 'MEMBRO') return false
-  if (args.ehSocioDeTorcidaReal) return false
-  // Já no sintético sem ser sócio: o nome do tenant já é a CN.
-  return !args.emTenantSintetico
+  return !args.ehSocioDeTorcidaReal
 }
 
 export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
@@ -413,22 +419,16 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     ...new Set(tenants.map((t) => t.afiliacaoId).filter((id): id is string => id != null)),
   ]
 
-  const sinteticosCn: Array<{ id: string; afiliacaoId: string | null; nome: string }> =
+  // Rótulo curto do clube ("TIMÃO") — identidade pública de quem ainda não é
+  // sócio. Não usa mais o nome do tenant sintético ("… — Comunidade Nacional").
+  const clubes: Array<{ id: string; nome: string; apelido: string | null }> =
     afiliacaoIds.length > 0
-      ? await db.tenant.findMany({
-          where: { afiliacaoId: { in: afiliacaoIds }, sintetico: true, ativo: true },
-          select: { id: true, afiliacaoId: true, nome: true },
+      ? await db.afiliacao.findMany({
+          where: { id: { in: afiliacaoIds } },
+          select: { id: true, nome: true, apelido: true },
         })
       : []
-  const sinteticoPorAfiliacao = new Map<string, { id: string; nome: string }>()
-  for (const s of sinteticosCn) {
-    if (s.afiliacaoId && !sinteticoPorAfiliacao.has(s.afiliacaoId)) {
-      sinteticoPorAfiliacao.set(s.afiliacaoId, {
-        id: s.id,
-        nome: formatNomeTorcida(s.nome),
-      })
-    }
-  }
+  const rotuloClubePorAfiliacao = new Map(clubes.map((c) => [c.id, nomeExibicaoAfiliacao(c)]))
 
   // Sócio de TO real no clube — tanto para subir badge no sintético quanto
   // para NÃO mascarar posts MEMBRO que vivem na torcida (alcance nacional).
@@ -447,23 +447,16 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
   }
 
   const badges = await getBadgesPorAutorTenant([
-    ...posts.map((p) => {
-      const meta = tenantMeta.get(p.tenantId)
+    // Identidade de torcedor não consulta cargo: o pill é fixo e a unidade do
+    // convite nunca é exibida.
+    ...posts.flatMap((p) => {
       const real = torcidaRealPorAutor.get(p.autorId)
-      const emSintetico = meta?.sintetico === true
-      if (emSintetico && real) return { autorId: p.autorId, tenantId: real.tenantId }
-      if (
-        deveMascararAutorComoComunidadeNacional({
-          tipoPost: p.tipo,
-          emTenantSintetico: emSintetico,
-          ehSocioDeTorcidaReal: Boolean(real),
-        }) &&
-        meta?.afiliacaoId
-      ) {
-        const cn = sinteticoPorAfiliacao.get(meta.afiliacaoId)
-        if (cn) return { autorId: p.autorId, tenantId: cn.id }
+      if (deveExibirIdentidadeTorcedor({ tipoPost: p.tipo, ehSocioDeTorcidaReal: Boolean(real) })) {
+        return []
       }
-      return { autorId: p.autorId, tenantId: p.tenantId }
+      const emSintetico = tenantMeta.get(p.tenantId)?.sintetico === true
+      if (emSintetico && real) return [{ autorId: p.autorId, tenantId: real.tenantId }]
+      return [{ autorId: p.autorId, tenantId: p.tenantId }]
     }),
     ...posts.flatMap((p) => {
       const c = p.comunicadoOrigem
@@ -476,18 +469,18 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     const meta = tenantMeta.get(p.tenantId)
     const real = torcidaRealPorAutor.get(p.autorId)
     const emSintetico = meta?.sintetico === true
-    const mascararCn = deveMascararAutorComoComunidadeNacional({
+    const identidadeTorcedor = deveExibirIdentidadeTorcedor({
       tipoPost: p.tipo,
-      emTenantSintetico: emSintetico,
       ehSocioDeTorcidaReal: Boolean(real),
     })
-    const cn =
-      mascararCn && meta?.afiliacaoId
-        ? sinteticoPorAfiliacao.get(meta.afiliacaoId)
-        : undefined
+    // Clube não resolvido (tenant sem afiliação) mantém o rótulo do post —
+    // mesmo comportamento de antes; o que não pode é ficar sem torcida alguma.
+    const rotuloClube = identidadeTorcedor
+      ? ((meta?.afiliacaoId ? rotuloClubePorAfiliacao.get(meta.afiliacaoId) : null) ||
+        formatNomeTorcida(p.tenant.nome))
+      : null
 
-    const tenantBadgeId =
-      emSintetico && real ? real.tenantId : cn ? cn.id : p.tenantId
+    const tenantBadgeId = emSintetico && real ? real.tenantId : p.tenantId
     const b = badges.get(chave(p.autorId, tenantBadgeId))
 
     const comunicado = p.comunicadoOrigem
@@ -498,11 +491,11 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
 
     const base = {
       ...p,
-      autor: mascararCn
+      autor: identidadeTorcedor
         ? {
             ...p.autor,
             sedeNome: null,
-            cargoNome: null,
+            cargoNome: CARGO_TORCEDOR,
             departamentoNome: null,
           }
         : b
@@ -526,8 +519,8 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     if (emSintetico && real) {
       return { ...base, tenant: { nome: real.tenantNome, logoUrl: base.tenant.logoUrl } }
     }
-    if (cn) {
-      return { ...base, tenant: { nome: cn.nome, logoUrl: base.tenant.logoUrl } }
+    if (rotuloClube) {
+      return { ...base, tenant: { nome: rotuloClube, logoUrl: base.tenant.logoUrl } }
     }
     return base
   })

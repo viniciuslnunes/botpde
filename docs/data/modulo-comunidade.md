@@ -185,15 +185,20 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
   sócio desliga em Sobre › "Número de sócio no feed"
   (`perfil-editar-form.tsx` → `salvarPerfilSocial`). Formatação pura em
   `formatCargoComNumeroSocio` (após `formatAutorCargoBadge`).
-  **TORCEDOR = CN até sócio (2026-08-07)**: convite de unidade cria vínculo
-  `TORCEDOR` na TO, mas a identidade pública no feed é a Comunidade Nacional
-  do clube (`TIMÃO — COMUNIDADE NACIONAL`) — sem nome da torcida, sem unidade,
-  sem pill "Torcedor" — até `SaasMembro.tipo === SOCIO`. Sócio no sintético
-  sobe a torcida real (`resolverTorcidaRealPorAutor`); post `MEMBRO` de
-  não-sócio em TO real (ex.: seed legado com `alcanceNacional`) é mascarado
-  para o sintético em `enriquecerPostsComBadges` /
-  `deveMascararAutorComoComunidadeNacional`. Comunicado `INSTITUCIONAL` não
-  mascara.
+  **TORCEDOR = clube + pill "Torcedor" (2026-08-12)**: convite de unidade cria
+  vínculo `TORCEDOR` na TO, mas a identidade pública no feed é o **clube**
+  (`TIMÃO`, de `nomeExibicaoAfiliacao`) com o pill `Torcedor` — sem nome da
+  torcida, sem unidade, sem cargo — até `SaasMembro.tipo === SOCIO`. Vale igual
+  em TO real e no tenant sintético da CN: antes o sintético caía num rótulo
+  longo e sem pill (`TIMÃO — COMUNIDADE NACIONAL`), divergindo do preview
+  pós-publicação, que já mostrava `TIMÃO` + `Torcedor` — o mesmo post mudava de
+  cara ao recarregar. Regra pura única: `deveExibirIdentidadeTorcedor`
+  (substitui `deveMascararAutorComoComunidadeNacional`) + constante
+  `CARGO_TORCEDOR` (`autor-badges-format.ts`, client-safe), consumida por
+  `enriquecerPostsComBadges` (feed/busca), `previewDoPost`
+  (`comunidade/actions.ts`) e os composers da aba Nacional. Sócio no sintético
+  sobe a torcida real (`resolverTorcidaRealPorAutor`). Comunicado
+  `INSTITUCIONAL` nunca vira identidade de torcedor.
   **Unidade não repete a torcida (2026-08-03)**: onde torcida e unidade
   aparecem lado a lado, a unidade some quando não identifica nada além da
   torcida — dois casos reais: unidade promovida a tenant próprio (Caso B, mesmo

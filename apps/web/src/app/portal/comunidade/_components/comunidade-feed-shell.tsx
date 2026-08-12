@@ -173,7 +173,7 @@ export function ComunidadeFeedShell({
 
   const salasMobile = (
     <Suspense fallback={null}>
-      <ComunidadeSalasMobile salas={salasAtivas} />
+      <ComunidadeSalasMobile salas={salasAtivas} sufixoEscopo={sufixoEscopo} />
     </Suspense>
   )
 
@@ -266,9 +266,11 @@ export function ComunidadeFeedShell({
         {!modoCanal && currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
             {modoNacional ? (
+              /* Identidade pública do não-sócio é o clube ("TIMÃO"), não o nome
+                 do tenant sintético ("… — Comunidade Nacional"). */
               <ComunidadeNacionalComposerSection
                 tenantId={tenant.id}
-                tenantNome={tenant.nome}
+                tenantNome={clubeNacional?.apelido || clubeNacional?.nome || tenant.nome}
                 userId={currentUser.id}
                 userName={currentUser.nome}
                 userAvatar={currentUser.avatarUrl}

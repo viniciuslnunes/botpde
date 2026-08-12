@@ -9,6 +9,7 @@ import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { LogoImage } from '@/components/media/logo-image'
 import { FeedComposerSkeleton } from '@/components/portal/feed-skeletons'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
+import { CARGO_TORCEDOR } from '@/lib/autor-badges-format'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -95,10 +96,10 @@ export async function ComunidadeNacionalShell({
         userName={currentUser.nome}
         userAvatar={currentUser.avatarUrl}
         tenantId={tenantSintetico.id}
-        tenantNome={`${nomeClube} — Comunidade Nacional`}
+        tenantNome={nomeClube}
         nacional
         autorBadges={{
-          cargoNome: 'Torcedor',
+          cargoNome: CARGO_TORCEDOR,
           departamentoNome: null,
           sedeNome: null,
         }}

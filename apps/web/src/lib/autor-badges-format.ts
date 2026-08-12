@@ -5,6 +5,14 @@
 
 import { formatUnidadeLabel } from './torcida-labels'
 
+/**
+ * Pill de quem ainda não é sócio de torcida real — a identidade pública dele é
+ * "torcedor do clube", não a torcida por onde entrou. Constante única para o
+ * feed (`enriquecerPostsComBadges`), o preview pós-publicação (`previewDoPost`)
+ * e o composer da Comunidade Nacional não divergirem.
+ */
+export const CARGO_TORCEDOR = 'Torcedor'
+
 /** Texto único do badge cargo + área (evita duplicar se o perfil já traz a área). */
 export function formatAutorCargoBadge(
   cargoNome: string | null,

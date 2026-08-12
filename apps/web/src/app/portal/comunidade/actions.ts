@@ -34,7 +34,12 @@ import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
-import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
+import {
+  CARGO_TORCEDOR,
+  chave,
+  getBadgesPorAutorTenant,
+  getTorcidaRealDoAutor,
+} from '@/lib/autor-badges'
 import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma, nomeExibicaoAfiliacao } from '@torcida/types'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import {
@@ -203,8 +208,10 @@ async function previewDoPost(opts: {
   const badge = badges.get(chave(opts.autorId, badgeTenantId))
   let cargoNome = badge?.cargoNome ?? null
   const departamentoNome = badge?.departamentoNome ?? null
+  // Mesma identidade pública do feed (`deveExibirIdentidadeTorcedor`): quem não
+  // é sócio de TO real posta como torcedor do clube.
   if (!cargoNome && opts.tenantSintetico && !torcidaReal) {
-    cargoNome = 'Torcedor'
+    cargoNome = CARGO_TORCEDOR
   }
 
   return {

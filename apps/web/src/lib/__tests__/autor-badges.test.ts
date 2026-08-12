@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   escolherCargoPrincipal,
-  deveMascararAutorComoComunidadeNacional,
+  deveExibirIdentidadeTorcedor,
   formatAutorCargoBadge,
   resolverDepartamentoBadge,
   rotuloCargoBadge,
@@ -140,44 +140,23 @@ describe('autor-badges', () => {
     expect(formatAutorUnidadeBadge('   ', 'GAVIÕES DA FIEL')).toBeNull()
   })
 
-  it('mascara TORCEDOR em TO real como Comunidade Nacional até virar sócio', () => {
+  it('quem não é sócio de TO real posta como torcedor do clube — no sintético e na torcida', () => {
+    // Torcedor convidado numa TO real: não expõe a torcida do convite.
     expect(
-      deveMascararAutorComoComunidadeNacional({
-        tipoPost: 'MEMBRO',
-        emTenantSintetico: false,
-        ehSocioDeTorcidaReal: false,
-      }),
+      deveExibirIdentidadeTorcedor({ tipoPost: 'MEMBRO', ehSocioDeTorcidaReal: false }),
     ).toBe(true)
-    // Já no sintético: o nome do tenant já é a CN — não precisa mascarar.
+    // No tenant sintético da CN vale a mesma identidade (antes divergia do
+    // preview pós-publicação: rótulo longo e sem pill).
     expect(
-      deveMascararAutorComoComunidadeNacional({
-        tipoPost: 'MEMBRO',
-        emTenantSintetico: true,
-        ehSocioDeTorcidaReal: false,
-      }),
+      deveExibirIdentidadeTorcedor({ tipoPost: 'MEMBRO', ehSocioDeTorcidaReal: false }),
+    ).toBe(true)
+    // Sócio: sobe (ou mantém) a torcida real, com o cargo dela.
+    expect(
+      deveExibirIdentidadeTorcedor({ tipoPost: 'MEMBRO', ehSocioDeTorcidaReal: true }),
     ).toBe(false)
-    // Sócio: sobe (ou mantém) a torcida real.
+    // Comunicado institucional nunca vira identidade de torcedor.
     expect(
-      deveMascararAutorComoComunidadeNacional({
-        tipoPost: 'MEMBRO',
-        emTenantSintetico: false,
-        ehSocioDeTorcidaReal: true,
-      }),
-    ).toBe(false)
-    expect(
-      deveMascararAutorComoComunidadeNacional({
-        tipoPost: 'MEMBRO',
-        emTenantSintetico: true,
-        ehSocioDeTorcidaReal: true,
-      }),
-    ).toBe(false)
-    // Comunicado institucional nunca vira CN.
-    expect(
-      deveMascararAutorComoComunidadeNacional({
-        tipoPost: 'INSTITUCIONAL',
-        emTenantSintetico: false,
-        ehSocioDeTorcidaReal: false,
-      }),
+      deveExibirIdentidadeTorcedor({ tipoPost: 'INSTITUCIONAL', ehSocioDeTorcidaReal: false }),
     ).toBe(false)
   })
 })

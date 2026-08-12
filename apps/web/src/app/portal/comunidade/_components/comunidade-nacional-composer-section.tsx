@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic'
 import { getComposerContext } from './composer-context'
 import { FeedComposerSkeleton } from '@/components/portal/feed-skeletons'
+import { CARGO_TORCEDOR } from '@/lib/autor-badges-format'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -40,7 +41,7 @@ export async function ComunidadeNacionalComposerSection({
       tenantNome={torcidaReal?.nome ?? tenantNome}
       nacional
       autorBadges={{
-        cargoNome: autorBadges?.cargoNome ?? 'Torcedor',
+        cargoNome: autorBadges?.cargoNome ?? CARGO_TORCEDOR,
         departamentoNome: autorBadges?.departamentoNome ?? null,
         sedeNome: autorBadges?.sedeNome ?? null,
       }}

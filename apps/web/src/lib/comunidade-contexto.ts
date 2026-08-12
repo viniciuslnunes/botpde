@@ -6,6 +6,7 @@ import { filtrarTenantsRestritos } from '@/lib/isolamento'
 import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import { isSuperAdminEmail, resolverTorcidaDoTorcedor } from '@/lib/tenant-context'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
+import { listarTorcidasDoClube } from '@/lib/tenant-hierarquia-plataforma'
 import {
   COR_PRIMARIA_PLATAFORMA,
   designFromPrimary,
@@ -543,6 +544,21 @@ export const getTenantIdsPorAfiliacao = cache(async (afiliacaoId: string): Promi
     orderBy: { nome: 'asc' },
   })
   return filtrarTenantsRestritos(tenants.map((t) => t.id))
+})
+
+/**
+ * Quantas torcidas o clube tem na plataforma — metadado do banner da CN.
+ *
+ * **Não** é `getTenantIdsPorAfiliacao().length`: aquele conjunto é o *escopo do
+ * feed* (inclui o container sintético da CN e os portais de unidade Caso B, que
+ * publicam no nacional mas não são torcidas). Contagem vem de
+ * `listarTorcidasDoClube` (raiz + ativa + não sintética), com o mesmo corte R5
+ * do feed para não anunciar uma unidade que saiu da malha de interação.
+ */
+export const contarTorcidasDoClubeNaCN = cache(async (afiliacaoId: string): Promise<number> => {
+  const torcidas = await listarTorcidasDoClube(afiliacaoId)
+  const visiveis = await filtrarTenantsRestritos(torcidas)
+  return visiveis.length
 })
 
 /**
