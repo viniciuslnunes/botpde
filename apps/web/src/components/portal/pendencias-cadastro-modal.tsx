@@ -63,9 +63,13 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
     !naTelaDeAtualizacao &&
     principal.codigo !== codigoOculto
 
-  useEffect(() => {
+  // Outra pendência = outra ciência: desmarca no render, para o checkbox não
+  // aparecer marcado por um frame no aviso novo.
+  const [codigoSincronizado, setCodigoSincronizado] = useState(principal?.codigo)
+  if (principal?.codigo !== codigoSincronizado) {
+    setCodigoSincronizado(principal?.codigo)
     setCiencia(false)
-  }, [principal?.codigo])
+  }
 
   useEffect(() => {
     if (!aberta) return

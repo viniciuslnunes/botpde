@@ -58,9 +58,13 @@ export function MediaLightbox({ urls, index, caption, onClose, onIndexChange }: 
     }
   }, [avancar, onClose, voltar])
 
-  useEffect(() => {
+  // Trocar de mídia reabre a legenda — no render, senão ela fica um frame
+  // escondida sobre a imagem nova.
+  const [indexSincronizado, setIndexSincronizado] = useState(index)
+  if (index !== indexSincronizado) {
+    setIndexSincronizado(index)
     setCaptionVisible(true)
-  }, [index])
+  }
 
   if (!mounted || urls.length === 0) return null
 

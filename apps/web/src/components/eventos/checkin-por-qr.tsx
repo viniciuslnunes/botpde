@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { registrarCheckInPorQr } from '@/app/admin/eventos/actions'
 import { Camera, CloudOff, QrCode, StopCircle, Wifi } from 'lucide-react'
+import { useOnline } from '@/lib/use-online'
 import {
   enqueueCheckinOffline,
   listCheckinOffline,
@@ -33,7 +34,7 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
   const [scanning, setScanning] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [fila, setFila] = useState<CheckinOfflineItem[]>([])
-  const [online, setOnline] = useState(true)
+  const online = useOnline()
   const [syncing, setSyncing] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -66,21 +67,16 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
     setSyncing(false)
   }, [eventoId, refreshFila])
 
+  // O estado de conexão vem do `useOnline`; aqui fica só o efeito colateral de
+  // voltar a ter rede (esvaziar a fila offline).
   useEffect(() => {
     refreshFila()
-    setOnline(navigator.onLine)
     const onOnline = () => {
-      setOnline(true)
       void syncFila()
     }
-    const onOffline = () => setOnline(false)
     window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
     void syncFila()
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
+    return () => window.removeEventListener('online', onOnline)
   }, [refreshFila, syncFila])
 
   const stopCamera = useCallback(() => {

@@ -431,7 +431,12 @@ function SocialEmbed({ url }: { url: string }) {
   const themeAware = provider != null && embedSupportsColorScheme(provider)
   const shellRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
-  const processedRef = useRef(false)
+  /**
+   * Qual versão do embed já foi montada (`rearmeKey`), não um booleano.
+   * Guardando a chave, trocar URL/tema invalida sozinho — não é preciso um
+   * effect zerando a flag, que seria escrita em ref durante o render.
+   */
+  const processedRef = useRef<string | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
   const [visible, setVisible] = useState(false)
   const [activated, setActivated] = useState(false)
@@ -467,33 +472,36 @@ function SocialEmbed({ url }: { url: string }) {
     return () => io.disconnect()
   }, [url])
 
-  useEffect(() => {
-    processedRef.current = false
+  // Rearma o embed no render quando muda a URL — ou o tema, nos widgets que só
+  // leem o esquema na criação (hoje: X). Em effect, o frame anterior continuava
+  // montado por um render depois da troca.
+  // `visible` só volta a false na troca de URL: o embed já visível não precisa
+  // reentrar no viewport só porque o tema mudou.
+  const rearmeKey = `${url}|${themeAware ? colorScheme : ''}`
+  const [rearmeSincronizado, setRearmeSincronizado] = useState(rearmeKey)
+  const [urlSincronizada, setUrlSincronizada] = useState(url)
+  if (rearmeKey !== rearmeSincronizado) {
+    setRearmeSincronizado(rearmeKey)
     setActivated(false)
     setHasFrame(false)
-    setVisible(false)
-  }, [url])
-
-  // Remonta widgets que só leem o tema na criação (hoje: X)
-  useEffect(() => {
-    if (!themeAware) return
-    processedRef.current = false
-    setActivated(false)
-    setHasFrame(false)
-  }, [themeAware, colorScheme])
+    if (url !== urlSincronizada) {
+      setUrlSincronizada(url)
+      setVisible(false)
+    }
+  }
 
   useEffect(() => {
     if (!provider || provider === 'youtube') return
-    if (!visible || cardWidth <= 0 || processedRef.current) return
+    if (!visible || cardWidth <= 0 || processedRef.current === rearmeKey) return
     const host = hostRef.current
     if (!host) return
 
-    processedRef.current = true
+    processedRef.current = rearmeKey
     void loadEmbedScript(provider).then(() => {
       processOfficialEmbed(provider, host)
       setActivated(true)
     })
-  }, [provider, url, visible, cardWidth, colorScheme])
+  }, [provider, url, visible, cardWidth, colorScheme, rearmeKey])
 
   useEffect(() => {
     const host = hostRef.current

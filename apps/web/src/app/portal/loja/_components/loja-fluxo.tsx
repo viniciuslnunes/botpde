@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { Check } from 'lucide-react'
 
 const STORAGE_KEY = 'torcida:loja-ultima'
@@ -18,17 +18,23 @@ export function LojaRememberStore({ tenantId }: { tenantId: string }) {
   return null
 }
 
+/** Nada a assinar: a chave só muda em outra navegação, que remonta o hook. */
+const semInscricao = () => () => {}
+
+function lerUltimaLoja(): string | null {
+  try {
+    return sessionStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
 export function useUltimaLojaHref(fallback = '/portal/loja'): string {
-  const [href, setHref] = useState(fallback)
-  useEffect(() => {
-    try {
-      const id = sessionStorage.getItem(STORAGE_KEY)
-      if (id) setHref(`/portal/loja/${id}`)
-    } catch {
-      /* ignore */
-    }
-  }, [fallback])
-  return href
+  // `useSyncExternalStore` em vez de effect + setState: no servidor devolve
+  // null (daí o fallback) e o valor real entra já no render pós-hidratação,
+  // sem o render extra que o effect causava.
+  const id = useSyncExternalStore(semInscricao, lerUltimaLoja, () => null)
+  return id ? `/portal/loja/${id}` : fallback
 }
 
 export function ContinuarComprandoLink({

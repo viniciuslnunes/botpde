@@ -60,9 +60,13 @@ export function NotificationBell({
   const rootRef = useRef<HTMLDivElement>(null)
   const itemsRef = useLatestRef(items)
 
-  useEffect(() => {
+  // Fecha o painel ao navegar, no render (em effect ele fica aberto por um
+  // frame sobre a página nova).
+  const [pathnameSincronizado, setPathnameSincronizado] = useState(pathname)
+  if (pathname !== pathnameSincronizado) {
+    setPathnameSincronizado(pathname)
     setOpen(false)
-  }, [pathname])
+  }
 
   // pointerdown (não onClick): fecha no toque, sem esperar mouseup.
   // Evita o backdrop `fixed inset-0` do header (z-50), que não cobre o
