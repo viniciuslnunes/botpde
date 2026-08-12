@@ -1,9 +1,9 @@
 /**
- * Nomes de torcida (própria, aliada ou coirmã) e de afiliação (clube apoiado)
- * são sempre exibidos em caixa alta.
+ * Nomes de torcida (própria, aliada ou coirmã), de afiliação (clube apoiado) e
+ * de unidade (Sede/Subsede/PDE) são sempre exibidos em caixa alta.
  *
  * Use em toda projeção/UI que referencia `Tenant.nome`, `Afiliacao.nome` /
- * `Afiliacao.apelido` (ou título de catálogo equivalente).
+ * `Afiliacao.apelido`, `Sede.nome` (ou título de catálogo equivalente).
  * Não aplicar antes de matching de paleta (`paletaDoClube`) — lá o casing
  * original do banco importa.
  */
@@ -21,6 +21,17 @@ export function formatNomeTorcida(nome) {
 
 /** `Afiliacao.nome` / `Afiliacao.apelido` (clube). */
 export function formatNomeAfiliacao(nome) {
+  return formatNomeCaixaAlta(nome)
+}
+
+/**
+ * `Sede.nome` — Sede, Subsede ou PDE. Unidade promovida a portal já chegava em
+ * caixa alta por `formatNomeTorcida` (é `Tenant.nome`) enquanto a irmã sem
+ * portal vinha capitalizada do banco, então a mesma lista misturava
+ * "SUBSEDE RIO CLARO" e "Subsede ABC". A caixa é de exibição: não normalize o
+ * dado gravado, que é o que o presidente digitou.
+ */
+export function formatNomeUnidade(nome) {
   return formatNomeCaixaAlta(nome)
 }
 

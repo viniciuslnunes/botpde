@@ -115,7 +115,13 @@ export function ListagemToolbar({
           {filtrando ? ' filtrados' : ''}
         </p>
 
-        {acoes && <div className="ml-auto shrink-0">{acoes}</div>}
+        {/* Painel aberto de AdminCreateDisclosure marca data-create-open e
+            precisa da linha inteira — senão fica espremido ao lado da busca. */}
+        {acoes && (
+          <div className="ml-auto shrink-0 has-[[data-create-open]]:w-full has-[[data-create-open]]:basis-full has-[[data-create-open]]:ml-0">
+            {acoes}
+          </div>
+        )}
       </div>
 
       {compactos.length > 0 && (

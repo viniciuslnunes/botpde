@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: tag-version-from-git
+    runs-on: ubuntu-latest
+    # Commits só de sync/tag metadata não precisam reprocessar.
+    if: ${{ !contains(github.event.head_commit.message, 'chore(release)') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Buscar refs para contagem --all
+        run: git fetch --prune --unshallow 2>/dev/null || git fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Calcular versão
+        id: version
+        run: |
+          VERSION=$(node -e "import('./scripts/lib/version-from-git.mjs').then(m => console.log(m.computeVersionFromGit().version))")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Computed: v$VERSION"
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sincronizar package.json (commit de release)
+        if: steps.version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node scripts/release-sync.mjs -- --no-commit
+          # Reconta após o working tree; a versão no arquivo descreve ESTE commit
+          # (antes do commit de sync). Aceitável: off-by-one no patch/minor só
+          # após o commit de sync — o build do app usa Git no next.config.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- package.json CHANGELOG.md; then
+            echo "Sem mudanças em package.json"
+          else
+            git add package.json CHANGELOG.md
+            git commit -m "chore(release): ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Tag já existe"
+          else
+            git tag -a "v${VERSION}" -m "Release v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
+      - name: GitHub Release
+        if: steps.version.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

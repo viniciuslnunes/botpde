@@ -23,7 +23,9 @@ export function AdminCreateDisclosure({ label, title, children }: AdminCreateDis
   const [open, setOpen] = useState(false)
 
   return (
-    <div>
+    // `data-create-open` deixa a ListagemToolbar empurrar o painel para a
+    // linha de baixo (basis-full) — sem isso o form abre ao lado da busca.
+    <div className={open ? 'w-full' : undefined} {...(open ? { 'data-create-open': '' } : {})}>
       {!open ? (
         <m.button
           type="button"
@@ -45,7 +47,7 @@ export function AdminCreateDisclosure({ label, title, children }: AdminCreateDis
             animate="show"
             exit="exit"
             transition={springSnappy}
-            className="overflow-hidden"
+            className="w-full overflow-hidden"
           >
             <div className="flex items-center justify-between gap-3 pb-2">
               <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">

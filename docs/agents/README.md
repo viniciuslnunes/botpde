@@ -28,6 +28,7 @@ Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
 | Agente | Quando usar |
 |---|---|
 | `setup` | Onboarding de máquina: Node/pnpm, Docker, Postgres local, sync, `.env` e secrets do time (`/setup` no Cursor; script `scripts/dev-setup.*`) |
+| `ops-schema` | Pós-deploy / merge em `main` com mudança de `schema.prisma`: detecta drift e aplica `db:push` em HML→prod (`schema:check` / `schema:deploy`) |
 | `research-dominio` | Entender o nicho, benchmarks, riscos — antes de decidir |
 | `aliancas-torcidas` | Estudar alianças/rivalidades; recomendar aliados na config |
 | `product-strategy` | Decidir o quê construir e em que ordem |
@@ -50,6 +51,9 @@ Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
 6. **Fechar plano** → aprovação humana.
 7. **Implementar** → `implementation` segue `CLAUDE.md`.
 8. **Verificar** → `qa-verification` confere DoD e roda testes.
+9. **Schema remoto** (se `schema.prisma` mudou) → `ops-schema`: `schema:check`
+   + `db:push` HML→prod (`docs/ops/schema-deploy.md`). O deploy Railway **não**
+   aplica o schema.
 
 ## Performance (plano concluído — manutenção contínua)
 

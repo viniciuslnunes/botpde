@@ -23,7 +23,8 @@ type AuditLogRow = {
   detalhes: unknown
   criadoEm: Date
   ator: { id: string; nome: string | null; email: string | null } | null
-  tenant: { id: string; nome: string; slug: string }
+  /** Nulo em ação de plataforma (entidade global, ex.: catálogo de clubes). */
+  tenant: { id: string; nome: string; slug: string } | null
 }
 
 function formatarDataHora(data: Date) {
@@ -227,10 +228,20 @@ export default async function AuditoriaPlataformaPage({
                     {formatarDataHora(log.criadoEm)}
                   </td>
                   <td className="px-3 py-2 text-[rgb(var(--foreground))]">
-                    <span className="font-medium">{formatNomeTorcida(log.tenant.nome)}</span>
-                    <span className="ml-1 font-mono text-xs text-[rgb(var(--foreground-muted))]">
-                      {log.tenant.slug}
-                    </span>
+                    {log.tenant ? (
+                      <>
+                        <span className="font-medium">{formatNomeTorcida(log.tenant.nome)}</span>
+                        <span className="ml-1 font-mono text-xs text-[rgb(var(--foreground-muted))]">
+                          {log.tenant.slug}
+                        </span>
+                      </>
+                    ) : (
+                      // Ação sobre entidade global (catálogo de clubes): não
+                      // pertence a torcida nenhuma.
+                      <span className="font-medium text-[rgb(var(--foreground-muted))]">
+                        Plataforma
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <p className="font-medium text-[rgb(var(--foreground))]">{nomeAtor(log.ator)}</p>

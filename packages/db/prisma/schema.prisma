@@ -2888,7 +2888,16 @@ model Afiliacao {
 
   torcedoresEstimadosTipo  TorcedoresEstimadosTipo? @map("torcedores_estimados_tipo")
 
+  /// Arquivado (false) sai da seleção de onboarding/switcher sem apagar histórico.
+  /// Clube nunca é excluído enquanto tiver vínculo — `Partida`/`Noticia` são Cascade.
+
+  ativo          Boolean           @default(true)
+
   criadoEm       DateTime          @default(now()) @map("criado_em")
+
+  /// `@default(now())` backfilla as linhas já existentes no `db push`;
+  /// `@updatedAt` continua atualizando a cada escrita.
+  atualizadoEm   DateTime          @default(now()) @updatedAt @map("atualizado_em")
 
 
 
@@ -2907,6 +2916,14 @@ model Afiliacao {
   torcidasConhecidas TorcidaConhecida[]
 
 
+
+  /// Listagem do catálogo (`/super-admin/clubes`): ordena por nome, faceta por UF/série.
+
+  @@index([nome])
+
+  @@index([estado])
+
+  @@index([serie])
 
   @@map("saas_afiliacoes")
 
@@ -4809,9 +4826,12 @@ model AuditLog {
 
   id       String  @id @default(uuid())
 
-  tenantId String  @map("tenant_id")
+  /// Nulo = ação de PLATAFORMA (super-admin sobre entidade global: o catálogo de
+  /// clubes, por exemplo). Mutação dentro de um tenant continua obrigada a preencher.
 
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String? @map("tenant_id")
+
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   atorId   String? @map("ator_id")
 

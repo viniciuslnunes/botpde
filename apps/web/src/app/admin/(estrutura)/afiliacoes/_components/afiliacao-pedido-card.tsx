@@ -154,9 +154,15 @@ function ThumbImagem({
 export function AfiliacaoPedidoCard({
   pedido,
   podeDecidir,
+  /** Super Admin: nome da torcida dona do pedido (lista cross-tenant). */
+  torcidaNome,
+  /** Slot de ações extras do contexto (ex.: promover a portal no Super Admin). */
+  extra,
 }: {
   pedido: SolicitacaoView
   podeDecidir: boolean
+  torcidaNome?: string | null
+  extra?: ReactNode
 }) {
   const [aprovarState, aprovarAction, aprovando] = useActionState<SolicitacaoActionState, FormData>(
     aprovarSolicitacao,
@@ -255,6 +261,11 @@ export function AfiliacaoPedidoCard({
                 <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--foreground-muted))]">
                   {TIPO_LABEL[pedido.tipo]}
                 </span>
+                {torcidaNome ? (
+                  <span className="badge-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                    → {torcidaNome}
+                  </span>
+                ) : null}
                 <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
                   <MapPin className="h-3 w-3 shrink-0" />
                   {pedido.cidade}/{pedido.estado}
@@ -551,6 +562,10 @@ export function AfiliacaoPedidoCard({
           </dl>
         )}
       </div>
+
+      {extra ? (
+        <div className="border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">{extra}</div>
+      ) : null}
 
       {/* Ações */}
       {pendente && podeDecidir && (

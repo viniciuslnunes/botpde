@@ -1,5 +1,6 @@
-/** Estados brasileiros (siglas) — módulo puro, seguro para Client Components. */
-export const UFS_BRASIL: string[] = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
-  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-]
+/**
+ * Estados brasileiros (siglas) — módulo puro, seguro para Client Components.
+ * A lista vive em `@torcida/types` (`afiliacao.js`), onde o Zod do catálogo de
+ * clubes valida a UF; aqui é só o reexport para quem já importava daqui.
+ */
+export { UFS_BRASIL } from '@torcida/types'

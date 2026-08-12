@@ -1372,6 +1372,22 @@ operar as configs reservadas até haver presidente de verdade. Passivo:
 A rota irmã `promoverUnidadeAPortal` (super-admin) nunca teve o fallback — a
 divergência entre os dois caminhos era o próprio bug.
 
+**O cargo não era o único resíduo (2026-08-11).** No mesmo `$transaction`, o
+owner herdado ganhava também `SaasMembro` APROVADO (com `sedeId` da unidade) e
+`MembroConversa` ADMIN no canal oficial. Tirar a presidência — pela UI ou pelo
+repair — deixava os dois de pé, e `resolverUnidadeDoVinculo`
+(`lib/comunidade-contexto.ts`) elege a aba **Minha unidade** pelo `SaasMembro`
+mais recente da worktree, `orderBy criadoEm desc`, sem consultar liderança: a
+Comunidade do super-admin abria no canal de uma subsede alheia. A regra da
+Comunidade está certa — varrer a worktree é o que impede o sócio de PDE logado
+na Sede de perder a aba dela; o dado é que era fabricado. Operar a plataforma
+não associa ninguém a uma torcida, então `db:repair-owner-heranca-promocao`
+passou a limpar o vínculo junto, com a evidência direta de que foi fabricado:
+o `AuditLog SEDE_PROMOVIDA_TENANT` daquela unidade registrou a pessoa em
+`detalhes.ownerUserId`. Sem esse registro o script não encosta — presidente da
+Sede que também é sócio real da subsede tem vínculo legítimo. Carteirinha
+(`SaasSocio`) nunca é apagada: é identidade, o script só reporta.
+
 **Regra única.** `lib/lideranca.ts` concentra a decisão nos dois formatos de
 unidade que o produto tem:
 
@@ -1405,6 +1421,38 @@ unidades sem portal), com KPI de "sem liderança", filtro **"só onde eu lidero"
 e remoção. O painel antigo (`transferirOwnerAction`/`removerOwnerAction`,
 `listarTorcidasParaTransferencia`) foi removido: listava tenants em ordem
 alfabética sem dizer qual era raiz e qual era unidade.
+
+**"Portal" não é categoria de unidade (2026-08-11).** O console rotulava toda
+linha Caso B com a string fixa `'Portal de unidade'`, então SUBSEDE RIO CLARO e
+PDE FIEL BAIXADA – PRAIA GRANDE apareciam sem o tipo, ao lado de PDEs Caso A
+corretamente rotulados. Não era erro de dado: as duas promoções
+(`promoverSedeParaTenant` e `promoverUnidadeAPortal`) só trocam `Sede.tenantId`
+e preservam `tipo` e `sedeId` — a unidade **já** é filha na árvore com sua
+natureza. A apresentação é que descartava `Sede.tipo`. Agora `tipoLabel` vem
+sempre de `labelTipoUnidade(sede.tipo)`, inclusive no typeahead, tirado da
+"cara" do portal (a sede cujo pai está em outro tenant). Ter tenant próprio
+segue distinguindo **só** como a liderança é trocada — o campo `caso`, que a UI
+usa para dizer "presidência" × "liderança" — nunca o que a unidade é. Pela
+mesma razão as filhas viraram **uma lista só**, ordenada por hierarquia (Sede,
+Subsede, PDE) e depois pelo nome: os portais vinham em bloco no topo porque a
+montagem os percorria antes das sedes Caso A. A comparação usa
+`sensitivity: 'base'` — a caixa do nome não pode decidir posição na lista.
+
+Foi essa mistura que expôs a lacuna na convenção de nomes: torcida e clube
+sempre foram exibidos em caixa alta (`packages/types/src/nome-torcida.js`), mas
+`Sede.nome` não tinha regra — então a unidade promovida vinha em caixa alta (é
+`Tenant.nome`) e a irmã sem portal, capitalizada do banco. `formatNomeUnidade`
+entra na mesma fonte única e vale para Sede/Subsede/PDE. É formatação de
+**exibição**: o dado gravado continua sendo o que o presidente digitou.
+
+O cabeçalho do grupo mostrava a inicial num círculo colorido, ignorando o
+escudo que a torcida já tem. Agora usa `resolveTenantLogoUrl` + `LogoImage`
+(máscara circular de `useEscudoCircular`, `next/image` quando o host é
+otimizável), com a inicial só como último recurso. Para não pagar 2–3 queries
+por raiz numa listagem paginada, os degraus 1–2 da cascata saíram para
+`resolveLogoTenantSemIO` — função pura que `resolveTenantLogoUrl` também usa,
+então quem já carregou as sedes resolve o caso comum em memória e só o resto
+vai ao banco, em `Promise.all`.
 
 ### 5.22 Bandeiras — departamento por recorte de categoria (2026-08-06)
 
@@ -1475,6 +1523,45 @@ spec KMS/DEK/escrow T1–T6) — não por pedido isolado de “criptografar”.
 
 Plano completo, vocabulário e o que E2EE quebraria no monorepo:
 `docs/data/plano-criptografia-e-moderacao.md`.
+
+### 5.24 Catálogo de clubes no Super Admin — `Afiliacao` editável (2026-08-11)
+
+`Afiliacao` sempre foi referência global (onboarding, Sofascore, mapa, rivalidade),
+mas o super-admin só tinha a fila de **solicitações de unidade** sob o rótulo
+"Afiliações" — dois conceitos colidiam no menu. Agora:
+
+- **Catálogo** em `/super-admin/clubes` (tabs Catálogo / Métricas / Qualidade):
+  CRUD com Zod (`packages/types/src/afiliacao.js`), rivalidades simétricas,
+  arquivar vs excluir (`bloqueiosExclusaoClube` — `Partida`/`Noticia` são Cascade),
+  listagem via `LISTAGEM_SUPER_ADMIN_CLUBES`, métricas em
+  `lib/super-admin/clubes-metricas.ts` (`count`/`groupBy` + cache 5 min).
+- **Schema**: `Afiliacao.ativo` + `atualizadoEm` + índices `nome`/`estado`/`serie`;
+  `AuditLog.tenantId` **nullable** para ações de plataforma (clube não tem tenant).
+- **Unidades**: a fila de `SolicitacaoUnidade` mora em `/super-admin/unidades`;
+  `/super-admin/afiliacoes` faz `permanentRedirect` (links antigos em
+  `Notificacao`).
+
+Contrato puro + testes: `afiliacao.js` / `lib/__tests__/afiliacao-clube.test.ts`.
+Spec: `docs/data/modulo-super-admin.md` § Catálogo de clubes.
+
+### 5.25 Versionamento do produto por commits (2026-08-11)
+
+Uma versão de produto no monorepo: `package.json` da raiz (`torcida-saas`).
+Pacotes privados não sincronizam versão. Fórmula:
+
+`1.<commits_em_main>.<commits_totais>` — major fixo em **1**; minor =
+`git rev-list --count` de `main`; patch = `git rev-list --count --all`.
+Calculada no build do Next (fallback: `package.json`) via
+`scripts/lib/version-from-git.mjs`. No push em `main`, o workflow de release
+sincroniza `package.json`/`CHANGELOG`, cria tag `vX.Y.Z` e GitHub Release.
+Escape hatch: `pnpm release:sync`.
+
+Identidade de build (versão · publicação · commit) é injetada no Next
+(`NEXT_PUBLIC_APP_*`, helper `lib/app-version.ts`) e exibida **somente** no
+Super Admin (card na visão geral + rodapé da sidebar).
+
+Runbook: `docs/ops/release.md`. Schema continua em `docs/ops/schema-deploy.md`
+(versão ≠ `db:push`).
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

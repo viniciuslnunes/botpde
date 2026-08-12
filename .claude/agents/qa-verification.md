@@ -30,6 +30,9 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] `tenantId` presente em todas as queries de dados SaaS.
 - [ ] Tipos de retorno de queries Prisma novas anotados explicitamente (§5.2).
 - [ ] Documentação atualizada quando o impacto é estrutural.
+- [ ] Se `packages/db/prisma/schema.prisma` mudou: `pnpm --filter @torcida/db
+  schema:check` (ou handoff explícito para `ops-schema` — push HML→prod).
+  Deploy em `main` **não** sincroniza o banco. Ver `docs/ops/schema-deploy.md`.
 - [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` (cache, Suspense,
   `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat,

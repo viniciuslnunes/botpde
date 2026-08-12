@@ -9,6 +9,7 @@ import { LogOut, Menu, Shield, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
+import { AppBuildMetaSidebar } from '@/components/super-admin/app-build-meta'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 
 interface SuperAdminBadges {
@@ -49,8 +50,11 @@ function SidebarBody({
         <SuperAdminNav onNavigate={onNavigate} badges={badges} />
       </div>
 
-      <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
-        <ThemeToggle variant="row" />
+      <div className="border-t border-[rgb(var(--border))]">
+        <AppBuildMetaSidebar />
+        <div className="space-y-1 px-3 pb-3 lg:hidden">
+          <ThemeToggle variant="row" />
+        </div>
       </div>
     </>
   )

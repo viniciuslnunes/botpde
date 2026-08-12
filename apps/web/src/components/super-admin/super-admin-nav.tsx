@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   PlusCircle,
   ScrollText,
+  Shield,
   ShieldAlert,
   UserCheck,
   type LucideIcon,
@@ -29,7 +30,10 @@ export const SUPER_ADMIN_NAV_ITEMS: SuperAdminNavItem[] = [
   { href: '/super-admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
   { href: '/super-admin/torcidas', label: 'Torcidas', icon: Building2 },
   { href: '/super-admin/liderancas', label: 'Lideranças', icon: Crown },
-  { href: '/super-admin/afiliacoes', label: 'Afiliações', icon: Handshake, badgeKey: 'afiliacoes' },
+  { href: '/super-admin/clubes', label: 'Clubes', icon: Shield },
+  // `Afiliacao` (clube) e `SolicitacaoUnidade` (subsede/PDE) são coisas
+  // diferentes; o menu deixou de chamar as duas de "Afiliações".
+  { href: '/super-admin/unidades', label: 'Unidades', icon: Handshake, badgeKey: 'afiliacoes' },
   { href: '/super-admin/usuarios', label: 'Usuários', icon: UserCheck },
   { href: '/super-admin/moderacao', label: 'Moderação', icon: ShieldAlert, badgeKey: 'moderacao' },
   { href: '/super-admin/auditoria', label: 'Auditoria', icon: ScrollText },

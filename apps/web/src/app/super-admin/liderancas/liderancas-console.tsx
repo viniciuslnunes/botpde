@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Crown, Loader2, UserCheck, UserMinus, UserX } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { LogoImage } from '@/components/media/logo-image'
 import type {
   GrupoLideranca,
   LiderancasResumo,
@@ -97,12 +98,24 @@ export function LiderancasConsole({
               className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
             >
               <div className="flex items-center gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
-                <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ backgroundColor: grupo.corPrimaria }}
-                >
-                  {grupo.nome.charAt(0).toUpperCase()}
-                </span>
+                {grupo.logoUrl ? (
+                  // Sem `rounded`: só `useEscudoCircular` decide recorte. Badge
+                  // com fundo assado ganha máscara; PNG com alpha (o caso do
+                  // escudo do Gaviões) fica natural, sem cantos cortados.
+                  <LogoImage
+                    src={grupo.logoUrl}
+                    alt=""
+                    size={64}
+                    className="h-8 w-8 shrink-0 object-contain"
+                  />
+                ) : (
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: grupo.corPrimaria }}
+                  >
+                    {grupo.nome.charAt(0).toUpperCase()}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
                     {grupo.nome}

@@ -1,6 +1,10 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
+import {
+  carregarMapaPortalMae,
+  filtrarTenantsRaiz,
+} from '@/lib/tenant-hierarquia-plataforma'
 
 export type ScopeType = 'TORCIDA' | 'CLUBE'
 
@@ -223,11 +227,18 @@ export async function getTorcedoresPrivadosPorTenant(opts: {
 }
 
 export async function getTenantsPorAfiliacao(afiliacaoId: string): Promise<Array<{ id: string; slug: string; nome: string }>> {
-  const rows = await db.tenant.findMany({
-    where: { ativo: true, sintetico: false, afiliacaoId },
-    select: { id: true, slug: true, nome: true },
-    orderBy: { nome: 'asc' },
-  })
-  return rows
+  const [rows, maePorFilho]: [
+    { id: string; slug: string; nome: string }[],
+    Map<string, string>,
+  ] = await Promise.all([
+    db.tenant.findMany({
+      where: { ativo: true, sintetico: false, afiliacaoId },
+      select: { id: true, slug: true, nome: true },
+      orderBy: { nome: 'asc' },
+    }),
+    carregarMapaPortalMae(),
+  ])
+  const raizSet = new Set(filtrarTenantsRaiz(rows.map((r) => r.id), maePorFilho))
+  return rows.filter((r) => raizSet.has(r.id))
 }
 

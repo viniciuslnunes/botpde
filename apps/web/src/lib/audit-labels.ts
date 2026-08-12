@@ -159,6 +159,15 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   SALA_ENQUETE_VOTO: 'Voto em enquete',
   SALA_ENQUETE_ENCERRADA: 'Enquete encerrada',
   PERFIL_SOCIAL_ATUALIZADO: 'Perfil social atualizado',
+
+  // Catálogo de clubes (`Afiliacao`) — ações de plataforma, sem tenant.
+  CLUBE_CRIADO: 'Clube cadastrado',
+  CLUBE_ATUALIZADO: 'Clube atualizado',
+  CLUBE_ARQUIVADO: 'Clube arquivado',
+  CLUBE_REATIVADO: 'Clube reativado',
+  CLUBE_EXCLUIDO: 'Clube excluído',
+  CLUBE_RIVALIDADE_ADICIONADA: 'Rivalidade adicionada',
+  CLUBE_RIVALIDADE_REMOVIDA: 'Rivalidade removida',
 }
 
 export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
@@ -194,6 +203,7 @@ export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
   BarCategoria: 'Categoria (Bar)',
   BarCaixaTurno: 'Turno de caixa (Bar)',
   BarMovimentacaoEstoque: 'Movimentação de estoque (Bar)',
+  Afiliacao: 'Clube',
 }
 
 export function labelAcaoAuditoria(acao: string): string {

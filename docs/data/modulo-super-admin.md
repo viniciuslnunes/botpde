@@ -30,19 +30,37 @@ que é RBAC por tenant). Badges de contagem (`afiliacoes`, `moderacao`) vêm de
 `contarPendentesSuperAdmin()` (`lib/super-admin/pendentes-badges.ts`),
 buscado uma vez no `layout.tsx` e repassado via prop — sem polling/SSE (baixo
 volume de tráfego no super-admin não justifica o custo do
-`use-admin-navbar-context` do admin).
+`use-admin-navbar-context` do admin). Rodapé discreto da sidebar:
+`AppBuildMetaSidebar` (`vX.Y.Z · commit`).
+
+## Build (versão · publicação · commit)
+
+Identidade do deploy, **só** no Super Admin (portal/admin de tenant não
+mostram):
+
+| Campo | Fonte |
+|---|---|
+| Versão | `1.<commits_main>.<commits_totais>` (Git no build; fallback `package.json`) via `NEXT_PUBLIC_APP_VERSION` |
+| Publicação | ISO do build (`NEXT_PUBLIC_APP_PUBLISHED_AT`), exibida em fuso SP |
+| Commit | `RAILWAY_GIT_COMMIT_SHA` / `NEXT_PUBLIC_APP_COMMIT` (link GitHub) |
+
+Helper: `apps/web/src/lib/app-version.ts` + `scripts/lib/version-from-git.mjs`.
+UI: `AppBuildMetaCard` na visão geral e `AppBuildMetaSidebar` no shell.
+Processo: `docs/ops/release.md` (`ARCHITECTURE.md` §5.25).
 
 ## Rotas
 
 | Rota | Função |
 |---|---|
-| `/super-admin` | Dashboard — KPIs agregados (`lib/super-admin/plataforma-dashboard.ts`) |
+| `/super-admin` | Dashboard — KPIs agregados (`lib/super-admin/plataforma-dashboard.ts`) + card **Build da plataforma** (versão · publicação · commit) |
 | `/super-admin/torcidas` | Hub: trocar de torcida (`TenantSwitcher`), lista com busca (`torcidas-lista-cliente.tsx`), transferir owner |
 | `/super-admin/setup` | Criar tenant; lista todos os tenants (ativos e inativos) com busca (`tenants-lista-cliente.tsx`), toggle ativo/inativo, seletor de plano |
-| `/super-admin/afiliacoes` | Fila de solicitações de unidade (subsede/PDE) de todas as torcidas |
+| `/super-admin/clubes` | Catálogo global de clubes (`Afiliacao`) — CRUD, rivalidades, métricas, qualidade |
+| `/super-admin/unidades` | Fila de solicitações de unidade (subsede/PDE) de todas as torcidas |
+| `/super-admin/afiliacoes` | Redirect permanente → `/super-admin/unidades` (URL legada em notificações) |
 | `/super-admin/usuarios` | Busca de usuário por e-mail/nome/@nickname + vínculos em todos os tenants + exportação LGPD |
 | `/super-admin/moderacao` | Fila cross-tenant de denúncias (post/mensagem) pendentes |
-| `/super-admin/auditoria` | `AuditLog` de todas as torcidas, com filtro por torcida/ação/busca |
+| `/super-admin/auditoria` | `AuditLog` de todas as torcidas **e** ações de plataforma (`tenantId` nulo), com filtro por torcida/ação/busca |
 | `/super-admin/relatorios/perfis-torcedores-privados` | Relatório de perfis marcados como privados |
 
 ## Padrões de mutação
@@ -50,7 +68,9 @@ volume de tráfego no super-admin não justifica o custo do
 Toda ação de escrita segue o mesmo esqueleto: `'use server'`, gate
 `superAdminEmails.includes(email)`, Zod, `db.$transaction`, `auditLog.create`
 com `tenantId` do **registro afetado** (não do host da requisição — o
-super-admin não está "dentro" de nenhum tenant). Ações que espelham uma
+super-admin não está "dentro" de nenhum tenant). **Exceção:** mutações sobre
+entidade global (`Afiliacao` / catálogo de clubes) gravam `tenantId: null` —
+a UI de auditoria mostra "Plataforma" nesse caso. Ações que espelham uma
 operação que também existe no admin do tenant (moderação de denúncia)
 gravam `detalhes.viaSuperAdmin: true` no `AuditLog`, para o admin local saber
 que a ação veio da operação da plataforma, não de alguém da própria diretoria.
@@ -58,7 +78,35 @@ que a ação veio da operação da plataforma, não de alguém da própria diret
 Referências: `torcidas/actions.ts` (`alternarAtivoTenantAction`,
 `alterarPlanoTenantAction`), `liderancas/actions.ts`
 (`transferirLiderancaSuperAdmin`, `removerLiderancaSuperAdmin`),
-`moderacao/actions.ts` (`resolverDenunciaSuperAdminAction` e pares).
+`moderacao/actions.ts` (`resolverDenunciaSuperAdminAction` e pares),
+`clubes/actions.ts` (CRUD + rivalidades do catálogo).
+
+## Catálogo de clubes (2026-08-11)
+
+`Afiliacao` é o time apoiado (referência global). O super-admin edita o catálogo
+em `/super-admin/clubes`:
+
+| Aba | Rota | Função |
+|---|---|---|
+| Catálogo | `/super-admin/clubes` | Listagem (`LISTAGEM_SUPER_ADMIN_CLUBES`) + disclosure de criar |
+| Métricas | `/super-admin/clubes/metricas` | KPIs + distribuição + rankings + adesão (`clubes-metricas.ts`) |
+| Qualidade | `/super-admin/clubes/qualidade` | Contagens por campo faltante + fila acionável (teto 30) |
+| Detalhe | `/super-admin/clubes/[id]` | Form completo, rivais, uso, histórico |
+| Métricas do clube | `/super-admin/clubes/[id]/metricas` | Torcidas-raiz + unidades lazy (`carregarUnidadesDaTorcida`) |
+
+Contrato puro em `packages/types/src/afiliacao.js` (`ClubeSchema`,
+`completudeClube`, `bloqueiosExclusaoClube`, `slugClube`). Escudo sobe com
+purpose `clube-escudo` (Cloudinary). Arquivar (`ativo: false`) é o caminho
+padrão; exclusão definitiva só com vínculos zerados (Cascade em
+`Partida`/`Noticia` apagaria histórico). Ver `ARCHITECTURE.md` §5.24.
+
+**Torcida ≠ portal Caso B:** listagens e KPIs de "torcidas" usam
+`carregarMapaPortalMae` / `filtrarTenantsRaiz` (`lib/tenant-hierarquia-plataforma.ts`)
+para excluir portais de unidade promovida. Feeds/CN por `afiliacaoId` continuam
+incluindo todos os tenants do clube.
+
+A fila de **unidades** (subsede/PDE) ficou em `/super-admin/unidades` — o menu
+não chama mais as duas coisas de "Afiliações".
 
 ## Lideranças (2026-08-06)
 
@@ -148,7 +196,7 @@ E2EE; “SA lê” e “servidor cego” são mutuamente excludentes. Evolução
   mensageria) e cruza tenants (um `User` pode ter `SaasMembro` em vários
   tenants ao mesmo tempo). Depende de resolver antes o furo de visibilidade
   cross-tenant já registrado em `docs/knowledge/contexto-legal.md`.
-- **Badge de contagem no menu**: implementado só para "Afiliações"
+- **Badge de contagem no menu**: implementado só para "Unidades"
   (`SolicitacaoUnidade` PENDENTE) e "Moderação" (`Denuncia` +
   `DenunciaMensagem` PENDENTE). "Auditoria" não tem um conceito de
   pendência — não existe badge lá.

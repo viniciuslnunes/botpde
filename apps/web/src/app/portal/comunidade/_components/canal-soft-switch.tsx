@@ -53,7 +53,8 @@ export type CanalSoftSwitchSeed = {
 type SoftSwitchContextValue = {
   enabled: true
   canalAtivoId: string
-  softSwitchPara: (id: string) => void
+  /** Resolve quando o canal já está no ar — dá pra envolver numa transition. */
+  softSwitchPara: (id: string) => Promise<void>
   prefetchCanal: (id: string) => void
 }
 
@@ -118,30 +119,28 @@ export function CanalSoftSwitchProvider({
   )
 
   const softSwitchPara = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const limpo = id.trim()
       if (!limpo || limpo === activeCanalId) return
 
-      void (async () => {
-        const { trocouTenant } = await registrarCanalVisitadoAction(limpo)
-        // Oficial de outra unidade: remount RSC com cookie de tenant novo.
-        if (trocouTenant) {
-          router.push(linkCanalComunidade(limpo))
-          return
-        }
+      const { trocouTenant } = await registrarCanalVisitadoAction(limpo)
+      // Oficial de outra unidade: remount RSC com cookie de tenant novo.
+      if (trocouTenant) {
+        router.push(linkCanalComunidade(limpo))
+        return
+      }
 
-        const gen = ++switchGen.current
-        setActiveCanalId(limpo)
-        window.history.pushState(null, '', linkCanalComunidade(limpo))
-        prefetchCanal(limpo)
+      const gen = ++switchGen.current
+      setActiveCanalId(limpo)
+      window.history.pushState(null, '', linkCanalComunidade(limpo))
+      prefetchCanal(limpo)
 
-        const cached = chromeCache.current.get(limpo)
-        if (cached) {
-          setChrome(cached)
-        } else {
-          void carregarChrome(limpo, gen)
-        }
-      })()
+      const cached = chromeCache.current.get(limpo)
+      if (cached) {
+        setChrome(cached)
+      } else {
+        await carregarChrome(limpo, gen)
+      }
     },
     [activeCanalId, carregarChrome, prefetchCanal, router],
   )

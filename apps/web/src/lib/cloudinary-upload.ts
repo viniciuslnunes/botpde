@@ -17,6 +17,8 @@ type UploadPurpose =
   | 'sede'
   | 'mensagem'
   | 'patrimonio'
+  /** Escudo do catálogo global de clubes (`/super-admin/clubes`) — sem tenant. */
+  | 'clube-escudo'
 
 interface SignResponse {
   cloudName: string

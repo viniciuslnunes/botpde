@@ -7,6 +7,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
+    "schema:check": "node scripts/schema-deploy.js",
+    "schema:deploy": "node scripts/schema-deploy.js",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
     "db:repair-system-roles": "node scripts/repair-system-role-permissions.js",

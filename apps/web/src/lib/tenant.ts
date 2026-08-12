@@ -105,6 +105,21 @@ function fallbackTenantSlug(host: string): string | null {
 }
 
 /**
+ * Degraus 1–2 da cascata, sem tocar o banco. Quem já carregou as sedes do
+ * tenant (listagens que hidratam vários de uma vez) resolve o caso comum aqui e
+ * só paga as queries de canal do degrau 3 para os que sobrarem — sem
+ * reimplementar a regra por fora.
+ */
+export function resolveLogoTenantSemIO(
+  sedesDoTenant: Array<{ id: string; sedeId: string | null; fotoUrl: string | null }>,
+  tenantLogoUrl: string | null,
+): string | null {
+  const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
+  const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
+  return raiz?.fotoUrl ?? tenantLogoUrl ?? null
+}
+
+/**
  * Logo efetivo do tenant para topbar / comunidade:
  * 1. `Sede.fotoUrl` da sede raiz (foto da unidade)
  * 2. `Tenant.logoUrl` (Design)
@@ -125,11 +140,10 @@ export async function resolveTenantLogoUrl(
     where: { tenantId },
     select: { id: true, sedeId: true, tipo: true, fotoUrl: true, canalConversaId: true },
   })
-  const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
-  const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
-  if (raiz?.fotoUrl) return raiz.fotoUrl
+  const semIO = resolveLogoTenantSemIO(sedesDoTenant, tenantLogoUrl)
+  if (semIO) return semIO
 
-  if (tenantLogoUrl) return tenantLogoUrl
+  const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
 
   // Mesma ordem de getOrCreateCanalOficial: SEDE com ponteiro → única sede
   // com canal (unidade Caso B / PDE promovida) → canal nativo do tenant.

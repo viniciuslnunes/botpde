@@ -14,6 +14,12 @@ type Props = {
   disabled?: boolean
   id?: string
   'aria-describedby'?: string
+  /**
+   * Restringe a busca a esta UF. No cadastro de clube a praça já veio do mapa —
+   * sem isso "Praia Grande" mistura SC e SP e o operador grava o estado errado.
+   */
+  uf?: string
+  placeholder?: string
 }
 
 type ResultadoBusca = {
@@ -23,12 +29,14 @@ type ResultadoBusca = {
   erro: string | null
 }
 
-function rotuloMunicipio(m: { cidade: string; uf: string }): string {
+function rotuloMunicipio(m: { cidade: string; uf: string }, ufFixa?: string): string {
+  // Com UF já escolhida no mapa, o rótulo curto evita ruído "Cidade · SP" duplicado.
+  if (ufFixa) return m.cidade
   return `${m.cidade} · ${m.uf}`
 }
 
 /**
- * Combobox nacional de município (cidade + UF).
+ * Combobox de município (cidade + UF).
  * Só vale seleção de uma opção da lista — texto digitado que não vira seleção
  * é descartado no blur, voltando ao rótulo do `value` atual.
  */
@@ -38,13 +46,16 @@ export function ComboboxRegiao({
   disabled,
   id = 'regiao',
   'aria-describedby': ariaDescribedBy,
+  uf,
+  placeholder = 'Busque sua cidade',
 }: Props) {
   const listboxId = useId()
   const optionIdPrefix = useId()
   const listRef = useRef<HTMLUListElement>(null)
   const buscaSeq = useRef(0)
 
-  const rotuloValue = value ? rotuloMunicipio(value) : ''
+  const ufFiltro = uf?.trim().toUpperCase() || undefined
+  const rotuloValue = value ? rotuloMunicipio(value, ufFiltro) : ''
   const [query, setQuery] = useState(rotuloValue)
   const [resultado, setResultado] = useState<ResultadoBusca | null>(null)
   const [aberto, setAberto] = useState(false)
@@ -67,7 +78,7 @@ export function ComboboxRegiao({
   }, [query])
 
   const espelhaValueSelecionado =
-    value != null && termoBusca.length > 0 && termoBusca === rotuloMunicipio(value)
+    value != null && termoBusca.length > 0 && termoBusca === rotuloMunicipio(value, ufFiltro)
   const termoBuscavel = termoBusca.length >= 2 && !espelhaValueSelecionado
 
   useEffect(() => {
@@ -76,11 +87,12 @@ export function ComboboxRegiao({
     const seq = ++buscaSeq.current
     const termo = termoBusca
     const tent = tentativa
-    void buscarRegioesPorTexto(termo)
+    void buscarRegioesPorTexto(termo, ufFiltro)
       .then((lista) => {
         if (seq !== buscaSeq.current) return
-        setResultado({ termo, tentativa: tent, opcoes: lista, erro: null })
-        setDestaque(lista.length > 0 ? 0 : -1)
+        const opcoes = ufFiltro ? lista.filter((m) => m.uf === ufFiltro) : lista
+        setResultado({ termo, tentativa: tent, opcoes, erro: null })
+        setDestaque(opcoes.length > 0 ? 0 : -1)
       })
       .catch(() => {
         if (seq !== buscaSeq.current) return
@@ -92,7 +104,7 @@ export function ComboboxRegiao({
         })
         setDestaque(-1)
       })
-  }, [termoBusca, termoBuscavel, tentativa])
+  }, [termoBusca, termoBuscavel, tentativa, ufFiltro])
 
   useEffect(() => {
     if (destaque < 0 || !listRef.current) return
@@ -103,7 +115,7 @@ export function ComboboxRegiao({
   }, [destaque, optionIdPrefix])
 
   function selecionar(m: MunicipioBrasil) {
-    const rotulo = rotuloMunicipio(m)
+    const rotulo = rotuloMunicipio(m, ufFiltro)
     setQuery(rotulo)
     setPrevValue(rotulo)
     setAberto(false)
@@ -124,7 +136,7 @@ export function ComboboxRegiao({
 
   const mostrarLista = aberto && !disabled
   const termoAtual = query.trim()
-  const espelhaValue = value != null && termoAtual === rotuloMunicipio(value)
+  const espelhaValue = value != null && termoAtual === rotuloMunicipio(value, ufFiltro)
   const precisaMaisLetras = termoAtual.length < 2 || espelhaValue
   const activeDescendant =
     mostrarLista && destaque >= 0 && opcoesVisiveis[destaque]
@@ -197,7 +209,7 @@ export function ComboboxRegiao({
             if (query !== rotuloValue) setQuery(rotuloValue)
           }}
           onKeyDown={onKeyDown}
-          placeholder="Busque sua cidade"
+          placeholder={placeholder}
           autoComplete="off"
           role="combobox"
           aria-expanded={aberto}
@@ -205,7 +217,7 @@ export function ComboboxRegiao({
           aria-autocomplete="list"
           aria-activedescendant={activeDescendant}
           aria-describedby={ariaDescribedBy}
-          aria-label="Sua cidade"
+          aria-label={ufFiltro ? `Cidade em ${ufFiltro}` : 'Sua cidade'}
         />
         {carregandoVisivel && (
           <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[rgb(var(--foreground-muted))]" />
@@ -242,7 +254,9 @@ export function ComboboxRegiao({
             </li>
           ) : opcoesVisiveis.length === 0 ? (
             <li className="px-3 py-2 text-sm text-[rgb(var(--foreground-muted))]" role="presentation">
-              Nenhuma cidade encontrada
+              {ufFiltro
+                ? `Nenhuma cidade em ${ufFiltro} com esse nome`
+                : 'Nenhuma cidade encontrada'}
             </li>
           ) : (
             opcoesVisiveis.map((opcao, i) => {
@@ -275,7 +289,9 @@ export function ComboboxRegiao({
                     }`}
                   >
                     {opcao.cidade}
-                    <span className="text-[rgb(var(--foreground-muted))]"> · {opcao.uf}</span>
+                    {!ufFiltro ? (
+                      <span className="text-[rgb(var(--foreground-muted))]"> · {opcao.uf}</span>
+                    ) : null}
                   </button>
                 </li>
               )

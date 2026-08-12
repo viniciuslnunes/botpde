@@ -1,50 +1,32 @@
 'use client'
 
-import { useActionState, useEffect, useId, useRef, useState } from 'react'
-import { Check, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
+import { useActionState, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Loader2, Rocket } from 'lucide-react'
 import { m, AnimatePresence } from 'motion/react'
-import { Badge, type BadgeVariant } from '@torcida/ui'
+import { criarSolicitacaoManual, type SolicitacaoActionState } from '@/app/admin/(estrutura)/afiliacoes/afiliacao-actions'
 import {
-  aprovarSolicitacao,
-  criarSolicitacaoManual,
-  editarSolicitacao,
-  recusarSolicitacao,
-  type SolicitacaoActionState,
-} from '@/app/admin/(estrutura)/afiliacoes/afiliacao-actions'
+  AfiliacaoPedidoCard,
+  type SolicitacaoView as PedidoView,
+} from '@/app/admin/(estrutura)/afiliacoes/_components/afiliacao-pedido-card'
 import type { StatusExibicaoSolicitacao } from '@/lib/afiliacao-unidade'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { normalizarInicioEndereco } from '@/lib/endereco'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { buildGoogleMapsUrl } from '@/lib/google-maps'
 import { springSnappy } from '@/lib/motion-presets'
 import { MotionTabBar } from '@/components/motion/motion-tab-bar'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 
-export interface SolicitacaoView {
-  id: string
-  /** Derivado na leitura — `REMOVIDA` = foi aprovada e a unidade excluída depois. */
-  status: StatusExibicaoSolicitacao
+/**
+ * Mesma view do card do admin (`/admin/afiliacoes`) + o que só o Super Admin
+ * enxerga: a torcida dona do pedido e o estado de promoção a portal próprio.
+ */
+export interface SolicitacaoView extends PedidoView {
   torcidaNome: string
-  nome: string
-  tipo: 'SUBSEDE' | 'PONTO_ENCONTRO'
-  cidade: string
-  estado: string
-  endereco: string | null
-  contatoNome: string | null
-  fotoUrl: string | null
-  lat: number | null
-  lng: number | null
-  contatoEmail: string | null
-  contatoTelefone: string | null
-  vinculo: string | null
-  observacao: string | null
-  provasUrls: string[]
-  motivo: string | null
-  criadoEm: string
   /** Sede criada ao aprovar (null enquanto PENDENTE/RECUSADA). */
   sedeId: string | null
   /** true = já virou portal próprio (tenant dedicado). */
@@ -55,18 +37,6 @@ export interface TorcidaOption {
   id: string
   nome: string
   clubeNome: string | null
-}
-
-const TIPO_LABEL: Record<SolicitacaoView['tipo'], string> = {
-  SUBSEDE: 'Subsede',
-  PONTO_ENCONTRO: 'PDE',
-}
-
-const STATUS_VARIANT: Record<SolicitacaoView['status'], BadgeVariant> = {
-  PENDENTE: 'warning',
-  APROVADA: 'success',
-  RECUSADA: 'neutral',
-  REMOVIDA: 'neutral',
 }
 
 const INPUT_CLASS =
@@ -448,248 +418,26 @@ function PromoverForm({ sedeId }: { sedeId: string }) {
   )
 }
 
-function ClampComTexto({ label, texto }: { label: string; texto: string }) {
-  const [expandido, setExpandido] = useState(false)
-
-  return (
-    <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-      <span className="font-medium">{label}:</span>{' '}
-      <span className={expandido ? '' : 'line-clamp-2'}>{texto}</span>{' '}
-      <button
-        type="button"
-        onClick={() => setExpandido((v) => !v)}
-        className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-      >
-        {expandido ? 'ver menos' : 'ver mais'}
-      </button>
-    </p>
-  )
+/** Estado de portal próprio da unidade aprovada — rodapé do card (null = sem rodapé). */
+function promocaoNode(s: SolicitacaoView): ReactNode {
+  if (s.status !== 'APROVADA') return null
+  if (s.promovida) {
+    return (
+      <p className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-success-fg))]">
+        <Rocket className="h-3.5 w-3.5" />
+        Portal próprio ativo
+      </p>
+    )
+  }
+  if (!s.sedeId) return null
+  return <PromoverForm sedeId={s.sedeId} />
 }
 
-function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
-  const [aprovarState, aprovarAction, aprovando] = useActionState<SolicitacaoActionState, FormData>(
-    aprovarSolicitacao,
-    {},
-  )
-  const [recusarState, recusarAction, recusando] = useActionState<SolicitacaoActionState, FormData>(
-    recusarSolicitacao,
-    {},
-  )
-  const [editarState, editarAction, editando] = useActionState<SolicitacaoActionState, FormData>(
-    editarSolicitacao,
-    {},
-  )
-  const [modo, setModo] = useState<'ver' | 'recusar' | 'editar'>('ver')
+type FiltroStatus = StatusExibicaoSolicitacao
 
-  const ocupado = aprovando || recusando || editando
-  const pendente = s.status === 'PENDENTE'
-
-  return (
-    <li className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-2">
-          {s.fotoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={s.fotoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
-          ) : null}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-              {s.nome}
-              <span className="ml-1.5 rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--foreground-muted))]">
-                {TIPO_LABEL[s.tipo]}
-              </span>
-            </p>
-            <p className="badge-primary mt-1.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
-              → {s.torcidaNome}
-            </p>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-[rgb(var(--foreground-muted))]">
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {s.cidade}/{s.estado}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {s.contatoNome ?? 'Sem liderança definida'}
-                {s.contatoTelefone ? ` · ${s.contatoTelefone}` : ''}
-                {s.contatoEmail ? ` · ${s.contatoEmail}` : ''}
-              </span>
-              {s.lat != null && s.lng != null && (
-                <a
-                  href={
-                    buildGoogleMapsUrl({
-                      lat: s.lat,
-                      lng: s.lng,
-                      endereco: s.endereco ?? undefined,
-                      cidade: s.cidade,
-                      estado: s.estado,
-                    }) ?? undefined
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[rgb(var(--color-primary-fg))] hover:underline"
-                >
-                  <MapPin className="h-3 w-3" />
-                  Ver no mapa
-                </a>
-              )}
-            </p>
-            {s.vinculo && <ClampComTexto label="Credenciamento" texto={s.vinculo} />}
-            {s.provasUrls.length > 0 && (
-              <p className="mt-1 flex flex-wrap gap-2 text-xs">
-                {s.provasUrls.map((url, i) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[rgb(var(--color-primary-fg))] hover:underline"
-                  >
-                    prova {i + 1}
-                  </a>
-                ))}
-              </p>
-            )}
-            {s.motivo && <ClampComTexto label="Motivo" texto={s.motivo} />}
-          </div>
-        </div>
-        <Badge variant={STATUS_VARIANT[s.status]} className="shrink-0">
-          {s.status}
-        </Badge>
-      </div>
-
-      {s.status === 'APROVADA' &&
-        (s.promovida ? (
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-400">
-            <Rocket className="h-3.5 w-3.5" />
-            Portal próprio ativo
-          </p>
-        ) : s.sedeId ? (
-          <PromoverForm sedeId={s.sedeId} />
-        ) : null)}
-
-      {pendente && modo === 'ver' && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <form action={aprovarAction}>
-            <input type="hidden" name="solicitacaoId" value={s.id} />
-            <button
-              type="submit"
-              disabled={ocupado}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {aprovando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Aprovar e promover a portal
-            </button>
-          </form>
-          <button
-            type="button"
-            onClick={() => setModo('editar')}
-            disabled={ocupado}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
-          </button>
-          <button
-            type="button"
-            onClick={() => setModo('recusar')}
-            disabled={ocupado}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-800 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-          >
-            <X className="h-3.5 w-3.5" />
-            Recusar
-          </button>
-        </div>
-      )}
-
-      {pendente && modo === 'recusar' && (
-        <form action={recusarAction} className="mt-2 flex items-center gap-1.5">
-          <input type="hidden" name="solicitacaoId" value={s.id} />
-          <input
-            name="motivo"
-            required
-            minLength={3}
-            maxLength={500}
-            placeholder="Motivo da recusa"
-            className={`w-52 ${INPUT_CLASS_SM} focus:border-red-500`}
-          />
-          <button
-            type="submit"
-            disabled={ocupado}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-          >
-            Confirmar recusa
-          </button>
-          <button
-            type="button"
-            onClick={() => setModo('ver')}
-            className="text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-          >
-            Cancelar
-          </button>
-        </form>
-      )}
-
-      {pendente && modo === 'editar' && (
-        <form action={editarAction} className="mt-2 grid gap-2 sm:grid-cols-2">
-          <input type="hidden" name="solicitacaoId" value={s.id} />
-          <input
-            name="nome"
-            defaultValue={s.nome}
-            required
-            minLength={3}
-            maxLength={100}
-            className={INPUT_CLASS_SM}
-          />
-          <select name="tipo" defaultValue={s.tipo} className={INPUT_CLASS_SM}>
-            <option value="PONTO_ENCONTRO">PDE</option>
-            <option value="SUBSEDE">Subsede</option>
-          </select>
-          <input name="cidade" defaultValue={s.cidade} required className={INPUT_CLASS_SM} />
-          <input
-            name="estado"
-            defaultValue={s.estado}
-            required
-            maxLength={2}
-            className={INPUT_CLASS_SM}
-          />
-          <input
-            name="endereco"
-            defaultValue={s.endereco ?? ''}
-            placeholder="Endereço (opcional)"
-            className={`sm:col-span-2 ${INPUT_CLASS_SM}`}
-          />
-          <div className="flex items-center gap-2 sm:col-span-2">
-            <button
-              type="submit"
-              disabled={ocupado}
-              className="btn-primary rounded-lg px-3 py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
-            >
-              Salvar
-            </button>
-            <button
-              type="button"
-              onClick={() => setModo('ver')}
-              className="text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="mt-1 space-y-0.5">
-        <Feedback state={aprovarState} />
-        <Feedback state={recusarState} />
-        <Feedback state={editarState} />
-      </div>
-    </li>
-  )
-}
-
-type FiltroStatus = 'TODAS' | StatusExibicaoSolicitacao
+const ORDEM_FILTROS: FiltroStatus[] = ['PENDENTE', 'APROVADA', 'RECUSADA', 'REMOVIDA']
 
 const FILTRO_LABEL: Record<FiltroStatus, string> = {
-  TODAS: 'Todas',
   PENDENTE: 'Pendentes',
   APROVADA: 'Aprovadas',
   RECUSADA: 'Recusadas',
@@ -697,62 +445,72 @@ const FILTRO_LABEL: Record<FiltroStatus, string> = {
 }
 
 function GerenciarSolicitacoes({ solicitacoes }: { solicitacoes: SolicitacaoView[] }) {
-  const [filtro, setFiltro] = useState<FiltroStatus>('TODAS')
+  const [filtro, setFiltro] = useState<FiltroStatus>(
+    () => ORDEM_FILTROS.find((s) => solicitacoes.some((x) => x.status === s)) ?? 'PENDENTE',
+  )
 
-  const filtros: { id: FiltroStatus; count: number }[] = (
-    ['TODAS', 'PENDENTE', 'APROVADA', 'RECUSADA', 'REMOVIDA'] as FiltroStatus[]
-  ).map((id) => ({
-    id,
-    count: id === 'TODAS' ? solicitacoes.length : solicitacoes.filter((s) => s.status === id).length,
-  }))
+  const contagens = useMemo(() => {
+    const base: Record<FiltroStatus, number> = {
+      PENDENTE: 0,
+      APROVADA: 0,
+      RECUSADA: 0,
+      REMOVIDA: 0,
+    }
+    for (const s of solicitacoes) base[s.status] += 1
+    return base
+  }, [solicitacoes])
 
-  const solicitacoesFiltradas =
-    filtro === 'TODAS' ? solicitacoes : solicitacoes.filter((s) => s.status === filtro)
+  const filtradas = solicitacoes.filter((s) => s.status === filtro)
+
+  if (solicitacoes.length === 0) {
+    return (
+      <MotionEmptyState
+        title="Nenhuma solicitação de unidade"
+        description="Elas chegam do onboarding (“Solicitar cadastro de unidade”) ou pela aba Registrar."
+      />
+    )
+  }
 
   return (
-    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Solicitações de unidade</h2>
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar solicitações">
-          {filtros.map((f) => {
-            if (f.id !== 'TODAS' && f.count === 0) return null
-            const active = filtro === f.id
-            return (
-              <button
-                key={f.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setFiltro(f.id)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                  active
-                    ? 'bg-[rgb(var(--color-primary))] text-white'
-                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
-                }`}
-              >
-                {FILTRO_LABEL[f.id]}
-                <span className={`ml-1 tabular-nums ${active ? 'text-white/80' : 'opacity-70'}`}>
-                  {f.count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+    <div className="space-y-4">
+      <MotionTabBar
+        items={ORDEM_FILTROS.map((id) => ({
+          id,
+          label: FILTRO_LABEL[id],
+          count: contagens[id] > 0 ? contagens[id] : undefined,
+        }))}
+        activeId={filtro}
+        onTabChange={(id) => setFiltro(id as FiltroStatus)}
+        layoutId="super-admin-afiliacoes-status-tabs"
+      />
 
-      {solicitacoesFiltradas.length === 0 ? (
-        <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-          {solicitacoes.length === 0
-            ? 'Nenhuma solicitação. Elas chegam do onboarding (“Solicitar cadastro de unidade”) ou pela aba Registrar.'
-            : 'Nenhuma solicitação neste filtro.'}
-        </p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {solicitacoesFiltradas.map((s) => (
-            <SolicitacaoCard key={s.id} s={s} />
-          ))}
-        </ul>
-      )}
+      <AnimatePresence mode="wait">
+        <m.div
+          key={filtro}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={springSnappy}
+          className="space-y-4"
+        >
+          {filtradas.length === 0 ? (
+            <MotionEmptyState
+              title={`Nenhuma solicitação ${FILTRO_LABEL[filtro].toLowerCase()}`}
+              description="Troque de aba para ver outros status."
+            />
+          ) : (
+            filtradas.map((s) => (
+              <AfiliacaoPedidoCard
+                key={s.id}
+                pedido={s}
+                podeDecidir
+                torcidaNome={s.torcidaNome}
+                extra={promocaoNode(s) ?? undefined}
+              />
+            ))
+          )}
+        </m.div>
+      </AnimatePresence>
     </div>
   )
 }

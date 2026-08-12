@@ -136,6 +136,13 @@ export async function promoverUnidadeAPortal(
     }
 
     const tenantMaeId = sede.tenantId
+    const tenantMae: { afiliacaoId: string | null; corPrimaria: string } | null =
+      await db.tenant.findUnique({
+        where: { id: tenantMaeId },
+        select: { afiliacaoId: true, corPrimaria: true },
+      })
+    if (!tenantMae) throw new ExpectedError('Torcida-mãe não encontrada.')
+
     const slug = await slugUnico(slugify(`${sede.nome}${sede.cidade ? `-${sede.cidade}` : ''}`))
 
     const novoTenant: { id: string; slug: string } = await db.tenant.create({
@@ -143,7 +150,8 @@ export async function promoverUnidadeAPortal(
         slug,
         nome: sede.nome,
         plano: 'FREE',
-        corPrimaria: sede.tenant?.corPrimaria ?? '#2563eb',
+        corPrimaria: sede.tenant?.corPrimaria ?? tenantMae.corPrimaria,
+        afiliacaoId: tenantMae.afiliacaoId,
         ...(sede.fotoUrl ? { logoUrl: sede.fotoUrl } : {}),
       },
       select: { id: true, slug: true },
@@ -240,7 +248,7 @@ export async function promoverUnidadeAPortal(
 
     invalidateHierarchyCache(tenantMaeId)
     invalidateHierarchyCache(novoTenant.id)
-revalidatePath('/super-admin/afiliacoes')
+revalidatePath('/super-admin/unidades')
   revalidatePath('/admin/afiliacoes')
   revalidatePath('/admin/torcida')
 

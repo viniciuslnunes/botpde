@@ -11,6 +11,10 @@ import {
   type ClubeOpcao,
   type TorcidaOpcao,
 } from '@/lib/torcida-labels'
+import {
+  carregarMapaPortalMae,
+  filtrarTenantsRaiz,
+} from '@/lib/tenant-hierarquia-plataforma'
 
 export type { ClubeOpcao, TorcidaOpcao }
 export { labelClubeComUf, labelTorcidaComClube }
@@ -238,12 +242,20 @@ export const TORCIDAS_SELECAO_CACHE_TAG = 'torcidas-para-selecao'
 export const CLUBES_SELECAO_CACHE_TAG = 'clubes-para-selecao'
 
 async function fetchTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
-  const rows: TorcidaRowComAfiliacao[] = await db.tenant.findMany({
-    where: { ativo: true, sintetico: false },
-    select: TORCIDA_SELECAO_SELECT,
-    orderBy: { nome: 'asc' },
-  })
-  return rows.map(mapTorcidaOpcao)
+  const [rows, maePorFilho]: [TorcidaRowComAfiliacao[], Map<string, string>] = await Promise.all([
+    db.tenant.findMany({
+      where: { ativo: true, sintetico: false },
+      select: TORCIDA_SELECAO_SELECT,
+      orderBy: { nome: 'asc' },
+    }),
+    carregarMapaPortalMae(),
+  ])
+  const raizes = filtrarTenantsRaiz(
+    rows.map((r) => r.id),
+    maePorFilho,
+  )
+  const raizSet = new Set(raizes)
+  return rows.filter((r) => raizSet.has(r.id)).map(mapTorcidaOpcao)
 }
 
 /** Lista enxuta para seletores de super-admin (cache cross-request 5 min). */

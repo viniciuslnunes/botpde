@@ -7,6 +7,8 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { useEscudoCircular } from '@/lib/use-escudo-circular'
 
 const SIZES = {
+  /** Linha de tabela/lista densa (catálogo de clubes do super-admin). */
+  xs: { box: 'h-8 w-8', px: 32, icon: 'h-3.5 w-3.5', text: 'text-xs' },
   sm: { box: 'h-11 w-11', px: 44, icon: 'h-4 w-4', text: 'text-sm' },
   md: { box: 'h-14 w-14', px: 56, icon: 'h-5 w-5', text: 'text-lg' },
   lg: { box: 'h-16 w-16', px: 64, icon: 'h-6 w-6', text: 'text-xl' },

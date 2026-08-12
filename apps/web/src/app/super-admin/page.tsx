@@ -15,6 +15,7 @@ import {
   listarTopTorcidasPorMembros,
   serieNovasTorcidasPorMes,
 } from '@/lib/super-admin/plataforma-dashboard'
+import { AppBuildMetaCard } from '@/components/super-admin/app-build-meta'
 
 export const metadata: Metadata = { title: 'Visão geral — Super Admin' }
 
@@ -58,10 +59,10 @@ async function PlataformaOverview() {
           badge={`+${kpis.novosMembros30d} nos últimos 30d`}
         />
         <StatCard
-          label="Afiliações pendentes"
+          label="Unidades pendentes"
           value={kpis.afiliacoesPendentes}
           icon={<ClipboardCheck className="h-5 w-5" />}
-          href="/super-admin/afiliacoes"
+          href="/super-admin/unidades"
           tone={kpis.afiliacoesPendentes > 0 ? 'warning' : 'default'}
         />
       </KpiGrid>
@@ -107,6 +108,8 @@ async function PlataformaOverview() {
           ))}
         </tbody>
       </TableShell>
+
+      <AppBuildMetaCard />
 
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
         Gerenciar torcidas específicas: <Link href="/super-admin/torcidas" className="underline">Torcidas</Link>.

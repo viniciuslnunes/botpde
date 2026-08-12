@@ -31,6 +31,10 @@ setorize-secrets.kdbx
 # Dumps do banco (cópia local da Railway — ver docs/ops/postgres-local-dev.md)
 .dumps/
 
+# Notas locais com mapa de ambientes / credenciais (ex.: AMBIENTES.local.md)
+*.local.md
+**/*.local.md
+
 # Scratch local (Playwright ad-hoc, capturas, dumps temporários)
 shot-*.mjs
 apps/web/shot-*.mjs

@@ -182,6 +182,15 @@ export function ComunidadeEscopoTabs({
   const wasPending = useRef(false)
   const [slugPendente, setSlugPendente] = useState<string | null>(null)
   const [tip, setTip] = useState<HoverTipAnchor | null>(null)
+  /**
+   * Aba escolhida no clique, antes da rota commitar. Sem isso a navegação RSC
+   * (segundos numa rede ruim) não dá **nenhum** retorno visual e a pessoa
+   * clica de novo achando que o primeiro clique não pegou.
+   */
+  const [abaClicada, setAbaClicada] = useState<string | null>(null)
+  const [navegando, startNav] = useTransition()
+  /** Só enquanto a navegação/action está no ar — some sozinho ao commitar. */
+  const abaPendente = navegando || pending ? abaClicada : null
 
   function limparTip() {
     setTip(null)
@@ -612,7 +621,12 @@ export function ComunidadeEscopoTabs({
           tab.slugAlvo !== '' &&
           atualSlug != null &&
           tab.slugAlvo !== atualSlug
-        const carregandoEsta = pending && slugPendente === tab.slugAlvo
+        // Otimista: enquanto a rota não commita, a aba clicada é a "ativa"
+        // (indicador desliza + spinner). Uma aba pendente por vez.
+        const estaPendente = abaPendente === tab.id
+        const ativoVisual = abaPendente ? estaPendente : ativo
+        const carregandoEsta =
+          estaPendente || (pending && slugPendente === tab.slugAlvo)
         const arrastavel = Boolean(ehMovel && chaveMovel && chavesArrastaveis.includes(chaveMovel))
         const dragKey = chaveMovel
         const arrastando = dragKey != null && draggingKey === dragKey
@@ -624,7 +638,7 @@ export function ComunidadeEscopoTabs({
               ? chaveAtividadeCanal(tab.canalId)
               : null
         const temNovidade =
-          Boolean(chaveAtividade) && !ativo && unreadKeys.has(chaveAtividade!)
+          Boolean(chaveAtividade) && !ativoVisual && unreadKeys.has(chaveAtividade!)
 
         /** 32×32 sem scale no ícone (hover distorce a medida entre abas). */
         const visual = (
@@ -636,7 +650,7 @@ export function ComunidadeEscopoTabs({
                 aria-hidden
                 className={[
                   'flex items-center justify-center rounded-full text-xs font-bold',
-                  ativo
+                  ativoVisual
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
@@ -692,7 +706,7 @@ export function ComunidadeEscopoTabs({
         const className = [
           'relative -mb-px flex h-11 touch-none items-center justify-center pb-2 pt-0.5',
           // Com novidade: menos fade — o escudo “acende” junto com o ponto.
-          ativo ? 'opacity-100' : temNovidade ? 'opacity-95 hover:opacity-100' : 'opacity-55 hover:opacity-90',
+          ativoVisual ? 'opacity-100' : temNovidade ? 'opacity-95 hover:opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',
         ].join(' ')
         // Largura do hit-area = logo + folga mínima
@@ -758,7 +772,7 @@ export function ComunidadeEscopoTabs({
           ) : null
         ) : null
 
-        const indicator = ativo ? (
+        const indicator = ativoVisual ? (
           <m.span
             layoutId="comunidade-escopo-tab-indicator"
             className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[rgb(var(--primary))] shadow-[0_0_10px_rgb(var(--primary)/0.55)]"
@@ -831,6 +845,7 @@ export function ComunidadeEscopoTabs({
                     return
                   }
                   setSlugPendente(tab.slugAlvo)
+                  setAbaClicada(tab.id)
                 }}
                 className="contents"
               >
@@ -840,7 +855,7 @@ export function ComunidadeEscopoTabs({
                 <button
                   type="submit"
                   disabled={busy}
-                  aria-current={ativo ? 'page' : undefined}
+                  aria-current={ativoVisual ? 'page' : undefined}
                   aria-label={ariaLabel}
                   className={className}
                   style={tabBtnStyle}
@@ -856,7 +871,7 @@ export function ComunidadeEscopoTabs({
                 scroll={false}
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
-                aria-current={ativo ? 'page' : undefined}
+                aria-current={ativoVisual ? 'page' : undefined}
                 aria-label={ariaLabel}
                 className={className}
                 style={tabBtnStyle}
@@ -875,11 +890,28 @@ export function ComunidadeEscopoTabs({
                     e.preventDefault()
                     return
                   }
-                  // Soft-switch também para Minha torcida/unidade (canalId
-                  // fixo): limpa o foco Caso A ao escolher a Sede de novo.
-                  if (tab.canalId && softSwitch?.enabled) {
-                    e.preventDefault()
-                    softSwitch.softSwitchPara(tab.canalId)
+                  // Ctrl/⌘/shift/botão do meio: deixa o navegador abrir a aba.
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                    return
+                  }
+                  if (ativo) return
+                  e.preventDefault()
+                  // A navegação vira transition nossa: `navegando` acende o
+                  // escudo no ato, em vez de a barra ficar muda até o RSC
+                  // chegar (era isso que fazia parecer que o 1º clique não
+                  // pegou e cobrava um 2º).
+                  setAbaClicada(tab.id)
+                  const canalId = tab.canalId
+                  if (canalId && softSwitch?.enabled) {
+                    // Soft-switch também para Minha torcida/unidade (canalId
+                    // fixo): limpa o foco Caso A ao escolher a Sede de novo.
+                    startNav(async () => {
+                      await softSwitch.softSwitchPara(canalId)
+                    })
+                  } else {
+                    startNav(() => {
+                      router.push(tab.href, { scroll: false })
+                    })
                   }
                 }}
               >

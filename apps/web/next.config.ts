@@ -1,3 +1,7 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 import bundleAnalyzer from '@next/bundle-analyzer'
@@ -21,8 +25,79 @@ const deploymentId =
   process.env.RAILWAY_DEPLOYMENT_ID?.trim() ||
   undefined
 
+const here = dirname(fileURLToPath(import.meta.url))
+const repoRoot = join(here, '../..')
+
+function readRootPackageVersion(): string {
+  try {
+    const raw = readFileSync(join(repoRoot, 'package.json'), 'utf8')
+    const pkg = JSON.parse(raw) as { version?: string }
+    return pkg.version?.trim() || '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/** 1.<commits_main>.<commits_totais> — ver scripts/lib/version-from-git.mjs */
+function versionFromGitOrPackage(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_VERSION?.trim()
+  if (fromEnv) return fromEnv
+
+  try {
+    const mainRef = (() => {
+      for (const ref of ['origin/main', 'main'] as const) {
+        try {
+          execSync(`git rev-parse --verify ${ref}`, {
+            cwd: repoRoot,
+            stdio: ['ignore', 'pipe', 'ignore'],
+          })
+          return ref
+        } catch {
+          /* next */
+        }
+      }
+      return 'HEAD'
+    })()
+    const count = (args: string) => {
+      const out = execSync(`git rev-list --count ${args}`, {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+      return Number.parseInt(out, 10)
+    }
+    const minor = count(mainRef)
+    let patch = count('--all')
+    if (!Number.isFinite(patch) || patch < minor) patch = minor
+    if (Number.isFinite(minor) && Number.isFinite(patch)) {
+      return `1.${minor}.${patch}`
+    }
+  } catch {
+    // sem .git no build → package.json
+  }
+  return readRootPackageVersion()
+}
+
+const appVersion = versionFromGitOrPackage()
+const appCommit =
+  process.env.NEXT_PUBLIC_APP_COMMIT?.trim() ||
+  process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
+  (process.env.NODE_ENV === 'production' ? 'unknown' : 'dev')
+const appPublishedAt =
+  process.env.NEXT_PUBLIC_APP_PUBLISHED_AT?.trim() || new Date().toISOString()
+const appRepo =
+  process.env.NEXT_PUBLIC_APP_REPO?.trim() ||
+  process.env.GITHUB_REPOSITORY?.trim() ||
+  'viniciuslnunes/botpde'
+
 const nextConfig: NextConfig = {
   ...(deploymentId ? { deploymentId } : {}),
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_APP_COMMIT: appCommit,
+    NEXT_PUBLIC_APP_PUBLISHED_AT: appPublishedAt,
+    NEXT_PUBLIC_APP_REPO: appRepo,
+  },
   experimental: {
     // Sem @torcida/ui: optimizePackageImports no barrel quebra o singleton do Sonner
     // (toast() e <Toaster /> em grafos distintos → toasts silenciosos).
@@ -65,6 +140,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Next 16 só otimiza as qualidades declaradas; 90 é usado nos avatares.
+    qualities: [75, 90],
     // Stickers locais — Next 16 exige localPatterns explícito para assets em public/.
     localPatterns: [{ pathname: '/stickers/**' }],
     remotePatterns: [

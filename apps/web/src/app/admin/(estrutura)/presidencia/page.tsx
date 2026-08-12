@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
+import { formatNomeUnidade, PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { labelTipoUnidade } from '@/lib/torcida-labels'
 import {
@@ -75,7 +75,7 @@ export default async function PresidenciaPage() {
     .filter((s) => s.id !== raizId && !(s.sedeId && idsPaisExternos.has(s.sedeId)))
     .map((s) => ({
       sedeId: s.id,
-      nome: s.nome,
+      nome: formatNomeUnidade(s.nome),
       tipoLabel: labelTipoUnidade(s.tipo),
       lider: s.responsavelUserId
         ? {

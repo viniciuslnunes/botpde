@@ -1,0 +1,138 @@
+name: Schema deploy
+
+# Railway só regenera o client Prisma — não aplica schema.
+# Fluxo: detecta mudança em schema.prisma → db:push HML → db:push prod.
+#
+# TEMP (testes): prod também é automático (sem required reviewers).
+# Para reverter ao gate manual: ver docs/ops/schema-deploy.md § Reverter gate de prod.
+#
+# Setup: docs/ops/schema-deploy.md § GitHub Actions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/db/prisma/schema.prisma'
+      - 'packages/db/scripts/schema-deploy.js'
+      - '.github/workflows/schema-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Aplicar db:push mesmo sem diff de schema detectado'
+        type: boolean
+        default: false
+      skip_prod:
+        description: 'Só HML — não enfileirar o job de produção'
+        type: boolean
+        default: false
+
+concurrency:
+  group: schema-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detectar mudança de schema
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Precisa do commit anterior ao push (github.event.before).
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Detectar
+        id: detect
+        env:
+          FORCE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          SINCE="${BEFORE:-}"
+          if [ -z "$SINCE" ] || [ "$SINCE" = "0000000000000000000000000000000000000000" ]; then
+            SINCE="HEAD~1"
+          fi
+          echo "Base do diff: $SINCE"
+
+          if [ "$FORCE_INPUT" = "true" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Force (workflow_dispatch): tratando como mudou."
+            exit 0
+          fi
+
+          pnpm --filter @torcida/db schema:check -- --ci-detect --since="$SINCE"
+
+  deploy-hml:
+    name: db:push Homolog
+    needs: detect
+    if: needs.detect.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Aplicar schema em HML
+        env:
+          TORCIDA_ENV: homolog
+          DATABASE_URL: ${{ secrets.DATABASE_URL_HML }}
+        run: pnpm --filter @torcida/db schema:deploy -- --apply --force
+
+  deploy-prod:
+    # TEMP (testes): automático após HML. Reverter: reativar required reviewers
+    # no environment "production" (docs/ops/schema-deploy.md § Reverter).
+    name: db:push Produção
+    needs: [detect, deploy-hml]
+    if: |
+      needs.detect.outputs.changed == 'true' &&
+      needs.deploy-hml.result == 'success' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.skip_prod)
+    runs-on: ubuntu-latest
+    # Mantém o environment só para isolar DATABASE_URL_PROD (sem protection rules).
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Aplicar schema em produção
+        env:
+          TORCIDA_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: pnpm --filter @torcida/db schema:deploy -- --apply --force --i-know-prod

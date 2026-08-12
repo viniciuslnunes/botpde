@@ -103,10 +103,23 @@ function clienteFake(estado: EstadoDepartamental) {
       },
     },
     userRole: {
-      findMany: async (): Promise<{ role: PerfilFake }[]> => {
-        modelosLidos.push('userRole')
+      // Dois call sites distintos batem em `userRole`: os perfis DO usuário
+      // (projeção de área) e a liderança DO tenant (`idsLiderancaTenant`, via
+      // canais de departamento). Só o primeiro é gateado por elegibilidade —
+      // sem separar, a invariante do torcedor testava a chamada errada.
+      findMany: async (
+        args: { where?: { userId?: string } } = {},
+      ): Promise<{ role: PerfilFake }[] | { userId: string }[]> => {
+        if (!args.where?.userId) {
+          modelosLidos.push('userRole:lideranca')
+          return []
+        }
+        modelosLidos.push('userRole:perfis')
         return estado.perfis.map((perfil) => ({ role: perfil }))
       },
+    },
+    user: {
+      findMany: async (): Promise<{ id: string }[]> => [],
     },
     userDepartamento: {
       findMany: async (): Promise<{ departamentoId: string }[]> =>
@@ -249,7 +262,7 @@ describe('syncMembershipFromRoles — projeção de perfil de área', () => {
     expect(estado.gestoria).toEqual([])
     expect(escritas).toEqual([])
     // Inelegível nem chega a ler os perfis: nada pode ser desejado.
-    expect(modelosLidos).not.toContain('userRole')
+    expect(modelosLidos).not.toContain('userRole:perfis')
   })
 
   it('torcedor com projeções herdadas perde equipe e gestoria na sincronização', async () => {

@@ -33,6 +33,10 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 - Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).
 - O projeto usa **`db push`** (não há pasta de migrations). Mudança de schema é
   sincronizada, não versionada em migration files.
+- **Pós-merge:** Railway não aplica schema. Ao propor alteração que toca
+  `schema.prisma`, avise no plano: “exigirá agente `ops-schema` /
+  `pnpm --filter @torcida/db schema:deploy` em HML→prod”. Ver
+  `docs/ops/schema-deploy.md`.
 
 ## Regras do schema (deste repo)
 - Toda tabela de dados SaaS tem `tenantId` — exceto referências globais (ex.: `Clube`,

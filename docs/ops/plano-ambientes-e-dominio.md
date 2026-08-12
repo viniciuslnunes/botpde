@@ -469,9 +469,13 @@ teste; Production ainda intacta; local sync aponta para HML.
 ### Fase 5 — Processo e blindagem contínua
 
 - [ ] Fluxo Git: feature → PR → `staging` (homolog) → validar → merge `main` (prod)
-- [ ] Proibir `db:push` / seeds volumosos contra Production (checklist humano;
-      futuro: script que recusa se `ROOT_DOMAIN` contém `torcidas.setorize`
-      sem flag `--i-know-prod`)
+- [x] Detectar schema drift pós-`main`: agente `ops-schema` +
+      `schema:check` / `schema:deploy` + workflow
+      `.github/workflows/schema-deploy.yml` (HML→prod automático; **TEMP**
+      sem required reviewers — reverter em `docs/ops/schema-deploy.md`)
+- [ ] Proibir `db:push` / seeds volumosos contra Production sem flag
+      (`schema:deploy` já exige `--i-know-prod`; futuro: recusar se
+      `ROOT_DOMAIN` contém `torcidas.setorize` sem a flag)
 - [ ] Remover do pacote de time qualquer DSN de prod; rotacionar secrets velhos
 - [ ] Atualizar `ARCHITECTURE.md` item 26 + status Faixa A em
       `plano-investimento-infra.md`

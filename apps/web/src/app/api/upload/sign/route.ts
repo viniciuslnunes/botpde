@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getCloudinaryConfig, signCloudinaryParams } from '@/lib/cloudinary'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
@@ -16,6 +17,7 @@ const purposeSchema = z.enum([
   'sede',
   'mensagem',
   'patrimonio',
+  'clube-escudo',
 ])
 
 const bodySchema = z.object({
@@ -83,6 +85,13 @@ export async function POST(request: NextRequest) {
       // também pode anexar mídia em conversas das quais participa.
       const { membro } = await assertPodeEnviarNaConversa(conversaId, session.user.id)
       folder = `torcida/${membro.conversa.tenantId}/mensagens/${conversaId}`
+    } else if (purpose === 'clube-escudo') {
+      // Catálogo de clubes é global (sem tenant): o gate é a allowlist de
+      // super-admin, igual ao resto de `/super-admin`, não `assertPermission`.
+      if (!session.user.email || !isSuperAdminEmail(session.user.email)) {
+        return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+      }
+      folder = 'catalogo/clubes'
     } else if (purpose === 'patrimonio') {
       const { tenant } = await assertPermission(PERMISSIONS.PATRIMONY_VIEW)
       folder = `torcida/${tenant.id}/patrimonio`

@@ -522,7 +522,7 @@ export async function editarSede(
   revalidatePath('/portal/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
   revalidatePath('/admin/afiliacoes')
-  revalidatePath('/super-admin/afiliacoes')
+  revalidatePath('/super-admin/unidades')
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
@@ -606,7 +606,7 @@ export async function salvarFotoSede(
   revalidatePath('/portal/sedes')
   revalidatePath('/portal/comunidade/canais')
   revalidatePath('/admin/afiliacoes')
-  revalidatePath('/super-admin/afiliacoes')
+  revalidatePath('/super-admin/unidades')
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
 
@@ -753,7 +753,7 @@ export async function geocodificarSedesSemCoords(): Promise<GeocodeLoteResult> {
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath('/admin/afiliacoes')
-  revalidatePath('/super-admin/afiliacoes')
+  revalidatePath('/super-admin/unidades')
 
   return {
     ok: true,

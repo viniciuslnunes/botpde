@@ -679,6 +679,131 @@ export const LISTAGEM_SUPER_ADMIN_LIDERANCAS: ListagemSpec = {
   ],
 }
 
+/**
+ * Catálogo de clubes (`Afiliacao`) — referência GLOBAL, sem `tenantId`: a página
+ * declara `escopo: { global: true, motivo }` em `montarWhereListagem`.
+ *
+ * `completude` não é coluna do banco: é a fila de trabalho da aba Qualidade
+ * traduzida em cláusulas (campo nulo/vazio), para o operador achar o que falta
+ * sem varrer a tabela inteira no cliente.
+ */
+export const LISTAGEM_SUPER_ADMIN_CLUBES: ListagemSpec = {
+  id: 'super-admin-clubes',
+  basePath: '/super-admin/clubes',
+  sortPadrao: 'nome',
+  dirPadrao: 'asc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar por nome, apelido, slug ou cidade…',
+  buscaModo: 'termos',
+  buscaEm: [{ campo: 'nome' }, { campo: 'apelido' }, { campo: 'slug' }, { campo: 'cidade' }],
+  colunas: [
+    { id: 'nome', label: 'Clube', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'serie',
+      label: 'Série',
+      ordenarPor: 'serie',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'serie',
+        label: 'Série',
+        tipo: 'enum',
+        campo: 'serie',
+        multiplo: true,
+        faceta: true,
+        valorNulo: 'sem',
+        opcoes: [
+          { valor: 'A', label: 'Série A' },
+          { valor: 'B', label: 'Série B' },
+          { valor: 'C', label: 'Série C' },
+          { valor: 'D', label: 'Série D' },
+          { valor: 'ESTADUAL', label: 'Estadual' },
+          { valor: 'OUTRA', label: 'Outra' },
+          { valor: 'sem', label: 'Sem série' },
+        ],
+      },
+    },
+    {
+      id: 'estado',
+      label: 'UF',
+      ordenarPor: 'estado',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'estado',
+        label: 'UF',
+        tipo: 'enum',
+        campo: 'estado',
+        multiplo: true,
+        faceta: true,
+        valorNulo: 'sem',
+      },
+    },
+    {
+      id: 'cidade',
+      label: 'Cidade',
+      ordenarPor: 'cidade',
+      dirPadrao: 'asc',
+      filtro: { id: 'cidade', label: 'Cidade', tipo: 'texto', campo: 'cidade' },
+    },
+    // `tenants._count` vira `orderBy: { tenants: { _count: dir } }` — agregação
+    // do Postgres, não contagem montada em memória.
+    { id: 'torcidas', label: 'Torcidas', ordenarPor: 'tenants._count', dirPadrao: 'desc', align: 'right' },
+    {
+      id: 'torcedoresEstimados',
+      label: 'Torcedores est.',
+      ordenarPor: 'torcedoresEstimados',
+      dirPadrao: 'desc',
+      align: 'right',
+    },
+    {
+      id: 'completude',
+      label: 'Cadastro',
+      filtro: {
+        id: 'completude',
+        label: 'Cadastro',
+        tipo: 'enum',
+        // Sem coluna equivalente no banco: cada opção traz cláusula pronta.
+        campo: 'id',
+        multiplo: true,
+        opcoes: [
+          { valor: 'sem-escudo', label: 'Sem escudo' },
+          { valor: 'sem-serie', label: 'Sem série' },
+          { valor: 'sem-uf', label: 'Sem UF' },
+          { valor: 'sem-cidade', label: 'Sem cidade' },
+          { valor: 'sem-slug', label: 'Sem slug' },
+          { valor: 'sem-estimativa', label: 'Sem estimativa' },
+        ],
+        clausulas: {
+          'sem-escudo': { OR: [{ escudoUrl: null }, { escudoUrl: '' }] },
+          'sem-serie': { serie: null },
+          'sem-uf': { OR: [{ estado: null }, { estado: '' }] },
+          'sem-cidade': { OR: [{ cidade: null }, { cidade: '' }] },
+          'sem-slug': { OR: [{ slug: null }, { slug: '' }] },
+          'sem-estimativa': { OR: [{ torcedoresEstimados: null }, { torcedoresEstimados: 0 }] },
+        },
+      },
+    },
+    {
+      id: 'situacao',
+      label: 'Situação',
+      ordenarPor: 'ativo',
+      dirPadrao: 'desc',
+      filtro: {
+        id: 'situacao',
+        label: 'Situação',
+        tipo: 'enum',
+        // URL carrega string; Prisma espera boolean — cláusulas traduzem.
+        campo: 'ativo',
+        faceta: true,
+        clausulas: { true: { ativo: true }, false: { ativo: false } },
+        opcoes: [
+          { valor: 'true', label: 'Ativos' },
+          { valor: 'false', label: 'Arquivados' },
+        ],
+      },
+    },
+  ],
+}
+
 /** Todas as listagens registradas — base dos testes de invariante. */
 export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_TORCEDORES,
@@ -692,4 +817,5 @@ export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_LOJA_PEDIDOS,
   LISTAGEM_SUPER_ADMIN_SETUP,
   LISTAGEM_SUPER_ADMIN_LIDERANCAS,
+  LISTAGEM_SUPER_ADMIN_CLUBES,
 ]

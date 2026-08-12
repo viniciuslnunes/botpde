@@ -1,8 +1,13 @@
 import { db } from '@torcida/db'
-import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeTorcida, formatNomeUnidade, SYSTEM_ROLES } from '@torcida/types'
+import { resolveLogoTenantSemIO, resolveTenantLogoUrl } from '@/lib/tenant'
 import { tokensDaBusca } from '@/lib/listagem/query'
 import type { ListagemParams } from '@/lib/listagem'
 import { labelTipoUnidade } from '@/lib/torcida-labels'
+import {
+  carregarMapaPortalMae,
+  paraTenantRaiz,
+} from '@/lib/tenant-hierarquia-plataforma'
 
 /**
  * Console de lideranças do super-admin (`/super-admin/liderancas`).
@@ -22,7 +27,12 @@ export type LinhaLideranca = {
   /** Caso A: unidade cuja liderança muda. `null` no Caso B. */
   sedeId: string | null
   nome: string
-  /** "Torcida", "Subsede", "PDE" — natureza da linha na árvore. */
+  /**
+   * "Torcida", "Subsede", "PDE" — natureza da unidade na árvore, sempre vinda
+   * de `Sede.tipo`. Ter portal próprio (Caso B) é detalhe de implementação da
+   * liderança (`caso`), **não** uma categoria de unidade: uma subsede promovida
+   * continua sendo Subsede.
+   */
   tipoLabel: string
   slug: string | null
   corPrimaria: string
@@ -37,6 +47,8 @@ export type GrupoLideranca = {
   nome: string
   clubeLabel: string | null
   corPrimaria: string
+  /** Escudo/logo efetivo (`resolveTenantLogoUrl`); `null` cai na inicial. */
+  logoUrl: string | null
   raiz: LinhaLideranca
   filhas: LinhaLideranca[]
 }
@@ -67,6 +79,7 @@ type SedeRow = {
   tipo: string
   tenantId: string | null
   sedeId: string | null
+  fotoUrl: string | null
   responsavelUserId: string | null
   responsavelUser: { nome: string | null; email: string | null } | null
 }
@@ -76,6 +89,7 @@ type TenantRow = {
   slug: string
   nome: string
   corPrimaria: string
+  logoUrl: string | null
   afiliacao: { nome: string; apelido: string | null; estado: string | null } | null
 }
 
@@ -85,8 +99,6 @@ type OwnerRow = {
   user: { nome: string | null; email: string | null }
 }
 
-type MaeRow = { filho: string; mae: string }
-
 function clubeLabel(t: TenantRow): string | null {
   if (!t.afiliacao) return null
   const nome = t.afiliacao.apelido || t.afiliacao.nome
@@ -94,23 +106,25 @@ function clubeLabel(t: TenantRow): string | null {
 }
 
 function paraRaiz(tenantId: string, maePorFilho: Map<string, string>): string {
-  return maePorFilho.get(tenantId) ?? tenantId
+  return paraTenantRaiz(tenantId, maePorFilho)
 }
 
 /**
- * Portal de unidade (Caso B): a Sede do portal aponta para uma Sede de outro
- * tenant. Um par (filho → mãe) por portal — leitura leve, só ids.
+ * Ordem da árvore: Sede, depois Subsede, depois PDE. Tipo desconhecido (portal
+ * legado sem a sede da unidade) vai para o fim, não para o topo.
  */
+const PESO_HIERARQUIA: Record<string, number> = {
+  SEDE: 0,
+  SUBSEDE: 1,
+  PONTO_ENCONTRO: 2,
+}
+
+function pesoHierarquia(tipo: string): number {
+  return PESO_HIERARQUIA[tipo] ?? 99
+}
+
 async function carregarMapaMae(): Promise<Map<string, string>> {
-  const rows: MaeRow[] = await db.$queryRaw`
-    SELECT DISTINCT s.tenant_id AS filho, pai.tenant_id AS mae
-    FROM saas_sedes s
-    INNER JOIN saas_sedes pai ON pai.id = s.sede_id
-    WHERE s.tenant_id IS NOT NULL
-      AND pai.tenant_id IS NOT NULL
-      AND s.tenant_id <> pai.tenant_id
-  `
-  return new Map(rows.map((r) => [r.filho, r.mae]))
+  return carregarMapaPortalMae()
 }
 
 function intersectir(base: Set<string> | null, recorte: Set<string>): Set<string> {
@@ -408,6 +422,7 @@ function montarGrupo(
   ownersPorTenant: Map<string, OwnerRow[]>,
   maePorFilho: Map<string, string>,
   meuUserId: string,
+  extra: { logoUrl: string | null },
 ): GrupoLideranca {
   const sedePorId = new Map(sedes.map((s) => [s.id, s]))
 
@@ -446,7 +461,7 @@ function montarGrupo(
       caso: 'A',
       tenantId: sede.tenantId!,
       sedeId: sede.id,
-      nome: sede.nome,
+      nome: formatNomeUnidade(sede.nome),
       tipoLabel: labelTipoUnidade(sede.tipo),
       slug: null,
       corPrimaria,
@@ -455,19 +470,29 @@ function montarGrupo(
     }
   }
 
-  const filhas: LinhaLideranca[] = []
+  // Uma lista só, ordenada por hierarquia e depois pelo nome — ter portal
+  // próprio não muda o lugar da unidade na árvore, então Caso A e Caso B se
+  // misturam. Sem isso os portais vinham em bloco no topo, fora de ordem.
+  const filhasOrdenaveis: { linha: LinhaLideranca; tipo: string }[] = []
 
   for (const outro of tenants) {
     if (maePorFilho.get(outro.id) !== t.id) continue
-    filhas.push(linhaTenant(outro, 'Portal de unidade'))
 
     const sedesDoPortal = sedes.filter((s) => s.tenantId === outro.id)
+    // A "cara" do portal é a própria unidade promovida — é dela que sai o tipo
+    // da linha. Sem ela (dado legado), cai em "Unidade" em vez de inventar.
     const sedeDoProprioPortal = sedesDoPortal.find(
       (s) => s.sedeId && sedePorId.get(s.sedeId)?.tenantId === t.id,
     )
+    const tipoPortal = sedeDoProprioPortal?.tipo ?? ''
+    filhasOrdenaveis.push({
+      linha: linhaTenant(outro, tipoPortal ? labelTipoUnidade(tipoPortal) : 'Unidade'),
+      tipo: tipoPortal,
+    })
+
     for (const sede of sedesDoPortal) {
       if (sede.id === sedeDoProprioPortal?.id) continue
-      filhas.push(linhaSede(sede, outro.corPrimaria))
+      filhasOrdenaveis.push({ linha: linhaSede(sede, outro.corPrimaria), tipo: sede.tipo })
     }
   }
 
@@ -475,14 +500,25 @@ function montarGrupo(
   const raizSedeId = sedesDoTenant.find((s) => s.tipo === 'SEDE')?.id ?? null
   for (const sede of sedesDoTenant) {
     if (sede.id === raizSedeId) continue
-    filhas.push(linhaSede(sede, t.corPrimaria))
+    filhasOrdenaveis.push({ linha: linhaSede(sede, t.corPrimaria), tipo: sede.tipo })
   }
+
+  filhasOrdenaveis.sort((a, b) => {
+    const peso = pesoHierarquia(a.tipo) - pesoHierarquia(b.tipo)
+    if (peso !== 0) return peso
+    // `sensitivity: 'base'` porque nome de portal vem em caixa alta
+    // (`formatNomeTorcida`) e o de Sede em capitalizado — sem isso "SUBSEDE
+    // RIO CLARO" e "Subsede ABC" ordenariam em blocos separados.
+    return a.linha.nome.localeCompare(b.linha.nome, 'pt-BR', { sensitivity: 'base' })
+  })
+  const filhas: LinhaLideranca[] = filhasOrdenaveis.map((f) => f.linha)
 
   return {
     tenantId: t.id,
     nome: formatNomeTorcida(t.nome),
     clubeLabel: clubeLabel(t),
     corPrimaria: t.corPrimaria,
+    logoUrl: extra.logoUrl,
     raiz: linhaTenant(t, 'Torcida'),
     filhas,
   }
@@ -512,6 +548,7 @@ async function hidratarGrupos(
         slug: true,
         nome: true,
         corPrimaria: true,
+        logoUrl: true,
         afiliacao: { select: { nome: true, apelido: true, estado: true } },
       },
     }),
@@ -523,6 +560,7 @@ async function hidratarGrupos(
         tipo: true,
         tenantId: true,
         sedeId: true,
+        fotoUrl: true,
         responsavelUserId: true,
         responsavelUser: { select: { nome: true, email: true } },
       },
@@ -548,12 +586,39 @@ async function hidratarGrupos(
     else ownersPorTenant.set(o.tenantId, [o])
   }
 
+  // Escudo da torcida pela cascata canônica. Os dois primeiros degraus (foto da
+  // sede raiz, logo do Design) saem das linhas já carregadas acima; só quem não
+  // resolver aí paga as queries de canal — em paralelo, nunca uma por raiz em
+  // série.
+  const logoPorTenant = new Map<string, string | null>()
+  const pendentes: TenantRow[] = []
+  for (const id of raizIds) {
+    const t = tenants.find((x) => x.id === id)
+    if (!t) continue
+    const direto = resolveLogoTenantSemIO(
+      sedes.filter((s) => s.tenantId === t.id),
+      t.logoUrl,
+    )
+    if (direto) logoPorTenant.set(t.id, direto)
+    else pendentes.push(t)
+  }
+  if (pendentes.length > 0) {
+    const resolvidos = await Promise.all(
+      pendentes.map((t) => resolveTenantLogoUrl(t.id, t.logoUrl)),
+    )
+    pendentes.forEach((t, i) => logoPorTenant.set(t.id, resolvidos[i] ?? null))
+  }
+
   const tenantPorId = new Map(tenants.map((t) => [t.id, t]))
   const grupos: GrupoLideranca[] = []
   for (const id of raizIds) {
     const t = tenantPorId.get(id)
     if (!t) continue
-    grupos.push(montarGrupo(t, tenants, sedes, ownersPorTenant, maePorFilho, meuUserId))
+    grupos.push(
+      montarGrupo(t, tenants, sedes, ownersPorTenant, maePorFilho, meuUserId, {
+        logoUrl: logoPorTenant.get(t.id) ?? null,
+      }),
+    )
   }
   return grupos
 }
@@ -763,6 +828,27 @@ export async function sugerirLiderancas(
     }),
   ])
 
+  // Tipo da unidade promovida, para o portal aparecer como "Subsede"/"PDE" —
+  // mesma regra da listagem: ter tenant próprio não muda o que a unidade é.
+  const idsPortais = tenants.filter((t) => maePorFilho.has(t.id)).map((t) => t.id)
+  const tipoPorPortal = new Map<string, string>()
+  if (idsPortais.length > 0) {
+    const carasDePortal: {
+      tenantId: string | null
+      tipo: string
+      sede: { tenantId: string | null } | null
+    }[] = await db.sede.findMany({
+      where: { tenantId: { in: idsPortais }, sede: { tenantId: { not: null } } },
+      select: { tenantId: true, tipo: true, sede: { select: { tenantId: true } } },
+    })
+    for (const s of carasDePortal) {
+      // Só a unidade promovida tem pai em OUTRO tenant; as sedes internas do
+      // portal têm o próprio portal como pai e não devem sobrescrever o tipo.
+      if (!s.tenantId || s.sede?.tenantId === s.tenantId) continue
+      tipoPorPortal.set(s.tenantId, s.tipo)
+    }
+  }
+
   const vistos = new Set<string>()
   const out: SugestaoLideranca[] = []
 
@@ -780,7 +866,7 @@ export async function sugerirLiderancas(
       raizId,
       label: formatNomeTorcida(t.nome),
       sublabel: ehPortal
-        ? `Portal · ${t.slug}`
+        ? labelTipoUnidade(tipoPorPortal.get(t.id) ?? 'Unidade')
         : clubeLabel(t) ?? t.slug,
       tipo: ehPortal ? 'unidade' : 'torcida',
     })
@@ -791,7 +877,7 @@ export async function sugerirLiderancas(
     if (!s.tenantId) continue
     push({
       raizId: paraRaiz(s.tenantId, maePorFilho),
-      label: s.nome,
+      label: formatNomeUnidade(s.nome),
       sublabel: labelTipoUnidade(s.tipo),
       tipo: 'unidade',
     })
@@ -813,7 +899,7 @@ export async function sugerirLiderancas(
     push({
       raizId: paraRaiz(s.tenantId, maePorFilho),
       label: s.responsavelUser?.email ?? s.responsavelUser?.nome ?? 'Líder',
-      sublabel: s.nome,
+      sublabel: formatNomeUnidade(s.nome),
       tipo: 'lider',
     })
     if (out.length >= limite) return out

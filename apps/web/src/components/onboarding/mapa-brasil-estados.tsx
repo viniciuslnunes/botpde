@@ -27,6 +27,7 @@ import {
   REGIOES_BRASIL,
   regiaoDaUf,
   type RegiaoBrasilId,
+  type RegiaoBrasilMeta,
 } from '@/lib/regioes-brasil'
 
 const VIEWBOX_FULL = '0 0 450 460'
@@ -172,6 +173,7 @@ function CabecalhoPainel({
   titulo,
   subtitulo,
   uf,
+  cor,
   onLimpar,
   filtro,
   onFiltro,
@@ -181,18 +183,21 @@ function CabecalhoPainel({
   titulo: string
   subtitulo: string
   uf?: string
+  /** Cor da região quando o painel não é de um estado específico. */
+  cor?: string
   onLimpar: () => void
   filtro: string
   onFiltro: (v: string) => void
   mostrarFiltro: boolean
   reduceMotion: boolean
 }) {
+  const corFundo = uf ? corRegiao(uf) : cor
   return (
     <header
       className="sticky top-0 z-10 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))]/95 px-4 py-3 backdrop-blur-md"
       style={
-        uf
-          ? { background: `linear-gradient(135deg, ${corRegiao(uf)}18 0%, rgb(var(--surface-raised)) 55%)` }
+        corFundo
+          ? { background: `linear-gradient(135deg, ${corFundo}18 0%, rgb(var(--surface-raised)) 55%)` }
           : undefined
       }
     >
@@ -200,6 +205,13 @@ function CabecalhoPainel({
         <div className="flex min-w-0 items-center gap-2.5">
           {uf ? (
             <BandeiraEstado uf={uf} size="md" />
+          ) : cor ? (
+            <span
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white ring-1 ring-white/20"
+              style={{ backgroundColor: `${cor}33` }}
+            >
+              <MapPin className="h-4 w-4" style={{ color: cor }} />
+            </span>
           ) : (
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--color-primary))]/15 text-[rgb(var(--color-primary-fg))]">
               <Search className="h-4 w-4" />
@@ -223,7 +235,7 @@ function CabecalhoPainel({
           type="button"
           onClick={onLimpar}
           className="shrink-0 rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
-          aria-label={uf ? 'Fechar seleção do estado' : 'Limpar busca'}
+          aria-label={uf ? 'Fechar seleção do estado' : cor ? 'Limpar região' : 'Limpar busca'}
         >
           <X className="h-4 w-4" />
         </button>
@@ -286,6 +298,7 @@ return (
 function PainelLateral({
   modo,
   uf,
+  regiao,
   clubes,
   filtroLocal,
   onFiltroLocal,
@@ -295,8 +308,9 @@ function PainelLateral({
   busca,
   panelRef,
 }: {
-  modo: 'estado' | 'busca'
+  modo: 'estado' | 'regiao' | 'busca'
   uf?: string
+  regiao?: RegiaoBrasilMeta
   clubes: AfiliacaoOnboarding[]
   filtroLocal: string
   onFiltroLocal: (v: string) => void
@@ -319,17 +333,19 @@ function PainelLateral({
   const titulo =
     modo === 'estado' && uf
       ? (NOME_UF[uf] ?? uf)
-      : `Resultados para "${busca}"`
+      : modo === 'regiao' && regiao
+        ? `Região ${regiao.nome}`
+        : `Resultados para "${busca}"`
 
   const subtitulo =
-    modo === 'estado'
-      ? `${clubes.length} ${clubes.length === 1 ? 'clube' : 'clubes'} cadastrados`
-      : `${clubes.length} ${clubes.length === 1 ? 'encontrado' : 'encontrados'}`
+    modo === 'busca'
+      ? `${clubes.length} ${clubes.length === 1 ? 'encontrado' : 'encontrados'}`
+      : `${clubes.length} ${clubes.length === 1 ? 'clube' : 'clubes'} cadastrados`
 
   return (
     <m.aside
       ref={panelRef}
-      key={modo === 'estado' ? uf : 'busca'}
+      key={modo === 'estado' ? uf : modo === 'regiao' ? regiao?.id : 'busca'}
       initial={{ opacity: 0, x: reduceMotion ? 0 : 16 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: reduceMotion ? 0 : 8 }}
@@ -340,6 +356,7 @@ function PainelLateral({
         titulo={titulo}
         subtitulo={subtitulo}
         uf={modo === 'estado' ? uf : undefined}
+        cor={modo === 'regiao' ? regiao?.face : undefined}
         onLimpar={onLimpar}
         filtro={filtroLocal}
         onFiltro={onFiltroLocal}
@@ -385,12 +402,18 @@ export function MapaBrasilEstados({
   const painelRef = useRef<HTMLElement | null>(null)
 
   const buscaAtiva = Boolean(busca.trim())
-  const painelAtivo = Boolean(ufSelecionada) || buscaAtiva
-  const modoPainel: 'estado' | 'busca' | null = buscaAtiva
+  const painelAtivo = Boolean(ufSelecionada) || buscaAtiva || Boolean(regiaoDestaque)
+  const modoPainel: 'estado' | 'regiao' | 'busca' | null = buscaAtiva
     ? 'busca'
     : ufSelecionada
       ? 'estado'
-      : null
+      : regiaoDestaque
+        ? 'regiao'
+        : null
+
+  const metaRegiaoDestaque = regiaoDestaque
+    ? (REGIOES_BRASIL.find((r) => r.id === regiaoDestaque) ?? undefined)
+    : undefined
 
   const totalPorUf = useMemo(() => {
     const map = new Map<string, number>()
@@ -411,12 +434,23 @@ export function MapaBrasilEstados({
   }, [afiliacoes])
 
   const clubesPainel = ufSelecionada ? (clubesPorUf.get(ufSelecionada) ?? []) : []
+
+  // Região: mantém a ordem de relevância do catálogo, só recorta pelas UFs.
+  const clubesRegiao = useMemo(() => {
+    if (!metaRegiaoDestaque) return []
+    const ufs = new Set(metaRegiaoDestaque.ufs)
+    return afiliacoes.filter((a) => {
+      const uf = a.estado?.toUpperCase()
+      return uf ? ufs.has(uf) : false
+    })
+  }, [afiliacoes, metaRegiaoDestaque])
+
   const ufTooltip = ufHover && ufHover !== ufSelecionada ? ufHover : null
   const zoomAtivo = !isViewportBrasil(viewport)
 
   useEffect(() => {
     setFiltroPainel('')
-  }, [ufSelecionada, busca])
+  }, [ufSelecionada, busca, regiaoDestaque])
 
   useEffect(() => {
     if (buscaAtiva) {
@@ -445,7 +479,7 @@ export function MapaBrasilEstados({
       el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
     })
     return () => window.cancelAnimationFrame(id)
-  }, [painelAtivo, ufSelecionada, buscaAtiva, reduceMotion])
+  }, [painelAtivo, ufSelecionada, regiaoDestaque, buscaAtiva, reduceMotion])
 
   function selecionarUf(uf: string) {
     if ((totalPorUf.get(uf) ?? 0) === 0) return
@@ -645,6 +679,19 @@ export function MapaBrasilEstados({
               modo="estado"
               uf={ufSelecionada}
               clubes={clubesPainel}
+              filtroLocal={filtroPainel}
+              onFiltroLocal={setFiltroPainel}
+              onLimpar={fecharPainel}
+              onSelecionarClube={onSelecionarClube}
+              reduceMotion={reduceMotion ?? false}
+              panelRef={painelRef}
+            />
+          ) : modoPainel === 'regiao' && metaRegiaoDestaque ? (
+            <PainelLateral
+              key={`regiao-${metaRegiaoDestaque.id}`}
+              modo="regiao"
+              regiao={metaRegiaoDestaque}
+              clubes={clubesRegiao}
               filtroLocal={filtroPainel}
               onFiltroLocal={setFiltroPainel}
               onLimpar={fecharPainel}

@@ -24,6 +24,13 @@ jobs:
           BRANCH=$(git rev-parse --abbrev-ref HEAD)
           REPO="${{ github.repository }}"
 
+          VERSION=$(node -e "import('./scripts/lib/version-from-git.mjs').then(m => console.log(m.computeVersionFromGit().version))" 2>/dev/null || node -p "require('./package.json').version")
+          TAG=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || echo "")
+          VERSION_LABEL="v${VERSION}"
+          if [ -n "$TAG" ]; then
+            VERSION_LABEL="${TAG}"
+          fi
+
           FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | head -12 | sed 's/^/\`/' | sed 's/$/\`/' | tr '\n' '\n' || echo "(commit inicial)")
           COUNT=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | wc -l | tr -d ' ')
           STATS=$(git diff --shortstat HEAD~1 HEAD 2>/dev/null || echo "")
@@ -45,12 +52,14 @@ jobs:
             --arg total "$TOTAL" \
             --arg stats "$STATS" \
             --arg date "$DATE_STR" \
+            --arg version "$VERSION_LABEL" \
             '{
               embeds: [{
                 color: 1,
                 title: "🛠️ NOVA ATUALIZAÇÃO — BOT PDE",
                 description: (">>> **" + $msg + "**" + (if $body != "" then ("\n\n" + $body) else "" end)),
                 fields: [
+                  {name: "📦 VERSÃO",                       value: ("`" + $version + "`"), inline: true},
                   {name: "👤 AUTOR",                        value: ("`" + $author + "`"),  inline: true},
                   {name: "🔀 BRANCH",                       value: ("`" + $branch + "`"),  inline: true},
                   {name: "🔢 COMMIT",                       value: ("[`" + $hash + "`](" + $url + ")"), inline: true},

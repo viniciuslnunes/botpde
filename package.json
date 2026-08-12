@@ -1,6 +1,6 @@
 {
   "name": "torcida-saas",
-  "version": "0.0.0",
+  "version": "1.768.779",
   "private": true,
   "scripts": {
     "build": "turbo build",
@@ -9,7 +9,9 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
-    "db:push": "turbo db:push"
+    "db:push": "turbo db:push",
+    "release:sync": "node scripts/release-sync.mjs",
+    "version:print": "node -e \"import('./scripts/lib/version-from-git.mjs').then(m => { const v = m.computeVersionFromGit(); console.log(v.version); console.error(JSON.stringify(v, null, 2)); })\""
   },
   "devDependencies": {
     "prettier": "^3.3.3",

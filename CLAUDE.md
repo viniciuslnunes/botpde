@@ -48,6 +48,8 @@ pnpm --filter @torcida/web lint
 pnpm --filter @torcida/web test       # Vitest (RBAC, rate-limit, visibilidade)
 pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
+pnpm --filter @torcida/db schema:check # exit 1 se schema mudou (pós-deploy: HML/prod ainda precisam de push)
+pnpm --filter @torcida/db schema:deploy # db:push no alvo (HML/prod; prod exige --i-know-prod) — ver docs/ops/schema-deploy.md
 pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comunidade
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
@@ -55,7 +57,7 @@ pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 pnpm --filter @torcida/db db:repair-carteirinha-espelho  # carteirinha do sócio Caso B nos dois níveis
-pnpm --filter @torcida/db db:repair-owner-heranca-promocao  # tira owner herdado da mãe em portal de unidade (simula; --apply grava)
+pnpm --filter @torcida/db db:repair-owner-heranca-promocao  # tira owner herdado da mãe em portal de unidade + o SaasMembro/canal fabricados junto (simula; --apply grava)
 pnpm --filter @torcida/db db:repair-espelho-membros-sede # membro (sócio OU torcedor) de unidade sem espelho na Sede
 pnpm --filter @torcida/db db:reconciliar-torcedor-convite -- --email=<e> --convite=<slug>  # torcedor global que devia ter entrado por convite
 pnpm --filter @torcida/db audit:regras       # invariantes de negócio + matriz de relações
@@ -75,9 +77,15 @@ pnpm --filter @torcida/web audit:jornadas       # canais corretos + matriz de va
 pnpm --filter @torcida/db reset:jornadas -- --dry-run  # limpa só o lote de jornadas
 pnpm --filter @torcida/web audit:areas-projetos # áreas de atuação e projetos NÃO concedem permissão
 pnpm --filter @torcida/web audit:achados        # status medido dos achados de ARCHITECTURE §7
+pnpm version:print                              # 1.<commits_main>.<commits_totais> (docs/ops/release.md)
+pnpm release:sync                               # sincroniza package.json + tag a partir do Git
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
+Versão do produto: `1.<commits_em_main>.<commits_totais>` (ver
+`docs/ops/release.md`). Mudança em `schema.prisma`: workflow **Schema deploy**
+aplica `db:push` em HML e em prod (nessa ordem; **TEMP** sem approve — ver
+`docs/ops/schema-deploy.md`). O Railway **não** aplica o schema sozinho.
 
 **Lentidão em `localhost` não é bug do app**: sem Postgres local, cada query
 Prisma atravessa o proxy público da Railway (RTT medido: 125ms; ~131ms por
@@ -289,9 +297,14 @@ lenta em dev, suba o banco local: agente `/setup` (ou
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.
 - **Super Admin** — operação da plataforma (`/super-admin`), fora do RBAC por
   tenant (gate por allowlist de e-mail, `isSuperAdminEmail`): torcidas, plano,
-  afiliações, usuários, moderação e auditoria cross-tenant; ver
-  `docs/data/modulo-super-admin.md` (inclui pendência: LGPD só tem exportação,
-  exclusão de conta ainda não implementada).
+  catálogo de clubes (`Afiliacao`, `/super-admin/clubes`), unidades
+  (`SolicitacaoUnidade`, `/super-admin/unidades` — URL antiga `/afiliacoes`
+  redireciona), usuários, moderação e auditoria cross-tenant (inclui ações de
+  plataforma com `AuditLog.tenantId` nulo); identidade de build (versão ·
+  publicação · commit) na visão geral e rodapé da sidebar — ver
+  `docs/data/modulo-super-admin.md` e `docs/ops/release.md`.
+  e `ARCHITECTURE.md` §5.24 (inclui pendência: LGPD só tem exportação, exclusão
+  de conta ainda não implementada).
 - **Canal restrito (R5)** — a liderança de uma unidade Caso B pode isolar o
   canal: sai da malha de **interação** (CN, coirmãs, aliados, salas, lojas, DMs,
   onboarding público, busca) e mantém administração e comunidade **internas**.

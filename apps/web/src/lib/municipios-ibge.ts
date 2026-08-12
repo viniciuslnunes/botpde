@@ -71,15 +71,21 @@ function ehCapital(m: MunicipioBrasil): boolean {
  * Ranking: 1º match exato, 2º começa com o termo, 3º contém o termo; resto descartado.
  * Dentro do mesmo tier a capital vem primeiro — sem isso "sao" devolve dezenas de
  * homônimos em ordem alfabética e São Paulo nem entra no limite. Depois, alfabético.
+ *
+ * Com `uf`, restringe à malha daquele estado (cadastro de clube / praça já escolhida).
  */
 export async function buscarMunicipiosBrasil(
   query: string,
   limite = 20,
+  uf?: string,
 ): Promise<MunicipioBrasil[]> {
   const alvo = normalizarTexto(query)
   if (alvo.length < 2) return []
 
-  const todos: MunicipioBrasil[] = await listarMunicipiosBrasil()
+  const ufUpper = uf?.trim().toUpperCase()
+  const todos: MunicipioBrasil[] = ufUpper
+    ? (await listarMunicipiosPorUf(ufUpper)).map((cidade) => ({ cidade, uf: ufUpper }))
+    : await listarMunicipiosBrasil()
   if (todos.length === 0) return []
 
   const ranked: RankedMunicipio[] = []
@@ -101,7 +107,7 @@ export async function buscarMunicipiosBrasil(
 
   const resultado: MunicipioBrasil[] = ranked
     .slice(0, Math.max(0, limite))
-    .map(({ cidade, uf }) => ({ cidade, uf }))
+    .map(({ cidade, uf: u }) => ({ cidade, uf: u }))
   return resultado
 }
 

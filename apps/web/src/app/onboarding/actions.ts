@@ -103,13 +103,20 @@ export async function buscarCidadesDaUf(uf: string): Promise<string[]> {
 
 const buscaRegiaoSchema = z.string().trim().min(2).max(60)
 
-/** Busca nacional cidade+UF para o combobox do passo Região. */
-export async function buscarRegioesPorTexto(query: string): Promise<MunicipioBrasil[]> {
+/** Busca cidade+UF para o combobox do passo Região. `uf` opcional restringe ao estado. */
+export async function buscarRegioesPorTexto(
+  query: string,
+  uf?: string,
+): Promise<MunicipioBrasil[]> {
   const session = await auth()
   if (!session?.user?.id) return []
   const parsed = buscaRegiaoSchema.safeParse(query)
   if (!parsed.success) return []
-  return buscarMunicipiosBrasil(parsed.data)
+  const ufParsed =
+    typeof uf === 'string' && UFS_BRASIL.includes(uf.trim().toUpperCase())
+      ? uf.trim().toUpperCase()
+      : undefined
+  return buscarMunicipiosBrasil(parsed.data, 20, ufParsed)
 }
 
 export async function buscarDepartamentos(

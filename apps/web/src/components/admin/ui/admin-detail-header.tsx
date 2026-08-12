@@ -49,9 +49,10 @@ export function AdminDetailHeader({
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           {icon ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
+            // Escudo/foto: sem tint roxo nem caixa menor que a arte (`:has(img)`).
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] [&:has(img)]:bg-transparent">
               {icon}
             </div>
           ) : null}
