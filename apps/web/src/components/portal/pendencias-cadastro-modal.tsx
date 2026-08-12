@@ -10,6 +10,7 @@ import {
   type PendenciaCadastro,
 } from '@/lib/pendencias-cadastro'
 import { dispensarPendenciaCadastro } from '@/app/portal/cadastro/associacao/actions'
+import { useHidratado } from '@/lib/use-hidratado'
 
 type Props = {
   pendencias: PendenciaCadastro[]
@@ -46,14 +47,11 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const tituloId = useId()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHidratado()
   const [codigoOculto, setCodigoOculto] = useState<string | null>(null)
   const [ciencia, setCiencia] = useState(false)
   const [pending, startTransition] = useTransition()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const naTelaDeAtualizacao = pendencias.some(
     (p) => pathname === p.href || pathname.startsWith(`${p.href}/`),

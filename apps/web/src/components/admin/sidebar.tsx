@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -34,6 +34,7 @@ import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-conte
 import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { useHidratado } from '@/lib/use-hidratado'
 
 /** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */
 const ICON_BY_ID: Record<string, LucideIcon> = {
@@ -272,11 +273,7 @@ export function AdminSidebar({
   onMobileClose,
 }: AdminSidebarProps) {
   const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useHidratado()
 
   // Trava o scroll do body enquanto o drawer mobile está aberto.
   useEffect(() => {

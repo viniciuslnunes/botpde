@@ -184,9 +184,13 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
 
   const sugestoes = useMemo(() => [...recentes, ...demais], [recentes, demais])
 
-  useEffect(() => {
+  // Volta o destaque ao topo quando a lista muda (mesmo ajuste em render que
+  // o bloco de `syncKey` acima já usa).
+  const [destaqueKey, setDestaqueKey] = useState(`${alvoBusca}|${aberto}`)
+  if (destaqueKey !== `${alvoBusca}|${aberto}`) {
+    setDestaqueKey(`${alvoBusca}|${aberto}`)
     setDestaque(0)
-  }, [alvoBusca, aberto])
+  }
 
   function selecionar(item: T) {
     const key = item.recentKey ?? item.id

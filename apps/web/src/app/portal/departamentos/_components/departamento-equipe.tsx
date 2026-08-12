@@ -441,31 +441,27 @@ function AdicionarMembroForm({
   slug: string
 }) {
   const [q, setQ] = useState('')
-  const [candidatos, setCandidatos] = useState<
-    Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
-  >([])
-  const [buscou, setBuscou] = useState(false)
+  /** Última busca concluída; o termo junto deriva "já buscou" e a lista visível. */
+  const [busca, setBusca] = useState<{
+    termo: string
+    itens: Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
+  }>({ termo: '', itens: [] })
   const [pendingSearch, startSearch] = useTransition()
   const [state, action, pending] = useActionState(adicionarMembroArea, {} as ActionState)
   useActionStateToast(state, pending, 'Membro adicionado ao departamento')
 
   const qBusca = q.trim().length >= 2 ? q.trim() : ''
-  const candidatosVisiveis = qBusca ? candidatos : []
+  const buscaConcluida = qBusca !== '' && busca.termo === qBusca
+  const candidatosVisiveis = buscaConcluida ? busca.itens : []
+  const buscou = buscaConcluida
 
   useEffect(() => {
-    if (!qBusca) {
-      setBuscou(false)
-      setCandidatos([])
-      return
-    }
+    if (!qBusca) return
     let cancelled = false
     const t = setTimeout(() => {
       startSearch(() => {
         void buscarCandidatosArea(departamentoId, qBusca).then((rows) => {
-          if (!cancelled) {
-            setCandidatos(rows)
-            setBuscou(true)
-          }
+          if (!cancelled) setBusca({ termo: qBusca, itens: rows })
         })
       })
     }, 280)
@@ -477,11 +473,8 @@ function AdicionarMembroForm({
 
   useEffect(() => {
     if (!state.ok) return
-    const t = setTimeout(() => {
-      setQ('')
-      setCandidatos([])
-      setBuscou(false)
-    }, 0)
+    // Limpar o termo já esconde a lista e zera o "buscou" (ambos derivados).
+    const t = setTimeout(() => setQ(''), 0)
     return () => clearTimeout(t)
   }, [state.ok])
 

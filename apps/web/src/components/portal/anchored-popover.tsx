@@ -2,7 +2,6 @@
 
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -11,6 +10,7 @@ import {
   type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { useHidratado } from '@/lib/use-hidratado'
 
 export type AnchoredPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 
@@ -137,14 +137,10 @@ export function AnchoredPopover({
   children,
   zIndex = 50,
 }: AnchoredPopoverProps) {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHidratado()
   const [coords, setCoords] = useState<Coords | null>(null)
   const [needsScroll, setNeedsScroll] = useState(false)
   const portalRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const atualizar = useCallback(() => {
     const anchor = anchorRef.current

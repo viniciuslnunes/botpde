@@ -762,22 +762,22 @@ function AreaPessoasPainel({
 }) {
   const confirmAction = useConfirmAction()
   const [q, setQ] = useState('')
-  const [candidatos, setCandidatos] = useState<
-    Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
-  >([])
+  /** Última busca concluída — o termo junto evita mostrar resultado de outro. */
+  const [busca, setBusca] = useState<{
+    termo: string
+    itens: Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
+  }>({ termo: '', itens: [] })
   const [pendingSearch, startSearch] = useTransition()
   const qBusca = q.trim().length >= 2 ? q.trim() : ''
+  const candidatos = busca.termo === qBusca ? busca.itens : []
 
   useEffect(() => {
-    if (!qBusca) {
-      setCandidatos([])
-      return
-    }
+    if (!qBusca) return
     let cancelled = false
     const t = setTimeout(() => {
       startSearch(() => {
         void buscarCandidatosParaArea(area.id, departamentoId, qBusca).then((rows) => {
-          if (!cancelled) setCandidatos(rows)
+          if (!cancelled) setBusca({ termo: qBusca, itens: rows })
         })
       })
     }, 280)
@@ -850,7 +850,12 @@ function AreaPessoasPainel({
                 slug={slug}
                 areaId={area.id}
                 targetUserId={c.id}
-                onDone={() => setCandidatos((prev) => prev.filter((p) => p.id !== c.id))}
+                onDone={() =>
+                  setBusca((prev) => ({
+                    ...prev,
+                    itens: prev.itens.filter((p) => p.id !== c.id),
+                  }))
+                }
               />
             </li>
           ))}

@@ -38,8 +38,11 @@ function formatarData(iso: string) {
 export function BuscaUsuarioClient() {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
-  const [resultados, setResultados] = useState<UsuarioBuscaItem[]>([])
-  const [carregando, setCarregando] = useState(false)
+  /** Última busca concluída — o termo junto deriva a lista e o "carregando". */
+  const [busca, setBusca] = useState<{ termo: string; itens: UsuarioBuscaItem[] }>({
+    termo: '',
+    itens: [],
+  })
   const [selecionado, setSelecionado] = useState<UsuarioDetalhe | null>(null)
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false)
   const [apagandoId, setApagandoId] = useState<string | null>(null)
@@ -51,34 +54,36 @@ export function BuscaUsuarioClient() {
     return () => clearTimeout(t)
   }, [q])
 
+  const termoBusca = debounced.length >= 2 ? debounced : ''
+  const resultados = busca.termo === termoBusca ? busca.itens : []
+  const carregando = termoBusca !== '' && busca.termo !== termoBusca
+
   const buscar = useCallback(async (termo: string) => {
     abortRef.current?.abort()
-    if (termo.length < 2) {
-      setResultados([])
-      return
-    }
     const controller = new AbortController()
     abortRef.current = controller
-    setCarregando(true)
+    // Grava sempre com o termo — inclusive em falha — senão o "carregando",
+    // que é derivado, nunca desligaria.
+    let itens: UsuarioBuscaItem[] = []
     try {
       const res = await fetch(`/api/super-admin/usuarios/busca?q=${encodeURIComponent(termo)}`, {
         signal: controller.signal,
       })
       const data = (await res.json()) as { usuarios?: UsuarioBuscaItem[]; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Erro na busca')
-      setResultados(data.usuarios ?? [])
+      itens = data.usuarios ?? []
     } catch (e) {
+      // Abort é troca de termo: quem assumiu a busca é que vai gravar.
       if (e instanceof DOMException && e.name === 'AbortError') return
       toast.error(e instanceof Error ? e.message : 'Erro na busca')
-      setResultados([])
-    } finally {
-      if (abortRef.current === controller) setCarregando(false)
     }
+    setBusca({ termo, itens })
   }, [])
 
   useEffect(() => {
-    void buscar(debounced)
-  }, [debounced, buscar])
+    if (!termoBusca) return
+    void buscar(termoBusca)
+  }, [termoBusca, buscar])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 

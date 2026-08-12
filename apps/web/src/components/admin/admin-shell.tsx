@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -86,9 +86,12 @@ function AdminTopbar({
 
   // Soft-nav não remonta o shell: fecha dropdowns para não deixar
   // `fixed inset-0` invisível do header (z-50) cobrindo o sidebar.
-  useEffect(() => {
+  // No render: em effect o overlay sobrevive um frame depois de navegar.
+  const [pathnameSincronizado, setPathnameSincronizado] = useState(pathname)
+  if (pathname !== pathnameSincronizado) {
+    setPathnameSincronizado(pathname)
     setUserDropOpen(false)
-  }, [pathname])
+  }
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -251,9 +254,13 @@ export function AdminShell({
     menuBadges,
   } = useAdminNavbarContext(notifications)
 
-  useEffect(() => {
+  // Fecha o drawer ao navegar, no render (em effect ele fica aberto por um
+  // frame sobre a página nova).
+  const [pathnameDrawer, setPathnameDrawer] = useState(pathname)
+  if (pathname !== pathnameDrawer) {
+    setPathnameDrawer(pathname)
     setMobileOpen(false)
-  }, [pathname])
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">

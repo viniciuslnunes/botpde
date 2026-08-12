@@ -39,50 +39,54 @@ export function LiderancasBuscaInteligente({
   const wrapRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [q, setQ] = useState(params.q)
-  const [sugestoes, setSugestoes] = useState<SugestaoLideranca[]>([])
+  /** Última busca concluída — o termo junto deriva "carregando". */
+  const [busca, setBusca] = useState<{ termo: string; itens: SugestaoLideranca[] }>({
+    termo: '',
+    itens: [],
+  })
   const [aberto, setAberto] = useState(false)
-  const [carregandoSugestoes, setCarregandoSugestoes] = useState(false)
   const [ativo, setAtivo] = useState(-1)
   const [pendente, startTransition] = useTransition()
 
-  useEffect(() => {
+  // Ressincroniza com a URL no render (em effect o campo pisca com o termo
+  // anterior depois de navegar).
+  const [qSincronizado, setQSincronizado] = useState(params.q)
+  if (params.q !== qSincronizado) {
+    setQSincronizado(params.q)
     setQ(params.q)
-  }, [params.q])
+  }
+
+  const termoBusca = q.trim().length >= 2 ? q.trim() : ''
+  const sugestoes = busca.termo === termoBusca ? busca.itens : []
+  const carregandoSugestoes = termoBusca !== '' && busca.termo !== termoBusca
 
   useEffect(() => {
-    const termo = q.trim()
-    if (termo.length < 2) {
-      setSugestoes([])
-      setCarregandoSugestoes(false)
-      return
-    }
+    if (!termoBusca) return
 
     const timer = window.setTimeout(() => {
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
-      setCarregandoSugestoes(true)
-      void fetch(`/api/super-admin/liderancas/busca?q=${encodeURIComponent(termo)}`, {
+      void fetch(`/api/super-admin/liderancas/busca?q=${encodeURIComponent(termoBusca)}`, {
         signal: controller.signal,
       })
         .then(async (res) => {
           const data = (await res.json()) as { sugestoes?: SugestaoLideranca[] }
           if (!res.ok) throw new Error('Falha na busca')
-          setSugestoes(data.sugestoes ?? [])
+          setBusca({ termo: termoBusca, itens: data.sugestoes ?? [] })
           setAberto(true)
           setAtivo(-1)
         })
         .catch((e: unknown) => {
+          // Abort não conclui busca nenhuma — deixar como está mantém o
+          // "carregando" para o termo novo, que já está em voo.
           if (e instanceof DOMException && e.name === 'AbortError') return
-          setSugestoes([])
-        })
-        .finally(() => {
-          if (abortRef.current === controller) setCarregandoSugestoes(false)
+          setBusca({ termo: termoBusca, itens: [] })
         })
     }, DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [q])
+  }, [termoBusca])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -118,8 +122,8 @@ export function LiderancasBuscaInteligente({
   }
 
   function limpar() {
+    // Zerar o termo já esconde a lista (`sugestoes` é derivado do termo atual).
     setQ('')
-    setSugestoes([])
     navegar('', null)
   }
 
