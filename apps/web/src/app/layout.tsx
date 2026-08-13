@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@torcida/ui'
-import { DialogProvider } from '@torcida/ui'
+/** Módulo direto — barrel `@torcida/ui` duplica o Context e quebra useDialog no SSR. */
+import { DialogProvider } from '@torcida/ui/services/dialog'
 import { ClientToastProvider } from '@/components/providers/client-toast-provider'
 import { UnsavedChangesProvider } from '@/lib/unsaved-changes'
 import { LinkStatusBarSuppressor } from '@/components/link-status-bar-suppressor'

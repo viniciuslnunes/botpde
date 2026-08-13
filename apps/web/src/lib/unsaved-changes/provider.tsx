@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname } from 'next/navigation'
-import { useDialog } from '@torcida/ui'
+import { useDialog } from '@torcida/ui/services/dialog'
 import { UnsavedChangesContext } from './context'
 import { NavigationGuard } from './navigation-guard'
 import type { UnsavedChangeEntry, UnsavedChangesContextValue } from './types'

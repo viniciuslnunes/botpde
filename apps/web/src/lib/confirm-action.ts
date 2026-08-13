@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback } from 'react'
-import { toast, useDialog, type ConfirmOptions } from '@torcida/ui'
+import { useDialog, type ConfirmOptions } from '@torcida/ui/services/dialog'
+import { toast } from '@torcida/ui/services/toast'
 import { runPersistAction, type PersistToastLabels } from '@/lib/toast-action'
 
 export type ConfirmDialogRequest = ConfirmOptions & {

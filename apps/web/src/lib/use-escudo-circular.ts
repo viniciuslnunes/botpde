@@ -6,6 +6,7 @@ import {
   lerCacheEscudoCircular,
   subscribeEscudoCircular,
 } from '@/lib/escudo-forma'
+import { useHidratado } from '@/lib/use-hidratado'
 
 export type EscudoCircularShape = 'auto' | 'circle' | 'rounded'
 
@@ -21,6 +22,8 @@ export function useEscudoCircular(
   src: string | null | undefined,
   shape: EscudoCircularShape = 'auto',
 ): { circular: boolean; pronto: boolean } {
+  const hidratado = useHidratado()
+
   // Resposta imediata quando não depende de detecção: sem src, shape fixo, ou
   // cache já quente. Antes isso era decidido dentro do layout effect, o que
   // custava um render extra e caía em `react-hooks/set-state-in-effect`.
@@ -59,9 +62,10 @@ export function useEscudoCircular(
 
   if (imediato) return imediato
 
-  // Cache quente é lido no render: `detectarEscudoCircular` avisa pela
-  // assinatura quando termina, e o cache é o mesmo módulo em memória.
-  const cache = src ? lerCacheEscudoCircular(src) : null
+  // Cache quente (memória + localStorage) só existe no browser. Ler no SSR
+  // deixava o HTML com skeleton e o 1º paint do client com <img> — mismatch
+  // de hidratação no LogoMiniatura da navbar.
+  const cache = hidratado && src ? lerCacheEscudoCircular(src) : null
   if (cache !== null) return { circular: cache, pronto: true }
   if (detectado && detectado.src === src) {
     return { circular: detectado.circular, pronto: true }
