@@ -31,6 +31,11 @@ describe('google-maps', () => {
     expect(isGoogleMapsConfigured()).toBe(true)
   })
 
+  it('ignora placeholder de .env.example', () => {
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'your_google_maps_api_key'
+    expect(isGoogleMapsConfigured()).toBe(false)
+  })
+
   it('usa DEMO_MAP_ID quando Map ID não está configurado', () => {
     expect(getGoogleMapsMapId()).toBe('DEMO_MAP_ID')
   })

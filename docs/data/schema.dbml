@@ -1,32 +1,432 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Torcida SaaS — Modelo de dados (DBML para https://dbdiagram.io/d)
-// Fonte da verdade: packages/db/prisma/schema.prisma
-// Gerado a partir do schema em 2026-07-09. Regenerar quando o schema mudar.
+// Fonte: packages/db/prisma/schema.prisma
+// Gerado automaticamente em 2026-08-12.
 //
-// ⚠️ DESATUALIZADO (achado da auditoria de conhecimento, 2026-07-16): faltam
-// ~20 tabelas adicionadas depois de 2026-07-09, entre elas: saas_afiliacoes,
-// saas_torcidas_conhecidas, saas_perfis_torcedor, saas_rivalidades_clube,
-// saas_rivalidades_torcida, saas_aliancas, saas_recomendacoes_alianca,
-// saas_comentarios, saas_reacoes, saas_denuncias, saas_enquetes_post (+opcoes/
-// votos), saas_hashtags (+post_hashtags), saas_post_salvos,
-// saas_momentos_story, saas_perfil_destaques (+itens), saas_seguimentos,
-// saas_perfis_membro, saas_notificacoes, saas_noticias. Não confiar neste
-// arquivo para o modelo atual de Comunidade/Alianças — ler schema.prisma
-// diretamente até a regeneração completa.
-//
-// Como usar: abra https://dbdiagram.io/d, cole este arquivo inteiro no editor.
+// Como usar: abra https://dbdiagram.io/d e cole este arquivo no editor.
 // Nomes de tabela/coluna = nomes REAIS no Postgres (@map do Prisma).
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────
-// LEGADO DO BOT (Discord.js) — tabelas sem prefixo, acessadas via `pg` cru
-// ─────────────────────────────────────────────────────────────────────────
+// ─── ENUMS ─────────────────────────────────────────────────────────────────
+
+Enum BalancoDetalheNivel {
+  TOTAIS
+  CATEGORIAS
+  COMPLETO
+}
+
+Enum Plano {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+Enum PapelAreaDepartamento {
+  MEMBRO
+  RESPONSAVEL
+}
+
+Enum TipoProjeto {
+  CAMPANHA
+  PROJETO
+  ACAO
+  PARCERIA
+}
+
+Enum StatusProjeto {
+  PLANEJADO
+  ATIVO
+  CONCLUIDO
+  CANCELADO
+}
+
+Enum TipoMembro {
+  SOCIO
+  TORCEDOR
+}
+
+Enum StatusMembro {
+  PENDENTE
+  APROVADO
+  REPROVADO
+}
+
+Enum OrigemImportacao {
+  CSV
+  BOT
+  DISCORD
+  MOCK
+}
+
+Enum StatusImportacao {
+  PENDENTE
+  PROCESSANDO
+  CONCLUIDA
+  ERRO
+}
+
+Enum PeriodicidadePlanoAssociacao {
+  MENSAL
+  TRIMESTRAL
+  QUADRIMENSAL
+  SEMESTRAL
+  ANUAL
+  UNICA
+}
+
+Enum TipoCobrancaAssociacao {
+  MENSALIDADE
+  ADESAO
+  AVULSA
+}
+
+Enum StatusCobrancaAssociacao {
+  PENDENTE
+  PAGA
+  CANCELADA
+  VENCIDA
+}
+
+Enum MetodoPagamentoCobranca {
+  MANUAL
+  PIX
+}
+
+Enum TipoSede {
+  SEDE
+  SUBSEDE
+  PONTO_ENCONTRO
+}
+
+Enum StatusSolicitacaoUnidade {
+  PENDENTE
+  APROVADA
+  RECUSADA
+}
+
+Enum StatusReativacaoCanal {
+  PENDENTE
+  APROVADA
+  RECUSADA
+  EXPIRADA
+  IMPOSTA
+}
+
+Enum RsvpStatus {
+  CONFIRMADO
+  RECUSADO
+  LISTA_ESPERA
+}
+
+Enum TipoEvento {
+  GERAL
+  CARAVANA
+  ENSAIO
+}
+
+Enum TipoCupom {
+  PERCENTUAL
+  FIXO
+}
+
+Enum PedidoTicketStatus {
+  ABERTO
+  ATENDENDO
+  FECHADO
+}
+
+Enum PedidoTicketMotivoFecho {
+  ENTREGUE
+  MANUAL
+  CANCELADO
+}
+
+Enum ModalidadeEntrega {
+  RETIRADA
+  ENVIO
+}
+
+Enum StatusPedido {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  ENTREGUE
+}
+
+Enum PrioridadeComunicado {
+  NORMAL
+  IMPORTANTE
+  URGENTE
+}
+
+Enum TorcedoresEstimadosTipo {
+  IBOPE_DIGITAL
+  LIMITE_ATE
+}
+
+Enum SerieCampeonato {
+  A
+  B
+  C
+  D
+  ESTADUAL
+  OUTRA
+}
+
+Enum StatusAlianca {
+  SUGERIDA
+  PENDENTE
+  ATIVA
+  ENCERRADA
+}
+
+Enum ConfiancaRecomendacao {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+Enum TipoPost {
+  INSTITUCIONAL
+  MEMBRO
+}
+
+Enum VisibilidadePost {
+  PUBLICO
+  TENANT
+  PRIVADO
+}
+
+Enum StatusSeguimento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  BLOQUEADO
+}
+
+Enum TipoReacao {
+  CURTIR
+  FORCA
+  VAMOS
+  PRESENTE
+}
+
+Enum StatusDenuncia {
+  PENDENTE
+  RESOLVIDA
+  DESCARTADA
+}
+
+Enum TipoNotificacao {
+  SEGUIMENTO_PENDENTE
+  SEGUIMENTO_APROVADO
+  SEGUIMENTO_REJEITADO
+  NOVO_COMENTARIO
+  NOVA_REACAO
+  COMUNICADO_URGENTE
+  DENUNCIA_NOVA
+  DENUNCIA_RESOLVIDA
+  NOVA_MENSAGEM
+  MENCAO
+  REPOST
+  ALIANCA_PROPOSTA
+  ALIANCA_ACEITA
+  ALIANCA_REJEITADA
+  ALIANCA_ENCERRADA
+  ALIANCA_CANCELADA
+  MEMBRO_APROVADO
+  MEMBRO_REPROVADO
+  MEMBRO_SOLICITADO
+  COBRANCA_PENDENTE
+  COBRANCA_VENCIDA
+  EVENTO_LEMBRETE
+  EVENTO_RSVP
+  EVENTO_DIA_GESTOR
+  GRUPO_PEDIDO
+  GRUPO_APROVADO
+  GRUPO_REJEITADO
+  GRUPO_ADMIN
+  GRUPO_REMOVIDO
+  CANAL_PEDIDO
+  CANAL_APROVADO
+  CANAL_REJEITADO
+  MENSAGEM_SOLICITACAO_PENDENTE
+  MENSAGEM_SOLICITACAO_APROVADA
+  MENSAGEM_SOLICITACAO_REJEITADA
+  PEDIDO_CONFIRMADO
+  PEDIDO_CANCELADO
+  PEDIDO_ENTREGUE
+  SOCIO_CARTEIRINHA_EMITIDA
+  SOCIO_CARTEIRINHA_RENOVADA
+  SOCIO_CARTEIRINHA_REVOGADA
+  ACESSO_ATUALIZADO
+  DEPARTAMENTO_ADICIONADO
+  DEPARTAMENTO_REMOVIDO
+  SEDE_RESPONSAVEL_DEFINIDO
+  BAR_VENDA_ESTORNADA
+  BAR_ESTOQUE_BAIXO
+  BAR_FIADO_VENCIDO
+  BAR_COMANDA_VENCIDA
+  BAR_TURNO_DIVERGENCIA
+  BAR_ESTORNO_ANOMALO
+  PATRIMONIO_RESPONSAVEL_DEFINIDO
+  PEDIDO_RECEBIDO
+  SOLICITACAO_UNIDADE_CRIADA
+  CANAL_RESTRITO_ATIVADO
+  CANAL_REATIVACAO_SOLICITADA
+  CANAL_REATIVACAO_RECUSADA
+  CANAL_REATIVADO
+}
+
+Enum TipoConversa {
+  DIRETA
+  GRUPO
+  CANAL
+}
+
+Enum VisibilidadeCanal {
+  TENANT
+  HIERARQUIA
+  ALIADOS
+  PUBLICO
+}
+
+Enum StatusMembroConversa {
+  ATIVO
+  PENDENTE
+  REJEITADO
+}
+
+Enum PapelConversa {
+  ADMIN
+  MEMBRO
+}
+
+Enum MandoJogo {
+  CASA
+  FORA
+}
+
+Enum StatusPartida {
+  AGENDADA
+  AO_VIVO
+  ENCERRADA
+  CANCELADA
+}
+
+Enum StatusNoticia {
+  RASCUNHO
+  APROVADA
+  REJEITADA
+}
+
+Enum TipoSalaReuniao {
+  EVENTO
+  ABERTA
+  DM_GRUPO
+}
+
+Enum PapelParticipanteReuniao {
+  HOST
+  MODERADOR
+  PARTICIPANTE
+}
+
+Enum TipoFinanceiroLancamento {
+  RECEITA
+  DESPESA
+}
+
+Enum CategoriaFinanceiroLancamento {
+  MENSALIDADE
+  LOJA
+  EVENTO
+  CARAVANA
+  PATRIMONIO
+  BAR
+  DOACAO
+  OUTROS
+}
+
+Enum CategoriaPatrimonioItem {
+  INSTRUMENTO
+  BANDEIRA
+  UNIFORME
+  MOBILIARIO
+  ELETRONICO
+  ESPACO
+  OUTROS
+}
+
+Enum StatusPatrimonioItem {
+  DISPONIVEL
+  EM_USO
+  MANUTENCAO
+  BAIXADO
+}
+
+Enum StatusPatrimonioEmprestimo {
+  ABERTO
+  DEVOLVIDO
+  COM_DANO
+}
+
+Enum MetodoPagamentoBar {
+  PIX
+  DINHEIRO
+  CARTAO_DEBITO
+  CARTAO_CREDITO
+  FIADO
+}
+
+Enum StatusVendaBar {
+  PENDENTE
+  PAGA
+  EM_COMANDA
+  CANCELADA
+  ESTORNADA
+}
+
+Enum TipoMovEstoqueBar {
+  ENTRADA
+  SAIDA
+  AJUSTE
+}
+
+Enum StatusComandaBar {
+  ABERTA
+  FECHADA_PAGA
+  FECHADA_COM_DEBITO
+  QUITADA
+  VENCIDA
+  CANCELADA
+}
+
+Enum StatusPagamentoComandaBar {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+}
+
+Enum TipoTitularComandaBar {
+  MEMBRO
+  AVULSO
+}
+
+Enum StatusFiadoBar {
+  PENDENTE
+  PAGA
+  CANCELADA
+  VENCIDA
+}
+
+// ─── TABELAS ───────────────────────────────────────────────────────────────
 
 Table membros {
   id integer [pk, increment]
   discord_id varchar [unique, not null]
   nome varchar [not null]
-  tipo varchar [note: "'socio' ou 'torcedor'"]
+  tipo varchar [not null, note: '\'socio\' ou \'torcedor\'']
   numero_associado varchar
   cidade varchar
   telefone varchar
@@ -35,18 +435,19 @@ Table membros {
   aprovado_por_nome varchar
   criado_em timestamp
   imagem_prova varchar
-  Note: 'Base legada de membros do bot Discord'
+  Note: 'Tabela legada do bot — lida pelo SaaS para exibir dados no portal'
 }
 
-Table produtos {
+Table BotProduto {
   id integer [pk, increment]
   nome varchar [not null]
   tamanhos varchar [not null]
-  preco decimal
+  preco decimal(10, 2) [not null]
   imagem_url varchar
   ativo boolean
   criado_em timestamp
   estoque json
+  Note: 'Tabela legada do bot — produtos da loja'
 }
 
 Table pedidos {
@@ -57,11 +458,12 @@ Table pedidos {
   produto_nome varchar
   tamanho varchar
   quantidade integer [not null]
-  preco_unit decimal
-  total decimal
+  preco_unit decimal(10, 2)
+  total decimal(10, 2)
   status varchar
   canal_ticket_id varchar
   criado_em timestamp
+  Note: 'Tabela legada do bot — pedidos da loja'
 }
 
 Table aprovacoes_recrutamento {
@@ -72,585 +474,1716 @@ Table aprovacoes_recrutamento {
   candidato_nome varchar
   tipo varchar
   criado_em timestamp
+  Note: 'Tabela legada do bot — ranking de recrutadores'
 }
 
 Table bot_config {
   key varchar [pk]
   value varchar
+  Note: 'Tabela legada do bot — configurações persistidas (IDs de mensagens)'
 }
 
-Ref: pedidos.produto_id > produtos.id
-
-// ─────────────────────────────────────────────────────────────────────────
-// SAAS — TENANTS (raiz multi-tenant)
-// ─────────────────────────────────────────────────────────────────────────
-
 Table saas_tenants {
-  id uuid [pk]
+  id varchar [pk]
   slug varchar [unique, not null]
   nome varchar [not null]
-  plano varchar [note: 'FREE | BASIC | PREMIUM']
-  cor_primaria varchar
+  plano Plano [not null]
+  cor_primaria varchar [not null]
   logo_url varchar
-  ativo boolean
-  criado_em timestamp
-  database_url varchar [note: 'null = banco compartilhado']
+  design json
+  ativo boolean [not null]
+  criado_em timestamp [not null]
+  hierarquia_visivel_para_filhos boolean [not null]
+  loja_visivel_nas_unidades boolean [not null]
+  agenda_visivel_nas_unidades boolean [not null]
+  sintetico boolean [not null]
+  database_url varchar
   discord_guild_id varchar [unique]
-  Note: 'Torcida/organização. Raiz de quase todo dado SaaS (tenantId).'
+  afiliacao_id varchar
+  torcida_conhecida_id varchar [unique]
+  canal_restrito boolean [not null]
+  canal_restrito_desde timestamp
+  canal_restrito_por_id varchar
+  convite_slug varchar [unique]
+  convite_ativo boolean [not null]
+  balanco_financeiro_visivel boolean [not null]
+  balanco_detalhe_nivel BalancoDetalheNivel [not null]
+  exigir_documentos_cadastro boolean [not null]
+  solicitar_pendencias_cadastro boolean [not null]
+  propagar_pendencias_cadastro_unidades boolean [not null]
+  periodicidades_onboarding PeriodicidadePlanoAssociacao[]
+  suporte_plataforma boolean [not null]
+  suporte_plataforma_desde timestamp
+  suporte_plataforma_por_id varchar
 }
 
 Table saas_users {
-  id uuid [pk]
+  id varchar [pk]
   email varchar [unique]
   nome varchar
+  nickname varchar [unique]
   avatar_url varchar
+  criado_em timestamp [not null]
   discord_id varchar [unique]
   google_id varchar [unique]
-  senha_hash varchar [note: 'só contas e-mail/senha']
+  senha_hash varchar
   consentido_em timestamp
-  criado_em timestamp
-  Note: 'Usuário global (cross-tenant via UserRole)'
+  ultimo_acesso_em timestamp
+  Indexes {
+    nome [name: 'idx']
+  }
 }
 
-// ─── CARGOS E PERMISSÕES ──────────────────────────────────────────────────
-
 Table saas_roles {
-  id uuid [pk]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
   nome varchar [not null]
-  cor varchar
-  ordem integer
-  is_system boolean
-  permissions "varchar[]" [note: 'lista de permissões (RBAC)']
-  Indexes { (tenant_id, nome) [unique] }
+  cor varchar [not null]
+  ordem integer [not null]
+  is_system boolean [not null]
+  permissions varchar[]
+  permissions_extras varchar[]
+  departamento_id varchar
+  papel_no_departamento varchar
+  Indexes {
+    (tenant_id, nome) [unique]
+    departamento_id [name: 'idx']
+  }
 }
 
 Table saas_user_roles {
-  id uuid [pk]
-  user_id uuid [not null]
-  tenant_id uuid [not null]
-  role_id uuid [not null]
-  criado_em timestamp
-  Indexes { (user_id, tenant_id, role_id) [unique] }
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  role_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (user_id, tenant_id, role_id) [unique]
+    tenant_id [name: 'idx']
+  }
 }
 
 Table saas_user_permissions {
-  id uuid [pk]
-  user_id uuid [not null]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
   permission varchar [not null]
-  granted boolean [note: 'override: concede/revoga permissão pontual']
-  criado_em timestamp
-  Indexes { (user_id, tenant_id, permission) [unique] }
+  granted boolean [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (user_id, tenant_id, permission) [unique]
+    tenant_id [name: 'idx']
+  }
 }
 
-// ─── DEPARTAMENTOS ────────────────────────────────────────────────────────
-
 Table saas_departamentos {
-  id uuid [pk]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
   nome varchar [not null]
-  cor varchar
-  ordem integer
-  criado_em timestamp
-  Indexes { (tenant_id, nome) [unique] }
+  slug varchar [not null]
+  modulo_portal varchar
+  permissions varchar[]
+  permissions_gestor varchar[]
+  cor varchar [not null]
+  ordem integer [not null]
+  canal_conversa_id varchar [unique]
+  meta json
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, nome) [unique]
+    (tenant_id, slug) [unique]
+  }
 }
 
 Table saas_user_departamentos {
-  id uuid [pk]
-  user_id uuid [not null]
-  tenant_id uuid [not null]
-  departamento_id uuid [not null]
-  criado_em timestamp
-  Indexes { (user_id, tenant_id, departamento_id) [unique] }
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  departamento_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (user_id, tenant_id, departamento_id) [unique]
+    departamento_id [name: 'idx']
+    tenant_id [name: 'idx']
+  }
+  Note: 'Associação usuário ↔ departamento (multi-departamento, como cargos do Discord)'
 }
 
 Table saas_departamento_gestores {
-  id uuid [pk]
-  departamento_id uuid [not null]
-  user_id uuid [not null]
-  criado_em timestamp
-  Indexes { (departamento_id, user_id) [unique] }
+  id varchar [pk]
+  departamento_id varchar [not null]
+  user_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (departamento_id, user_id) [unique]
+    user_id [name: 'idx']
+  }
+  Note: 'Quem pode gerenciar os membros de um departamento (adicionar/remover membros, atribuir perfis dentro do escopo do departamento). Owners/admins do tenant (via Role.isSystem) continuam com acesso total independente desta tabela — isso serve para delegar gestão de UM departamento específico a alguém que não é admin geral (ex: liderança de um departamento na subsede/pde).'
 }
 
-// ─── MEMBROS / SÓCIOS ─────────────────────────────────────────────────────
+Table saas_departamento_areas {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  departamento_id varchar [not null]
+  nome varchar [not null]
+  slug varchar [not null]
+  descricao varchar
+  icone varchar
+  ordem integer [not null]
+  ativa boolean [not null]
+  sazonal boolean [not null]
+  meta json
+  canal_conversa_id varchar [unique]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (departamento_id, slug) [unique]
+    (tenant_id, ativa) [name: 'idx']
+  }
+  Note: 'Área interna de um departamento (ex.: Campanha do Agasalho dentro do Social). Organiza gente e trabalho — NÃO concede permissão. RBAC continua no Departamento (permissions/permissionsGestor); área é só rótulo e filtro.'
+}
+
+Table saas_departamento_area_membros {
+  id varchar [pk]
+  area_id varchar [not null]
+  user_id varchar [not null]
+  papel PapelAreaDepartamento [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (area_id, user_id) [unique]
+    user_id [name: 'idx']
+  }
+  Note: 'Associação usuário ↔ área de departamento. Exige `UserDepartamento` prévio no departamento pai (elegibilidade validada na Server Action, não aqui). `papel = RESPONSAVEL` é accountability, não gestão — quem gere é `DepartamentoGestor` / `canManageDepartamento`.'
+}
+
+Table saas_projetos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  departamento_id varchar [not null]
+  area_id varchar
+  titulo varchar [not null]
+  slug varchar [not null]
+  descricao varchar
+  tipo TipoProjeto [not null]
+  status StatusProjeto [not null]
+  inicio timestamp [not null]
+  fim timestamp
+  recorrenteAnual boolean [not null]
+  meta_quantidade integer
+  meta_unidade varchar
+  realizado_quantidade integer [not null]
+  orcamento_previsto decimal(12, 2)
+  responsavel_id varchar
+  criado_por_id varchar [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (departamento_id, slug) [unique]
+    (tenant_id, status, inicio) [name: 'idx']
+    (tenant_id, departamento_id) [name: 'idx']
+    area_id [name: 'idx']
+  }
+  Note: 'Trabalho de um departamento com começo, meta e prestação de contas (Campanha do Agasalho, Festa das Crianças, Escolinha da Bateria, Corrida de Rua). Transversal: serve Social, Bateria, Carnaval, Caravanas e Patrimônio. Como a área, NÃO concede permissão — quem gere é `canManageDepartamento`.'
+}
+
+Table saas_projeto_participantes {
+  id varchar [pk]
+  projeto_id varchar [not null]
+  user_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (projeto_id, user_id) [unique]
+    user_id [name: 'idx']
+  }
+  Note: 'Voluntário/equipe de um projeto. Subconjunto de quem já está no departamento — validado na Server Action, como na área.'
+}
 
 Table saas_membros {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  user_id uuid [not null]
-  tipo varchar [note: 'SOCIO | TORCEDOR']
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
+  tipo TipoMembro [not null]
   nome varchar [not null]
   idade integer
   telefone varchar
   cidade varchar
   numero_associado varchar
+  anos_socio integer
+  cep varchar
+  numero varchar
+  bloco varchar
+  complemento varchar
   imagem_prova varchar
-  status varchar [note: 'PENDENTE | APROVADO | REPROVADO']
+  status StatusMembro [not null]
+  rg varchar
+  cpf varchar
+  filiacao varchar
+  escolaridade varchar
+  profissao varchar
+  data_nascimento timestamp
+  sexo varchar
+  estado_civil varchar
+  nacionalidade varchar
+  logradouro varchar
+  bairro varchar
+  uf char(2)
+  foto_documento_url varchar
+  comprovante_residencia_url varchar
+  responsavel_nome varchar
+  responsavel_documento varchar
+  autorizacao_menor_aceita_em timestamp
+  termo_responsabilidade_aceito_em timestamp
+  plano_associacao_id varchar
+  data_expedicao_carteirinha timestamp
+  periodicidade_pretendida PeriodicidadePlanoAssociacao
+  adimplente boolean [not null]
+  pendencias_cadastro_dispensadas varchar[]
   aprovado_por_id varchar
   aprovado_por_nome varchar
   aprovado_em timestamp
+  reprovado_em timestamp
+  reprovado_por_id varchar
+  reprovado_por_nome varchar
+  reprovado_categoria varchar
+  reprovado_motivo varchar
+  reprovado_pontos varchar[]
+  reprovado_permite_reenvio boolean [not null]
+  desligado_em timestamp
+  desligado_motivo varchar
+  desligado_por_id varchar
   discord_id varchar
   discord_tag varchar
-  sede_id uuid [note: 'vínculo territorial (SetNull)']
-  importacao_id uuid [note: 'origem da importação (SetNull)']
-  criado_em timestamp
-  atualizado_em timestamp
-  Indexes { (tenant_id, user_id) [unique] }
+  sede_id varchar
+  departamento_id varchar
+  departamento_sede_id varchar
+  importacao_id varchar
+  espelhado boolean [not null]
+  aprovado_na_unidade_tenant_id varchar
+  membro_origem_id varchar [unique]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, user_id) [unique]
+    (tenant_id, cpf) [unique]
+    sede_id [name: 'idx']
+    departamento_id [name: 'idx']
+    departamento_sede_id [name: 'idx']
+    importacao_id [name: 'idx']
+    (tenant_id, status, criado_em) [name: 'idx']
+    (tenant_id, criado_em) [name: 'idx']
+    (tenant_id, nome) [name: 'idx']
+    (tenant_id, adimplente) [name: 'idx']
+    plano_associacao_id [name: 'idx']
+    espelhado [name: 'idx']
+  }
 }
 
 Table saas_importacoes_membros {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  origem varchar [note: 'CSV | BOT | DISCORD | MOCK']
-  status varchar [note: 'PENDENTE | PROCESSANDO | CONCLUIDA | ERRO']
-  total_linhas integer
-  importados integer
-  duplicados integer
+  id varchar [pk]
+  tenant_id varchar [not null]
+  origem OrigemImportacao [not null]
+  status StatusImportacao [not null]
+  total_linhas integer [not null]
+  importados integer [not null]
+  duplicados integer [not null]
   erros json
   criado_por_id varchar
-  criado_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, criado_em) [name: 'idx']
+  }
 }
 
 Table saas_socios {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  user_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
   numero_socio integer [not null]
   nome varchar [not null]
   validade timestamp [not null]
+  expedido_em timestamp
+  criado_em timestamp [not null]
   discord_id varchar
-  criado_em timestamp
+  qr_token varchar [unique]
+  qr_emitido_em timestamp
   Indexes {
     (tenant_id, numero_socio) [unique]
     (tenant_id, user_id) [unique]
+    (tenant_id, validade) [name: 'idx']
+    (tenant_id, nome) [name: 'idx']
+  }
+}
+
+Table saas_planos_associacao {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  nome varchar [not null]
+  descricao varchar
+  valor decimal(12, 2) [not null]
+  periodicidade PeriodicidadePlanoAssociacao [not null]
+  beneficios varchar
+  ativo boolean [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, ativo) [name: 'idx']
+  }
+}
+
+Table saas_cobrancas_associacao {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
+  membro_id varchar
+  plano_associacao_id varchar
+  evento_id varchar
+  tipo TipoCobrancaAssociacao [not null]
+  descricao varchar [not null]
+  valor decimal(12, 2) [not null]
+  vencimento timestamp [not null]
+  status StatusCobrancaAssociacao [not null]
+  pago_em timestamp
+  metodo_pagamento MetodoPagamentoCobranca
+  pix_copia_cola varchar
+  gateway_provider varchar
+  gateway_external_id varchar
+  financeiro_lancamento_id varchar [unique]
+  criado_por_id varchar
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status, vencimento) [name: 'idx']
+    (tenant_id, user_id) [name: 'idx']
+    membro_id [name: 'idx']
+    evento_id [name: 'idx']
+    gateway_external_id [name: 'idx']
+    (evento_id, user_id) [unique]
   }
 }
 
 Table saas_bloqueados {
-  id uuid [pk]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
   registro varchar [not null]
   nome varchar
   motivo varchar
   bloqueado_por_id varchar
   bloqueado_por_nome varchar
-  criado_em timestamp
-  Indexes { (tenant_id, registro) [unique] }
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, registro) [unique]
+  }
 }
 
-// ─── SEDES (hierarquia Sede → Subsede → PDE) ──────────────────────────────
-
 Table saas_sedes {
-  id uuid [pk]
-  tenant_id uuid [note: 'OPCIONAL — pré-adesão possível (SetNull)']
+  id varchar [pk]
+  tenant_id varchar
   nome varchar [not null]
-  tipo varchar [note: 'SEDE | SUBSEDE | PONTO_ENCONTRO']
+  tipo TipoSede [not null]
   endereco varchar
   cidade varchar
   estado varchar
   cep varchar
   lat float
   lng float
+  street_view_heading integer
+  street_view_pitch integer
+  street_view_fov integer
   capacidade integer
   responsavel varchar
+  responsavel_user_id varchar
   telefone varchar
   horarios varchar
   descricao varchar
   foto_url varchar
-  ativa boolean
-  sede_id uuid [note: 'auto-referência: sede pai']
-  sede_referencia_nome varchar [note: 'pai que ainda não é tenant']
+  ativa boolean [not null]
+  criado_em timestamp [not null]
+  sede_id varchar
+  sede_referencia_nome varchar
   sede_referencia_slug varchar
-  criado_em timestamp
+  canal_conversa_id varchar [unique]
+  Indexes {
+    tenant_id [name: 'idx']
+    sede_id [name: 'idx']
+    responsavel_user_id [name: 'idx']
+  }
 }
 
-// ─── EVENTOS ──────────────────────────────────────────────────────────────
-
-Table saas_eventos {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  titulo varchar [not null]
-  descricao varchar
-  data timestamp [not null]
-  local varchar
-  sede_id uuid
+Table saas_solicitacoes_unidade {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  nome varchar [not null]
+  tipo TipoSede [not null]
+  cidade varchar [not null]
+  estado varchar [not null]
+  endereco varchar
+  regiao varchar
+  cep varchar
   lat float
   lng float
+  foto_url varchar
+  contato_nome varchar
+  contato_email varchar
+  contato_telefone varchar
+  vinculo varchar
+  observacao varchar
+  provas_urls varchar[]
+  status StatusSolicitacaoUnidade [not null]
+  solicitado_por_id varchar
+  decidido_por_id varchar
+  decidido_em timestamp
+  motivo varchar
+  sede_id varchar [unique]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status) [name: 'idx']
+    status [name: 'idx']
+  }
+}
+
+Table saas_solicitacoes_reativacao_canal {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  solicitante_tenant_id varchar [not null]
+  solicitado_por_id varchar
+  mensagem varchar
+  prazo_em timestamp [not null]
+  status StatusReativacaoCanal [not null]
+  decidido_por_id varchar
+  decidido_em timestamp
+  motivo varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status) [name: 'idx']
+    (status, prazo_em) [name: 'idx']
+  }
+  Note: 'R5 — pedido da Sede para a liderança reabrir um canal restrito. Silêncio até `prazoEm` (5 dias) reativa automaticamente: a expiração é DERIVADA na leitura (`lib/isolamento.ts`), o cron só materializa a linha.'
+}
+
+Table saas_eventos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  tipo TipoEvento [not null]
+  titulo varchar [not null]
+  descricao varchar
+  foto_url varchar
+  data timestamp [not null]
+  local varchar
+  sede_id varchar
+  lat float
+  lng float
+  valor_vaga decimal(12, 2)
+  check_in_exige_pagamento boolean [not null]
+  capacidade integer
+  serie_id varchar
+  partida_id varchar
+  projeto_id varchar
   criado_por_id varchar
+  criado_em timestamp [not null]
   discord_message_id varchar
-  criado_em timestamp
+  Indexes {
+    tenant_id [name: 'idx']
+    sede_id [name: 'idx']
+    serie_id [name: 'idx']
+    partida_id [name: 'idx']
+    (tenant_id, data) [name: 'idx']
+    (tenant_id, tipo, data) [name: 'idx']
+    projeto_id [name: 'idx']
+  }
 }
 
 Table saas_evento_rsvps {
-  id uuid [pk]
-  evento_id uuid [not null]
-  user_id uuid [not null]
-  status varchar [note: 'CONFIRMADO | RECUSADO']
-  checked_in_at timestamp [note: 'check-in real (≠ RSVP)']
+  id varchar [pk]
+  evento_id varchar [not null]
+  user_id varchar [not null]
+  status RsvpStatus [not null]
+  criado_em timestamp [not null]
+  checked_in_at timestamp
   checked_in_por_id varchar
-  Indexes { (evento_id, user_id) [unique] }
+  Indexes {
+    (evento_id, user_id) [unique]
+    (evento_id, status, criado_em) [name: 'idx']
+  }
 }
 
-// ─── LOJA ─────────────────────────────────────────────────────────────────
-
 Table saas_categorias {
-  id uuid [pk]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
   nome varchar [not null]
   slug varchar [not null]
-  ordem integer [default: 0]
-  parent_id uuid [note: 'opcional — hierarquia Masculino > Camisetas']
-  Indexes { (tenant_id, slug) [unique] }
+  ordem integer [not null]
+  parent_id varchar
+  Indexes {
+    (tenant_id, slug) [unique]
+    tenant_id [name: 'idx']
+  }
 }
 
 Table saas_cupons {
-  id uuid [pk]
-  tenant_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
   codigo varchar [not null]
-  tipo varchar [note: 'PERCENTUAL | FIXO']
-  valor decimal [not null]
-  primeira_compra boolean [default: false]
-  ativo boolean [default: true]
+  tipo TipoCupom [not null]
+  valor decimal(10, 2) [not null]
+  primeira_compra boolean [not null]
+  ativo boolean [not null]
   valido_ate timestamp
-  criado_em timestamp
-  Indexes { (tenant_id, codigo) [unique] }
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, codigo) [unique]
+    tenant_id [name: 'idx']
+  }
 }
 
-Table saas_produtos {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  categoria_id uuid
+Table SaasProduto {
+  id varchar [pk]
+  tenant_id varchar [not null]
   nome varchar [not null]
   slug varchar
   descricao varchar
-  preco decimal [not null]
-  preco_original decimal [note: 'para exibir promo']
+  preco decimal(10, 2) [not null]
+  preco_original decimal(10, 2)
   marca varchar
-  ativo boolean
-  destaque boolean [default: false]
-  ordem integer [default: 0]
-  estoque json
-  tamanhos "varchar[]"
-  imagens_url "varchar[]"
-  criado_em timestamp
-  atualizado_em timestamp
-  Indexes { (tenant_id, slug) [unique] }
+  ativo boolean [not null]
+  destaque boolean [not null]
+  ordem integer [not null]
+  estoque json [not null]
 }
 
 Table saas_carrinho_itens {
-  id uuid [pk]
-  user_id uuid [not null]
-  tenant_id uuid [not null, note: 'tenant DONO do produto']
-  produto_id uuid [not null]
-  tamanho varchar [default: 'UN']
-  quantidade integer [default: 1]
-  criado_em timestamp
-  atualizado_em timestamp
-  Indexes { (user_id, produto_id, tamanho) [unique] }
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  produto_id varchar [not null]
+  tamanho varchar [not null]
+  quantidade integer [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (user_id, produto_id, tamanho) [unique]
+    user_id [name: 'idx']
+  }
 }
 
 Table saas_pedidos {
-  id uuid [pk]
-  tenant_id uuid [not null, note: 'tenant DONO dos produtos']
-  user_id uuid [not null]
-  subtotal decimal [not null]
-  desconto decimal [default: 0]
-  total decimal [not null]
-  status varchar [note: 'PENDENTE | CONFIRMADO | CANCELADO | ENTREGUE']
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
+  subtotal decimal(10, 2) [not null]
+  desconto decimal(10, 2) [not null]
+  total decimal(10, 2) [not null]
+  status StatusPedido [not null]
   cupom_codigo varchar
-  modalidade_entrega varchar [default: 'RETIRADA', note: 'RETIRADA | ENVIO']
+  modalidade_entrega ModalidadeEntrega [not null]
   endereco_entrega json
-  grupo_checkout_id uuid [note: 'agrupa pedidos de um checkout multi-tenant']
+  grupo_checkout_id varchar
+  financeiro_lancamento_id varchar [unique]
   discord_id varchar
   canal_ticket_id varchar
-  criado_em timestamp
-  atualizado_em timestamp
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    tenant_id [name: 'idx']
+    user_id [name: 'idx']
+    grupo_checkout_id [name: 'idx']
+    (tenant_id, status, criado_em) [name: 'idx']
+    (tenant_id, criado_em) [name: 'idx']
+  }
 }
 
 Table saas_pedido_itens {
-  id uuid [pk]
-  pedido_id uuid [not null]
-  produto_id uuid [not null]
-  produto_nome varchar [not null, note: 'snapshot']
+  id varchar [pk]
+  pedido_id varchar [not null]
+  produto_id varchar [not null]
+  produto_nome varchar [not null]
   tamanho varchar
   quantidade integer [not null]
-  preco_unit decimal [not null]
-  total decimal [not null]
+  preco_unit decimal(10, 2) [not null]
+  total decimal(10, 2) [not null]
+  Indexes {
+    pedido_id [name: 'idx']
+    produto_id [name: 'idx']
+  }
 }
 
-// ─── COMUNICADOS OFICIAIS ─────────────────────────────────────────────────
+Table saas_pedido_tickets {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  pedido_id varchar [unique, not null]
+  conversa_id varchar [unique, not null]
+  status PedidoTicketStatus [not null]
+  atendente_id varchar
+  aberto_em timestamp [not null]
+  atendido_em timestamp
+  fechado_em timestamp
+  fechado_por_id varchar
+  motivo_fecho PedidoTicketMotivoFecho
+  Indexes {
+    (tenant_id, status, aberto_em) [name: 'idx']
+    (tenant_id, fechado_em) [name: 'idx']
+  }
+  Note: 'Ticket de atendimento pós-compra (conversa persistente comprador ↔ loja). 1:1 com SaasPedido. Status da fila é independente do StatusPedido.'
+}
 
 Table saas_announcements {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  autor_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
+  autor_id varchar [not null]
   titulo varchar [not null]
   corpo varchar [not null]
-  prioridade varchar [note: 'NORMAL | IMPORTANTE | URGENTE']
-  fixado boolean
-  publicado_em timestamp
-  criado_em timestamp
-  atualizado_em timestamp
+  prioridade PrioridadeComunicado [not null]
+  fixado boolean [not null]
+  publicado_em timestamp [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    tenant_id [name: 'idx']
+    (tenant_id, publicado_em) [name: 'idx']
+  }
 }
 
 Table saas_announcement_reads {
-  id uuid [pk]
-  announcement_id uuid [not null]
-  user_id uuid [not null]
-  lido_em timestamp
-  Indexes { (announcement_id, user_id) [unique] }
+  id varchar [pk]
+  announcement_id varchar [not null]
+  user_id varchar [not null]
+  lido_em timestamp [not null]
+  Indexes {
+    (announcement_id, user_id) [unique]
+    user_id [name: 'idx']
+  }
+  Note: 'Rastreio de leitura por associado — usado para saber quem já viu um comunicado oficial (não se aplica a Post/mural local).'
 }
 
-// ─── COMUNIDADE / MODERAÇÃO / AUDITORIA ───────────────────────────────────
+Table saas_afiliacoes {
+  id varchar [pk]
+  nome varchar [not null]
+  apelido varchar
+  slug varchar [unique]
+  serie SerieCampeonato
+  escudo_url varchar
+  cidade varchar
+  estado varchar
+  api_external_id varchar
+  torcedores_estimados integer
+  torcedores_estimados_fonte varchar
+  torcedores_estimados_tipo TorcedoresEstimadosTipo
+  criado_em timestamp [not null]
+}
+
+Table saas_torcidas_conhecidas {
+  id varchar [pk]
+  nome varchar [not null, note: 'nome completo (fiel à fonte)']
+  titulo varchar [note: 'versão curta/legível p/ exibição (sem prefixo)']
+  slug varchar [unique, not null]
+  afiliacao_id varchar
+  clube_nome_original varchar
+  fundacao varchar
+  sede varchar
+  subsedes varchar
+  lema varchar
+  site_oficial varchar
+  cidade varchar
+  uf varchar
+  logo_url varchar
+  fonte_url varchar
+  ativa boolean [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    afiliacao_id [name: 'idx']
+  }
+  Note: 'Catálogo nacional de torcidas organizadas conhecidas (fora da plataforma). Dataset gerado por scraper (`src/data/torcidas-conhecidas.js`); usado no onboarding como referência informativa por clube (Afiliacao).'
+}
+
+Table saas_perfis_torcedor {
+  id varchar [pk]
+  user_id varchar [unique, not null]
+  afiliacao_id varchar [note: 'clube que torce']
+  torcida_conhecida_id varchar [note: 'organizada conhecida (fora da plataforma)']
+  regiao varchar [note: 'cidade/estado do torcedor']
+  bio varchar
+  onboarding_concluido_em timestamp
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    afiliacao_id [name: 'idx']
+    torcida_conhecida_id [name: 'idx']
+  }
+}
+
+Table saas_rivalidades_clube {
+  id varchar [pk]
+  afiliacao_a_id varchar [not null]
+  afiliacao_b_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (afiliacao_a_id, afiliacao_b_id) [unique]
+    afiliacao_b_id [name: 'idx']
+  }
+}
+
+Table saas_rivalidades_torcida {
+  id varchar [pk]
+  tenant_a_id varchar [not null]
+  tenant_b_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_a_id, tenant_b_id) [unique]
+    tenant_b_id [name: 'idx']
+  }
+}
+
+Table saas_aliancas {
+  id varchar [pk]
+  tenant_origem_id varchar [not null]
+  tenant_aliado_id varchar [not null]
+  status StatusAlianca [not null]
+  proposta_por_id varchar [not null]
+  confirmada_por_id varchar
+  confirmada_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_origem_id, tenant_aliado_id) [unique]
+    tenant_aliado_id [name: 'idx']
+    (tenant_origem_id, status) [name: 'idx']
+    (tenant_aliado_id, status) [name: 'idx']
+  }
+}
+
+Table saas_recomendacoes_alianca {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  tenant_sugerido_id varchar
+  nome_sugerido varchar [not null]
+  confianca ConfiancaRecomendacao [not null]
+  fonte varchar [not null]
+  observacao varchar
+  criado_em timestamp [not null]
+  Indexes {
+    tenant_id [name: 'idx']
+  }
+}
 
 Table saas_posts {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  autor_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
+  autor_id varchar [not null]
   titulo varchar
   conteudo varchar [not null]
   imagem_url varchar
-  fixado boolean
-  criado_em timestamp
-  atualizado_em timestamp
-}
-
-Table saas_advertencias {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  membro_discord_id varchar [not null]
-  membro_nome varchar [not null]
-  motivo varchar
-  tier integer
-  prazo timestamp [not null]
-  emitido_por_id varchar
-  emitido_por_nome varchar
-  resolvida boolean
-  criado_em timestamp
-}
-
-Table saas_audit_logs {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  ator_id uuid
-  acao varchar [not null]
-  entidade varchar
-  entidade_id varchar
-  detalhes json
-  criado_em timestamp
-}
-
-// ─── SALAS MEET (WebRTC / LiveKit) ────────────────────────────────────────
-
-Table saas_salas_reuniao {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  host_id uuid [not null]
-  titulo varchar [not null]
-  tipo varchar [note: 'EVENTO | ABERTA | DM_GRUPO (DM_GRUPO nunca gravado hoje)']
-  livekit_room_name varchar [unique, not null, note: 'formato "${tenantId}:${slug}"']
-  link_convite varchar [unique, not null]
-  agendada_para timestamp
-  encerrada_em timestamp [note: 'preenchido = sala encerrada (soft delete)']
-  evento_id uuid [note: 'vínculo opcional a um Evento (SetNull)']
-  criado_em timestamp
-  Indexes { (tenant_id, encerrada_em) }
-  Note: 'Sala de videoconferência (LiveKit). LiveKit é opcional — sem config, funciona como chat/enquetes/presença.'
-}
-
-Table saas_participantes_reuniao {
-  id uuid [pk]
-  sala_id uuid [not null]
-  user_id uuid [not null]
-  papel varchar [note: 'HOST | MODERADOR | PARTICIPANTE (MODERADOR nunca atribuído hoje)']
-  entrou_em timestamp
-  saiu_em timestamp
-  Indexes { (sala_id, user_id) [unique] }
-  Note: 'Registro de presença (upsert por entrada/saída)'
-}
-
-Table saas_mensagens_reuniao {
-  id uuid [pk]
-  sala_id uuid [not null]
-  autor_id uuid [not null]
-  conteudo varchar [not null]
-  destacada boolean [note: 'mensagem fixada pelo host']
-  editada_em timestamp
-  excluida_em timestamp [note: 'soft delete']
-  criado_em timestamp
+  midia_urls varchar[]
+  tipo TipoPost [not null]
+  visibilidade VisibilidadePost [not null]
+  fixado boolean [not null]
+  oculto boolean [not null]
+  alcance_nacional boolean [not null]
+  post_origem_id varchar
+  comunicado_origem_id varchar
+  evento_id varchar
+  conversa_id varchar
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
   Indexes {
-    (sala_id, criado_em)
-    (sala_id, destacada)
+    (tenant_id, criado_em) [name: 'idx']
+    (tenant_id, oculto) [name: 'idx']
+    (autor_id, criado_em) [name: 'idx']
+    (tenant_id, tipo, oculto, conversa_id, criado_em) [name: 'idx']
+    post_origem_id [name: 'idx']
+    comunicado_origem_id [name: 'idx']
+    evento_id [name: 'idx']
+    conversa_id [name: 'idx']
   }
-  Note: 'Chat da sala (polling)'
 }
 
-Table saas_enquetes_reuniao {
-  id uuid [pk]
-  sala_id uuid [not null]
-  criador_id uuid [not null]
-  pergunta varchar [not null]
+Table saas_perfis_membro {
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  bio varchar
+  perfil_privado boolean [not null]
+  avatar_url varchar
+  banner_url varchar
+  banner_pos integer [note: 'enquadramento vertical do banner (object-position Y, 0–100)']
+  exibir_cidade boolean [not null]
+  exibir_sede boolean [not null]
+  exibir_desde boolean [not null]
+  exibir_numero_socio_no_feed boolean [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (user_id, tenant_id) [unique]
+  }
+}
+
+Table saas_seguimentos {
+  id varchar [pk]
+  seguidor_id varchar [not null]
+  seguido_id varchar [not null]
+  tenant_contexto_id varchar [not null]
+  status StatusSeguimento [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (seguidor_id, seguido_id) [unique]
+    (seguido_id, status) [name: 'idx']
+    (seguidor_id, status) [name: 'idx']
+  }
+}
+
+Table saas_comentarios {
+  id varchar [pk]
+  post_id varchar [not null]
+  autor_id varchar [not null]
+  conteudo varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (post_id, criado_em) [name: 'idx']
+  }
+}
+
+Table saas_reacoes {
+  id varchar [pk]
+  post_id varchar [not null]
+  user_id varchar [not null]
+  tipo TipoReacao [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (post_id, user_id) [unique]
+  }
+}
+
+Table saas_denuncias {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  post_id varchar [not null]
+  denunciante_id varchar [not null]
+  motivo varchar [not null]
+  status StatusDenuncia [not null]
+  resolvido_por_id varchar
+  resolvido_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status) [name: 'idx']
+  }
+}
+
+Table saas_enquetes_post {
+  id varchar [pk]
+  post_id varchar [unique, not null]
   encerrada_em timestamp
-  criado_em timestamp
-  Indexes { (sala_id, encerrada_em) }
-  Note: 'Enquete ao vivo. Votantes (quem votou em quê) só são expostos ao host.'
+  criado_em timestamp [not null]
 }
 
-Table saas_opcoes_enquete_reuniao {
-  id uuid [pk]
-  enquete_id uuid [not null]
+Table saas_opcoes_enquete_post {
+  id varchar [pk]
+  enquete_id varchar [not null]
   texto varchar [not null]
-  ordem integer
-  Indexes { (enquete_id, ordem) }
+  ordem integer [not null]
+  Indexes {
+    (enquete_id, ordem) [name: 'idx']
+  }
 }
 
-Table saas_votos_enquete_reuniao {
-  id uuid [pk]
-  enquete_id uuid [not null]
-  opcao_id uuid [not null]
-  user_id uuid [not null]
-  criado_em timestamp
-  Indexes { (enquete_id, user_id) [unique, note: '1 voto por pessoa por enquete; upsert permite trocar de voto'] }
+Table saas_votos_enquete_post {
+  id varchar [pk]
+  enquete_id varchar [not null]
+  opcao_id varchar [not null]
+  user_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (enquete_id, user_id) [unique]
+  }
 }
 
-// ─── MENSAGERIA (DM 1×1 e grupos — ARCHITECTURE.md §6 item 27) ─────────────
+Table saas_hashtags {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  tag varchar [not null]
+  Indexes {
+    (tenant_id, tag) [unique]
+    tag [name: 'idx']
+  }
+}
+
+Table saas_post_hashtags {
+  id varchar [pk]
+  post_id varchar [not null]
+  hashtag_id varchar [not null]
+  Indexes {
+    (post_id, hashtag_id) [unique]
+    hashtag_id [name: 'idx']
+  }
+}
+
+Table saas_post_salvos {
+  id varchar [pk]
+  user_id varchar [not null]
+  post_id varchar [not null]
+  tenant_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (user_id, post_id) [unique]
+    (user_id, tenant_id) [name: 'idx']
+  }
+}
+
+Table saas_feed_timeline {
+  id varchar [pk]
+  viewer_id varchar [not null]
+  post_id varchar [not null]
+  autor_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (viewer_id, post_id) [unique]
+    (viewer_id, criado_em) [name: 'idx']
+    (viewer_id, autor_id) [name: 'idx']
+    post_id [name: 'idx']
+  }
+  Note: 'Timeline materializada da rede ("Minha rede" / filtro seguindo). Guarda o fan-out do post para o viewer no momento da publicação/aprovação.'
+}
+
+Table saas_momentos_story {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
+  midia_url varchar [not null]
+  conteudo varchar
+  criado_em timestamp [not null]
+  expira_em timestamp [not null]
+  Indexes {
+    (tenant_id, expira_em) [name: 'idx']
+    (user_id, tenant_id) [name: 'idx']
+  }
+  Note: 'Momento efêmero estilo story (expira em 24h).'
+}
+
+Table saas_perfil_destaques {
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  titulo varchar [not null]
+  capa_url varchar
+  ordem integer [not null]
+  Indexes {
+    (user_id, tenant_id) [name: 'idx']
+  }
+}
+
+Table saas_perfil_destaque_itens {
+  id varchar [pk]
+  destaque_id varchar [not null]
+  post_id varchar [not null]
+  ordem integer [not null]
+  Indexes {
+    (destaque_id, post_id) [unique]
+  }
+}
+
+Table saas_notificacoes {
+  id varchar [pk]
+  user_id varchar [not null]
+  tenant_id varchar [not null]
+  tipo TipoNotificacao [not null]
+  titulo varchar [not null]
+  corpo varchar
+  link varchar
+  lida boolean [not null]
+  ator_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (user_id, lida, criado_em) [name: 'idx']
+    (tenant_id, user_id, criado_em) [name: 'idx']
+  }
+}
 
 Table saas_conversas {
-  id uuid [pk]
-  tipo varchar [not null, note: 'DIRETA | GRUPO']
-  tenant_id uuid [not null, note: 'contexto/auditoria — leitura é por participação, não por tenant']
-  nome varchar [note: 'só GRUPO']
-  descricao varchar [note: 'só GRUPO']
-  avatar_url varchar [note: 'só GRUPO']
-  criado_por_id uuid [not null]
-  criado_em timestamp
-  atualizado_em timestamp [note: 'bumpado a cada mensagem — ordena a inbox']
-  Indexes { (tenant_id, atualizado_em) }
-  Note: 'Conversa persistente (DM/grupo). Separada do chat efêmero das salas.'
+  id varchar [pk]
+  tipo TipoConversa [not null]
+  tenant_id varchar [not null]
+  nome varchar
+  descricao varchar
+  avatar_url varchar
+  publica boolean [not null]
+  comunidade boolean [not null]
+  codigo_convite varchar [unique]
+  institucional boolean [not null]
+  canal_oficial boolean [not null]
+  visibilidade_canal VisibilidadeCanal [not null]
+  somente_admin_publica boolean [not null]
+  criado_por_id varchar [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, atualizado_em) [name: 'idx']
+    (tenant_id, tipo, canal_oficial) [name: 'idx']
+    (tenant_id, tipo, publica) [name: 'idx']
+  }
 }
 
 Table saas_membros_conversa {
-  id uuid [pk]
-  conversa_id uuid [not null]
-  user_id uuid [not null]
-  papel varchar [note: 'ADMIN | MEMBRO']
-  entrou_em timestamp
-  ultima_leitura_em timestamp [note: 'base do contador de não-lidas']
-  silenciada boolean
-  saiu_em timestamp [note: 'soft leave — histórico preservado']
+  id varchar [pk]
+  conversa_id varchar [not null]
+  user_id varchar [not null]
+  papel PapelConversa [not null]
+  status StatusMembroConversa [not null]
+  entrou_em timestamp [not null]
+  ultima_leitura_em timestamp
+  silenciada boolean [not null]
+  saiu_em timestamp
   Indexes {
     (conversa_id, user_id) [unique]
-    (user_id, saiu_em)
+    (user_id, saiu_em) [name: 'idx']
+    (conversa_id, status, saiu_em) [name: 'idx']
   }
 }
 
 Table saas_mensagens_diretas {
-  id uuid [pk]
-  conversa_id uuid [not null]
-  autor_id uuid [not null]
+  id varchar [pk]
+  conversa_id varchar [not null]
+  autor_id varchar [not null]
   conteudo varchar [not null]
-  midia_urls "varchar[]" [note: 'mesmo pipeline do feed: Cloudinary, embeds, stickers']
-  resposta_a_id uuid [note: 'reply (SetNull)']
+  midia_urls varchar[]
+  resposta_a_id varchar
   editada_em timestamp
-  removida_em timestamp [note: 'soft delete — mantém posição na thread']
-  criado_em timestamp
-  Indexes { (conversa_id, criado_em) }
+  removida_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (conversa_id, criado_em) [name: 'idx']
+  }
 }
 
 Table saas_bloqueios_usuario {
-  id uuid [pk]
-  bloqueador_id uuid [not null]
-  bloqueado_id uuid [not null]
-  criado_em timestamp
+  id varchar [pk]
+  bloqueador_id varchar [not null]
+  bloqueado_id varchar [not null]
+  criado_em timestamp [not null]
   Indexes {
     (bloqueador_id, bloqueado_id) [unique]
-    bloqueado_id
+    bloqueado_id [name: 'idx']
   }
-  Note: 'Bloqueio usuário↔usuário (mensageria). Distinto de saas_bloqueados (blocklist de registros por tenant).'
+}
+
+Table saas_membro_bloqueios {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  user_id varchar [not null]
+  motivo varchar [not null]
+  bloqueado_por_id varchar
+  bloqueado_por_nome varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, user_id) [unique]
+    user_id [name: 'idx']
+  }
 }
 
 Table saas_denuncias_mensagem {
-  id uuid [pk]
-  tenant_id uuid [not null, note: 'tenant da conversa — moderação daquele contexto']
-  mensagem_id uuid [not null]
-  denunciante_id uuid [not null]
+  id varchar [pk]
+  tenant_id varchar [not null]
+  mensagem_id varchar [not null]
+  denunciante_id varchar [not null]
   motivo varchar [not null]
-  status varchar [note: 'PENDENTE | RESOLVIDA | DESCARTADA']
-  resolvido_por_id uuid
+  status StatusDenuncia [not null]
+  resolvido_por_id varchar
   resolvido_em timestamp
-  criado_em timestamp
-  Indexes { (tenant_id, status) }
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status) [name: 'idx']
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// RELACIONAMENTOS (Refs)
-// ═══════════════════════════════════════════════════════════════════════════
+Table saas_partidas {
+  id varchar [pk]
+  afiliacao_id varchar [not null]
+  adversario varchar [not null]
+  competicao varchar
+  data_hora timestamp [not null]
+  local varchar
+  mando MandoJogo [not null]
+  placar_casa integer
+  placar_fora integer
+  status StatusPartida [not null]
+  fonte_external_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (afiliacao_id, data_hora) [name: 'idx']
+    (afiliacao_id, status, data_hora) [name: 'idx']
+  }
+}
 
-// Cargos & permissões
+Table saas_noticias {
+  id varchar [pk]
+  afiliacao_id varchar [not null]
+  titulo varchar [not null]
+  resumo varchar
+  url varchar [not null]
+  fonte varchar [not null]
+  embed_html varchar
+  embed_thumbnail varchar
+  status StatusNoticia [not null]
+  publicado_em timestamp
+  curado_por_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (afiliacao_id, url) [unique]
+    (afiliacao_id, status, publicado_em) [name: 'idx']
+  }
+}
+
+Table saas_salas_reuniao {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  host_id varchar [not null]
+  titulo varchar [not null]
+  tipo TipoSalaReuniao [not null]
+  livekit_room_name varchar [unique, not null]
+  link_convite varchar [unique, not null]
+  agendada_para timestamp
+  encerrada_em timestamp
+  evento_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, encerrada_em) [name: 'idx']
+  }
+}
+
+Table saas_participantes_reuniao {
+  id varchar [pk]
+  sala_id varchar [not null]
+  user_id varchar [not null]
+  papel PapelParticipanteReuniao [not null]
+  entrou_em timestamp [not null]
+  saiu_em timestamp
+  Indexes {
+    (sala_id, user_id) [unique]
+  }
+}
+
+Table saas_mensagens_reuniao {
+  id varchar [pk]
+  sala_id varchar [not null]
+  autor_id varchar [not null]
+  conteudo varchar [not null]
+  destacada boolean [not null]
+  editada_em timestamp
+  excluida_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (sala_id, criado_em) [name: 'idx']
+    (sala_id, destacada) [name: 'idx']
+  }
+}
+
+Table saas_enquetes_reuniao {
+  id varchar [pk]
+  sala_id varchar [not null]
+  criador_id varchar [not null]
+  pergunta varchar [not null]
+  encerrada_em timestamp
+  criado_em timestamp [not null]
+  Indexes {
+    (sala_id, encerrada_em) [name: 'idx']
+  }
+}
+
+Table saas_opcoes_enquete_reuniao {
+  id varchar [pk]
+  enquete_id varchar [not null]
+  texto varchar [not null]
+  ordem integer [not null]
+  Indexes {
+    (enquete_id, ordem) [name: 'idx']
+  }
+}
+
+Table saas_votos_enquete_reuniao {
+  id varchar [pk]
+  enquete_id varchar [not null]
+  opcao_id varchar [not null]
+  user_id varchar [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (enquete_id, user_id) [unique]
+  }
+}
+
+Table saas_advertencias {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  membro_discord_id varchar [not null]
+  membro_nome varchar [not null]
+  motivo varchar
+  tier integer [not null]
+  prazo timestamp [not null]
+  emitido_por_id varchar
+  emitido_por_nome varchar
+  resolvida boolean [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    tenant_id [name: 'idx']
+  }
+}
+
+Table saas_audit_logs {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  ator_id varchar
+  acao varchar [not null]
+  entidade varchar
+  entidade_id varchar
+  detalhes json
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, criado_em) [name: 'idx']
+    criado_em [name: 'idx']
+  }
+}
+
+Table saas_financeiro_lancamentos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  tipo TipoFinanceiroLancamento [not null]
+  categoria CategoriaFinanceiroLancamento [not null]
+  valor decimal(12, 2) [not null]
+  descricao varchar [not null]
+  data timestamp [not null]
+  observacao varchar
+  departamento_id varchar
+  projeto_id varchar
+  criado_por_id varchar [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, data) [name: 'idx']
+    (tenant_id, tipo, data) [name: 'idx']
+    (tenant_id, categoria) [name: 'idx']
+    (tenant_id, departamento_id, data) [name: 'idx']
+    projeto_id [name: 'idx']
+  }
+}
+
+Table saas_patrimonio_itens {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  nome varchar [not null]
+  categoria CategoriaPatrimonioItem [not null]
+  status StatusPatrimonioItem [not null]
+  quantidade integer [not null]
+  localizacao varchar
+  valor_estimado decimal(12, 2)
+  observacao varchar
+  meta json
+  area_id varchar
+  responsavel_id varchar
+  criado_por_id varchar [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, status) [name: 'idx']
+    (tenant_id, categoria) [name: 'idx']
+    (tenant_id, nome) [name: 'idx']
+    area_id [name: 'idx']
+  }
+}
+
+Table saas_patrimonio_emprestimos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  item_id varchar [not null]
+  user_id varchar [not null]
+  status StatusPatrimonioEmprestimo [not null]
+  foto_saida_url varchar [not null]
+  foto_guarda_url varchar
+  observacao varchar
+  dano_reportado boolean [not null]
+  dano_observacao varchar
+  aberto_em timestamp [not null]
+  devolvido_em timestamp
+  Indexes {
+    (tenant_id, status, aberto_em) [name: 'idx']
+    (item_id, status) [name: 'idx']
+    (user_id, status) [name: 'idx']
+  }
+  Note: 'Empréstimo com evidência fotográfica (saída + guarda na devolução). Colaborador conclui sozinho; gestor audita e pode marcar dano.'
+}
+
+Table saas_bar_categorias {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  nome varchar [not null]
+  slug varchar [not null]
+  ordem integer [not null]
+  ativo boolean [not null]
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, slug) [unique]
+    (tenant_id, sede_id) [name: 'idx']
+  }
+}
+
+Table saas_bar_produtos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  categoria_id varchar
+  nome varchar [not null]
+  descricao varchar
+  preco decimal(10, 2) [not null]
+  custo_medio decimal(10, 2) [not null]
+  estoque integer [not null]
+  estoque_minimo integer
+  imagem_url varchar
+  ativo boolean [not null]
+  destaque boolean [not null]
+  ordem integer [not null]
+  criado_por_id varchar
+  criado_em timestamp [not null]
+  atualizado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, ativo) [name: 'idx']
+    categoria_id [name: 'idx']
+  }
+}
+
+Table saas_bar_vendas {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  comanda_id varchar
+  turno_id varchar
+  operador_id varchar [not null]
+  subtotal decimal(10, 2) [not null]
+  desconto decimal(10, 2) [not null]
+  total decimal(10, 2) [not null]
+  metodo_pagamento MetodoPagamentoBar
+  status StatusVendaBar [not null]
+  gateway_provider varchar
+  gateway_external_id varchar
+  pix_copia_cola varchar
+  pago_em timestamp
+  financeiro_lancamento_id varchar
+  financeiro_estorno_lancamento_id varchar
+  observacao varchar
+  estornado_por_id varchar
+  estornado_em timestamp
+  motivo_estorno varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, criado_em) [name: 'idx']
+    (tenant_id, sede_id, status) [name: 'idx']
+    comanda_id [name: 'idx']
+    turno_id [name: 'idx']
+    gateway_external_id [name: 'idx']
+  }
+}
+
+Table saas_bar_venda_itens {
+  id varchar [pk]
+  venda_id varchar [not null]
+  produto_id varchar
+  produto_nome varchar [not null]
+  quantidade integer [not null]
+  preco_unit decimal(10, 2) [not null]
+  custo_unit decimal(10, 2) [not null]
+  total decimal(10, 2) [not null]
+  Indexes {
+    venda_id [name: 'idx']
+    produto_id [name: 'idx']
+  }
+}
+
+Table saas_bar_fornecedores {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  nome varchar [not null]
+  contato varchar
+  documento varchar
+  observacao varchar
+  ativo boolean [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, ativo) [name: 'idx']
+  }
+}
+
+Table saas_bar_estoque_mov {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  produto_id varchar [not null]
+  tipo TipoMovEstoqueBar [not null]
+  quantidade integer [not null]
+  custo_total decimal(10, 2)
+  motivo varchar
+  venda_id varchar
+  fornecedor_id varchar
+  financeiro_lancamento_id varchar
+  operador_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, produto_id, criado_em) [name: 'idx']
+  }
+}
+
+Table saas_bar_caixa_turnos {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  aberto_em timestamp [not null]
+  fechado_em timestamp
+  aberto_por_id varchar [not null]
+  fechado_por_id varchar
+  sangria decimal(10, 2) [not null]
+  dinheiro_contado decimal(10, 2)
+  observacao varchar
+  dinheiro_esperado decimal(10, 2)
+  diferenca decimal(10, 2)
+  divergencia_alta boolean [not null]
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, fechado_em) [name: 'idx']
+  }
+  Note: 'Turno de caixa do bar por unidade (SEDE/SUBSEDE/PDE). No máximo um turno aberto por unidade (fechadoEm = null) — enforced na aplicação.'
+}
+
+Table saas_bar_comandas {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  codigo varchar [not null]
+  titular_user_id varchar
+  titular_membro_id varchar
+  titular_nome varchar [not null]
+  tipo TipoTitularComandaBar [not null]
+  status StatusComandaBar [not null]
+  limite decimal(10, 2)
+  total decimal(10, 2) [not null]
+  total_pago decimal(10, 2) [not null]
+  desconto decimal(10, 2) [not null]
+  turno_abertura_id varchar
+  turno_fechamento_id varchar
+  aberta_em timestamp [not null]
+  aberta_por_id varchar [not null]
+  fechada_em timestamp
+  fechada_por_id varchar
+  vencimento timestamp
+  pago_em timestamp
+  cancelada_em timestamp
+  motivo_cancelamento varchar
+  observacao varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, status) [name: 'idx']
+    (tenant_id, sede_id, codigo) [name: 'idx']
+    titular_user_id [name: 'idx']
+    titular_membro_id [name: 'idx']
+  }
+  Note: 'Conta aberta do bar (comanda) — acumula lançamentos (BarVenda EM_COMANDA) e fecha com um ou mais pagamentos. Substitui o fluxo de Fiado. Ver docs/data/modulo-bar-comanda.md.'
+}
+
+Table saas_bar_comanda_pagamentos {
+  id varchar [pk]
+  comanda_id varchar [not null]
+  metodo_pagamento MetodoPagamentoBar [not null]
+  valor decimal(10, 2) [not null]
+  recebido_em timestamp [not null]
+  turno_id varchar
+  operador_id varchar [not null]
+  gateway_provider varchar
+  gateway_external_id varchar
+  pix_copia_cola varchar
+  pago_em timestamp
+  status StatusPagamentoComandaBar [not null]
+  financeiro_lancamento_id varchar [unique]
+  criado_em timestamp [not null]
+  Indexes {
+    comanda_id [name: 'idx']
+    turno_id [name: 'idx']
+    gateway_external_id [name: 'idx']
+  }
+}
+
+Table saas_bar_fiados {
+  id varchar [pk]
+  tenant_id varchar [not null]
+  sede_id varchar [not null]
+  venda_id varchar [unique, not null]
+  user_id varchar [not null]
+  membro_id varchar
+  valor decimal(10, 2) [not null]
+  vencimento timestamp [not null]
+  status StatusFiadoBar [not null]
+  pago_em timestamp
+  metodo_pagamento_quitacao MetodoPagamentoBar
+  financeiro_lancamento_id varchar [unique]
+  criado_por_id varchar
+  criado_em timestamp [not null]
+  Indexes {
+    (tenant_id, sede_id, status, vencimento) [name: 'idx']
+    user_id [name: 'idx']
+    membro_id [name: 'idx']
+  }
+  Note: 'Venda a fiado (crédito) vinculada a um membro — quitação gera o lançamento no livro-caixa só quando o débito é pago (ver docs/data/modulo-bar.md).'
+}
+
+// ─── RELAÇÕES ──────────────────────────────────────────────────────────────
+
+Ref: pedidos.produto_id > BotProduto.id
+Ref: saas_tenants.afiliacao_id > saas_afiliacoes.id [delete: set null]
+Ref: saas_tenants.torcida_conhecida_id > saas_torcidas_conhecidas.id [delete: set null]
 Ref: saas_roles.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_roles.departamento_id > saas_departamentos.id [delete: set null]
 Ref: saas_user_roles.user_id > saas_users.id [delete: cascade]
 Ref: saas_user_roles.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_user_roles.role_id > saas_roles.id [delete: cascade]
 Ref: saas_user_permissions.user_id > saas_users.id [delete: cascade]
 Ref: saas_user_permissions.tenant_id > saas_tenants.id [delete: cascade]
-
-// Departamentos
 Ref: saas_departamentos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_departamentos.canal_conversa_id > saas_conversas.id [delete: set null]
 Ref: saas_user_departamentos.user_id > saas_users.id [delete: cascade]
 Ref: saas_user_departamentos.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_user_departamentos.departamento_id > saas_departamentos.id [delete: cascade]
 Ref: saas_departamento_gestores.departamento_id > saas_departamentos.id [delete: cascade]
 Ref: saas_departamento_gestores.user_id > saas_users.id [delete: cascade]
-
-// Membros / sócios
+Ref: saas_departamento_areas.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_departamento_areas.departamento_id > saas_departamentos.id [delete: cascade]
+Ref: saas_departamento_areas.canal_conversa_id > saas_conversas.id [delete: set null]
+Ref: saas_departamento_area_membros.area_id > saas_departamento_areas.id [delete: cascade]
+Ref: saas_departamento_area_membros.user_id > saas_users.id [delete: cascade]
+Ref: saas_projetos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_projetos.departamento_id > saas_departamentos.id [delete: cascade]
+Ref: saas_projetos.area_id > saas_departamento_areas.id [delete: set null]
+Ref: saas_projetos.responsavel_id > saas_users.id [delete: set null]
+Ref: saas_projeto_participantes.projeto_id > saas_projetos.id [delete: cascade]
+Ref: saas_projeto_participantes.user_id > saas_users.id [delete: cascade]
+Ref: saas_membros.plano_associacao_id > saas_planos_associacao.id [delete: set null]
+Ref: saas_membros.sede_id > saas_sedes.id [delete: set null]
+Ref: saas_membros.departamento_id > saas_departamentos.id [delete: set null]
+Ref: saas_membros.departamento_sede_id > saas_departamentos.id [delete: set null]
+Ref: saas_membros.importacao_id > saas_importacoes_membros.id [delete: set null]
+Ref: saas_membros.membro_origem_id > saas_membros.id [delete: set null]
 Ref: saas_membros.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_membros.user_id > saas_users.id
-Ref: saas_membros.sede_id > saas_sedes.id [delete: set null]
-Ref: saas_membros.importacao_id > saas_importacoes_membros.id [delete: set null]
 Ref: saas_importacoes_membros.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_socios.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_socios.user_id > saas_users.id
+Ref: saas_planos_associacao.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_cobrancas_associacao.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_cobrancas_associacao.user_id > saas_users.id [delete: cascade]
+Ref: saas_cobrancas_associacao.membro_id > saas_membros.id [delete: set null]
+Ref: saas_cobrancas_associacao.plano_associacao_id > saas_planos_associacao.id [delete: set null]
+Ref: saas_cobrancas_associacao.evento_id > saas_eventos.id [delete: set null]
+Ref: saas_cobrancas_associacao.criado_por_id > saas_users.id [delete: set null]
 Ref: saas_bloqueados.tenant_id > saas_tenants.id [delete: cascade]
-
-// Sedes (auto-referência + tenant opcional)
 Ref: saas_sedes.tenant_id > saas_tenants.id [delete: set null]
+Ref: saas_sedes.responsavel_user_id > saas_users.id [delete: set null]
 Ref: saas_sedes.sede_id > saas_sedes.id
-
-// Eventos
+Ref: saas_sedes.canal_conversa_id > saas_conversas.id [delete: set null]
+Ref: saas_solicitacoes_unidade.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_solicitacoes_unidade.solicitado_por_id > saas_users.id [delete: set null]
+Ref: saas_solicitacoes_unidade.decidido_por_id > saas_users.id [delete: set null]
+Ref: saas_solicitacoes_unidade.sede_id > saas_sedes.id [delete: set null]
+Ref: saas_solicitacoes_reativacao_canal.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_eventos.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_eventos.sede_id > saas_sedes.id
+Ref: saas_eventos.partida_id > saas_partidas.id [delete: set null]
+Ref: saas_eventos.projeto_id > saas_projetos.id [delete: set null]
 Ref: saas_evento_rsvps.evento_id > saas_eventos.id [delete: cascade]
 Ref: saas_evento_rsvps.user_id > saas_users.id
-
-// Loja
 Ref: saas_categorias.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_categorias.parent_id > saas_categorias.id [delete: set null]
 Ref: saas_cupons.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_produtos.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_produtos.categoria_id > saas_categorias.id [delete: set null]
+Ref: SaasProduto.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_carrinho_itens.user_id > saas_users.id [delete: cascade]
 Ref: saas_carrinho_itens.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_carrinho_itens.produto_id > saas_produtos.id [delete: cascade]
+Ref: saas_carrinho_itens.produto_id > SaasProduto.id [delete: cascade]
 Ref: saas_pedidos.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_pedidos.user_id > saas_users.id
 Ref: saas_pedido_itens.pedido_id > saas_pedidos.id [delete: cascade]
-Ref: saas_pedido_itens.produto_id > saas_produtos.id
-
-// Comunicados
+Ref: saas_pedido_itens.produto_id > SaasProduto.id
+Ref: saas_pedido_tickets.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_pedido_tickets.pedido_id > saas_pedidos.id [delete: cascade]
+Ref: saas_pedido_tickets.conversa_id > saas_conversas.id [delete: restrict]
+Ref: saas_pedido_tickets.atendente_id > saas_users.id [delete: set null]
+Ref: saas_pedido_tickets.fechado_por_id > saas_users.id [delete: set null]
 Ref: saas_announcements.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_announcements.autor_id > saas_users.id
 Ref: saas_announcement_reads.announcement_id > saas_announcements.id [delete: cascade]
 Ref: saas_announcement_reads.user_id > saas_users.id [delete: cascade]
-
-// Comunidade / moderação / auditoria
+Ref: saas_torcidas_conhecidas.afiliacao_id > saas_afiliacoes.id [delete: set null]
+Ref: saas_perfis_torcedor.user_id > saas_users.id [delete: cascade]
+Ref: saas_perfis_torcedor.afiliacao_id > saas_afiliacoes.id [delete: set null]
+Ref: saas_perfis_torcedor.torcida_conhecida_id > saas_torcidas_conhecidas.id [delete: set null]
+Ref: saas_rivalidades_clube.afiliacao_a_id > saas_afiliacoes.id [delete: cascade]
+Ref: saas_rivalidades_clube.afiliacao_b_id > saas_afiliacoes.id [delete: cascade]
+Ref: saas_rivalidades_torcida.tenant_a_id > saas_tenants.id [delete: cascade]
+Ref: saas_rivalidades_torcida.tenant_b_id > saas_tenants.id [delete: cascade]
+Ref: saas_aliancas.tenant_origem_id > saas_tenants.id [delete: cascade]
+Ref: saas_aliancas.tenant_aliado_id > saas_tenants.id [delete: cascade]
+Ref: saas_aliancas.proposta_por_id > saas_users.id
+Ref: saas_aliancas.confirmada_por_id > saas_users.id
+Ref: saas_recomendacoes_alianca.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_posts.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_posts.autor_id > saas_users.id
-Ref: saas_advertencias.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_audit_logs.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_audit_logs.ator_id > saas_users.id
-
-// Salas Meet (WebRTC / LiveKit)
+Ref: saas_posts.post_origem_id > saas_posts.id [delete: set null]
+Ref: saas_posts.comunicado_origem_id > saas_announcements.id [delete: set null]
+Ref: saas_posts.evento_id > saas_eventos.id [delete: set null]
+Ref: saas_posts.conversa_id > saas_conversas.id [delete: set null]
+Ref: saas_perfis_membro.user_id > saas_users.id [delete: cascade]
+Ref: saas_perfis_membro.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_seguimentos.seguidor_id > saas_users.id [delete: cascade]
+Ref: saas_seguimentos.seguido_id > saas_users.id [delete: cascade]
+Ref: saas_seguimentos.tenant_contexto_id > saas_tenants.id [delete: cascade]
+Ref: saas_comentarios.post_id > saas_posts.id [delete: cascade]
+Ref: saas_comentarios.autor_id > saas_users.id [delete: cascade]
+Ref: saas_reacoes.post_id > saas_posts.id [delete: cascade]
+Ref: saas_reacoes.user_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_denuncias.post_id > saas_posts.id [delete: cascade]
+Ref: saas_denuncias.denunciante_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias.resolvido_por_id > saas_users.id
+Ref: saas_enquetes_post.post_id > saas_posts.id [delete: cascade]
+Ref: saas_opcoes_enquete_post.enquete_id > saas_enquetes_post.id [delete: cascade]
+Ref: saas_votos_enquete_post.enquete_id > saas_enquetes_post.id [delete: cascade]
+Ref: saas_votos_enquete_post.opcao_id > saas_opcoes_enquete_post.id [delete: cascade]
+Ref: saas_votos_enquete_post.user_id > saas_users.id [delete: cascade]
+Ref: saas_hashtags.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_post_hashtags.post_id > saas_posts.id [delete: cascade]
+Ref: saas_post_hashtags.hashtag_id > saas_hashtags.id [delete: cascade]
+Ref: saas_post_salvos.user_id > saas_users.id [delete: cascade]
+Ref: saas_post_salvos.post_id > saas_posts.id [delete: cascade]
+Ref: saas_post_salvos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_feed_timeline.viewer_id > saas_users.id [delete: cascade]
+Ref: saas_feed_timeline.post_id > saas_posts.id [delete: cascade]
+Ref: saas_momentos_story.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_momentos_story.user_id > saas_users.id [delete: cascade]
+Ref: saas_perfil_destaques.user_id > saas_users.id [delete: cascade]
+Ref: saas_perfil_destaques.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_perfil_destaque_itens.destaque_id > saas_perfil_destaques.id [delete: cascade]
+Ref: saas_perfil_destaque_itens.post_id > saas_posts.id [delete: cascade]
+Ref: saas_notificacoes.user_id > saas_users.id [delete: cascade]
+Ref: saas_notificacoes.ator_id > saas_users.id [delete: set null]
+Ref: saas_conversas.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_conversas.criado_por_id > saas_users.id [delete: cascade]
+Ref: saas_membros_conversa.conversa_id > saas_conversas.id [delete: cascade]
+Ref: saas_membros_conversa.user_id > saas_users.id [delete: cascade]
+Ref: saas_mensagens_diretas.conversa_id > saas_conversas.id [delete: cascade]
+Ref: saas_mensagens_diretas.autor_id > saas_users.id [delete: cascade]
+Ref: saas_mensagens_diretas.resposta_a_id > saas_mensagens_diretas.id [delete: set null]
+Ref: saas_bloqueios_usuario.bloqueador_id > saas_users.id [delete: cascade]
+Ref: saas_bloqueios_usuario.bloqueado_id > saas_users.id [delete: cascade]
+Ref: saas_membro_bloqueios.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_membro_bloqueios.user_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias_mensagem.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_denuncias_mensagem.mensagem_id > saas_mensagens_diretas.id [delete: cascade]
+Ref: saas_denuncias_mensagem.denunciante_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias_mensagem.resolvido_por_id > saas_users.id
+Ref: saas_partidas.afiliacao_id > saas_afiliacoes.id [delete: cascade]
+Ref: saas_noticias.afiliacao_id > saas_afiliacoes.id [delete: cascade]
+Ref: saas_noticias.curado_por_id > saas_users.id
 Ref: saas_salas_reuniao.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_salas_reuniao.host_id > saas_users.id
 Ref: saas_salas_reuniao.evento_id > saas_eventos.id [delete: set null]
@@ -664,18 +2197,59 @@ Ref: saas_opcoes_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: 
 Ref: saas_votos_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: cascade]
 Ref: saas_votos_enquete_reuniao.opcao_id > saas_opcoes_enquete_reuniao.id [delete: cascade]
 Ref: saas_votos_enquete_reuniao.user_id > saas_users.id [delete: cascade]
-
-// Mensageria (DM e grupos)
-Ref: saas_conversas.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_conversas.criado_por_id > saas_users.id [delete: cascade]
-Ref: saas_membros_conversa.conversa_id > saas_conversas.id [delete: cascade]
-Ref: saas_membros_conversa.user_id > saas_users.id [delete: cascade]
-Ref: saas_mensagens_diretas.conversa_id > saas_conversas.id [delete: cascade]
-Ref: saas_mensagens_diretas.autor_id > saas_users.id [delete: cascade]
-Ref: saas_mensagens_diretas.resposta_a_id > saas_mensagens_diretas.id [delete: set null]
-Ref: saas_bloqueios_usuario.bloqueador_id > saas_users.id [delete: cascade]
-Ref: saas_bloqueios_usuario.bloqueado_id > saas_users.id [delete: cascade]
-Ref: saas_denuncias_mensagem.tenant_id > saas_tenants.id [delete: cascade]
-Ref: saas_denuncias_mensagem.mensagem_id > saas_mensagens_diretas.id [delete: cascade]
-Ref: saas_denuncias_mensagem.denunciante_id > saas_users.id [delete: cascade]
-Ref: saas_denuncias_mensagem.resolvido_por_id > saas_users.id
+Ref: saas_advertencias.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_audit_logs.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_audit_logs.ator_id > saas_users.id
+Ref: saas_financeiro_lancamentos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_financeiro_lancamentos.departamento_id > saas_departamentos.id [delete: set null]
+Ref: saas_financeiro_lancamentos.projeto_id > saas_projetos.id [delete: set null]
+Ref: saas_financeiro_lancamentos.criado_por_id > saas_users.id
+Ref: saas_patrimonio_itens.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_patrimonio_itens.area_id > saas_departamento_areas.id [delete: set null]
+Ref: saas_patrimonio_itens.responsavel_id > saas_users.id [delete: set null]
+Ref: saas_patrimonio_itens.criado_por_id > saas_users.id
+Ref: saas_patrimonio_emprestimos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_patrimonio_emprestimos.item_id > saas_patrimonio_itens.id [delete: cascade]
+Ref: saas_patrimonio_emprestimos.user_id > saas_users.id [delete: cascade]
+Ref: saas_bar_categorias.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_categorias.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_produtos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_produtos.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_produtos.categoria_id > saas_bar_categorias.id [delete: set null]
+Ref: saas_bar_produtos.criado_por_id > saas_users.id [delete: set null]
+Ref: saas_bar_vendas.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_vendas.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_vendas.comanda_id > saas_bar_comandas.id [delete: set null]
+Ref: saas_bar_vendas.turno_id > saas_bar_caixa_turnos.id [delete: set null]
+Ref: saas_bar_vendas.operador_id > saas_users.id [delete: cascade]
+Ref: saas_bar_vendas.estornado_por_id > saas_users.id [delete: set null]
+Ref: saas_bar_venda_itens.venda_id > saas_bar_vendas.id [delete: cascade]
+Ref: saas_bar_venda_itens.produto_id > saas_bar_produtos.id [delete: set null]
+Ref: saas_bar_fornecedores.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_estoque_mov.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_estoque_mov.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_estoque_mov.produto_id > saas_bar_produtos.id [delete: cascade]
+Ref: saas_bar_estoque_mov.venda_id > saas_bar_vendas.id [delete: set null]
+Ref: saas_bar_estoque_mov.fornecedor_id > saas_bar_fornecedores.id [delete: set null]
+Ref: saas_bar_estoque_mov.operador_id > saas_users.id [delete: set null]
+Ref: saas_bar_caixa_turnos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_caixa_turnos.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_caixa_turnos.aberto_por_id > saas_users.id
+Ref: saas_bar_caixa_turnos.fechado_por_id > saas_users.id
+Ref: saas_bar_comandas.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_comandas.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_comandas.titular_user_id > saas_users.id [delete: set null]
+Ref: saas_bar_comandas.titular_membro_id > saas_membros.id [delete: set null]
+Ref: saas_bar_comandas.turno_abertura_id > saas_bar_caixa_turnos.id [delete: set null]
+Ref: saas_bar_comandas.turno_fechamento_id > saas_bar_caixa_turnos.id [delete: set null]
+Ref: saas_bar_comandas.aberta_por_id > saas_users.id [delete: cascade]
+Ref: saas_bar_comandas.fechada_por_id > saas_users.id [delete: set null]
+Ref: saas_bar_comanda_pagamentos.comanda_id > saas_bar_comandas.id [delete: cascade]
+Ref: saas_bar_comanda_pagamentos.turno_id > saas_bar_caixa_turnos.id [delete: set null]
+Ref: saas_bar_comanda_pagamentos.operador_id > saas_users.id [delete: cascade]
+Ref: saas_bar_fiados.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_bar_fiados.sede_id > saas_sedes.id [delete: cascade]
+Ref: saas_bar_fiados.venda_id > saas_bar_vendas.id [delete: cascade]
+Ref: saas_bar_fiados.user_id > saas_users.id [delete: cascade]
+Ref: saas_bar_fiados.membro_id > saas_membros.id [delete: set null]
+Ref: saas_bar_fiados.criado_por_id > saas_users.id [delete: set null]

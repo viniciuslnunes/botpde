@@ -2,12 +2,27 @@
  *  Em produção a key precisa ter Maps JavaScript API + Street View Static + Geocoding.
  */
 
+/** Placeholders de .env.example — truthy mas inválidos (InvalidKeyMapError). */
+function isPlaceholderMapsKey(key: string): boolean {
+  const k = key.trim().toLowerCase()
+  return (
+    !k ||
+    k === 'your_google_maps_api_key' ||
+    k.startsWith('your_') ||
+    k === 'changeme' ||
+    k === 'xxx'
+  )
+}
+
 export function isGoogleMapsConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim())
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  return Boolean(key && !isPlaceholderMapsKey(key))
 }
 
 export function getGoogleMapsApiKey(): string | null {
-  return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null
+  if (!key || isPlaceholderMapsKey(key)) return null
+  return key
 }
 
 export type GoogleMapsRegion = {
@@ -220,7 +235,7 @@ export function buildStreetViewImageUrl(
     fov?: number
   },
 ): string | null {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const key = getGoogleMapsApiKey()
   const location = queryLocal(sede)
   if (!key || !location) return null
   // Street View Static API: máximo 640×640.
@@ -646,7 +661,7 @@ function classificarPrecisaoEndereco(opts: {
 export async function reverseGeocodeRegion(
   coords: { lat: number; lng: number },
 ): Promise<GoogleMapsRegion | null> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const key = getGoogleMapsApiKey()
   if (!key) return null
 
   const params = new URLSearchParams({
@@ -703,7 +718,7 @@ export type GoogleMapsEnderecoReverso = {
 export async function reverseGeocodeEndereco(
   coords: { lat: number; lng: number },
 ): Promise<GoogleMapsEnderecoReverso | null> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const key = getGoogleMapsApiKey()
   if (!key) return null
 
   const params = new URLSearchParams({
@@ -772,7 +787,7 @@ export async function forwardGeocodeRegion(
   cidade: string,
   estado: string,
 ): Promise<GoogleMapsRegion | null> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const key = getGoogleMapsApiKey()
   const cidadeNorm = cidade.trim()
   const estadoNorm = estado.trim().toUpperCase()
   if (!key || !cidadeNorm || !estadoNorm) return null
@@ -798,7 +813,7 @@ const geocodeCache = new Map<string, Promise<{ lat: number; lng: number } | null
 
 /** Geocodifica um endereço livre (com cache em memória por query). */
 export function geocodeLatLng(address: string): Promise<{ lat: number; lng: number } | null> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const key = getGoogleMapsApiKey()
   const addressNorm = address.trim()
   if (!key || !addressNorm) return Promise.resolve(null)
 
