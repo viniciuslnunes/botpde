@@ -207,6 +207,16 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   - Estimativa web: inscritos digitais (IBOPE Top 50) ou “até 10 mil torcedores ou menos”.
   - Plataforma: sócios e torcedores (total + online, ponto verde).
   - Busca por prefixo (`startsWith`) em nome/apelido; dedup `saoMesmoClube`.
+- **Passo região (malha municipal, 2026-08-13):** cidade/UF só valem se existirem na
+  malha do IBGE — e essa malha é **dado versionado no repo**
+  (`apps/web/src/lib/data/municipios-brasil.json`, 27 UFs · 5.571 municípios),
+  não uma chamada de rede por busca. Atualização manual e revisada:
+  `pnpm --filter @torcida/web municipios:atualizar` (`--check` no CI eventual).
+  *Por quê:* o combobox chamava `servicodados.ibge.gov.br` a cada busca com
+  `unstable_cache` de 30 dias, e a falha era engolida como `[]` — um blip de rede
+  virava “Nenhuma cidade encontrada” **cacheado por 30 dias**, travando o passo
+  (e o “Usar minha localização”, que confere a cidade do GPS na mesma lista).
+  A malha muda a cada poucos anos: é referência, não integração.
 - Passo sócio coleta: nome, nº associado, idade, telefone, e-mail, CPF, RG, unidade/sede, imagem-prova;
   telefone/e-mail/CPF/RG são obrigatórios e únicos (lineage da torcida; e-mail único global em `User`).
   **departamento pretendido** (lista `Departamento` do tenant) — grava

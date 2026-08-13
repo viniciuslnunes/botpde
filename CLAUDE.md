@@ -84,6 +84,7 @@ pnpm --filter @torcida/web audit:jornadas       # canais corretos + matriz de va
 pnpm --filter @torcida/db reset:jornadas -- --dry-run  # limpa só o lote de jornadas
 pnpm --filter @torcida/web audit:areas-projetos # áreas de atuação e projetos NÃO concedem permissão
 pnpm --filter @torcida/web audit:achados        # status medido dos achados de ARCHITECTURE §7
+pnpm --filter @torcida/web municipios:atualizar # regenera a malha municipal do IBGE (--check só compara)
 pnpm version:print                              # 1.<commits_main>.<commits_totais> (docs/ops/release.md)
 pnpm release:sync                               # sincroniza package.json + tag a partir do Git
 ```
@@ -330,7 +331,12 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   (3 cores; sem verde/rival forçado; P&B sem virar marrom); nav/badges usam
   `--color-*-fg`. Domínio: `docs/knowledge/identidade-visual-cores.md`;
   spec: `docs/data/modulo-design.md`.
-- **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
+- **Onboarding** — **malha municipal (2026-08-13):** cidade/UF vêm de
+  `apps/web/src/lib/data/municipios-brasil.json` (versionado, 5.571 municípios),
+  nunca da API do IBGE em runtime — a chamada por busca com `unstable_cache` de
+  30 dias transformava blip de rede em "Nenhuma cidade encontrada" permanente.
+  Atualizar com `municipios:atualizar` e commitar o diff.
+  Wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.
 - **Super Admin** — operação da plataforma (`/super-admin`), fora do RBAC por

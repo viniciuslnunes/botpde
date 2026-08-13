@@ -840,7 +840,7 @@ function PassoRegiao({
           setErroLocalizacao('Não conseguimos resolver sua cidade pelo Google Maps. Preencha manualmente.')
           return
         }
-        // Só aceita a cidade se ela existir na lista de municípios do IBGE da UF.
+        // Só aceita a cidade se ela existir na malha municipal do IBGE da UF.
         const cidadesDaUf = await buscarCidadesDaUf(regiao.estado)
         const alvo = normalizarTexto(regiao.cidade)
         const nomeCanonico = cidadesDaUf.find((c) => normalizarTexto(c) === alvo)

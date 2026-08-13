@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:login": "playwright codegen --save-storage=e2e/.auth/user.json http://localhost:3000/entrar",
+    "municipios:atualizar": "node scripts/atualizar-municipios.mjs",
     "seed:jornadas": "vitest run --config vitest.seed.config.ts src/lib/__seed__/jornadas.seed.ts",
     "audit:jornadas": "vitest run --config vitest.audit.config.ts src/lib/__audit__/jornadas.audit.ts",
     "audit:areas-projetos": "vitest run --config vitest.audit.config.ts src/lib/__audit__/areas-projetos.audit.ts",

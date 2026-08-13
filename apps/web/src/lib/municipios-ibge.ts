@@ -1,63 +1,36 @@
-import { cache } from 'react'
-import { unstable_cache } from 'next/cache'
+import 'server-only'
 import { UFS_BRASIL } from '@/lib/onboarding'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { CAPITAL_DA_UF } from '@/lib/regioes-brasil'
-
-type MunicipioIbge = { nome: string }
+import MUNICIPIOS_POR_UF from '@/lib/data/municipios-brasil.json'
 
 export type MunicipioBrasil = { cidade: string; uf: string }
 
 /**
- * Lista os municípios de uma UF via API de localidades do IBGE.
- * Cache de 30 dias por UF (a malha municipal muda raramente).
- * Em UF inválida ou falha de rede/HTTP retorna `[]` — nunca lança.
+ * Malha municipal versionada no repo (`scripts/atualizar-municipios.mjs`), não
+ * consultada em runtime.
+ *
+ * Antes cada busca do passo Região chamava a API do IBGE, com o resultado em
+ * `unstable_cache` por 30 dias. Uma falha de rede era engolida como `[]` e
+ * gravada no cache: a indisponibilidade de um instante virava "Nenhuma cidade
+ * encontrada" permanente, e o onboarding parava. Como a malha muda a cada
+ * poucos anos, o dado é referência — atualiza por deploy, não por requisição.
  */
+const CIDADES_POR_UF: Record<string, string[]> = MUNICIPIOS_POR_UF
+
+/** Municípios de uma UF. UF inválida → `[]`. Nunca falha: dado local. */
 export async function listarMunicipiosPorUf(uf: string): Promise<string[]> {
   const ufUpper = uf.toUpperCase()
   if (!UFS_BRASIL.includes(ufUpper)) return []
-
-  return unstable_cache(
-    async (): Promise<string[]> => {
-      try {
-        const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufUpper}/municipios?orderBy=nome`,
-        )
-        if (!res.ok) return []
-        const municipios = (await res.json()) as MunicipioIbge[]
-        return municipios.map((m) => m.nome)
-      } catch {
-        return []
-      }
-    },
-    ['municipios-uf', ufUpper],
-    { revalidate: 2592000, tags: [`municipios-uf-${ufUpper}`] },
-  )()
+  return CIDADES_POR_UF[ufUpper] ?? []
 }
 
-/**
- * Índice nacional achatado (27 UFs × municípios), reaproveitando o cache por UF.
- * `unstable_cache` (30 dias) + `cache` do React (dedupe por request). Nunca lança.
- */
-export const listarMunicipiosBrasil = cache(async (): Promise<MunicipioBrasil[]> => {
-  return unstable_cache(
-    async (): Promise<MunicipioBrasil[]> => {
-      try {
-        const porUf: MunicipioBrasil[][] = await Promise.all(
-          UFS_BRASIL.map(async (uf): Promise<MunicipioBrasil[]> => {
-            const cidades: string[] = await listarMunicipiosPorUf(uf)
-            return cidades.map((cidade) => ({ cidade, uf }))
-          }),
-        )
-        return porUf.flat()
-      } catch {
-        return []
-      }
-    },
-    ['municipios-brasil'],
-    { revalidate: 2592000, tags: ['municipios-brasil'] },
-  )()
-})
+/** Índice nacional achatado (27 UFs × municípios). */
+export async function listarMunicipiosBrasil(): Promise<MunicipioBrasil[]> {
+  return UFS_BRASIL.flatMap((uf) =>
+    (CIDADES_POR_UF[uf] ?? []).map((cidade) => ({ cidade, uf })),
+  )
+}
 
 type RankedMunicipio = MunicipioBrasil & { rank: number; capital: boolean }
 
