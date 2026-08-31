@@ -63,13 +63,19 @@ export function LojaStoreSwitcher({
           'px-1 py-1',
         ].join(' ')}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[rgb(var(--background-subtle))] ring-1 ring-[rgb(var(--border))]">
-          {atual.logoUrl ? (
-            <LogoImage src={atual.logoUrl} alt={atual.nome} size={40} className="h-10 w-10 object-cover" />
-          ) : (
+        {atual.logoUrl ? (
+          <LogoImage
+            src={atual.logoUrl}
+            alt={atual.nome}
+            size={40}
+            unoptimized
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
             <ShoppingBag className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-          )}
-        </div>
+          </div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{atual.nome}</p>
           <p className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[rgb(var(--foreground-muted))]">
@@ -114,18 +120,19 @@ export function LojaStoreSwitcher({
                         : 'hover:bg-[rgb(var(--background-subtle))]',
                     ].join(' ')}
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[rgb(var(--background-subtle))]">
-                      {loja.logoUrl ? (
-                        <LogoImage
-                          src={loja.logoUrl}
-                          alt={loja.nome}
-                          size={36}
-                          className="h-9 w-9 object-cover"
-                        />
-                      ) : (
+                    {loja.logoUrl ? (
+                      <LogoImage
+                        src={loja.logoUrl}
+                        alt={loja.nome}
+                        size={36}
+                        unoptimized
+                        className="h-9 w-9 shrink-0 object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
                         <ShoppingBag className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
                         {loja.nome}

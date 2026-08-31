@@ -1,10 +1,17 @@
 import Link from 'next/link'
 import { db } from '@torcida/db'
-import { PERMISSIONS, isDepartamentoLegado } from '@torcida/types'
+import {
+  PERMISSIONS,
+  STATUS_PROJETO_ABERTOS,
+  hrefHomeDepartamento,
+  hrefOperacaoAdmin,
+  isDepartamentoLegado,
+  resolverModuloPortalDepartamento,
+} from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { InsightSection, KpiGrid, StatCard } from '@/components/admin/ui'
 import { MiniBarChart } from '@/components/admin/charts'
-import { AlertTriangle, KeyRound, Layers, ShieldCheck, UserMinus, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, KeyRound, Layers, ShieldCheck, UserMinus, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Departamentos · Visão' }
@@ -14,6 +21,7 @@ type DeptoRow = {
   nome: string
   slug: string
   cor: string
+  moduloPortal: string | null
 }
 
 /** Pendência acionável do módulo: o que está organizacionalmente incompleto. */
@@ -35,17 +43,18 @@ export default async function DepartamentosVisaoPage() {
   }
   type VinculoRow = { areaId: string; userId: string; papel: string }
 
-  const [deptosRaw, areas, vinculos, equipeAgg, gestores]: [
+  const [deptosRaw, areas, vinculos, equipeAgg, gestores, projetosAgg]: [
     DeptoRow[],
     AreaRow[],
     VinculoRow[],
     Array<{ departamentoId: string; _count: number }>,
     Array<{ departamentoId: string }>,
+    Array<{ departamentoId: string; _count: number }>,
   ] = await Promise.all([
     db.departamento.findMany({
       where: { tenantId: tenant.id },
       orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-      select: { id: true, nome: true, slug: true, cor: true },
+      select: { id: true, nome: true, slug: true, cor: true, moduloPortal: true },
     }),
     db.departamentoArea.findMany({
       where: { tenantId: tenant.id },
@@ -64,6 +73,11 @@ export default async function DepartamentosVisaoPage() {
       where: { departamento: { tenantId: tenant.id } },
       select: { departamentoId: true },
     }),
+    db.projeto.groupBy({
+      by: ['departamentoId'],
+      where: { tenantId: tenant.id, status: { in: [...STATUS_PROJETO_ABERTOS] } },
+      _count: true,
+    }),
   ])
 
   const deptos = deptosRaw.filter((d) => !isDepartamentoLegado(d))
@@ -72,6 +86,7 @@ export default async function DepartamentosVisaoPage() {
   const areasAtivas = areasDoTenant.filter((a) => a.ativa)
 
   const equipePorDepto = new Map(equipeAgg.map((r) => [r.departamentoId, r._count]))
+  const projetosPorDepto = new Map(projetosAgg.map((r) => [r.departamentoId, r._count]))
   const gestorPorDepto = new Set(gestores.map((g) => g.departamentoId))
 
   const responsaveisPorArea = new Set(
@@ -103,8 +118,8 @@ export default async function DepartamentosVisaoPage() {
     pendencias.push({
       id: `area-${a.id}`,
       titulo: `${a.nome} está sem responsável`,
-      detalhe: `Área ativa em ${depto?.nome ?? 'departamento'} — ninguém responde por ela hoje.`,
-      href: `/admin/departamentos/areas?departamento=${a.departamentoId}`,
+      detalhe: `Área ativa em ${depto?.nome ?? 'departamento'} — nomeie quem responde por ela na lista.`,
+      href: `/admin/departamentos/areas?q=${encodeURIComponent(a.nome)}`,
     })
   }
   for (const d of deptosSemGestor.slice(0, 4)) {
@@ -120,7 +135,7 @@ export default async function DepartamentosVisaoPage() {
       id: `sem-area-${d.id}`,
       titulo: `${d.nome} não tem áreas de atuação`,
       detalhe: 'Rode o seed de áreas canônicas ou crie as frentes de trabalho no portal.',
-      href: `/portal/departamentos/${d.slug}#areas`,
+      href: hrefHomeDepartamento(d.slug, 'areas'),
     })
   }
 
@@ -132,6 +147,27 @@ export default async function DepartamentosVisaoPage() {
       cor: d.cor,
     }))
     .filter((r) => r.valor > 0 || r.valorSecundario > 0)
+
+  const cards = deptos.map((d) => {
+    const ativas = areasAtivas.filter((a) => a.departamentoId === d.id)
+    const moduloKey = resolverModuloPortalDepartamento(d.slug, d.moduloPortal)
+    return {
+      id: d.id,
+      nome: d.nome,
+      slug: d.slug,
+      cor: d.cor,
+      areasAtivas: ativas.length,
+      semResponsavel: ativas.filter((a) => !responsaveisPorArea.has(a.id)).length,
+      pessoas: equipePorDepto.get(d.id) ?? 0,
+      projetosAbertos: projetosPorDepto.get(d.id) ?? 0,
+      temGestor: gestorPorDepto.has(d.id),
+      homeHref: hrefHomeDepartamento(d.slug),
+      areasHref: hrefHomeDepartamento(d.slug, 'areas'),
+      equipeHref: hrefHomeDepartamento(d.slug, 'equipe'),
+      projetosHref: hrefHomeDepartamento(d.slug, 'projetos'),
+      operacaoHref: hrefOperacaoAdmin(moduloKey),
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -175,6 +211,28 @@ export default async function DepartamentosVisaoPage() {
         — área organiza gente, departamento autoriza.
       </p>
 
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Departamentos</h2>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+            Unidade de trabalho. Abra o departamento para gerir áreas, equipe e projetos.
+          </p>
+        </div>
+        {cards.length === 0 ? (
+          <p className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhum departamento nesta torcida.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {cards.map((d) => (
+              <li key={d.id} className="min-w-0">
+                <DeptoResumoCard depto={d} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <InsightSection
         title="Distribuição da torcida"
         description="Pessoas na equipe de cada departamento e quantas áreas de atuação ele mantém ativas."
@@ -204,7 +262,7 @@ export default async function DepartamentosVisaoPage() {
             Pendências de organização
           </h2>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            O que está incompleto na estrutura — nada aqui bloqueia acesso, só qualidade do dado.
+            O que está incompleto na estrutura — clique para resolver no departamento.
           </p>
         </div>
 
@@ -253,5 +311,91 @@ export default async function DepartamentosVisaoPage() {
         )}
       </section>
     </div>
+  )
+}
+
+type DeptoResumo = {
+  nome: string
+  cor: string
+  areasAtivas: number
+  semResponsavel: number
+  pessoas: number
+  projetosAbertos: number
+  temGestor: boolean
+  homeHref: string
+  areasHref: string
+  equipeHref: string
+  projetosHref: string
+  operacaoHref: string | null
+}
+
+function DeptoResumoCard({ depto }: { depto: DeptoResumo }) {
+  const resumo = [
+    `${depto.areasAtivas} ${depto.areasAtivas === 1 ? 'área' : 'áreas'}`,
+    depto.semResponsavel > 0 ? `${depto.semResponsavel} sem responsável` : null,
+    `${depto.pessoas} ${depto.pessoas === 1 ? 'pessoa' : 'pessoas'}`,
+    `${depto.projetosAbertos} ${depto.projetosAbertos === 1 ? 'projeto' : 'projetos'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <article className="flex h-full min-w-0 flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <div className="flex min-w-0 items-start gap-2">
+        <span
+          className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: depto.cor }}
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+            {depto.nome}
+          </h3>
+          {!depto.temGestor && (
+            <span className="mt-1 inline-block rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-warning-fg))]">
+              Sem gestor
+            </span>
+          )}
+        </div>
+      </div>
+
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">{resumo}</p>
+
+      <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <Link
+          href={depto.homeHref}
+          className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-3 text-sm font-medium text-white hover:opacity-90"
+        >
+          Abrir
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+        <Link
+          href={depto.areasHref}
+          className="inline-flex items-center text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] hover:underline"
+        >
+          Áreas
+        </Link>
+        <Link
+          href={depto.equipeHref}
+          className="inline-flex items-center text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] hover:underline"
+        >
+          Equipe
+        </Link>
+        <Link
+          href={depto.projetosHref}
+          className="inline-flex items-center text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] hover:underline"
+        >
+          Projetos
+        </Link>
+        {depto.operacaoHref ? (
+          <Link
+            href={depto.operacaoHref}
+            className="inline-flex items-center text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] hover:underline"
+          >
+            Operação
+          </Link>
+        ) : null}
+      </div>
+    </article>
   )
 }

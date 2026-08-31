@@ -61,6 +61,19 @@ export default async function ClubeDadosPage({
       torcedoresEstimados: true,
       torcedoresEstimadosFonte: true,
       torcedoresEstimadosTipo: true,
+      fundacaoAno: true,
+      estadio: true,
+      estadioCapacidade: true,
+      siteOficial: true,
+      corPrimaria: true,
+      corSecundaria: true,
+      corAcento: true,
+      coresFonte: true,
+      wikidataQid: true,
+      ogolId: true,
+      rncPosicao: true,
+      rncPontos: true,
+      rncEdicao: true,
       criadoEm: true,
       _count: {
         select: {
@@ -134,6 +147,33 @@ export default async function ClubeDadosPage({
     torcedoresEstimadosTipo: clube.torcedoresEstimadosTipo ?? '',
   }
 
+  // Ficha vinda dos seeds de catálogo (CBF, Wikidata, Ogol, escudo). Não entra
+  // no formulário: é dado de fonte externa, com procedência, e a edição manual
+  // dele viraria divergência silenciosa no próximo seed.
+  const ficha: { label: string; valor: string }[] = [
+    clube.fundacaoAno ? { label: 'Fundação', valor: String(clube.fundacaoAno) } : null,
+    clube.estadio
+      ? {
+          label: 'Estádio',
+          valor: clube.estadioCapacidade
+            ? `${clube.estadio} · ${clube.estadioCapacidade.toLocaleString('pt-BR')} lugares`
+            : clube.estadio,
+        }
+      : null,
+    clube.rncPosicao
+      ? {
+          label: `Ranking CBF${clube.rncEdicao ? ` ${clube.rncEdicao}` : ''}`,
+          valor: `${clube.rncPosicao}º · ${(clube.rncPontos ?? 0).toLocaleString('pt-BR')} pts`,
+        }
+      : null,
+    clube.wikidataQid ? { label: 'Wikidata', valor: clube.wikidataQid } : null,
+    clube.ogolId ? { label: 'Ogol', valor: clube.ogolId } : null,
+  ].filter((item): item is { label: string; valor: string } => item !== null)
+
+  const cores = [clube.corPrimaria, clube.corSecundaria, clube.corAcento].filter(
+    (cor): cor is string => Boolean(cor),
+  )
+
   const uso = [
     { label: 'Torcidas na plataforma', valor: raizesAtivas.length },
     { label: 'Torcedores globais', valor: clube._count.torcedores },
@@ -182,6 +222,59 @@ export default async function ClubeDadosPage({
             </p>
           )}
         </section>
+
+        {ficha.length > 0 || cores.length > 0 ? (
+          <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Ficha do clube
+            </h2>
+            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              Preenchida pelos seeds de catálogo (CBF, Wikidata, Ogol). Para atualizar, rode
+              <span className="font-mono"> seed:ficha-clubes</span> — não é campo do formulário.
+            </p>
+            {ficha.length > 0 ? (
+              <dl className="mt-3 space-y-2">
+                {ficha.map((item) => (
+                  <div key={item.label} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-sm text-[rgb(var(--foreground-muted))]">{item.label}</dt>
+                    <dd className="text-right text-sm font-medium text-[rgb(var(--foreground))]">
+                      {item.valor}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {cores.length > 0 ? (
+              <div className="mt-4 border-t border-[rgb(var(--border))] pt-3">
+                <div className="flex items-center gap-2">
+                  {cores.map((cor) => (
+                    <span
+                      key={cor}
+                      title={cor}
+                      style={{ backgroundColor: cor }}
+                      className="h-6 w-6 rounded-full border border-[rgb(var(--border))]"
+                    />
+                  ))}
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {clube.coresFonte === 'escudo:cloudinary'
+                      ? 'derivadas do escudo — revisar'
+                      : 'paleta curada'}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            {clube.siteOficial ? (
+              <a
+                href={clube.siteOficial}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block break-all text-xs font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
+              >
+                {clube.siteOficial}
+              </a>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

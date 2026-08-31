@@ -7,7 +7,7 @@ import {
   resolveTenantNotificacaoMensageria,
 } from '@/lib/mensageria'
 import { assertConversaAccess } from '@/lib/mensageria-api'
-import { criarNotificacao } from '@/lib/notificacoes'
+import { criarNotificacao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { emitMensagemNova } from '@/lib/mensageria-bus'
 
 const acaoSchema = z.object({
@@ -50,6 +50,13 @@ export async function POST(
     const destinatario: { nome: string | null } | null = await db.user.findUnique({
       where: { id: userId },
       select: { nome: true },
+    })
+
+    const tenantNotifDest =
+      (await resolveTenantNotificacaoMensageria(userId)) ?? tenant.id
+    await reconciliarNotificacoesDoEvento(tenantNotifDest, {
+      tipo: 'MENSAGEM_SOLICITACAO_PENDENTE',
+      atorId: conversaMeta.criadoPorId,
     })
 
     if (parsed.data.acao === 'aprovar') {

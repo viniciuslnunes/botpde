@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
@@ -9,6 +9,9 @@ import bundleAnalyzer from '@next/bundle-analyzer'
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 })
+
+// `next dev` define NODE_ENV=development antes de carregar este arquivo.
+const ehDev = process.env.NODE_ENV !== 'production'
 
 const rootDomain = process.env.ROOT_DOMAIN?.trim()
 const serverActionOrigins = [
@@ -42,6 +45,11 @@ function readRootPackageVersion(): string {
 function versionFromGitOrPackage(): string {
   const fromEnv = process.env.NEXT_PUBLIC_APP_VERSION?.trim()
   if (fromEnv) return fromEnv
+
+  // Dev: nada de execSync do git ao carregar o config — são três `git rev-list`
+  // por start, e o valor precisa ser ESTÁVEL de qualquer forma (ver o
+  // comentário de `appPublishedAt`).
+  if (ehDev) return readRootPackageVersion()
 
   try {
     const mainRef = (() => {
@@ -83,8 +91,27 @@ const appCommit =
   process.env.NEXT_PUBLIC_APP_COMMIT?.trim() ||
   process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
   (process.env.NODE_ENV === 'production' ? 'unknown' : 'dev')
+
+/**
+ * Tudo que entra em `env` vira define de TEMPO DE COMPILAÇÃO (config.env →
+ * getNextConfigEnv → define-env.js), logo entra na chave de cache do Turbopack.
+ * Um valor novo a cada `next dev` reescreve a árvore compilada inteira como
+ * entradas novas e deixa as antigas como lixo que só sai em compactação — foi
+ * assim que o cache persistente chegou a 70 GB e passou a dominar o tempo de
+ * compilação de rota. Em dev o carimbo acompanha o package.json (estável entre
+ * restarts, muda só quando a versão muda); em produção segue o instante do build.
+ */
+function publicadoEmDev(): string {
+  try {
+    return statSync(join(repoRoot, 'package.json')).mtime.toISOString()
+  } catch {
+    return new Date(0).toISOString()
+  }
+}
+
 const appPublishedAt =
-  process.env.NEXT_PUBLIC_APP_PUBLISHED_AT?.trim() || new Date().toISOString()
+  process.env.NEXT_PUBLIC_APP_PUBLISHED_AT?.trim() ||
+  (ehDev ? publicadoEmDev() : new Date().toISOString())
 const appRepo =
   process.env.NEXT_PUBLIC_APP_REPO?.trim() ||
   process.env.GITHUB_REPOSITORY?.trim() ||

@@ -20,6 +20,7 @@
 
 - `tenantId`, `nome`, `categoria`, `status`, `quantidade` (≥ 1)
 - `localizacao`, `valorEstimado` (opcional), `observacao`
+- `fotoUrl` (opcional) — foto de catálogo; distinta das evidências de empréstimo
 - `areaId?` → `DepartamentoArea`
 - `responsavelId` (opcional → User), `criadoPorId`, timestamps
 
@@ -52,7 +53,11 @@ Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-d
 
 - Portal: `/portal/patrimonio`
 - Home: `/portal/departamentos/patrimonio`
-- Admin: `/admin/patrimonio`
+- Admin: `/admin/patrimonio` — `AdminTabs` (`?tab=`): **Acervo** (default, cards
+  com `fotoUrl`), Em uso agora, Precisa de você, **Histórico** (baixas e
+  exclusões permanentes: quem / quando, via `AuditLog`); edição/exclusão no
+  modal (unsaved-changes + confirmação). Baixa e exclusão gravam
+  `PATRIMONIO_ITEM_BAIXADO` / `PATRIMONIO_ITEM_EXCLUIDO` na mesma transação.
 - Schemas: `packages/types/src/patrimonio.js`
 - Lib: `apps/web/src/lib/patrimonio.ts`
 

@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CalendarHeart, CalendarRange, PartyPopper, Wallet } from 'lucide-react'
-import { hasPermission, PERMISSIONS } from '@torcida/types'
+import { hasPermission, hrefHomeDepartamento, PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
@@ -39,7 +39,7 @@ async function SocialKpis({
         label="Campanhas abertas"
         value={ops.campanhasAbertas}
         icon={<PartyPopper className="h-5 w-5" />}
-        href={`/portal/departamentos/${ops.departamentoSlug}#projetos`}
+        href={hrefHomeDepartamento(ops.departamentoSlug, 'projetos')}
       />
       <StatCard
         label="Ações (45d)"
@@ -52,7 +52,7 @@ async function SocialKpis({
           value={ops.orcamentosEstourados}
           tone={ops.orcamentosEstourados > 0 ? 'danger' : 'default'}
           icon={<Wallet className="h-5 w-5" />}
-          href={`/portal/departamentos/${ops.departamentoSlug}#projetos`}
+          href={hrefHomeDepartamento(ops.departamentoSlug, 'projetos')}
         />
       ) : (
         <StatCard
@@ -122,8 +122,8 @@ async function SocialHeaderLinks({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoSocial(tenantId, { incluirOrcamento: false })
   return (
     <Link
-      href={`/portal/departamentos/${ops.departamentoSlug}#projetos`}
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+      href={hrefHomeDepartamento(ops.departamentoSlug, 'projetos')}
+      className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
     >
       <PartyPopper className="h-4 w-4" aria-hidden />
       Campanhas no portal
@@ -200,7 +200,7 @@ export default async function AdminSocialPage() {
             </Suspense>
             <Link
               href="/admin/eventos?vista=semana"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
               Agenda da semana

@@ -3,9 +3,11 @@ import { auth } from '@/lib/auth'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import {
+  getCanalDaUnidadeDoVinculo,
   getCanalOficialDaSede,
   getCanalLeituraDireta,
   getCanalPorId,
+  getCanalSeMembroAtivo,
   getPostsDoCanal,
   podePublicarNoCanal,
   resolverChromeCanalMural,
@@ -22,10 +24,10 @@ import {
   carregarCanaisAbertosOperador,
   lerSlugsCanaisAbertosOperador,
 } from '@/lib/operador-canais-abertos'
-import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
 import {
   idsCanaisHierarquiaFixosNaBarra,
   ordemArrastavelSemFixos,
+  slugUnidadePrefixoBarra,
   slugsHierarquiaFixos,
   temUnidadeFixaOperador,
 } from '@/lib/operador-canais-ordem'
@@ -76,7 +78,9 @@ export default async function CanalDetalhePage({
     getUserPermissionsInTenant(session.user.id, viewerTenantId),
     superAdmin || operador
       ? getCanalLeituraDireta(id, session.user.id)
-      : getCanalPorId(id, viewerTenantId, session.user.id),
+      : (await getCanalPorId(id, viewerTenantId, session.user.id)) ??
+        (await getCanalDaUnidadeDoVinculo(id, session.user.id)) ??
+        (await getCanalSeMembroAtivo(id, session.user.id)),
     lerIdsCanaisAbertosSocio(),
     superAdmin ? lerSlugsCanaisAbertosOperador() : Promise.resolve([] as string[]),
   ])
@@ -91,16 +95,38 @@ export default async function CanalDetalhePage({
   const oficialSedeEarly = await getCanalOficialDaSede(torcidaReal.id, session.user.id, {
     leituraOperador: superAdmin || operador,
   })
+  const canaisAbertos = superAdmin
+    ? await carregarCanaisAbertosOperador(slugsOperador, {
+        excluirTenantIds: [torcidaReal.id],
+      })
+    : []
+  const slugUnidadeBarra = slugUnidadePrefixoBarra({
+    slugUnidadeContexto: slugUnidade,
+    slugTorcida,
+    canaisAbertos,
+    raizIdTorcida: torcidaReal.id,
+  })
+  const temUnidadeBarra = temUnidadeFixaOperador({
+    superAdmin,
+    temEscopoUnidade: Boolean(ctx.escopos.unidade || slugUnidadeBarra),
+    slugUnidade: slugUnidadeBarra,
+    atualSlug,
+  })
+  const canalIdUnidadeBarra =
+    temUnidadeBarra && slugUnidadeBarra === slugUnidade
+      ? (ctx.unidade?.canalId ?? null)
+      : null
+  const metaUnidadeBarra = canaisAbertos.find((c) => c.slug === slugUnidadeBarra)
   const idsHierarquiaFixos = idsCanaisHierarquiaFixosNaBarra({
     canalIdTorcida: oficialSedeEarly?.id ?? null,
-    canalIdUnidade: ctx.unidade?.canalId ?? null,
+    canalIdUnidade: canalIdUnidadeBarra,
     superAdmin,
-    temEscopoUnidade: Boolean(ctx.escopos.unidade),
-    slugUnidade,
+    temEscopoUnidade: temUnidadeBarra,
+    slugUnidade: slugUnidadeBarra,
     atualSlug,
   })
 
-  const [podePublicarGate, ehSocio, canaisVisitados, canaisAbertos, chromeFlags, composerCtx, tenantRow] =
+  const [podePublicarGate, ehSocio, canaisVisitados, chromeFlags, composerCtx, tenantRow] =
     await Promise.all([
       podePublicarNoCanal(canal, viewerTenantId, permissoes),
       podeVerFeedSocios(session.user.id, viewerTenantId),
@@ -111,14 +137,6 @@ export default async function CanalDetalhePage({
         idsHierarquiaFixos,
         { leituraOperador: superAdmin || operador },
       ),
-      superAdmin
-        ? (async () => {
-            const lineage = await getTorcidaLineageTenantIds(torcidaReal.id)
-            return carregarCanaisAbertosOperador(slugsOperador, {
-              excluirTenantIds: lineage,
-            })
-          })()
-        : Promise.resolve([] as Awaited<ReturnType<typeof carregarCanaisAbertosOperador>>),
       resolverChromeCanalMural(canal, viewerTenantId, permissoes),
       getComposerContext(viewerTenantId, session.user.id, session.user.name ?? null),
       db.tenant.findUnique({ where: { id: viewerTenantId }, select: { nome: true } }),
@@ -143,14 +161,9 @@ export default async function CanalDetalhePage({
 
   const slugsFixosBarra = slugsHierarquiaFixos({
     slugTorcida,
-    slugUnidade,
+    slugUnidade: slugUnidadeBarra,
     temTorcida: Boolean(slugTorcida),
-    temUnidade: temUnidadeFixaOperador({
-      superAdmin,
-      temEscopoUnidade: Boolean(ctx.escopos.unidade),
-      slugUnidade,
-      atualSlug,
-    }),
+    temUnidade: temUnidadeBarra,
   })
   const ordemBarraMovelInicial = await resolverOrdemBarraMovel({
     slugsOperador: ordemArrastavelSemFixos(
@@ -202,39 +215,49 @@ export default async function CanalDetalhePage({
     seedCanalId: canal.id,
   }
 
+  const ehCanalDaUnidade = Boolean(ctx.unidade && canal.id === ctx.unidade.canalId)
+  const escopoMural = ehCanalDaUnidade ? 'unidade' : 'torcida'
+  const tenantShell = ehCanalDaUnidade && ctx.unidade
+    ? {
+        id: ctx.unidade.tenantId,
+        nome: ctx.unidade.nome,
+        afiliacaoId: torcidaReal.afiliacaoId,
+        balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
+      }
+    : {
+        id: viewerTenantId,
+        nome: torcidaReal.nome,
+        afiliacaoId: torcidaReal.afiliacaoId,
+        balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
+      }
+
   return (
     <CanalSoftSwitchProvider seed={softSeed}>
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ComunidadeFeedShell
-          tenant={{
-            id: viewerTenantId,
-            nome: torcidaReal.nome,
-            afiliacaoId: torcidaReal.afiliacaoId,
-            balancoFinanceiroVisivel: torcidaReal.balancoFinanceiroVisivel,
-          }}
+          tenant={tenantShell}
           currentUser={currentUser}
           filtro="canal"
-          escopo="torcida"
+          escopo={escopoMural}
           escopos={ctx.escopos}
-          nomeUnidade={ctx.unidade?.nome ?? null}
-          logoUnidade={ctx.unidade?.logoUrl ?? null}
+          nomeUnidade={
+            slugUnidadeBarra === slugUnidade
+              ? (ctx.unidade?.nome ?? null)
+              : (metaUnidadeBarra?.nome ?? ctx.unidade?.nome ?? null)
+          }
+          logoUnidade={
+            slugUnidadeBarra === slugUnidade
+              ? (ctx.unidade?.logoUrl ?? null)
+              : (metaUnidadeBarra?.logoUrl ?? ctx.unidade?.logoUrl ?? null)
+          }
           modoContexto={ctx.modo}
           afiliacao={ctx.afiliacao}
           torcidaReal={torcidaReal}
           slugTorcida={slugTorcida}
-          slugUnidade={slugUnidade}
+          slugUnidade={slugUnidadeBarra}
           atualSlug={atualSlug}
           canalIdTorcida={oficialSedeEarly?.id ?? null}
-          canalIdUnidade={
-            temUnidadeFixaOperador({
-              superAdmin,
-              temEscopoUnidade: Boolean(ctx.escopos.unidade),
-              slugUnidade,
-              atualSlug,
-            })
-              ? (ctx.unidade?.canalId ?? null)
-              : null
-          }
+          canalIdUnidade={canalIdUnidadeBarra}
           superAdmin={superAdmin}
           canaisAbertos={canaisAbertos}
           canaisTematicosAbertos={tematicosNaBarra}

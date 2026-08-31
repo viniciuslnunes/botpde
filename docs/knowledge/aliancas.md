@@ -8,8 +8,9 @@
 ## Como ler este arquivo
 
 - **Aliados**: torcidas com aliança pública e estável.
-- **Rivais**: pares que **não** devem ser sugeridos como aliados; usados apenas para
-  moderação/segurança de conteúdo. Nunca gerar conteúdo que incite confronto.
+- **Rivais**: pares que **não** devem ser sugeridos como aliados; alimentam
+  moderação **e** isolamento técnico de visibilidade (desde 2026-07-16).
+  Nunca gerar conteúdo que incite confronto.
 - **Confiança**: alta / média / baixa, conforme a solidez da fonte.
 
 ## Modelo de entrada (template)
@@ -153,6 +154,48 @@ Bola; DOL (consulta 2026-07-10).
 Regra derivada para o produto: pares em blocos opostos (Punho Cruzado × Dedo
 pro Alto; Lado A × Lado B) **nunca** devem aparecer como sugestão de aliança,
 mesmo sem rivalidade direta documentada.
+
+### Política de isolamento (rivais) — 2026-08-26
+
+> Pesquisa de domínio após relato: fluxo rotulado “Afiliações” expondo
+> publicações e busca de **todas** as torcidas, inclusive rivais.
+> Confiança: **alta** no princípio (lei + cultura + spec já fechada);
+> **média** em qual tela exata vazou (homônimo de “afiliação”).
+
+**Regra de ouro:** rival **some do universo de interação** (inexistência
+digital mediada), não “existe mas o post é privado”. O produto já trata
+`resolveVisibility('rival', PUBLICO) === false` — “Rival nunca vê NADA —
+nem o público” (`docs/ops/auditoria-funcional-2026-07.md` Achado 2;
+`packages/types/src/visibility.js`). O padrão operacional de “sumir da
+praça” já existe no **canal restrito** (R5): corte em leitura, bidirecional,
+sem apagar dados (`docs/data/modulo-canal-restrito.md`).
+
+| Superfície | Rivais | Por quê |
+|---|---|---|
+| Feed, busca, permalink, comentário, seguir, DM, salas, loja mesclada | **Inexistência** (404 / zero hits, nunca 403 que confirma) | Cruzamento digital = risco físico + infiltração |
+| Side-channels (“N resultados”, typeahead, contagem de TOs, oráculo de UUID) | **Também isolam** | Contagem e 403 vazam existência |
+| Catálogo de **clubes** no onboarding (`Afiliacao`, grid de escudos) | **Lista nacional** — usuário escolhe o *próprio* time | Sem o catálogo não há direcionamento |
+| Passo **torcida** do onboarding / vitrine CN | Só TOs da **mesma** `Afiliacao` (coirmãs), nunca de clube rival | Recrutamento ≠ diretório nacional de organizadas |
+| Super-admin / seed / knowledge interno | Operação da plataforma | Não é superfície de associado |
+
+**Não reabrir** a decisão 2026-07-11 de `spec-onboarding.md` (“torcedor se
+relaciona livremente até com rivais; só sócio×sócio é bloqueado”). Ela
+conflita com a segregação de 2026-07-16 e com o analogismo da **torcida
+única** em SP (MP-SP, 2016 — `contexto-legal.md`): o Estado já separa
+rivais no estádio após mortes; a plataforma não pode ser o lugar onde se
+reencontram. Ponte para `product-strategy`: alinhar `docs/product/dominio.md`
+(resumo de visibilidade ainda omite `rival`) e o `canFollowUser`
+torcedor×sócio rival.
+
+Homônimo crítico de **“Afiliações”** — três coisas distintas:
+
+1. **`Afiliacao`** = o **time** (entidade global). Comunidade Nacional
+   chaveia por `afiliacaoId`.
+2. **Afiliação territorial** = `SolicitacaoUnidade` (subsede/PDE → Sede);
+   filas `/admin/afiliacoes` e `/super-admin/unidades` (URL antiga
+   `/super-admin/afiliacoes`).
+3. **Aliança** = irmandade **entre torcidas de times diferentes** (opt-in
+   do Presidente). Coirmã = outra TO do **mesmo** time — **não** é aliança.
 
 ## Vocabulário — aliada × co-irmã
 

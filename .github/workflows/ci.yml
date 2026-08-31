@@ -47,6 +47,13 @@ jobs:
       - name: Gerar Prisma Client
         run: pnpm --filter @torcida/db db:generate
 
+      # `db:generate` regrava src/prisma-exports.js a partir do client recém
+      # gerado. Se o commitado divergir, é porque o schema mudou sem regerar —
+      # o diff aparece aqui em vez de virar "X is not exported" em runtime.
+      # Ver docs/ops/dev-local-performance.md § reexport do Prisma.
+      - name: Reexports do Prisma em dia
+        run: git diff --exit-code -- packages/db/src/prisma-exports.js
+
       - name: Typecheck apps/web
         run: pnpm --filter @torcida/web exec tsc --noEmit
         env:
@@ -81,3 +88,8 @@ jobs:
         run: pnpm --filter @torcida/web lint
         env:
           SKIP_ENV_VALIDATION: true
+
+      # Responsividade mobile como invariante, não como auditoria pontual.
+      # Só análise estática: não precisa de app de pé nem de banco.
+      - name: Lint mobile (safe-area + unidades de viewport)
+        run: pnpm --filter @torcida/web lint:mobile

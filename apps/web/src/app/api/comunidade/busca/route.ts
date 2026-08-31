@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
-import { getActiveTenant } from '@/lib/tenant'
+import { assertPodeBuscarNaComunidade } from '@/lib/authz'
 import {
   resolverContextoComunidade,
   resolverEscopoComunidade,
+  resolverTenantIdBuscaComunidade,
 } from '@/lib/comunidade-contexto'
 import { buscarComunidade, type BuscaComunidadeModo } from '@/lib/comunidade-busca'
 
@@ -27,27 +27,13 @@ export async function GET(request: NextRequest) {
     const escopoParam = request.nextUrl.searchParams.get('escopo') ?? undefined
     const escopoDesejado = resolverEscopoComunidade(ctx, escopoParam)
     const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
-
-    let tenantId: string | null = null
-    if (escopo === 'nacional' && ctx.tenantSintetico) {
-      tenantId = ctx.tenantSintetico.id
-    } else if (ctx.modo === 'torcida') {
-      tenantId = ctx.tenant.id
-    } else if (ctx.torcidaReal) {
-      // TORCEDOR na aba Minha torcida — não cair no sintético da CN.
-      tenantId = ctx.torcidaReal.id
-    } else if (ctx.tenantSintetico) {
-      tenantId = ctx.tenantSintetico.id
-    }
+    const tenantId = resolverTenantIdBuscaComunidade(ctx, escopo)
 
     if (!tenantId) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
-    const tenantAtivo = await getActiveTenant(session.user.id, session.user.email)
-    if (tenantAtivo?.id === tenantId) {
-      await assertMembroAtivo(tenantId, session.user.id)
-    }
+    await assertPodeBuscarNaComunidade(tenantId, session.user.id, session.user.email)
 
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
     const modo = resolverModoBusca(request.nextUrl.searchParams.get('modo'))

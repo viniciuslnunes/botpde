@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { listLojasDoSocio, podeVerLojaTenant } from '@/lib/loja-lojas'
+import { listLojasDoSocio, podeGerirLoja, podeVerLojaTenant } from '@/lib/loja-lojas'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { ArrowLeft } from 'lucide-react'
-import { formatNomeTorcida, resolveLojaVitrine } from '@torcida/types'
+import { formatNomeTorcida, resolveLojaVitrine, resolverCapaLoja } from '@torcida/types'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import type { Metadata } from 'next'
 import {
   LojaCatalogoFallback,
@@ -42,8 +43,8 @@ export default async function PortalLojaTenantPage({
 
   if (!(await podeVerLojaTenant(session.user.id, tenantId, session.user.email))) notFound()
 
-  const [lojas, tenantRow, cupomDestaque, produtoDestaque] = await Promise.all([
-    listLojasDoSocio(session.user.id),
+  const [lojas, tenantRow, cupomDestaque, produtoDestaque, podeGerir] = await Promise.all([
+    listLojasDoSocio(session.user.id, session.user.email),
     db.tenant.findFirst({
       where: { id: tenantId, ativo: true },
       select: { nome: true, corPrimaria: true, design: true },
@@ -63,6 +64,7 @@ export default async function PortalLojaTenantPage({
       orderBy: [{ ordem: 'asc' }, { criadoEm: 'desc' }],
       select: { id: true, nome: true, preco: true, imagensUrl: true },
     }),
+    podeGerirLoja(session.user.id, tenantId, session.user.email),
   ])
 
   if (!tenantRow) notFound()
@@ -79,32 +81,33 @@ export default async function PortalLojaTenantPage({
       : `${formatarPreco(cupomDestaque.valor)} off`
     : null
 
-  const multiLoja = lojas.length > 1
   const vitrine = resolveLojaVitrine(tenantRow.design, tenantRow.corPrimaria)
-  const capaUrl =
-    vitrine.bannerUrl ??
-    (vitrine.usarDestaqueComoCapa ? (produtoDestaque?.imagensUrl[0] ?? null) : null)
+  const capa = resolverCapaLoja(
+    vitrine,
+    firstProdutoImagemUrl(produtoDestaque?.imagensUrl ?? null),
+  )
 
   return (
     <>
-      {multiLoja ? (
-        <Link
-          href="/portal/loja"
-          className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Todas as lojas
-        </Link>
-      ) : null}
+      <Link
+        href="/portal/loja"
+        className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Todas as lojas
+      </Link>
 
       <LojaHero
+        tenantId={tenantId}
         nome={nome}
         tipo={lojaResumo?.tipo ?? 'SEDE'}
         cidade={lojaResumo?.cidade ?? null}
         principal={lojaResumo?.principal ?? true}
         logoUrl={lojaResumo?.logoUrl ?? null}
         totalProdutos={totalProdutos}
-        capaUrl={capaUrl}
+        capaUrl={capa.capaUrl}
+        capaCustom={capa.capaCustom}
+        podeGerir={podeGerir}
         cupom={
           cupomDestaque && textoCupom
             ? { codigo: cupomDestaque.codigo, texto: textoCupom }
@@ -116,7 +119,7 @@ export default async function PortalLojaTenantPage({
                 id: produtoDestaque.id,
                 nome: produtoDestaque.nome,
                 precoLabel: formatarPreco(produtoDestaque.preco),
-                imagemUrl: produtoDestaque.imagensUrl[0] ?? null,
+                imagemUrl: firstProdutoImagemUrl(produtoDestaque.imagensUrl),
                 href: `/portal/loja/${tenantId}/${produtoDestaque.id}`,
               }
             : null

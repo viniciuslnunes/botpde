@@ -33,7 +33,7 @@ export default async function AdminBarFornecedoresPage() {
         <h2 className="font-semibold text-[rgb(var(--foreground))]">Fornecedores do bar</h2>
         <Link
           href="/admin/bar/estoque"
-          className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Voltar ao estoque
         </Link>

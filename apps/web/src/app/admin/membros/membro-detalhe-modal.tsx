@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { AnimatePresence, m } from 'motion/react'
+import { m } from 'motion/react'
 import {
   CheckCircle2,
   Circle,
@@ -18,12 +18,9 @@ import { labelPontoReprovacao, PONTOS_REPROVACAO } from '@torcida/types'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
-import {
-  lightboxBackdrop,
-  lightboxContent,
-  springGentle,
-  springSnappy,
-} from '@/lib/motion-presets'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
+import { springSnappy } from '@/lib/motion-presets'
+import { ORIGEM_CANAL_LABEL } from '@/lib/membro-origem'
 import { TabHistorico } from './membro-historico-tab'
 import { TabAcesso } from './membro-acesso-tab'
 import type { AdminMembroItem } from './admin-membro-item'
@@ -112,7 +109,7 @@ function Secao({
       <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         {titulo}
       </h3>
-      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</dl>
+      <dl className="grid grid-cols-1 gap-3 @md/modal:grid-cols-2 @3xl/modal:grid-cols-3">{children}</dl>
     </section>
   )
 }
@@ -133,7 +130,7 @@ function AnexoInline({
       <img
         src={imagemUrl}
         alt={`${titulo} de ${nome}`}
-        className="mx-auto max-h-64 w-auto max-w-full object-contain"
+        className="h-full max-h-56 w-full object-contain @xl/modal:max-h-72"
         onError={(e) => {
           const el = e.currentTarget
           el.style.display = 'none'
@@ -242,7 +239,7 @@ function Checklist({ itens, titulo }: { itens: CheckItem[]; titulo?: string }) {
           ) : null}
         </p>
       </div>
-      <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-1.5 @md/modal:grid-cols-2 @3xl/modal:grid-cols-3">
         {itens.map((item) => (
           <li
             key={item.id}
@@ -442,7 +439,7 @@ function TabResumo({
           {!!membro.reprovacoesOutraTorcida && (
             <p className="inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-2.5 py-1.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
               <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-              Reprovado em recrutamento de outra torcida (
+              Reprovado em torcida rival (
               {membro.reprovacoesOutraTorcida}x)
             </p>
           )}
@@ -635,7 +632,7 @@ function TabDocumentos({
     <div className="space-y-5">
       <Checklist itens={docs} />
       {temAnexo ? (
-        <div className="space-y-4">
+        <div className="grid gap-4 @xl/modal:grid-cols-2 @4xl/modal:grid-cols-3">
           {membro.imagemProva && (
             <AnexoInline
               imagemUrl={membro.imagemProva}
@@ -776,6 +773,16 @@ function TabOperacao({ membro, rep }: { membro: AdminMembroItem; rep: Set<string
               : 'Cadastro orgânico'
           }
         />
+        <Campo
+          label="Canal de entrada"
+          value={
+            membro.origemCanal
+              ? ORIGEM_CANAL_LABEL[membro.origemCanal]
+              : membro.importacaoId
+                ? ORIGEM_CANAL_LABEL.importacao
+                : null
+          }
+        />
         <Campo label="Atualizado em" value={membro.atualizadoEmLabel} />
       </Secao>
       <Secao titulo="Histórico operacional">
@@ -839,20 +846,6 @@ export function MembroDetalheModal({
     else if (trocouMembro) setTab('resumo')
   }
 
-  useEffect(() => {
-    if (!membro) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [membro, onClose])
-
   const pontosReprovados = new Set(membro?.reprovacao?.pontos ?? [])
   const checks = membro ? marcarReprovados(checklistCadastro(membro), pontosReprovados) : []
   const docs = membro ? marcarReprovados(checklistDocumentos(membro), pontosReprovados) : []
@@ -910,31 +903,15 @@ export function MembroDetalheModal({
   ]
 
   return (
-    <AnimatePresence>
-      {membro && (
-        <m.div
-          key={membro.id}
-          variants={lightboxBackdrop}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
-          role="presentation"
-          onClick={onClose}
-        >
-          <m.div
-            variants={lightboxContent}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            transition={springGentle}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`membro-detalhe-titulo-${membro.id}`}
-            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <AppModal
+      open={!!membro}
+      onClose={onClose}
+      size="xl"
+      height="frame"
+      labelledBy={membro ? `membro-detalhe-titulo-${membro.id}` : undefined}
+    >
+      {membro ? (
+        <>
             {/* Cabeçalho sticky */}
             <div className="shrink-0 border-b border-[rgb(var(--border))]">
               <div className="flex items-start justify-between gap-3 px-4 py-4 sm:px-5">
@@ -1066,7 +1043,7 @@ export function MembroDetalheModal({
             </div>
 
             {/* Corpo */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <AppModalBody className="px-4 py-4 sm:px-5">
               {tab === 'resumo' && (
                 <TabResumo
                   membro={membro}
@@ -1084,7 +1061,7 @@ export function MembroDetalheModal({
                 <TabAcesso key={membro.id} membroId={membro.id} />
               )}
               {tab === 'historico' && <TabHistorico key={membro.id} membroId={membro.id} />}
-            </div>
+            </AppModalBody>
 
             {/* Rodapé */}
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
@@ -1118,9 +1095,8 @@ export function MembroDetalheModal({
                 ]}
               />
             </div>
-          </m.div>
-        </m.div>
-      )}
-    </AnimatePresence>
+        </>
+      ) : null}
+    </AppModal>
   )
 }

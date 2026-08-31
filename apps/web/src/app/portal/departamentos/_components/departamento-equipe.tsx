@@ -13,6 +13,7 @@ import {
 import { useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { AvatarFoto } from '@/components/media/avatar-foto'
+import { classeFocoCard, useFocoCard } from './departamento-foco'
 
 export type MembroEquipe = {
   userId: string
@@ -59,6 +60,7 @@ function PessoaCard({
   podeGerirAreas,
   departamentoId,
   slug,
+  foco,
 }: {
   membro: MembroEquipe
   roleLabel: string
@@ -68,14 +70,22 @@ function PessoaCard({
   podeGerirAreas?: boolean
   departamentoId: string
   slug: string
+  foco?: boolean
 }) {
   const nome = rotuloPessoa(membro)
   const areasDaPessoa = (areas ?? []).filter((a) => membro.areaIds?.includes(a.id))
   const areasDisponiveis = (areas ?? []).filter((a) => !membro.areaIds?.includes(a.id))
+  const focoRef = useFocoCard(Boolean(foco))
 
   return (
     <div
-      className="flex min-w-[12rem] max-w-[16rem] flex-col gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm"
+      ref={focoRef}
+      id={`pessoa-${membro.userId}`}
+      aria-current={foco ? 'true' : undefined}
+      className={[
+        'flex min-w-[12rem] max-w-[16rem] flex-col gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm',
+        classeFocoCard(Boolean(foco)),
+      ].join(' ')}
       style={{ borderColor: `${accent}66` }}
     >
       <div className="flex items-center gap-2.5">
@@ -236,6 +246,7 @@ export function DepartamentoEquipe({
   isGestor,
   currentUserId,
   areas = [],
+  focoPessoaId,
 }: {
   departamentoId: string
   slug: string
@@ -247,6 +258,8 @@ export function DepartamentoEquipe({
   currentUserId: string
   /** Áreas do departamento — habilita o filtro por chips e os badges por pessoa. */
   areas?: AreaFiltro[]
+  /** Deep-link `?pessoa=` — destaca o card da pessoa. */
+  focoPessoaId?: string
 }) {
   const [filtroAreaId, setFiltroAreaId] = useState<string | null>(null)
   const membrosFiltrados = useMemo(
@@ -338,6 +351,7 @@ export function DepartamentoEquipe({
                     podeGerirAreas={isGestor}
                     departamentoId={departamentoId}
                     slug={slug}
+                    foco={m.userId === focoPessoaId}
                   />
                 ))}
               </div>
@@ -361,6 +375,7 @@ export function DepartamentoEquipe({
                     podeGerirAreas={isGestor}
                     departamentoId={departamentoId}
                     slug={slug}
+                    foco={m.userId === focoPessoaId}
                     action={
                       isGestor && m.userId !== currentUserId ? (
                         <RemoverMembroButton

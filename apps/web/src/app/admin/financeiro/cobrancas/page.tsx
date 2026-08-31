@@ -13,7 +13,7 @@ import { getPixProvider } from '@/lib/pix-gateway'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import {
   AdminCreateDisclosure,
-  AdminTabs,
+  AdminPendingTabs,
   adminTabIds,
   InsightSection,
   StatCard,
@@ -177,7 +177,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
         </AdminCreateDisclosure>
       ) : null}
 
-      <AdminTabs
+      <AdminPendingTabs
         tabs={STATUS_FILTROS.map((f) => ({
           id: f.value,
           label: f.label,

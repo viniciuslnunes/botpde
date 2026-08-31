@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { assertPermission, assertAnyPermission } from '@/lib/authz'
 import { garantirLancamentoFinanceiroPedido } from '@/lib/loja-financeiro'
 import { atenderTicket, fecharTicket, fecharTicketPorStatusPedido } from '@/lib/loja-ticket'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarSafe, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import {
   PERMISSIONS,
   CategoriaSchema,
@@ -436,6 +436,10 @@ export async function atualizarStatusPedido(
       }
       const notificacao = notificacaoPorStatus[statusNovo]
       if (notificacao) {
+        await reconciliarNotificacoesDoEvento(tenant.id, {
+          tipo: 'PEDIDO_RECEBIDO',
+          atorId: pedido.userId,
+        })
         await notificarSafe({
           userId: pedido.userId,
           tenantId: tenant.id,

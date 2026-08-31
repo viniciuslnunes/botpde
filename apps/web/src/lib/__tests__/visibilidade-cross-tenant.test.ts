@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canViewRecurso, relationFromLineage, resolveVisibility, SENSIBILIDADE } from '@torcida/types'
+import {
+  canViewRecurso,
+  podeDescobrirTorcida,
+  relationFromLineage,
+  resolveVisibility,
+  SENSIBILIDADE,
+} from '@torcida/types'
 
 describe('resolveVisibility', () => {
   it('self sempre vê, mesmo recurso restrito', () => {
@@ -24,6 +30,30 @@ describe('resolveVisibility', () => {
     expect(resolveVisibility('allied', SENSIBILIDADE.PUBLICO)).toBe(true)
     expect(resolveVisibility('allied', SENSIBILIDADE.RESTRITO)).toBe(false)
   })
+
+  it('rival não vê nada — nem recurso público', () => {
+    expect(resolveVisibility('rival', SENSIBILIDADE.PUBLICO)).toBe(false)
+    expect(resolveVisibility('rival', SENSIBILIDADE.RESTRITO)).toBe(false)
+    expect(canViewRecurso('rival', 'comunidade')).toBe(false)
+    expect(canViewRecurso('rival', 'memoria')).toBe(false)
+    expect(canViewRecurso('rival', 'loja')).toBe(false)
+    expect(canViewRecurso('rival', 'eventos')).toBe(false)
+    expect(canViewRecurso('rival', 'membros')).toBe(false)
+  })
+})
+
+describe('podeDescobrirTorcida', () => {
+  it('rival é inexistente — nem a vitrine pública', () => {
+    expect(podeDescobrirTorcida('rival')).toBe(false)
+  })
+
+  it('hierarquia e aliados descobrem; unrelated pode avaliar aliança', () => {
+    expect(podeDescobrirTorcida('self')).toBe(true)
+    expect(podeDescobrirTorcida('ancestor')).toBe(true)
+    expect(podeDescobrirTorcida('descendant')).toBe(true)
+    expect(podeDescobrirTorcida('allied')).toBe(true)
+    expect(podeDescobrirTorcida('unrelated')).toBe(true)
+  })
 })
 
 describe('canViewRecurso', () => {
@@ -47,6 +77,7 @@ describe('canViewRecurso', () => {
   it('tenant aliado vê recursos públicos, mas não vê dados restritos', () => {
     expect(canViewRecurso('allied', 'eventos')).toBe(true)
     expect(canViewRecurso('allied', 'loja')).toBe(true)
+    expect(canViewRecurso('allied', 'memoria')).toBe(true)
     expect(canViewRecurso('allied', 'membros')).toBe(false)
     expect(canViewRecurso('allied', 'socios')).toBe(false)
   })

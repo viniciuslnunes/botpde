@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getActiveTenant } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import { baixarCobrancaComoPaga } from '@/lib/cobrancas'
 import { assinarWebhookMock, getPixProvider, verificarWebhookMock } from '@/lib/pix-gateway'
 
@@ -16,8 +17,9 @@ export async function confirmarPixMock(cobrancaId: string): Promise<PortalCobran
   const session = await auth()
   if (!session?.user?.id) return { error: 'Não autorizado' }
 
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) return { error: 'Torcida não encontrada' }
+  const ativo = await getActiveTenant(session.user.id, session.user.email)
+  if (!ativo) return { error: 'Torcida não encontrada' }
+  const tenant = await carregarTenantCarteirinha(ativo, session.user.id)
 
   if (getPixProvider() !== 'mock') {
     return { error: 'Confirmação manual só disponível no modo mock' }

@@ -2,6 +2,9 @@
  * Resolve estimativa de torcedores/inscritos por clube (offline).
  *
  * Prioridade:
+ * 0. PESQUISA — Datafolha × base populacional do IBGE. É a única fonte que
+ *    responde "quantos TORCEDORES", então ganha do IBOPE (que mede seguidor de
+ *    rede social). Cobre ~17 clubes; ver `torcedores-pesquisa-datafolha.js`.
  * 1. IBOPE Repucom — total publicado no Ranking Digital (Top 50)
  * 2. Top 50 sem total publicado — piso do ranking (menor total IBOPE publicado)
  * 3. Fora do Top 50 — teto = **menor valor conhecido na base curada** (LIMITE_ATE)
@@ -19,6 +22,8 @@ import {
   IBOPE_RANKING_DIGITAL,
   indiceIbopeDigital,
 } from './ibope-ranking-digital.js'
+import { DATAFOLHA_REFERENCIA, TORCEDORES_PESQUISA } from './torcedores-pesquisa-datafolha.js'
+import { chaveGrupoClube } from './afiliacoes-normalize.js'
 
 const FONTE_IBOPE_PISO = `${FONTE_IBOPE_BASE} — integrante do Top 50 (total exato pendente de coleta; piso = menor publicado: 471,6 mil inscritos)`
 
@@ -41,14 +46,50 @@ export function fonteLimiteDesconhecido() {
   return 'Fora do Top 50 IBOPE Repucom; não há dado publicado de inscritos digitais para este clube'
 }
 
+/** Índice memoizado da pesquisa Datafolha: `chaveGrupoClube` → linha. */
+let cachePesquisa = null
+
+/** @returns {Map<string, import('./torcedores-pesquisa-datafolha.js').TorcedorPesquisaSeed>} */
+export function indicePesquisa() {
+  if (cachePesquisa) return cachePesquisa
+  cachePesquisa = new Map(
+    TORCEDORES_PESQUISA.map((linha) => [chaveGrupoClube(linha.nome, linha.uf), linha]),
+  )
+  return cachePesquisa
+}
+
 /**
- * @typedef {'IBOPE_DIGITAL' | 'LIMITE_ATE'} TorcedoresEstimadosTipo
+ * A fonte precisa carregar a ressalva: percentual dentro da margem de erro vira
+ * ordem de grandeza, não medição.
+ * @param {import('./torcedores-pesquisa-datafolha.js').TorcedorPesquisaSeed} linha
+ * @returns {string}
+ */
+export function fontePesquisa(linha) {
+  const base =
+    `Datafolha ${DATAFOLHA_REFERENCIA.coletaEm.replace('/', ' e ')} ` +
+    `(${linha.percentual}% dos brasileiros de 16+, margem ±${DATAFOLHA_REFERENCIA.margemErroPontos} p.p.) ` +
+    '× população 16+ do Censo 2022 (IBGE)'
+  return linha.dentroDaMargem ? `${base} — percentual dentro da margem: ordem de grandeza` : base
+}
+
+/**
+ * @typedef {'PESQUISA' | 'IBOPE_DIGITAL' | 'LIMITE_ATE'} TorcedoresEstimadosTipo
  * @typedef {{ valor: number, tipo: TorcedoresEstimadosTipo, fonte: string, posicao: number | null }} TorcedoresEstimadosResolvido
  */
 
 /** @param {string} chave chaveGrupoClube(nome, uf) */
 /** @returns {TorcedoresEstimadosResolvido} */
 export function resolverTorcedoresEstimados(chave) {
+  const pesquisa = indicePesquisa().get(chave)
+  if (pesquisa) {
+    return {
+      valor: pesquisa.torcedores,
+      tipo: 'PESQUISA',
+      fonte: fontePesquisa(pesquisa),
+      posicao: null,
+    }
+  }
+
   const ibope = indiceIbopeDigital().get(chave)
   if (ibope) {
     return {

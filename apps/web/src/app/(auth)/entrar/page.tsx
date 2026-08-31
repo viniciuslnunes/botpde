@@ -22,7 +22,7 @@ export default async function EntrarPage({
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
   return (
-    <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
+    <div className="app-shell-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-4">
       {tenant ? (
         <TenantDesignBridge corPrimaria={tenant.corPrimaria} design={tenant.design} />
       ) : null}

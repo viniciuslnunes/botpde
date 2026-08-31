@@ -20,7 +20,9 @@ import { NavbarBrandOverrideProvider } from '@/lib/navbar-brand-override'
 import { ModoOperadorProvider } from '@/lib/modo-operador'
 import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
+import { resolverTenantCarteirinhaId } from '@/lib/associacao-escopo-server'
 import { PendenciasCadastroModal } from '@/components/portal/pendencias-cadastro-modal'
+import { resolverCtaAssocieSeNavbar } from '@/lib/associe-se'
 
 export default async function PortalLayout({
   children,
@@ -129,15 +131,18 @@ export default async function PortalLayout({
         ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
         : null
 
-  const [avatarUrl, userName, pendenciasSnap] = await Promise.all([
+  const [avatarUrl, userName, pendenciasSnap, associeSe] = await Promise.all([
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
     ctx.modo === 'torcida' && !isSuperAdmin
-      ? carregarPendenciasCadastro(ctx.tenant.id, session.user.id).catch((err: unknown) => {
-          console.error('[portal/layout] pendencias cadastro', err)
-          return null
-        })
+      ? resolverTenantCarteirinhaId(ctx.tenant.id, session.user.id)
+          .then((tenantId) => carregarPendenciasCadastro(tenantId, session.user.id))
+          .catch((err: unknown) => {
+            console.error('[portal/layout] pendencias cadastro', err)
+            return null
+          })
       : Promise.resolve(null),
+    isSuperAdmin ? Promise.resolve(null) : resolverCtaAssocieSeNavbar(session.user.id),
   ])
 
   const navbar = (
@@ -155,11 +160,13 @@ export default async function PortalLayout({
       tenantSlugAtual={hostTenant?.slug ?? null}
       escopoCanal={escopoCanal}
       brandCanal={brandCanal}
+      associeSe={associeSe}
+      isSuperAdmin={isSuperAdmin}
     />
   )
 
   return (
-    <div className="app-shell-bg min-h-screen">
+    <div className="app-shell-bg min-h-dvh">
       {designBridgeProps ? (
         <TenantDesignBridge
           corPrimaria={designBridgeProps.corPrimaria}

@@ -19,6 +19,20 @@ export const DEFAULT_CROP_VIEWPORT: CropViewport = {
   offsetY: 0,
 }
 
+/**
+ * Proporção da capa da loja — crop e cards (`aspect-[16/9]`) precisam coincidir.
+ */
+export const LOJA_CAPA_ASPECT = 16 / 9
+
+/** Tamanho inicial do frame (antes do ResizeObserver) no mesmo aspecto do CSS. */
+export function cropFrameSizeForAspect(
+  aspect: number,
+  width = 320,
+): { w: number; h: number } {
+  if (!(aspect > 0) || !(width > 0)) return { w: 320, h: 180 }
+  return { w: width, h: width / aspect }
+}
+
 export function clampCropZoom(zoom: number): number {
   return Math.min(MAX_CROP_ZOOM, Math.max(MIN_CROP_ZOOM, zoom))
 }

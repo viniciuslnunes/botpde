@@ -26,32 +26,35 @@ import {
   ACTION_TOKEN_HINTS,
   ACTION_TOKEN_KEYS,
   ACTION_TOKEN_LABELS,
+  CONTRASTE_AA,
+  CONTRASTE_AA_GRANDE,
   DEFAULT_ACTIONS,
   DEFAULT_ACTIONS_FG,
   DEFAULT_BRAND_FG,
-  DEFAULT_SURFACE_DARK,
-  DEFAULT_SURFACE_LIGHT,
   SURFACE_TOKEN_KEYS,
   SURFACE_TOKEN_LABELS,
+  aplicarMarcaAoDesign,
   aplicarPaletaAoDesign,
   capturarPaletaDoDesign,
   contrasteRatio,
   contrasteTextoSobre,
   customPaletteParaSugerida,
-  derivarAcoesDaMarca,
   gerarPaletasSugeridas,
   isCorPadraoPlataforma,
   mixHex,
   paletaDoClube,
+  paletaTemContrasteOk,
   resolveActionTextColors,
   resolveTenantDesign,
+  resolverSuperficies,
+  sanearContrasteDoDesign,
 } from '@torcida/types'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { runPersistAction } from '@/lib/toast-action'
 import { extrairPaletaDeImagem } from '@/lib/extrair-paleta'
 import { restaurarDesignPadrao, salvarDesignTenant } from '@/app/admin/(plataforma)/design/actions'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@torcida/ui/services/theme'
 import {
   DesignStudioPreview,
   type PreviewMode,
@@ -90,9 +93,7 @@ const SECTIONS: { id: EditorSection; label: string; icon: typeof Palette }[] = [
 ]
 
 function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
-  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
-  const overrides = mode === 'dark' ? design.dark : design.light
-  return { ...defaults, ...overrides }
+  return resolverSuperficies(design, mode)
 }
 
 function secondaryHexOf(design: TenantDesign): string {
@@ -127,8 +128,8 @@ function buildContrastChecksForMode(
     brandFg.secondary,
     s.surface,
   )
-  const primarySoftBg = mixHex(s.surface, design.brand.primary, 0.14)
-  const secondarySoftBg = mixHex(s.surface, secondaryHex, 0.14)
+  const primarySoftBg = mixHex(s.surface, primaryText.fill, 0.14)
+  const secondarySoftBg = mixHex(s.surface, secondaryText.fill, 0.14)
   const tema = mode === 'dark' ? 'escuro' : 'claro'
 
   const pairs: {
@@ -191,8 +192,8 @@ function buildContrastChecksForMode(
       id: 'primary-btn',
       label: 'Botão primário',
       fg: primaryText.on,
-      bg: design.brand.primary,
-      min: 4.5,
+      bg: primaryText.fill,
+      min: CONTRASTE_AA,
       tip: 'Ajuste a primária ou o texto da primária.',
     },
     {
@@ -200,15 +201,15 @@ function buildContrastChecksForMode(
       label: 'Menu / tab ativo',
       fg: primaryText.fg,
       bg: primarySoftBg,
-      min: 3,
+      min: CONTRASTE_AA_GRANDE,
       tip: 'Texto de abas some — use Automático ou outra cor de texto.',
     },
     {
       id: 'secondary-btn',
       label: 'Botão secundário',
       fg: secondaryText.on,
-      bg: secondaryHex,
-      min: 4.5,
+      bg: secondaryText.fill,
+      min: CONTRASTE_AA,
       tip: 'Secundária clara precisa de texto escuro (e vice-versa).',
     },
     {
@@ -216,7 +217,7 @@ function buildContrastChecksForMode(
       label: 'Badge / link secundário',
       fg: secondaryText.fg,
       bg: secondarySoftBg,
-      min: 3,
+      min: CONTRASTE_AA_GRANDE,
       tip: 'Badge soft ou link da secundária ilegível neste tema.',
     },
   ]
@@ -235,22 +236,21 @@ function buildContrastChecksForMode(
   for (const key of ACTION_TOKEN_KEYS) {
     const fill = actions[key]
     const text = resolveActionTextColors(fill, actionsFg[key], s.surface)
-    const softBg = mixHex(s.surface, fill, 0.14)
     pairs.push(
       {
         id: `${key}-btn`,
         label: `Botão ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
         fg: text.on,
-        bg: fill,
-        min: 3,
+        bg: text.fill,
+        min: CONTRASTE_AA,
         tip: `Ajuste a cor ou o texto de ${ACTION_TOKEN_LABELS[key]}.`,
       },
       {
         id: `${key}-soft`,
         label: `Badge ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
         fg: text.fg,
-        bg: softBg,
-        min: 3,
+        bg: mixHex(s.surface, text.fill, 0.14),
+        min: CONTRASTE_AA_GRANDE,
         tip: `Badge soft ilegível no tema ${tema}. Use Automático ou outra cor.`,
       },
     )
@@ -283,20 +283,21 @@ function dualThemeTextStatus(
   design: TenantDesign,
   fill: string,
   fgOverride: string | null,
-): { mode: PreviewMode; softOk: boolean; btnOk: boolean; softRatio: number; btnRatio: number; text: ReturnType<typeof resolveActionTextColors>; softBg: string; surface: string }[] {
+): { mode: PreviewMode; softOk: boolean; btnOk: boolean; softRatio: number; btnRatio: number; text: ReturnType<typeof resolveActionTextColors>; fill: string; softBg: string; surface: string }[] {
   return (['light', 'dark'] as const).map((mode) => {
     const s = resolveSurfaces(design, mode)
     const text = resolveActionTextColors(fill, fgOverride, s.surface)
-    const softBg = mixHex(s.surface, fill, 0.14)
+    const softBg = mixHex(s.surface, text.fill, 0.14)
     const softRatio = contrasteRatio(text.fg, softBg)
-    const btnRatio = contrasteRatio(text.on, fill)
+    const btnRatio = contrasteRatio(text.on, text.fill)
     return {
       mode,
-      softOk: softRatio >= 3,
-      btnOk: btnRatio >= 4.5,
+      softOk: softRatio >= CONTRASTE_AA_GRANDE,
+      btnOk: btnRatio >= CONTRASTE_AA,
       softRatio,
       btnRatio,
       text,
+      fill: text.fill,
       softBg,
       surface: s.surface,
     }
@@ -544,12 +545,33 @@ function PaletaCard({
     nome: string
     descricao: string
     swatches: string[]
+    primary?: string
+    secondary?: string
+    actions?: {
+      success: string
+      danger: string
+      warning: string
+      info: string
+    }
   }
   badge?: string
   applyLabel?: string
   onApply: () => void
   onRemove?: () => void
 }) {
+  const contrasteOk =
+    paleta.primary && paleta.secondary && paleta.actions
+      ? paletaTemContrasteOk({
+          id: paleta.id,
+          nome: paleta.nome,
+          descricao: paleta.descricao,
+          primary: paleta.primary,
+          secondary: paleta.secondary,
+          actions: paleta.actions,
+          swatches: paleta.swatches,
+          fonte: 'atual',
+        })
+      : null
   return (
     <div className="group relative rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:border-[rgb(var(--border-strong))] hover:bg-[rgb(var(--background-subtle))]">
       <button type="button" onClick={onApply} className="w-full text-left">
@@ -562,6 +584,11 @@ function PaletaCard({
               {badge ? (
                 <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
                   {badge}
+                </span>
+              ) : null}
+              {contrasteOk === true ? (
+                <span className="rounded-md bg-[rgb(var(--color-info)_/_0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--color-info-fg))]">
+                  Claro+escuro
                 </span>
               ) : null}
             </div>
@@ -615,7 +642,13 @@ function PaletaCard({
   )
 }
 
-function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
+function ContrastPanel({
+  checks,
+  onFix,
+}: {
+  checks: ContrastCheck[]
+  onFix?: () => void
+}) {
   const fails = checks.filter((c) => !c.ok)
   const lightFails = fails.filter((c) => c.mode === 'light').length
   const darkFails = fails.filter((c) => c.mode === 'dark').length
@@ -652,6 +685,15 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
               ? `${fails.length} contraste${fails.length > 1 ? 's' : ''} fraco${fails.length > 1 ? 's' : ''} — claro: ${lightFails}, escuro: ${darkFails}`
               : 'Contraste OK nos temas claro e escuro'}
           </p>
+          {fails.length > 0 && onFix ? (
+            <button
+              type="button"
+              onClick={onFix}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500/25 dark:text-amber-100"
+            >
+              Corrigir contraste nos dois temas
+            </button>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {(['light', 'dark'] as const).map((mode) => {
               const list = byMode[mode]
@@ -765,7 +807,7 @@ function DualThemeTextSamples({
               </span>
               <span
                 className="inline-flex items-center rounded-md px-2 py-1 font-semibold"
-                style={{ backgroundColor: fill, color: row.text.on }}
+                style={{ backgroundColor: row.fill, color: row.text.on }}
               >
                 Botão
               </span>
@@ -1102,20 +1144,31 @@ export function DesignForm({
     setSection('identidade')
   }
 
+  function aplicarMarca(
+    opts: {
+      primary?: string
+      secondary?: string | null
+      rederiveSurfaces?: boolean
+    },
+  ) {
+    setDesign(
+      (d) =>
+        aplicarMarcaAoDesign(d, {
+          primary: opts.primary ?? d.brand.primary,
+          secondary:
+            opts.secondary !== undefined ? opts.secondary : d.brand.secondary,
+          accents: clubePaleta?.accents ?? [],
+          rederiveSurfaces: opts.rederiveSurfaces,
+        }) as TenantDesign,
+    )
+  }
+
   function reequilibrarAcoesDaMarca() {
-    const secondary =
-      design.brand.secondary &&
-      /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
-        ? design.brand.secondary
-        : null
-    const accents = clubePaleta?.accents ?? []
-    patch({
-      actions: derivarAcoesDaMarca(design.brand.primary, {
-        secondary,
-        accents,
-      }),
-      actionsFg: { ...DEFAULT_ACTIONS_FG },
-    })
+    aplicarMarca({ rederiveSurfaces: true })
+  }
+
+  function corrigirContraste() {
+    setDesign((d) => sanearContrasteDoDesign(d) as TenantDesign)
   }
 
   function salvarPaletaAtual() {
@@ -1204,7 +1257,7 @@ export function DesignForm({
             {section === 'identidade' ? (
               <SectionFrame
                 title="Identidade"
-                description="Paleta e marca. Amostras de texto mostram contraste no claro e no escuro."
+                description="Paleta e marca. Ao mudar a primária, superfícies e ações são recalculadas para o claro e o escuro fecharem contraste."
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
@@ -1213,8 +1266,9 @@ export function DesignForm({
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
                     Três opções na ordem da torcida: marca → escudo → clube.
-                    Aplicar atualiza marca, ações e superfícies na prévia até
-                    salvar o design.
+                    Aplicar atualiza marca, ações e superfícies (claro e escuro)
+                    na prévia até salvar. Cada card já fecha contraste AA nos
+                    dois temas.
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -1317,7 +1371,7 @@ export function DesignForm({
                     resolved={design.brand.primary}
                     token="brand.primary"
                     onChange={(v) => {
-                      if (v) patch({ brand: { ...design.brand, primary: v } })
+                      if (v) aplicarMarca({ primary: v, rederiveSurfaces: true })
                     }}
                     {...fieldProps}
                   />
@@ -1367,7 +1421,9 @@ export function DesignForm({
                     value={design.brand.secondary}
                     resolved={design.brand.secondary ?? '#888888'}
                     token="brand.secondary"
-                    onChange={(v) => patch({ brand: { ...design.brand, secondary: v } })}
+                    onChange={(v) =>
+                      aplicarMarca({ secondary: v, rederiveSurfaces: false })
+                    }
                     allowEmpty
                     emptyLabel="Remover"
                     {...fieldProps}
@@ -1424,7 +1480,7 @@ export function DesignForm({
                     onClick={reequilibrarAcoesDaMarca}
                     className="text-left text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
                   >
-                    Reequilibrar ações a partir da primária atual
+                    Reequilibrar claro, escuro e ações a partir da primária
                   </button>
                 </div>
               </SectionFrame>
@@ -1682,7 +1738,7 @@ export function DesignForm({
                         {key === 'background' || key === 'surfaceRaised' ? (
                           <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                             {key === 'background'
-                              ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca nos dois temas.'
+                              ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta ou mudar a primária, recebe papel AA nos dois temas — pastel do hue, ou branco puro se a marca for P&B.'
                               : 'Menu/popover e painéis elevados. Texto acompanha o contraste de cada tema.'}
                           </p>
                         ) : null}
@@ -1719,7 +1775,7 @@ export function DesignForm({
             onModeChange={setPreviewMode}
             onCompareChange={setCompareAtivo}
           />
-          <ContrastPanel checks={contrastChecks} />
+          <ContrastPanel checks={contrastChecks} onFix={corrigirContraste} />
         </div>
       </div>
 

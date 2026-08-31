@@ -187,7 +187,7 @@ export const TenantDesignSchema = z
     customPalettes: z.array(CustomPaletteSchema).max(20).default([]),
     light: SurfaceTokensSchema.default({}),
     dark: SurfaceTokensSchema.default({}),
-    /** Vitrine do portal `/portal/loja/[tenantId]` — edita em `/admin/loja/vitrine`. */
+    /** Vitrine do portal `/portal/loja/[tenantId]` — edita em `/admin/loja/vitrine` e no hover do portal (`store:manage`). */
     loja: LojaVitrineSchema.default({ ...DEFAULT_LOJA_VITRINE }),
   })
   .strict()
@@ -196,15 +196,24 @@ export const TenantDesignSchema = z
 /** @typedef {z.infer<typeof LojaVitrineSchema>} LojaVitrine */
 
 /** Defaults alinhados a `:root` / `.dark` em globals.css. */
+/** WCAG AA texto normal. */
+export const CONTRASTE_AA = 4.5
+/** WCAG AA texto grande / chrome 14px+ bold. */
+export const CONTRASTE_AA_GRANDE = 3
+/** Fill vs superfície — abaixo disso o botão some (branco no claro, preto no escuro). */
+export const CONTRASTE_FILL_MIN = 1.25
+/** WCAG 1.4.11 componentes de UI (botão discernível do fundo). */
+export const CONTRASTE_UI = 3
+
 export const DEFAULT_SURFACE_LIGHT = /** @type {const} */ ({
   background: '#ffffff',
   backgroundSubtle: '#f9fafb',
   foreground: '#111827',
-  foregroundMuted: '#6b7280',
+  foregroundMuted: '#4b5563',
   border: '#e5e7eb',
   borderStrong: '#9ca3af',
   surface: '#ffffff',
-  surfaceRaised: '#f9fafb',
+  surfaceRaised: '#f4f4f5',
 })
 
 export const DEFAULT_SURFACE_DARK = /** @type {const} */ ({
@@ -316,20 +325,36 @@ export function resolveLojaVitrine(designRaw, corPrimaria) {
 }
 
 /**
+ * URL da capa visível no portal: banner próprio, ou foto do destaque se a
+ * opção estiver ligada. `capaCustom` é o banner gravado (não o fallback).
+ * @param {{ bannerUrl: string | null, usarDestaqueComoCapa: boolean }} vitrine
+ * @param {string | null | undefined} destaqueImagemUrl
+ * @returns {{ capaUrl: string | null, capaCustom: boolean }}
+ */
+export function resolverCapaLoja(vitrine, destaqueImagemUrl) {
+  if (vitrine.bannerUrl) return { capaUrl: vitrine.bannerUrl, capaCustom: true }
+  if (vitrine.usarDestaqueComoCapa && destaqueImagemUrl) {
+    return { capaUrl: destaqueImagemUrl, capaCustom: false }
+  }
+  return { capaUrl: null, capaCustom: false }
+}
+
+/**
  * Monta um design a partir só da cor primária (sem overrides de superfície).
  * @param {string} primary
  * @param {string | null} [secondary]
  * @returns {TenantDesign}
  */
 export function designFromPrimary(primary, secondary = null) {
+  const sec =
+    secondary && /^#[0-9a-fA-F]{6}$/.test(secondary) ? secondary : null
+  const derived = derivarSuperficiesDaMarca(primary)
   return {
     ...DEFAULT_TENANT_DESIGN,
-    brand: {
-      primary,
-      secondary:
-        secondary && /^#[0-9a-fA-F]{6}$/.test(secondary) ? secondary : null,
-    },
-    actions: { ...DEFAULT_ACTIONS },
+    brand: { primary, secondary: sec },
+    actions: derivarAcoesDaMarca(primary, { secondary: sec }),
+    light: derived.light,
+    dark: derived.dark,
   }
 }
 
@@ -373,6 +398,56 @@ export const CLUBE_PALETAS = {
   figueirense: { primary: '#000000', secondary: '#ffffff' },
   caxias: { primary: '#8b0000', secondary: '#ffffff' },
   paulista: { primary: '#e31e24', secondary: '#000000' },
+  bragantino: { primary: '#cc0000', secondary: '#ffffff', accents: ['#001e62'] },
+  'red bull bragantino': { primary: '#cc0000', secondary: '#ffffff', accents: ['#001e62'] },
+  nautico: { primary: '#d21034', secondary: '#ffffff' },
+  'ponte preta': { primary: '#000000', secondary: '#ffffff' },
+  vitoria: { primary: '#e30613', secondary: '#000000' },
+  vitória: { primary: '#e30613', secondary: '#000000' },
+  cuiaba: { primary: '#006b3f', secondary: '#ffd100' },
+  cuiabá: { primary: '#006b3f', secondary: '#ffd100' },
+  juventude: { primary: '#006b3f', secondary: '#ffffff' },
+}
+
+/**
+ * Nomes oficiais / aliases → chave de `CLUBE_PALETAS`.
+ * Sem substring curta (`sport` dentro de “Sport Club Corinthians”).
+ * @type {Record<string, string>}
+ */
+export const CLUBE_PALETA_ALIASES = {
+  'sport club corinthians paulista': 'corinthians',
+  'sport club internacional': 'internacional',
+  'sociedade esportiva palmeiras': 'palmeiras',
+  'sao paulo futebol clube': 'sao paulo',
+  'clube de regatas do flamengo': 'flamengo',
+  'clube de regatas flamengo': 'flamengo',
+  'club de regatas vasco da gama': 'vasco',
+  'vasco da gama': 'vasco',
+  'fluminense football club': 'fluminense',
+  'botafogo de futebol e regatas': 'botafogo',
+  'santos futebol clube': 'santos',
+  'clube atletico mineiro': 'atletico-mg',
+  'atletico mineiro': 'atletico-mg',
+  'atletico mg': 'atletico-mg',
+  'gremio foot ball porto alegrense': 'gremio',
+  'clube atletico paranaense': 'athletico-pr',
+  'athletico paranaense': 'athletico-pr',
+  'athletico pr': 'athletico-pr',
+  'america mineiro': 'america-mg',
+  'america mg': 'america-mg',
+  'coritiba foot ball club': 'coritiba',
+  'ceara sporting clube': 'ceara',
+  'ceara sporting club': 'ceara',
+  'sport club do recife': 'sport',
+  'sociedade esportiva recreativa caxias do sul': 'caxias',
+  'caxias futebol clube': 'caxias',
+  'associacao atletica ponte preta': 'ponte preta',
+  'clube nautico capiberibe': 'nautico',
+  'nautico capibaribe': 'nautico',
+  'red bull bragantino': 'bragantino',
+  'esporte clube vitoria': 'vitoria',
+  'esporte clube juventude': 'juventude',
+  'cuiaba esporte clube': 'cuiaba',
 }
 
 /**
@@ -542,11 +617,53 @@ export function resolverMarcaTorcida(opts = {}) {
  * @param {string | null | undefined} apelido
  * @returns {{ primary: string, secondary: string, accents: string[], fonte: 'clube' } | null}
  */
+/**
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Casa nome/apelido oficial com o catálogo — chave exata, alias, hífen,
+ * depois a chave mais longa como palavra inteira (nunca `sport` dentro de
+ * “Sport Club Corinthians”).
+ * @param {string} normalized
+ * @returns {{ primary: string, secondary: string, accents?: string[] } | null}
+ */
+function lookupPaletaClube(normalized) {
+  if (!normalized) return null
+  const exact = CLUBE_PALETAS[normalized]
+  if (exact) return exact
+  const aliased = CLUBE_PALETA_ALIASES[normalized]
+  if (aliased && CLUBE_PALETAS[aliased]) return CLUBE_PALETAS[aliased]
+  const hyphen = normalized.replace(/\s+/g, '-')
+  if (hyphen !== normalized && CLUBE_PALETAS[hyphen]) return CLUBE_PALETAS[hyphen]
+  let best = /** @type {{ primary: string, secondary: string, accents?: string[] } | null} */ (null)
+  let bestLen = 0
+  for (const [k, v] of Object.entries(CLUBE_PALETAS)) {
+    if (k.length < 4 || k.length <= bestLen) continue
+    const re = new RegExp(`(?:^|\\s)${escapeRegex(k)}(?:\\s|$)`)
+    if (re.test(normalized)) {
+      best = v
+      bestLen = k.length
+    }
+  }
+  return best
+}
+
+/**
+ * Busca paleta curada pelo nome ou apelido da afiliação.
+ * @param {string | null | undefined} nome
+ * @param {string | null | undefined} apelido
+ * @returns {{ primary: string, secondary: string, accents: string[], fonte: 'clube' } | null}
+ */
 export function paletaDoClube(nome, apelido) {
   const candidates = [apelido, nome].filter(Boolean)
   for (const c of candidates) {
     const key = normalizeClubeKey(/** @type {string} */ (c))
-    const hit = CLUBE_PALETAS[key]
+    const hit = lookupPaletaClube(key)
     if (hit) {
       return {
         primary: hit.primary,
@@ -555,56 +672,150 @@ export function paletaDoClube(nome, apelido) {
         fonte: 'clube',
       }
     }
-    // Tentativa parcial (ex.: "São Paulo FC" → "sao paulo")
-    for (const [k, v] of Object.entries(CLUBE_PALETAS)) {
-      if (key.includes(k) || k.includes(key)) {
-        return {
-          primary: v.primary,
-          secondary: v.secondary,
-          accents: v.accents ?? [],
-          fonte: 'clube',
-        }
-      }
-    }
   }
   return null
 }
 
 /**
- * Deriva overrides leves de superfície a partir da cor primária (tint no hue).
- * Cobre fundo, sutil, superfície e elevada — sem “drenched” pesado.
+ * Pastel de alta L / baixa C no hue da marca — tint de papel, não mistura do
+ * hex escuro no branco (isso virava cinza sujo e derrubava o muted).
+ * Neutros (P&B) não tingem o claro.
  * @param {string} primaryHex
- * @returns {{ light: Record<string, string>, dark: Record<string, string>, secondary: string }}
+ * @returns {string | null}
+ */
+function pastelDaMarca(primaryHex) {
+  const { h, s } = hexToHsl(primaryHex)
+  if (s < 0.08) return null
+  return hslToHex(h, Math.min(s, 0.22) * 0.42, 0.96)
+}
+
+/**
+ * Sombra cromática para o tema escuro. Neutros ficam no zinc.
+ * @param {string} primaryHex
+ * @returns {string | null}
+ */
+function sombraDaMarca(primaryHex) {
+  const { h, s } = hexToHsl(primaryHex)
+  if (s < 0.08) return null
+  return hslToHex(h, Math.min(s, 0.28) * 0.48, 0.11)
+}
+
+/**
+ * Completa um modo (claro/escuro): garante texto 4.5:1 em todas as superfícies
+ * e bordas visíveis. Não reescreve os fundos passados.
+ * @param {'light' | 'dark'} mode
+ * @param {Partial<Record<SurfaceTokenKey, string>>} partial
+ * @returns {Record<SurfaceTokenKey, string>}
+ */
+export function completarSuperficies(mode, partial = {}) {
+  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const s = { ...defaults, ...partial }
+  const papers = [s.background, s.backgroundSubtle, s.surface, s.surfaceRaised]
+  let fg = s.foreground
+  let muted = s.foregroundMuted
+  for (const paper of papers) {
+    fg = ajustarParaContraste(fg, paper, CONTRASTE_AA)
+    muted = ajustarParaContraste(muted, paper, CONTRASTE_AA)
+  }
+  let border = s.border
+  if (contrasteRatio(border, s.background) < 1.3) {
+    border = mixHex(s.background, fg, mode === 'dark' ? 0.18 : 0.12)
+  }
+  let borderStrong = s.borderStrong
+  if (contrasteRatio(borderStrong, s.background) < 1.5) {
+    borderStrong = mixHex(s.background, fg, mode === 'dark' ? 0.32 : 0.22)
+  }
+  return {
+    background: s.background,
+    backgroundSubtle: s.backgroundSubtle,
+    foreground: fg,
+    foregroundMuted: muted,
+    border,
+    borderStrong,
+    surface: s.surface,
+    surfaceRaised: s.surfaceRaised,
+  }
+}
+
+/**
+ * Superfícies dos dois temas a partir da primária.
+ * Claro: papel alto-L (pastel do hue, ou branco puro se P&B) + texto AA.
+ * Escuro: zinc com sombra cromática + texto AA.
+ * @param {string} primaryHex
+ * @returns {{ light: Record<SurfaceTokenKey, string>, dark: Record<SurfaceTokenKey, string>, secondary: string }}
  */
 export function derivarSuperficiesDaMarca(primaryHex) {
   const secondary = contrasteTextoSobre(primaryHex) === 'light' ? '#ffffff' : '#0a0a0a'
+  const pastel = pastelDaMarca(primaryHex)
+  const sombra = sombraDaMarca(primaryHex)
 
-  // Light: página branca → sutil/elevada com tint suave da marca.
-  const lightBg = mixHex('#ffffff', primaryHex, 0.03)
-  const lightSubtle = mixHex('#f9fafb', primaryHex, 0.08)
-  const lightSurface = mixHex('#ffffff', primaryHex, 0.04)
-  const lightRaised = mixHex('#f4f4f5', primaryHex, 0.1)
+  const light = completarSuperficies('light', {
+    background: pastel ? mixHex('#ffffff', pastel, 0.55) : '#ffffff',
+    backgroundSubtle: pastel ? mixHex('#f9fafb', pastel, 0.7) : '#f9fafb',
+    surface: pastel ? mixHex('#ffffff', pastel, 0.4) : '#ffffff',
+    surfaceRaised: pastel ? mixHex('#f4f4f5', pastel, 0.65) : '#f4f4f5',
+  })
+  const dark = completarSuperficies('dark', {
+    background: sombra ? mixHex('#09090b', sombra, 0.55) : '#09090b',
+    backgroundSubtle: sombra ? mixHex('#18181b', sombra, 0.45) : '#18181b',
+    surface: sombra ? mixHex('#18181b', sombra, 0.4) : '#18181b',
+    surfaceRaised: sombra ? mixHex('#27272a', sombra, 0.4) : '#27272a',
+  })
 
-  // Dark: zinc base → tint progressivo (página < sutil < surface < raised).
-  const darkBg = mixHex('#09090b', primaryHex, 0.06)
-  const darkSubtle = mixHex('#18181b', primaryHex, 0.14)
-  const darkSurface = mixHex('#18181b', primaryHex, 0.1)
-  const darkRaised = mixHex('#27272a', primaryHex, 0.16)
+  return { secondary, light, dark }
+}
 
+/**
+ * Resolve tokens de superfície do modo ativo.
+ * Override do tenant ganha; buracos vêm da marca (não do cinza da plataforma)
+ * e o texto não definido é saneado contra os fundos efetivos.
+ * @param {{ brand?: { primary?: string }, light?: Record<string, string>, dark?: Record<string, string> }} design
+ * @param {'light' | 'dark'} mode
+ * @returns {Record<SurfaceTokenKey, string>}
+ */
+export function resolverSuperficies(design, mode) {
+  const primary =
+    typeof design.brand?.primary === 'string' && /^#[0-9a-fA-F]{6}$/.test(design.brand.primary)
+      ? design.brand.primary
+      : DEFAULT_TENANT_DESIGN.brand.primary
+  const derived = derivarSuperficiesDaMarca(primary)[mode]
+  const overrides = /** @type {Record<string, string | undefined>} */ (
+    (mode === 'dark' ? design.dark : design.light) ?? {}
+  )
+  const merged = { ...derived, ...overrides }
+  const userSet = (/** @type {SurfaceTokenKey} */ key) =>
+    typeof overrides[key] === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrides[key])
+  const papers = [
+    merged.background,
+    merged.backgroundSubtle,
+    merged.surface,
+    merged.surfaceRaised,
+  ]
+  let fg = merged.foreground
+  let muted = merged.foregroundMuted
+  if (!userSet('foreground')) {
+    for (const paper of papers) fg = ajustarParaContraste(fg, paper, CONTRASTE_AA)
+  }
+  if (!userSet('foregroundMuted')) {
+    for (const paper of papers) muted = ajustarParaContraste(muted, paper, CONTRASTE_AA)
+  }
+  let border = merged.border
+  let borderStrong = merged.borderStrong
+  if (!userSet('border') && contrasteRatio(border, merged.background) < 1.3) {
+    border = mixHex(merged.background, fg, mode === 'dark' ? 0.18 : 0.12)
+  }
+  if (!userSet('borderStrong') && contrasteRatio(borderStrong, merged.background) < 1.5) {
+    borderStrong = mixHex(merged.background, fg, mode === 'dark' ? 0.32 : 0.22)
+  }
   return {
-    secondary,
-    light: {
-      background: lightBg,
-      backgroundSubtle: lightSubtle,
-      surface: lightSurface,
-      surfaceRaised: lightRaised,
-    },
-    dark: {
-      background: darkBg,
-      backgroundSubtle: darkSubtle,
-      surface: darkSurface,
-      surfaceRaised: darkRaised,
-    },
+    background: merged.background,
+    backgroundSubtle: merged.backgroundSubtle,
+    foreground: fg,
+    foregroundMuted: muted,
+    border,
+    borderStrong,
+    surface: merged.surface,
+    surfaceRaised: merged.surfaceRaised,
   }
 }
 
@@ -689,55 +900,52 @@ export function filtrarVerdeForaDeContexto(hexes, identidadeHexes = []) {
 }
 
 /**
- * Texto de marca legível sobre superfície (badges / soft buttons).
- * Preto em fundo escuro (ou branco em fundo claro) some — clareia/escurece o hue.
+ * Texto de marca legível sobre superfície (badges / soft / links).
+ * Ajusta L no hue até fechar o contraste — neutros continuam P&B (sem marrom).
  * @param {string} brandHex
  * @param {string} surfaceHex
  * @param {number} [minRatio]
  * @returns {string}
  */
-export function corMarcaLegivel(brandHex, surfaceHex, minRatio = 3.2) {
-  if (contrasteRatio(brandHex, surfaceHex) >= minRatio) return brandHex
-  const { h, s, l } = hexToHsl(brandHex)
-  const surfaceDark = luminanciaRelativa(surfaceHex) < 0.45
-  if (surfaceDark) {
-    const targetL = s < 0.12 ? 0.78 : Math.max(0.55, Math.min(0.72, l + 0.42))
-    return hslToHex(h, s < 0.12 ? 0 : Math.max(s, 0.2), targetL)
-  }
-  const targetL = s < 0.12 ? 0.22 : Math.min(0.38, Math.max(0.16, l - 0.35))
-  return hslToHex(h, s < 0.12 ? 0 : Math.max(s, 0.2), targetL)
+export function corMarcaLegivel(brandHex, surfaceHex, minRatio = CONTRASTE_AA) {
+  return ajustarParaContraste(brandHex, surfaceHex, minRatio)
 }
 
 /**
- * Texto de botão sólido (`on`) e de badge/soft (`fg`) para uma ação.
+ * Texto de botão sólido (`on`) e de badge/soft/link (`fg`) para uma ação.
  *
- * - Automático: `on` contraste no preenchimento; `fg` tom da ação legível na
- *   superfície do tema (claro/escuro) — badge soft usa wash ~14% sobre a surface.
- * - Override manual: só é aplicado onde o contraste fecha (≥3:1). Se branco
- *   funciona no botão mas falha no badge claro (ou o inverso), aquele contexto
- *   volta ao automático — assim mudar num tema não quebra o outro.
+ * - Automático: `on` é branco ou preto conforme o ratio real no fill (não o
+ *   cutoff 0.4 de luminância); `fg` precisa fechar 4.5:1 na superfície (link)
+ *   e 3:1 no wash do badge. `fill` é o hex visível naquele tema (branco no
+ *   claro ganha um empurrão para não sumir).
+ * - Override manual: só vale onde o contraste fecha; senão volta ao auto —
+ *   assim um branco no botão escuro não quebra o badge no claro.
  *
  * @param {string} actionHex
  * @param {string | null | undefined} overrideHex
  * @param {string} surfaceHex superfície do modo ativo (light/dark)
- * @returns {{ on: string, fg: string }}
+ * @returns {{ on: string, fg: string, fill: string }}
  */
 export function resolveActionTextColors(actionHex, overrideHex, surfaceHex) {
-  const autoOn = contrasteTextoSobre(actionHex) === 'light' ? '#ffffff' : '#0a0a0a'
-  const autoFg = corMarcaLegivel(actionHex, surfaceHex)
-  /** Aprox. de `bg color / 0.14` sobre a superfície (Badge / soft). */
-  const softBg = mixHex(surfaceHex, actionHex, 0.14)
-  const minRatio = 3
+  const fill = resolverFillDaMarca(actionHex, surfaceHex)
+  const autoOn = textoSobreFill(fill)
+  const softBg = mixHex(surfaceHex, fill, 0.14)
+  let autoFg = ajustarParaContraste(actionHex, surfaceHex, CONTRASTE_AA)
+  autoFg = ajustarParaContraste(autoFg, softBg, CONTRASTE_AA_GRANDE)
 
   if (typeof overrideHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrideHex)) {
+    const onOk = contrasteRatio(overrideHex, fill) >= CONTRASTE_AA
+    const fgSoftOk = contrasteRatio(overrideHex, softBg) >= CONTRASTE_AA_GRANDE
+    // Texto de status/link é 14–16px: 4.5:1 no papel, não o piso de texto grande.
+    const fgSurfOk = contrasteRatio(overrideHex, surfaceHex) >= CONTRASTE_AA
     return {
-      on:
-        contrasteRatio(overrideHex, actionHex) >= minRatio ? overrideHex : autoOn,
-      fg: contrasteRatio(overrideHex, softBg) >= minRatio ? overrideHex : autoFg,
+      on: onOk ? overrideHex : autoOn,
+      fg: fgSoftOk && fgSurfOk ? overrideHex : autoFg,
+      fill,
     }
   }
 
-  return { on: autoOn, fg: autoFg }
+  return { on: autoOn, fg: autoFg, fill }
 }
 
 /**
@@ -1115,23 +1323,86 @@ export function capturarPaletaDoDesign(design, nome) {
  * @param {PaletaSugerida} paleta
  */
 export function aplicarPaletaAoDesign(design, paleta) {
-  const derived = derivarSuperficiesDaMarca(paleta.primary)
+  return aplicarMarcaAoDesign(design, {
+    primary: paleta.primary,
+    secondary: paleta.secondary,
+    accents: paleta.swatches?.slice(2) ?? [],
+    actions: paleta.actions,
+    actionsFg: paleta.actionsFg,
+  })
+}
+
+/**
+ * Recalcula ações + superfícies claro/escuro a partir da marca.
+ * Identidade (hex da primária/secundária) permanece; o que muda é o papel
+ * e o texto automático para os dois temas fecharem contraste.
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ * @param {{
+ *   primary?: string,
+ *   secondary?: string | null,
+ *   accents?: string[],
+ *   actions?: PaletaSugerida['actions'],
+ *   actionsFg?: PaletaSugerida['actionsFg'],
+ *   rederiveSurfaces?: boolean,
+ * }} [opts]
+ */
+export function aplicarMarcaAoDesign(design, opts = {}) {
+  const primary = opts.primary ?? design.brand.primary
+  const secondary =
+    opts.secondary !== undefined ? opts.secondary : (design.brand.secondary ?? null)
+  const derived = derivarSuperficiesDaMarca(primary)
+  const accents = opts.accents ?? []
+  const actions = opts.actions
+    ? { ...DEFAULT_ACTIONS, ...opts.actions }
+    : derivarAcoesDaMarca(primary, { secondary, accents })
+  if (!opts.actions) {
+    const destaque = accentDestaque(
+      primary,
+      typeof secondary === 'string' ? secondary : derived.secondary,
+      accents,
+    )
+    if (destaque) {
+      actions.danger = clampHexLightness(destaque, 0.28, 0.52)
+    }
+  }
+  const rederive = opts.rederiveSurfaces !== false
   return {
     ...design,
     version: 1,
     brand: {
-      primary: paleta.primary,
-      secondary: paleta.secondary,
+      primary,
+      secondary:
+        typeof secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(secondary)
+          ? secondary
+          : null,
     },
     brandFg: { ...DEFAULT_BRAND_FG },
-    actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
-    actionsFg: paleta.actionsFg
-      ? { ...DEFAULT_ACTIONS_FG, ...paleta.actionsFg }
+    actions,
+    actionsFg: opts.actionsFg
+      ? { ...DEFAULT_ACTIONS_FG, ...opts.actionsFg }
       : { ...DEFAULT_ACTIONS_FG },
     customPalettes: design.customPalettes ?? [],
-    light: { ...(design.light ?? {}), ...derived.light },
-    dark: { ...(design.dark ?? {}), ...derived.dark },
+    light: rederive ? derived.light : (design.light ?? derived.light),
+    dark: rederive ? derived.dark : (design.dark ?? derived.dark),
     grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,
+  }
+}
+
+/**
+ * Mantém fundos escolhidos; saneia texto/borda e zera overrides de fg
+ * que quebram um dos temas. Usado no botão “Corrigir contraste”.
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ */
+export function sanearContrasteDoDesign(design) {
+  const primary = design.brand?.primary ?? DEFAULT_TENANT_DESIGN.brand.primary
+  const derived = derivarSuperficiesDaMarca(primary)
+  return {
+    ...design,
+    version: 1,
+    brandFg: { ...DEFAULT_BRAND_FG },
+    actionsFg: { ...DEFAULT_ACTIONS_FG },
+    light: completarSuperficies('light', { ...derived.light, ...(design.light ?? {}) }),
+    dark: completarSuperficies('dark', { ...derived.dark, ...(design.dark ?? {}) }),
   }
 }
 
@@ -1214,6 +1485,96 @@ export function contrasteRatio(fg, bg) {
  */
 export function contrasteTextoSobre(bgHex) {
   return luminanciaRelativa(bgHex) > 0.4 ? 'dark' : 'light'
+}
+
+/**
+ * Branco vs preto no fill — escolhe pelo ratio real (âmbar/amarelo pede preto).
+ * @param {string} bgHex
+ * @returns {string}
+ */
+export function textoSobreFill(bgHex) {
+  const white = '#ffffff'
+  const black = '#0a0a0a'
+  return contrasteRatio(white, bgHex) >= contrasteRatio(black, bgHex) ? white : black
+}
+
+/**
+ * Caminha a luminância no hue até fechar `minRatio`. Neutros ficam acromáticos.
+ * @param {string} fgHex
+ * @param {string} bgHex
+ * @param {number} [minRatio]
+ * @returns {string}
+ */
+export function ajustarParaContraste(fgHex, bgHex, minRatio = CONTRASTE_AA) {
+  if (typeof fgHex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(fgHex)) {
+    return luminanciaRelativa(bgHex) < 0.45 ? '#fafafa' : '#0a0a0a'
+  }
+  if (typeof bgHex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(bgHex)) return fgHex
+  if (contrasteRatio(fgHex, bgHex) >= minRatio) return fgHex
+  const { h, s, l } = hexToHsl(fgHex)
+  const sat = s < 0.08 ? 0 : s
+  const hue = sat === 0 ? 0 : h
+  const bgDark = luminanciaRelativa(bgHex) < 0.45
+  const dir = bgDark ? 1 : -1
+  for (let step = 0.02; step <= 1; step += 0.02) {
+    const nextL = Math.max(0.04, Math.min(0.96, l + dir * step))
+    const candidate = hslToHex(hue, sat, nextL)
+    if (contrasteRatio(candidate, bgHex) >= minRatio) return candidate
+  }
+  const white = '#fafafa'
+  const black = '#0a0a0a'
+  return contrasteRatio(white, bgHex) >= contrasteRatio(black, bgHex) ? white : black
+}
+
+/**
+ * Fill da marca/ação visível contra a superfície do tema.
+ * Branco no claro e preto no escuro ganham um empurrão de L — a identidade
+ * gravada no JSON não muda; só o CSS do modo ativo.
+ * @param {string} fillHex
+ * @param {string} surfaceHex
+ * @returns {string}
+ */
+export function resolverFillDaMarca(fillHex, surfaceHex) {
+  if (typeof fillHex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(fillHex)) return fillHex
+  if (typeof surfaceHex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(surfaceHex)) {
+    return fillHex
+  }
+  if (contrasteRatio(fillHex, surfaceHex) >= CONTRASTE_FILL_MIN) return fillHex
+  const { h, s, l } = hexToHsl(fillHex)
+  const sat = s < 0.08 ? 0 : s
+  const hue = sat === 0 ? 0 : h
+  const surfaceDark = luminanciaRelativa(surfaceHex) < 0.45
+  const targetL = surfaceDark ? Math.min(0.92, l + 0.18) : Math.max(0.08, l - 0.18)
+  return hslToHex(hue, sat, targetL)
+}
+
+/**
+ * WCAG 1.4.11: botão precisa de 3:1 contra o fundo adjacente. Se o fill
+ * (mesmo após o empurrão) ainda não fecha, o CSS desenha um anel.
+ * @param {string} fillHex
+ * @param {string} surfaceHex
+ * @returns {boolean}
+ */
+export function precisaAnelFill(fillHex, surfaceHex) {
+  if (typeof fillHex !== 'string' || typeof surfaceHex !== 'string') return false
+  return contrasteRatio(fillHex, surfaceHex) < CONTRASTE_UI
+}
+
+/**
+ * Paleta sugerida já fecha AA de papel + botão primário nos dois temas.
+ * @param {PaletaSugerida} paleta
+ * @returns {boolean}
+ */
+export function paletaTemContrasteOk(paleta) {
+  const d = aplicarPaletaAoDesign(DEFAULT_TENANT_DESIGN, paleta)
+  for (const mode of /** @type {const} */ (['light', 'dark'])) {
+    const s = resolverSuperficies(d, mode)
+    if (contrasteRatio(s.foreground, s.background) < CONTRASTE_AA) return false
+    if (contrasteRatio(s.foregroundMuted, s.background) < CONTRASTE_AA) return false
+    const text = resolveActionTextColors(paleta.primary, null, s.surface)
+    if (contrasteRatio(text.on, text.fill) < CONTRASTE_AA) return false
+  }
+  return true
 }
 
 /**

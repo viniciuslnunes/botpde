@@ -47,6 +47,7 @@ interface MensagensShellProps {
   /** Quando false, pausa SSE/polling (painel colapsado). */
   active?: boolean
   onInboxChange?: (conversas: InboxItemDto[]) => void
+  podeCriarGrupo?: boolean
 }
 
 type Modal = 'nenhum' | 'dm' | 'grupo'
@@ -59,6 +60,7 @@ export function MensagensShell({
   inboxPreloaded = false,
   active = true,
   onInboxChange,
+  podeCriarGrupo = false,
 }: MensagensShellProps) {
   const embedded = variant === 'embedded'
   const [conversas, setConversas] = useState<InboxItemDto[]>(initialConversas)
@@ -94,23 +96,23 @@ export function MensagensShell({
       if (!res.ok) return
       const data = (await res.json()) as { conversas?: InboxItemDto[] }
       if (data.conversas) {
+        const fromApi = data.conversas
+        const ids = new Set(fromApi.map((c) => c.id))
         startTransition(() => {
           setConversas((prev) => {
-            const fromApi = data.conversas!
-            const ids = new Set(fromApi.map((c) => c.id))
-            // Rede de segurança se a API não devolveu o item sintético.
-            let merged = fromApi
             if (initialSelecionadaId && !ids.has(initialSelecionadaId)) {
               const local = prev.find((c) => c.id === initialSelecionadaId)
-              if (local) merged = [local, ...fromApi]
+              if (local) return [local, ...fromApi]
             }
-            onInboxChange?.(merged)
-            if (initialSelecionadaId && merged.some((c) => c.id === initialSelecionadaId)) {
-              setSelecionadaId(initialSelecionadaId)
-            }
-            return merged
+            return fromApi
           })
+          if (initialSelecionadaId && ids.has(initialSelecionadaId)) {
+            setSelecionadaId(initialSelecionadaId)
+          }
         })
+        // Fora do updater: chamar o pai durante o setState aninhava render
+        // (ComunidadeChatPanel atualizava enquanto MensagensShell ainda renderizava).
+        onInboxChange?.(fromApi)
       }
     } catch {
       // polling silencioso
@@ -156,7 +158,7 @@ export function MensagensShell({
       className={[
         'flex overflow-hidden bg-[rgb(var(--surface))]',
         embedded
-          ? 'h-[min(28rem,calc(100vh-12rem))] min-h-[16rem] rounded-xl border border-[rgb(var(--border))]'
+          ? 'h-[min(28rem,calc(100dvh-12rem))] min-h-[16rem] rounded-xl border border-[rgb(var(--border))]'
           : 'h-[calc(100dvh-8.5rem)] min-h-[22rem] rounded-2xl border border-[rgb(var(--border))] sm:min-h-[24rem]',
       ].join(' ')}
     >
@@ -184,15 +186,17 @@ export function MensagensShell({
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setModal('grupo')}
-              title="Novo grupo"
-              aria-label="Novo grupo"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]"
-            >
-              <Users className="h-4 w-4" />
-            </button>
+            {podeCriarGrupo ? (
+              <button
+                type="button"
+                onClick={() => setModal('grupo')}
+                title="Novo grupo"
+                aria-label="Novo grupo"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]"
+              >
+                <Users className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -220,7 +224,10 @@ export function MensagensShell({
               title="Nenhuma conversa ainda"
               description={
                 <>
-                  <p className="mt-0.5">Comece uma conversa com um membro da torcida ou crie um grupo.</p>
+                  <p className="mt-0.5">
+                    Comece uma conversa com um membro da torcida
+                    {podeCriarGrupo ? ' ou crie um grupo.' : '.'}
+                  </p>
                   <m.button
                     type="button"
                     onClick={() => setModal('dm')}
@@ -394,6 +401,7 @@ function NovaConversaModal({
   const [criando, setCriando] = useState(false)
   const [mounted, setMounted] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const chipsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMounted(true), 0)
@@ -506,6 +514,13 @@ function NovaConversaModal({
   }
 
   const idsSelecionados = new Set(selecionados.map((c) => c.id))
+  const resultadosVisiveis = resultados.filter((c) => !idsSelecionados.has(c.id))
+
+  useEffect(() => {
+    const el = chipsRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [selecionados.length])
 
   if (!mounted) return null
 
@@ -533,9 +548,9 @@ function NovaConversaModal({
         exit="exit"
         transition={springSnappy}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl"
+        className="flex max-h-[min(92dvh,100%)] min-h-0 w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-[rgb(var(--border))] px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-[rgb(var(--border))] px-4 py-3">
           <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">
             {tipo === 'dm' && contatoDm ? 'Solicitar conversa' : tipo === 'dm' ? 'Nova conversa' : 'Novo grupo'}
           </h3>
@@ -550,171 +565,175 @@ function NovaConversaModal({
               onClose()
             }}
             aria-label="Fechar"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+            className="app-action flex items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-3 p-4">
-          {tipo === 'dm' && contatoDm ? (
-            <>
-              <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5">
-                <Avatar nome={contatoDm.nome} avatarUrl={contatoDm.avatarUrl} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                    {contatoDm.nome ?? 'Membro'}
-                  </p>
-                  <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                    {formatNomeTorcida(contatoDm.tenantNome)}
-                  </p>
-                </div>
+        {tipo === 'dm' && contatoDm ? (
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5">
+              <Avatar nome={contatoDm.nome} avatarUrl={contatoDm.avatarUrl} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                  {contatoDm.nome ?? 'Membro'}
+                </p>
+                <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                  {formatNomeTorcida(contatoDm.tenantNome)}
+                </p>
               </div>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Envie uma mensagem inicial. O membro precisa aprovar antes da conversa continuar.
-              </p>
-              <textarea
-                value={mensagemInicial}
-                onChange={(e) => setMensagemInicial(e.target.value)}
-                autoFocus
-                maxLength={2000}
-                rows={4}
-                placeholder="Olá! Gostaria de conversar com você…"
-                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-              />
-              <button
-                type="button"
-                disabled={criando || mensagemInicial.trim().length === 0}
-                onClick={() =>
-                  void criarDm({
-                    destinatarioId: contatoDm.id,
-                    conteudo: mensagemInicial.trim(),
-                  })
-                }
-                className="w-full rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {criando ? 'Enviando…' : 'Enviar solicitação'}
-              </button>
-            </>
-          ) : (
-            <>
-          {tipo === 'grupo' && (
-            <>
-              <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                maxLength={60}
-                placeholder="Nome do grupo"
-                className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-              />
-              {selecionados.length > 0 && (
-                <m.div layout className="flex flex-wrap gap-1.5">
-                  <AnimatePresence mode="popLayout">
-                    {selecionados.map((c) => (
-                      <m.span
-                        key={c.id}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.85 }}
-                        transition={springSnappy}
-                        className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]"
-                      >
+            </div>
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Envie uma mensagem inicial. O membro precisa aprovar antes da conversa continuar.
+            </p>
+            <textarea
+              value={mensagemInicial}
+              onChange={(e) => setMensagemInicial(e.target.value)}
+              autoFocus
+              maxLength={2000}
+              rows={4}
+              placeholder="Olá! Gostaria de conversar com você…"
+              className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+            />
+            <button
+              type="button"
+              disabled={criando || mensagemInicial.trim().length === 0}
+              onClick={() =>
+                void criarDm({
+                  destinatarioId: contatoDm.id,
+                  conteudo: mensagemInicial.trim(),
+                })
+              }
+              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {criando ? 'Enviando…' : 'Enviar solicitação'}
+            </button>
+          </div>
+        ) : (
+          <>
+            {tipo === 'grupo' && (
+              <div className="shrink-0 space-y-3 px-4 pt-4">
+                <input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  maxLength={60}
+                  placeholder="Nome do grupo"
+                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                />
+                {selecionados.length > 0 && (
+                  <div
+                    ref={chipsRef}
+                    className="max-h-[min(6.75rem,22dvh)] min-h-0 overflow-y-auto overscroll-contain"
+                  >
+                    <m.div layout className="flex flex-wrap gap-1.5">
+                      <AnimatePresence mode="popLayout">
+                        {selecionados.map((c) => (
+                          <m.button
+                            key={c.id}
+                            type="button"
+                            layout
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.85 }}
+                            transition={springSnappy}
+                            aria-label={`Remover ${c.nome ?? 'membro'}`}
+                            onClick={() =>
+                              setSelecionados((prev) => prev.filter((x) => x.id !== c.id))
+                            }
+                            className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]"
+                          >
+                            {c.nome ?? 'Membro'}
+                            <X className="h-3 w-3" aria-hidden />
+                          </m.button>
+                        ))}
+                      </AnimatePresence>
+                    </m.div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="shrink-0 space-y-2 px-4 pb-2 pt-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  autoFocus
+                  placeholder={
+                    tipo === 'grupo'
+                      ? 'Buscar na rede ou na torcida'
+                      : 'Buscar membro pelo nome'
+                  }
+                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                />
+              </div>
+              {tipo === 'grupo' && (
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                  Sócios fora da sua rede ou torcida não entram em grupos — use DM com
+                  solicitação.
+                </p>
+              )}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
+              {buscando && resultadosVisiveis.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                  Buscando…
+                </p>
+              ) : resultadosVisiveis.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                  {tipo === 'grupo'
+                    ? busca.trim()
+                      ? idsSelecionados.size > 0 && resultados.length > 0
+                        ? 'Todos com esse nome já estão no grupo. Busque outro.'
+                        : 'Ninguém na sua rede ou torcida com esse nome.'
+                      : idsSelecionados.size > 0
+                        ? 'Os sugeridos já estão no grupo. Busque para adicionar mais.'
+                        : 'Só entram pessoas da sua rede de conexão ou associadas à sua torcida.'
+                    : 'Nenhum membro encontrado.'}
+                </p>
+              ) : (
+                <m.div variants={staggerContainer} initial="hidden" animate="show">
+                  {resultadosVisiveis.map((c, i) => (
+                    <m.button
+                      key={c.id}
+                      custom={i}
+                      variants={menuItemStagger}
+                      type="button"
+                      disabled={criando}
+                      onClick={() => escolher(c)}
+                      whileTap={{ scale: 0.99 }}
+                      transition={springSnappy}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                    >
+                      <Avatar nome={c.nome} avatarUrl={c.avatarUrl} size="sm" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
                         {c.nome ?? 'Membro'}
-                        <button
-                          type="button"
-                          aria-label={`Remover ${c.nome ?? 'membro'}`}
-                          onClick={() =>
-                            setSelecionados((prev) => prev.filter((x) => x.id !== c.id))
-                          }
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </m.span>
-                    ))}
-                  </AnimatePresence>
+                      </span>
+                      {!c.mesmoTenant && (
+                        <span className="shrink-0 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                          {formatNomeTorcida(c.tenantNome)}
+                        </span>
+                      )}
+                    </m.button>
+                  ))}
                 </m.div>
               )}
-            </>
-          )}
-
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              autoFocus
-              placeholder={
-                tipo === 'grupo'
-                  ? 'Buscar na rede ou na torcida'
-                  : 'Buscar membro pelo nome'
-              }
-              className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-            />
-          </div>
-          {tipo === 'grupo' && (
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              Sócios fora da sua rede ou torcida não entram em grupos — use DM com
-              solicitação.
-            </p>
-          )}
-            </>
-          )}
-        </div>
-
-        {!(tipo === 'dm' && contatoDm) && (
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {buscando && resultados.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Buscando…
-            </p>
-          ) : resultados.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              {tipo === 'grupo'
-                ? busca.trim()
-                  ? 'Ninguém na sua rede ou torcida com esse nome.'
-                  : 'Só entram pessoas da sua rede de conexão ou associadas à sua torcida.'
-                : 'Nenhum membro encontrado.'}
-            </p>
-          ) : (
-            <m.div variants={staggerContainer} initial="hidden" animate="show">
-              {resultados.map((c, i) => (
-                <m.button
-                  key={c.id}
-                  custom={i}
-                  variants={menuItemStagger}
-                  type="button"
-                  disabled={criando || idsSelecionados.has(c.id)}
-                  onClick={() => escolher(c)}
-                  whileTap={{ scale: 0.99 }}
-                  transition={springSnappy}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                >
-                <Avatar nome={c.nome} avatarUrl={c.avatarUrl} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
-                  {c.nome ?? 'Membro'}
-                </span>
-                {!c.mesmoTenant && (
-                  <span className="shrink-0 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    {formatNomeTorcida(c.tenantNome)}
-                  </span>
-                )}
-              </m.button>
-              ))}
-            </m.div>
-          )}
-        </div>
+            </div>
+          </>
         )}
 
         {tipo === 'grupo' && (
-          <div className="border-t border-[rgb(var(--border))] p-4">
+          <div className="shrink-0 border-t border-[rgb(var(--border))] p-4">
             <m.button
               type="button"
               disabled={criando || nome.trim().length < 3 || selecionados.length === 0}
               whileTap={{ scale: 0.98 }}
               transition={springSnappy}
               onClick={() => void criarGrupo()}
-              className="w-full rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {criando ? 'Criando…' : `Criar grupo (${selecionados.length + 1} participantes)`}
             </m.button>

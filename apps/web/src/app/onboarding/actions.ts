@@ -9,6 +9,7 @@ import {
   getSedesDaTorcidaOnboarding,
   getDepartamentosDoTenant,
   UFS_BRASIL,
+  podeListarTorcidasDaAfiliacao,
   type AfiliacaoOnboarding,
   type TorcidaOnboarding,
   type DepartamentoOnboarding,
@@ -24,6 +25,7 @@ import {
 import { clearTenantContextSlug, setTenantContextSlug } from '@/lib/tenant-context'
 import { lerSlugConviteDoCookie, limparSlugConviteCookie } from '@/lib/convite-cookie-server'
 import { resolverAfiliacaoIdEfetiva, resolverConvite } from '@/lib/convite'
+import { canalDeEntrada } from '@/lib/membro-origem'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
   encontrarConflitoCpf,
@@ -56,6 +58,11 @@ import {
   formatNomeTorcida,
   resolverPeriodicidadesOnboarding,
 } from '@torcida/types'
+import {
+  avaliarBloqueioNovaAssociacao,
+  torcidaTemLiderancaReal,
+  MENSAGEM_BLOQUEIO_ASSOCIACAO,
+} from '@/lib/associe-se'
 
 /**
  * O vínculo de sócio toma o advisory lock do nº de associado da torcida e só
@@ -82,6 +89,22 @@ export async function buscarTorcidas(afiliacaoId: string): Promise<TorcidaOnboar
   const session = await auth()
   if (!session?.user?.id) return []
   if (!z.string().uuid().safeParse(afiliacaoId).success) return []
+
+  const perfil: { afiliacaoId: string | null; onboardingConcluidoEm: Date | null } | null =
+    await db.perfilTorcedor.findUnique({
+      where: { userId: session.user.id },
+      select: { afiliacaoId: true, onboardingConcluidoEm: true },
+    })
+  if (
+    !podeListarTorcidasDaAfiliacao(
+      afiliacaoId,
+      perfil?.afiliacaoId ?? null,
+      Boolean(perfil?.onboardingConcluidoEm),
+    )
+  ) {
+    return []
+  }
+
   return getTorcidasPorAfiliacao(afiliacaoId)
 }
 
@@ -90,6 +113,29 @@ export async function buscarSedesDaTorcida(tenantId: string): Promise<SedeOnboar
   const session = await auth()
   if (!session?.user?.id) return []
   if (!z.string().uuid().safeParse(tenantId).success) return []
+
+  const perfil: { afiliacaoId: string | null; onboardingConcluidoEm: Date | null } | null =
+    await db.perfilTorcedor.findUnique({
+      where: { userId: session.user.id },
+      select: { afiliacaoId: true, onboardingConcluidoEm: true },
+    })
+  if (perfil?.onboardingConcluidoEm) {
+    const alvo: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { afiliacaoId: true },
+    })
+    const afiliacaoAlvo = await resolverAfiliacaoIdEfetiva(tenantId, alvo?.afiliacaoId ?? null)
+    if (
+      !podeListarTorcidasDaAfiliacao(
+        afiliacaoAlvo ?? '',
+        perfil.afiliacaoId,
+        true,
+      )
+    ) {
+      return []
+    }
+  }
+
   return getSedesDaTorcidaOnboarding(tenantId)
 }
 
@@ -450,6 +496,8 @@ const solicitarVinculoSchema = z.object({
     .max(64)
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  /** Deep-link do mapa Associe-se — distinto do onboarding aberto e do convite. */
+  origemAssocieSe: z.boolean().optional(),
   // ─── LGE / cadastro completo (2026-07): coletado direto no onboarding ────────
   // Obrigatória só para SOCIO (checado no `.superRefine` abaixo).
   dataNascimento: z
@@ -1175,15 +1223,15 @@ export async function solicitarVinculo(
       numero: data.numero,
       bloco: data.bloco,
       complemento: data.complemento,
-      numeroAssociado: data.caminhoSocio === 'NOVO' ? undefined : data.numeroAssociado,
-      anosSocio: data.caminhoSocio === 'NOVO' ? undefined : data.anosSocio,
-      imagemProva: data.caminhoSocio === 'NOVO' ? undefined : data.imagemProva,
+      numeroAssociado: data.caminhoSocio === 'NOVO' ? null : data.numeroAssociado,
+      anosSocio: data.caminhoSocio === 'NOVO' ? null : data.anosSocio,
+      imagemProva: data.caminhoSocio === 'NOVO' ? null : data.imagemProva,
       dataExpedicaoCarteirinha:
         data.caminhoSocio === 'EXISTENTE' && data.dataExpedicaoCarteirinha
-          ? parseDataCompetencia(data.dataExpedicaoCarteirinha) ?? undefined
-          : undefined,
+          ? parseDataCompetencia(data.dataExpedicaoCarteirinha) ?? null
+          : null,
       periodicidadePretendida:
-        data.caminhoSocio === 'EXISTENTE' ? data.periodicidadePretendida : undefined,
+        data.caminhoSocio === 'EXISTENTE' ? data.periodicidadePretendida ?? null : null,
       // LGE / cadastro completo (2026-07)
       dataNascimento: dataNascimento ?? undefined,
       sexo: data.sexo,
@@ -1316,7 +1364,12 @@ export async function solicitarVinculo(
       },
     })
 
-    if (existing?.status === 'APROVADO') {
+    const tipoGravado = typeof existing?.tipo === 'string' ? existing.tipo : null
+    const tipoEfetivo = tipoGravado ?? data.tipo
+    const upgradeTorcedorParaSocio =
+      existing?.status === 'APROVADO' && tipoGravado === 'TORCEDOR' && data.tipo === 'SOCIO'
+
+    if (existing?.status === 'APROVADO' && !upgradeTorcedorParaSocio) {
       // Também cura tentativas anteriores em que o vínculo foi persistido,
       // mas o provisionamento dos canais falhou depois da transação.
       // Best-effort: canal com problema não pode prender a pessoa no wizard.
@@ -1326,22 +1379,49 @@ export async function solicitarVinculo(
         sedeId: existing.sedeId,
         // Mesma leitura de `tipoExistente` abaixo: o vínculo já gravado manda,
         // e o do wizard só cobre o registro legado sem `tipo`.
-        tipo:
-          (typeof existing.tipo === 'string' ? existing.tipo : data.tipo) === 'TORCEDOR'
-            ? 'TORCEDOR'
-            : 'SOCIO',
+        tipo: tipoEfetivo === 'TORCEDOR' ? 'TORCEDOR' : 'SOCIO',
       })
       // Já é membro: isso não é erro. Conclui o onboarding e segue para a
       // comunidade — antes o wizard travava na última etapa sem saída.
       await concluirPerfilTorcedor(userId, afiliacaoIdEfetiva)
       await limparSlugConviteCookie()
-      const tipoExistente = typeof existing.tipo === 'string' ? existing.tipo : data.tipo
-      if (tipoExistente === 'TORCEDOR') {
+      if (tipoEfetivo === 'TORCEDOR') {
         await clearTenantContextSlug()
         return { ok: true, redirectTo: '/portal/comunidade?escopo=nacional' }
       }
       await setTenantContextSlug(tenantDestino.slug)
       return { ok: true, redirectTo: '/portal/comunidade' }
+    }
+
+    // Uma torcida por pessoa: segundo canal não entra por aqui (convite também
+    // não fura — o convite é o único jeito de *entrar* como TORCEDOR, e só na
+    // primeira torcida). Upgrade TORCEDOR→SOCIO na mesma worktree é o único
+    // avanço permitido. Roda depois do soft-success de "já APROVADO aqui".
+    const bloqueioAssoc = await avaliarBloqueioNovaAssociacao(userId, tenantDestino.id)
+    if (!bloqueioAssoc.ok) {
+      return { message: MENSAGEM_BLOQUEIO_ASSOCIACAO[bloqueioAssoc.motivo] }
+    }
+
+    if (data.tipo === 'SOCIO') {
+      const raizId = await resolverTenantRaizId(tenantDestino.id)
+      if (!(await torcidaTemLiderancaReal(raizId))) {
+        return { message: MENSAGEM_BLOQUEIO_ASSOCIACAO.sem_lideranca }
+      }
+      const perfilClube: {
+        afiliacaoId: string | null
+        onboardingConcluidoEm: Date | null
+      } | null = await db.perfilTorcedor.findUnique({
+        where: { userId },
+        select: { afiliacaoId: true, onboardingConcluidoEm: true },
+      })
+      if (perfilClube?.onboardingConcluidoEm && perfilClube.afiliacaoId) {
+        const doClube: Array<{ id: string }> = await getTorcidasPorAfiliacao(
+          perfilClube.afiliacaoId,
+        )
+        if (!doClube.some((t) => t.id === raizId)) {
+          return { message: MENSAGEM_BLOQUEIO_ASSOCIACAO.clube_errado }
+        }
+      }
     }
 
     // Bloqueio da diretoria: barra o usuário mesmo sem cadastro anterior, e
@@ -1394,6 +1474,15 @@ export async function solicitarVinculo(
         })
       }
     }
+
+    const viaConvite = await conviteAutorizaAcessoAntecipado(
+      data.conviteSlug,
+      tenantDestino.id,
+    )
+    const origemCadastro = canalDeEntrada({
+      viaConvite,
+      origemAssocieSe: data.origemAssocieSe,
+    })
 
     // Sócio: lock + unicidade de nº/CPF/RG/telefone na mesma transaction —
     // impede race e garante que identidade nunca entre duplicada na lineage.
@@ -1462,7 +1551,7 @@ export async function solicitarVinculo(
         }
 
         if (existing) {
-          if (existing.status === 'PENDENTE') {
+          if (existing.status === 'PENDENTE' || upgradeTorcedorParaSocio) {
             await tx.saasMembro.update({
               where: { id: existing.id },
               data: {
@@ -1470,6 +1559,18 @@ export async function solicitarVinculo(
                 status: statusInicial,
               },
             })
+            if (upgradeTorcedorParaSocio) {
+              await tx.auditLog.create({
+                data: {
+                  tenantId: tenantDestino.id,
+                  atorId: userId,
+                  acao: 'CADASTRO_SOLICITADO',
+                  entidade: 'SaasMembro',
+                  entidadeId: existing.id,
+                  detalhes: { origem: 'upgrade_torcedor' },
+                },
+              })
+            }
           } else {
             // REPROVADO — permite nova tentativa (atualiza o registro).
             await tx.saasMembro.update({
@@ -1513,6 +1614,7 @@ export async function solicitarVinculo(
               acao: 'CADASTRO_SOLICITADO',
               entidade: 'SaasMembro',
               entidadeId: novo.id,
+              detalhes: { origem: origemCadastro },
             },
           })
         }
@@ -1750,7 +1852,7 @@ export async function solicitarVinculo(
     // A entrada é de leitura: publicar no mural exige `assertMembroAtivo`
     // (status APROVADO), então o pendente lê e não escreve sem nenhum gate
     // extra.
-    if (dadosMembro.sedeId && (await conviteAutorizaAcessoAntecipado(data.conviteSlug, tenantDestino.id))) {
+    if (dadosMembro.sedeId && viaConvite) {
       await vincularCanaisBestEffort({
         tenantId: tenantDestino.id,
         userId,

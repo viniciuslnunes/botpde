@@ -31,7 +31,8 @@ import {
 } from '@/lib/canais'
 import { notificarSafe } from '@/lib/notificacoes'
 import { assertPodeMutarSedeNaArvore } from '@/lib/sede-acesso-mae'
-import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
+import { PERMISSIONS, casoLiderancaDaSede, podeCriarUnidadeTerritorial } from '@torcida/types'
+import { liderancaAtualDoTenant } from '@/lib/lideranca'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
 
@@ -437,8 +438,25 @@ export async function editarSede(
     return { errors: { tipo: [rebaixamentoErro] } }
   }
 
-  const resp = await resolverResponsavelUser(tenantDaUnidade, responsavelUserId)
-  if (resp.error) return { errors: { responsavelUserId: [resp.error] } }
+  const caso = casoLiderancaDaSede({
+    tipo: existing.tipo,
+    tenantId: existing.tenantId,
+    parentTenantId: pai?.tenantId ?? null,
+  })
+
+  let resp: { userId: string | null; nome: string | null }
+  if (caso === 'B') {
+    const owners = await liderancaAtualDoTenant(tenantDaUnidade)
+    const owner = owners[0] ?? null
+    resp = {
+      userId: owner?.userId ?? existing.responsavelUserId,
+      nome: owner?.nome ?? null,
+    }
+  } else {
+    const resolved = await resolverResponsavelUser(tenantDaUnidade, responsavelUserId)
+    if (resolved.error) return { errors: { responsavelUserId: [resolved.error] } }
+    resp = resolved
+  }
 
   await db.sede.update({
     where: { id: sedeId },
@@ -447,7 +465,7 @@ export async function editarSede(
       tipo: tipoFinal,
       sedeId: sedePaiId ?? null,
       responsavelUserId: resp.userId,
-      responsavel: resp.nome ?? responsavel ?? null,
+      responsavel: (responsavel && responsavel.trim()) || resp.nome || null,
       ...rest,
     },
   })

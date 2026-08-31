@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 /*
+  O script de tema no layout raiz usa class `.dark` no <html>, não prefers-color-scheme.
+  Sem isto, `dark:text-yellow-300` (etc.) dispara com o SO no escuro mesmo
+  quando o app está no claro — amarelo/rosa ilegível no papel branco.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
   Fontes explícitas para Tailwind v4 em monorepo.
   Sem @source, o Tailwind v4 não encontra os arquivos quando o build
   roda com CWD na raiz do monorepo (botpde/) em vez de apps/web/.
@@ -8,6 +15,9 @@
 */
 @source "../";                          /* apps/web/src/ — pages, components, lib */
 @source "../../../../packages/ui/src";  /* packages/ui — providers compartilhados  */
+/* e2e/scripts: não escanear — comentários com classes truncadas quebram o CSS. */
+@source not "../../e2e";
+@source not "../../scripts";
 
 /* ── Variáveis de tema ─────────────────────────────────────────── */
 :root {
@@ -20,7 +30,7 @@
   --background: 255 255 255;
   --background-subtle: 249 250 251;  /* gray-50 */
   --foreground: 17 24 39;            /* gray-900 */
-  --foreground-muted: 107 114 128;   /* gray-500 */
+  --foreground-muted: 75 85 99;      /* gray-600 — 7:1 no branco (gray-500 falhava com tint) */
 
   /* Bordas */
   --border: 229 231 235;             /* gray-200 */
@@ -28,7 +38,7 @@
 
   /* Superfícies */
   --surface: 255 255 255;
-  --surface-raised: 249 250 251;
+  --surface-raised: 244 244 245;     /* zinc-100 */
 
   /* Secundária (opcional — módulo Design) */
   --color-secondary: 124 58 237;
@@ -45,14 +55,19 @@
      NÃO usar var(--color-primary) aqui: com marca preta o texto some no escuro. */
   --color-primary-fg: 91 33 182;
   --color-primary-on: 255 255 255;
+  --color-primary-ring: 17 24 39;
+  --color-primary-ring-a: 0;
   --color-secondary-fg: 91 33 182;
   --color-secondary-on: 255 255 255;
+  --color-secondary-ring: 17 24 39;
+  --color-secondary-ring-a: 0;
   --primary-fg: var(--color-primary-fg);
   --secondary-fg: var(--color-secondary-fg);
-  --color-success-fg: var(--color-success);
-  --color-danger-fg: var(--color-danger);
-  --color-warning-fg: var(--color-warning);
-  --color-info-fg: var(--color-info);
+  /* *-fg = texto no papel, não a fill do botão (âmbar #d97706 falha AA no branco). */
+  --color-success-fg: 29 78 216;     /* #1d4ed8 */
+  --color-danger-fg: 185 28 28;      /* #b91c1c */
+  --color-warning-fg: 146 64 14;     /* #92400e amber-800 */
+  --color-info-fg: 29 78 216;        /* #1d4ed8 */
   --color-success-on: 255 255 255;
   --color-danger-on: 255 255 255;
   --color-warning-on: 255 255 255;
@@ -73,6 +88,15 @@
   --grid-opacity: 0.03;
   --grid-base: var(--background-subtle);
   --grid-line: var(--foreground);
+
+  /* Camadas (dropdown → sticky → sidebar → modal → confirm → toast)
+     Sidebar admin fica em z-60 de propósito: backdrops do header não a cobrem.
+     Modal de página (AppModal) porta no body em --z-modal, acima do menu. */
+  --z-dropdown: 40;
+  --z-sticky: 50;
+  --z-sidebar: 60;
+  --z-modal: 80;
+  --z-dialog: 100;
 }
 
 .dark {
@@ -87,6 +111,12 @@
   /* Fallback legível no escuro até o bridge do tenant aplicar a marca */
   --color-primary-fg: 196 181 253;
   --color-secondary-fg: 196 181 253;
+  --color-primary-ring: 250 250 250;
+  --color-secondary-ring: 250 250 250;
+  --color-success-fg: 147 197 253;   /* blue-300 */
+  --color-danger-fg: 252 165 165;    /* red-300 — só no .dark; no claro é red-700 */
+  --color-warning-fg: 252 211 77;    /* amber-300 — idem */
+  --color-info-fg: 147 197 253;
   /* Trilha um pouco mais forte (zinc-900 pede mais tinta) e brilho
      bem discreto — no escuro um branco opaco viraria flash. */
   --skeleton-track: rgb(var(--foreground) / 0.12);
@@ -235,6 +265,62 @@ select {
   max-width: 100%;
 }
 
+/* Piso de 16px em controle de texto no toque — iOS não dá zoom ao focar.
+   O Safari do iPhone amplia a página ao focar um campo com fonte < 16px e
+   NÃO desfaz o zoom ao sair: a tela fica escalada e só volta com pinch. É o
+   defeito que mais denuncia "isto é um site, não um app".
+   A correção é a fonte, não `maximum-scale=1` no viewport — isso mataria o
+   zoom por gesto (WCAG 1.4.4) e é acessibilidade, não estilo.
+   Escopo `pointer: coarse`: no desktop `text-sm` (14px) segue valendo, então
+   nenhuma tela de mouse muda. Os guardas de largura logo acima (`min-width:0`
+   e `select{max-width:100%}`) impedem que a fonte maior estoure a viewport.
+   Fora: controles que não abrem teclado (botão, checkbox, range, cor...). */
+@media (pointer: coarse) {
+  input:not(
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='file'],
+      [type='image'],
+      [type='checkbox'],
+      [type='radio'],
+      [type='color'],
+      [type='range']
+    ),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* O mesmo controle também precisa ser tocável: com `py-2 text-sm` um
+     <select> fechava em 41px. `textarea` fica de fora — a altura dele é o
+     número de linhas, não um alvo. */
+  input:not(
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='file'],
+      [type='image'],
+      [type='checkbox'],
+      [type='radio'],
+      [type='color'],
+      [type='range'],
+      [type='hidden']
+    ),
+  select {
+    min-height: 2.75rem;
+  }
+
+  /* Caixa de marcação nativa nasce em 13px. 44px deixaria a caixa
+     desproporcional ao texto, então o piso aqui é o mínimo da WCAG 2.5.8
+     (24px) — o rótulo associado continua ampliando a área de toque. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-height: 1.5rem;
+    min-width: 1.5rem;
+  }
+}
+
 :is(button, input, select, textarea, .app-action):disabled,
 :is(button, input, select, textarea, .app-action):disabled *,
 [aria-disabled='true'],
@@ -312,6 +398,19 @@ button,
 .text-primary {
   color: rgb(var(--color-primary-fg));
 }
+/* Status como TEXTO (kpi, resumo) — nunca a fill crua (âmbar some no claro). */
+.text-success {
+  color: rgb(var(--color-success-fg));
+}
+.text-danger {
+  color: rgb(var(--color-danger-fg));
+}
+.text-warning {
+  color: rgb(var(--color-warning-fg));
+}
+.text-info {
+  color: rgb(var(--color-info-fg));
+}
 .border-primary {
   border-color: rgb(var(--color-primary));
 }
@@ -321,6 +420,7 @@ button,
 .btn-primary {
   background-color: rgb(var(--color-primary));
   color: rgb(var(--color-primary-on));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-primary-ring) / var(--color-primary-ring-a, 0));
 }
 .btn-primary:hover {
   filter: brightness(0.92);
@@ -348,6 +448,7 @@ button,
 .btn-secondary {
   background-color: rgb(var(--color-secondary));
   color: rgb(var(--color-secondary-on));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-secondary-ring) / var(--color-secondary-ring-a, 0));
 }
 .btn-secondary:hover {
   filter: brightness(0.92);
@@ -485,6 +586,16 @@ button,
  */
 .torcida-dialog-backdrop {
   opacity: 1;
+  z-index: var(--z-dialog);
+}
+
+.app-modal-backdrop {
+  opacity: 1;
+  z-index: var(--z-modal);
+}
+
+.app-modal-backdrop[data-layer='nested'] {
+  z-index: calc(var(--z-modal) + 10);
 }
 @keyframes torcida-dialog-panel-in {
   from {
@@ -632,6 +743,18 @@ button,
   }
 }
 
+/* Barra que atravessa a tela (topbar sticky, dock, barra de checkout) precisa
+   respeitar o recorte LATERAL. Com `viewportFit: 'cover'` a página ocupa a
+   tela inteira, e em paisagem o notch / Dynamic Island come ~44px de um dos
+   lados: `px-4` (16px) joga o logo para baixo dele. O `.app-container` já faz
+   isso para o conteúdo, mas barra fixa/sticky vive fora dele.
+   A folga base é configurável — `[--app-inset-x:0.75rem]` numa barra mais
+   compacta — e o inset só entra quando é maior que ela. */
+.app-inset-x {
+  padding-left: max(var(--app-inset-x, 1rem), env(safe-area-inset-left));
+  padding-right: max(var(--app-inset-x, 1rem), env(safe-area-inset-right));
+}
+
 .app-shell-bg {
   position: relative;
   background-color: rgb(var(--grid-base, var(--background-subtle)));
@@ -668,9 +791,90 @@ html[data-grid='off'] .app-shell-bg {
   min-height: 2.5rem;
 }
 
+/* No toque o alvo tem que ser 44x44 (Apple HIG / WCAG 2.5.5) — nos DOIS eixos.
+   Só `min-height` deixava o botão de ícone (`h-9 w-9`) em 36x44: passava na
+   altura e falhava na largura, e era o caso do hambúrguer e do sino em todas
+   as telas de admin. `min-width` é no-op em botão com texto (já é mais largo),
+   então a regra vale para o conjunto sem alargar nada que não precise. */
 @media (pointer: coarse) {
   .app-action {
     min-height: 2.75rem;
+  }
+  /* `:not(.min-w-0)` é a válvula de escape, e é obrigatória: esta regra é
+     unlayered e venceria o `min-w-0` do Tailwind. Um botão que declara
+     `min-w-0 flex-1` está dizendo "preciso encolher" — forçar 44px de largura
+     nele fazia o card de patrimônio cortar 20px em 320px. Quem opta por
+     encolher continua encolhendo; o botão de ícone (sem `min-w-0`) ganha o
+     alvo quadrado. */
+  .app-action:not(.min-w-0) {
+    min-width: 2.75rem;
+  }
+}
+
+/* Alvo de toque para UI densa (abas de módulo, paginação de listagem).
+   Difere de `.app-action`: aquela já impõe 2.5rem TAMBÉM no mouse, o que
+   engordaria a tabela de quem opera no desktop. Aqui só o toque cresce —
+   no mouse a densidade fica exatamente como está. */
+@media (pointer: coarse) {
+  .app-touch-target {
+    min-height: 2.75rem;
+  }
+  /* Mesma válvula do `.app-action` — ver comentário acima. */
+  .app-touch-target:not(.min-w-0) {
+    min-width: 2.75rem;
+  }
+}
+
+/* Piso de altura de toque em TODO controle — a auditoria achou ~58 assinaturas
+   de botão/aba entre 16 e 40px de altura, espalhadas por dezenas de telas.
+   Marcar uma a uma seria churn enorme e alto risco de regressão; aqui uma
+   regra resolve o conjunto.
+
+   É seguro por semântica do CSS, não por sorte: `min-height` **não se aplica a
+   elemento inline não substituído**, então link em meio a texto continua
+   intacto sozinho — só `inline-flex`/`flex`/`block` crescem, que é exatamente
+   o alvo. E cresce só na vertical: o modo de falha que interessa evitar
+   (estouro horizontal) não é alcançado por `min-height`.
+
+   Fora, de propósito:
+   - `.absolute`/`.fixed` — badge de fechar (16px) posicionado por cima; esticar
+     deformaria o visual sem ganhar área útil;
+   - `.app-touch-line` — a área dele já é 44px por pseudo-elemento, e o ponto
+     daquela utilidade é justamente NÃO mexer no layout;
+   - `.sr-only` — não é alvo;
+   - `.app-sem-piso-toque` — escape explícito para UI densa que precise. */
+@media (pointer: coarse) {
+  :where(a[href], button, [role='button'], [role='tab'], summary):not(.absolute):not(.fixed):not(
+      .sr-only
+    ):not(.app-touch-line):not(.app-sem-piso-toque) {
+    min-height: 2.75rem;
+  }
+}
+
+/* Link de texto solto num card ("Ver departamento", "Escala da semana"): a
+   caixa tem a altura da linha (16–20px) e engordá-la abriria buracos no
+   layout. Aqui a área de toque cresce por pseudo-elemento — o alvo vira 44px
+   de altura e a diagramação não muda um pixel.
+   Só onde o link está sozinho na linha: a faixa se sobrepõe na vertical, e
+   perto de outro controle ela roubaria o toque. */
+@media (pointer: coarse) {
+  .app-touch-line {
+    position: relative;
+  }
+  /* 44px nos DOIS eixos, centrado no elemento. `min-width: 100%` deixa o
+     link largo intacto (a área acompanha o texto) e `width: 2.75rem` levanta
+     o piso do elemento estreito — é o caso do logo do tenant (`h-8 w-8`), que
+     declara `min-w-0` para poder encolher e por isso não pode usar
+     `.app-touch-target`. Sem mudar uma linha do layout nos dois casos. */
+  .app-touch-line::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2.75rem;
+    min-width: 100%;
+    height: 2.75rem;
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -816,3 +1020,5 @@ html[data-grid='off'] .app-shell-bg {
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
 }
+
+

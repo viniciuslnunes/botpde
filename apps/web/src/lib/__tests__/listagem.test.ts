@@ -28,6 +28,7 @@ import { montarChips, montarFiltroUI, paramsDoContrato } from '@/lib/listagem/ui
 import {
   LISTAGEM_ACESSOS_PESSOAS,
   LISTAGEM_MEMBROS,
+  LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SUPER_ADMIN_SETUP,
   LISTAGENS,
 } from '@/lib/listagem/specs'
@@ -112,6 +113,18 @@ describe('invariantes do registro de listagens', () => {
             JSON.stringify(ESCOPO_TENANT).slice(1, -1),
           )
         }
+      }
+    }
+  })
+
+  it('filtro por SaasMembro via .some. declara escopoSome com tenant', () => {
+    for (const spec of LISTAGENS) {
+      for (const filtro of filtrosDoSpec(spec)) {
+        if (!filtro.campo.includes('membros.some')) continue
+        expect(filtro.escopoSome, `${spec.id}/${filtro.id}`).toBeTruthy()
+        expect(comoTexto(filtro.escopoSome), `${spec.id}/${filtro.id}`).toContain(
+          JSON.stringify(ESCOPO_TENANT).slice(1, -1),
+        )
       }
     }
   })
@@ -284,6 +297,18 @@ describe('montagem do where', () => {
         escopo: { global: true, motivo: 'teste' },
       }),
     ).toThrow(/ESCOPO_TENANT/)
+  })
+
+  it('filtro de unidade em emitidas entra no some com tenantId', () => {
+    const params = parseListagemParams({ sede: 'sede-abc' }, LISTAGEM_SOCIOS_EMITIDAS)
+    const where = montarWhereListagem<ListagemWhere>(LISTAGEM_SOCIOS_EMITIDAS, params, {
+      escopo: { tenantId: TENANT },
+    })
+    const texto = comoTexto(where)
+    expect(texto).toContain(`"tenantId":"${TENANT}"`)
+    expect(texto).toContain('"sedeId":"sede-abc"')
+    expect(texto).toContain('"tipo":"SOCIO"')
+    expect(texto).toMatch(/"membros":\{"some":\{/)
   })
 
   it('busca em campo de dígitos não usa modo insensitive', () => {

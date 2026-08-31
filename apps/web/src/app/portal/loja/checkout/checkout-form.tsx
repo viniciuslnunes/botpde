@@ -1,15 +1,88 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
+import { useActionState, useMemo, useRef, useState, type InputHTMLAttributes, type Ref } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { finalizarPedido } from '../actions'
+import { finalizarPedido, type ActionState } from '../actions'
+import { isRedirectError } from '@/lib/toast-action'
 import { ArrowRight, Store } from 'lucide-react'
 import { rotuloTamanho } from '@torcida/types'
 import type { CheckoutItemSerializado } from '@/lib/loja-serialize'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
+import {
+  validarEnderecoEnvio,
+  type ErrosEnderecoCheckout,
+} from '@/lib/loja-checkout-endereco'
 import { LojaCheckoutStepper } from '../_components/loja-fluxo'
+
+async function finalizarPedidoNaUi(
+  prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    return await finalizarPedido(prev, formData)
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      error:
+        'A conexão com o servidor caiu no meio do envio. Recarregue e tente de novo — se o pedido já saiu, ele aparece em Pedidos.',
+    }
+  }
+}
+
+const inputBase =
+  'w-full border bg-transparent px-3 py-2 text-sm focus:outline-none'
+
+function classeCampo(invalido: boolean) {
+  return invalido
+    ? `${inputBase} border-[rgb(var(--color-danger))] focus:border-[rgb(var(--color-danger-fg))]`
+    : `${inputBase} border-[rgb(var(--border))] focus:border-[rgb(var(--primary))]`
+}
+
+function CampoCheckout({
+  id,
+  label,
+  value,
+  onChange,
+  erro,
+  inputRef,
+  autoComplete,
+  inputMode,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (valor: string) => void
+  erro?: string
+  inputRef?: Ref<HTMLInputElement>
+  autoComplete?: string
+  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode']
+}) {
+  const erroId = `${id}-erro`
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        id={id}
+        aria-label={label}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={erro ? erroId : undefined}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
+        placeholder={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={classeCampo(Boolean(erro))}
+      />
+      {erro ? (
+        <p id={erroId} className="mt-1.5 text-xs text-[rgb(var(--color-danger-fg))]">
+          {erro}
+        </p>
+      ) : null}
+    </div>
+  )
+}
 
 function formatarPreco(preco: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(preco)
@@ -30,9 +103,37 @@ export function CheckoutForm({
   cuponsDisponiveis: CupomDisponivel[]
   lojas: CheckoutLojaMeta[]
 }) {
-  const [state, action, pending] = useActionState(finalizarPedido, {})
+  const [state, action, pending] = useActionState(finalizarPedidoNaUi, {})
   const [modalidade, setModalidade] = useState<'RETIRADA' | 'ENVIO'>('RETIRADA')
   const [cupom, setCupom] = useState('')
+  const [cep, setCep] = useState('')
+  const [rua, setRua] = useState('')
+  const [numero, setNumero] = useState('')
+  const [complemento, setComplemento] = useState('')
+  const [errosEndereco, setErrosEndereco] = useState<ErrosEnderecoCheckout>({})
+  const [erroLocal, setErroLocal] = useState<string | null>(null)
+  const cepRef = useRef<HTMLInputElement>(null)
+  const ruaRef = useRef<HTMLInputElement>(null)
+  const numeroRef = useRef<HTMLInputElement>(null)
+
+  function limparErroCampo(campo: keyof ErrosEnderecoCheckout) {
+    setErrosEndereco((prev) => (prev[campo] ? { ...prev, [campo]: undefined } : prev))
+  }
+
+  function escolherModalidade(proxima: 'RETIRADA' | 'ENVIO') {
+    setModalidade(proxima)
+    setErrosEndereco({})
+    setErroLocal(null)
+  }
+
+  async function aoMudarCep(valor: string) {
+    setCep(valor)
+    limparErroCampo('cep')
+    const endereco = await buscarEnderecoPorCep(valor)
+    if (!endereco?.logradouro) return
+    setRua(endereco.logradouro)
+    limparErroCampo('rua')
+  }
 
   const nomes = useMemo(() => new Map(lojas.map((l) => [l.tenantId, l.nome])), [lojas])
 
@@ -69,6 +170,9 @@ export function CheckoutForm({
     changes: checkoutChanges,
   })
 
+  const temErroEndereco = Boolean(errosEndereco.cep || errosEndereco.rua || errosEndereco.numero)
+  const erroResumo = (temErroEndereco ? erroLocal : null) || state.error
+
   return (
     <div className="space-y-6">
       <LojaCheckoutStepper atual="checkout" lojasCount={grupos.length} />
@@ -76,10 +180,32 @@ export function CheckoutForm({
       <m.form
         key="form"
         action={action}
+        noValidate
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={springSnappy}
-        className="grid gap-8 lg:grid-cols-2"
+        // `[&>*]:min-w-0`: item de grid tem `min-width: auto`, então o
+        // min-content de um filho (resumo do pedido, campo de endereço) vira o
+        // piso da coluna e estoura a viewport em 320px. Mesmo tratamento do
+        // `InsightSection` — ver ARCHITECTURE §5.20.
+        className="grid gap-8 [&>*]:min-w-0 lg:grid-cols-2"
+        onSubmit={(e) => {
+          if (modalidade !== 'ENVIO') {
+            setErroLocal(null)
+            return
+          }
+          const erros = validarEnderecoEnvio({ cep, rua, numero })
+          if (erros.cep || erros.rua || erros.numero) {
+            e.preventDefault()
+            setErrosEndereco(erros)
+            setErroLocal('Informe o CEP, a rua e o número para envio.')
+            const primeiro = erros.cep ? cepRef : erros.rua ? ruaRef : numeroRef
+            primeiro.current?.focus()
+            return
+          }
+          setErrosEndereco({})
+          setErroLocal(null)
+        }}
       >
             <div className="space-y-6">
               <div>
@@ -123,7 +249,7 @@ export function CheckoutForm({
                       name="modalidadeEntrega"
                       value="RETIRADA"
                       checked={modalidade === 'RETIRADA'}
-                      onChange={() => setModalidade('RETIRADA')}
+                      onChange={() => escolherModalidade('RETIRADA')}
                     />
                     <div>
                       <p className="font-medium">Retirada na sede</p>
@@ -141,7 +267,7 @@ export function CheckoutForm({
                       name="modalidadeEntrega"
                       value="ENVIO"
                       checked={modalidade === 'ENVIO'}
-                      onChange={() => setModalidade('ENVIO')}
+                      onChange={() => escolherModalidade('ENVIO')}
                     />
                     <div>
                       <p className="font-medium">Envio por correios</p>
@@ -164,37 +290,64 @@ export function CheckoutForm({
                     transition={springSnappy}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-3 border border-[rgb(var(--border))] p-4">
-                      <input name="enderecoEntrega" type="hidden" value="" id="endereco-json" />
+                    <div
+                      className={
+                        temErroEndereco
+                          ? 'space-y-3 border border-[rgb(var(--color-danger)_/_0.45)] bg-[rgb(var(--color-danger)_/_0.04)] p-4'
+                          : 'space-y-3 border border-[rgb(var(--border))] p-4'
+                      }
+                    >
                       <input
-                        id="cep"
-                        placeholder="CEP"
-                        required
-                        onChange={async (e) => {
-                          const endereco = await buscarEnderecoPorCep(e.target.value)
-                          if (!endereco) return
-                          const rua = document.getElementById('rua') as HTMLInputElement | null
-                          if (endereco.logradouro && rua) rua.value = endereco.logradouro
-                        }}
-                        className="w-full border border-[rgb(var(--border))] bg-transparent px-3 py-2 text-sm focus:border-[rgb(var(--primary))] focus:outline-none"
+                        name="enderecoEntrega"
+                        type="hidden"
+                        value={JSON.stringify({
+                          cep: cep.trim(),
+                          rua: rua.trim(),
+                          numero: numero.trim(),
+                          complemento: complemento.trim() || undefined,
+                        })}
                       />
-                      <input
+                      <CampoCheckout
+                        id="cep"
+                        label="CEP"
+                        value={cep}
+                        onChange={aoMudarCep}
+                        erro={errosEndereco.cep}
+                        inputRef={cepRef}
+                        autoComplete="postal-code"
+                        inputMode="numeric"
+                      />
+                      <CampoCheckout
                         id="rua"
-                        placeholder="Rua"
-                        required
-                        className="w-full border border-[rgb(var(--border))] bg-transparent px-3 py-2 text-sm focus:border-[rgb(var(--primary))] focus:outline-none"
+                        label="Rua"
+                        value={rua}
+                        onChange={(valor) => {
+                          setRua(valor)
+                          limparErroCampo('rua')
+                        }}
+                        erro={errosEndereco.rua}
+                        inputRef={ruaRef}
+                        autoComplete="address-line1"
                       />
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
+                        <CampoCheckout
                           id="numero"
-                          placeholder="Número"
-                          required
-                          className="border border-[rgb(var(--border))] bg-transparent px-3 py-2 text-sm focus:border-[rgb(var(--primary))] focus:outline-none"
+                          label="Número"
+                          value={numero}
+                          onChange={(valor) => {
+                            setNumero(valor)
+                            limparErroCampo('numero')
+                          }}
+                          erro={errosEndereco.numero}
+                          inputRef={numeroRef}
+                          inputMode="numeric"
                         />
-                        <input
+                        <CampoCheckout
                           id="complemento"
-                          placeholder="Complemento (opcional)"
-                          className="border border-[rgb(var(--border))] bg-transparent px-3 py-2 text-sm focus:border-[rgb(var(--primary))] focus:outline-none"
+                          label="Complemento (opcional)"
+                          value={complemento}
+                          onChange={setComplemento}
+                          autoComplete="address-line2"
                         />
                       </div>
                     </div>
@@ -247,15 +400,21 @@ export function CheckoutForm({
               </div>
 
               <AnimatePresence>
-                {state.error && (
-                  <m.p
+                {erroResumo && (
+                  <m.div
+                    key="erro-checkout"
+                    role="alert"
+                    aria-live="assertive"
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="text-sm text-red-600"
+                    className="border border-[rgb(var(--color-danger)_/_0.4)] bg-[rgb(var(--color-danger)_/_0.08)] px-3 py-2.5"
                   >
-                    {state.error}
-                  </m.p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[rgb(var(--color-danger-fg))]">
+                      Não foi possível confirmar
+                    </p>
+                    <p className="mt-0.5 text-sm text-[rgb(var(--color-danger-fg))]">{erroResumo}</p>
+                  </m.div>
                 )}
               </AnimatePresence>
 
@@ -264,27 +423,6 @@ export function CheckoutForm({
                 disabled={pending}
                 whileTap={{ scale: pending ? 1 : 0.98 }}
                 transition={springSnappy}
-                onClick={(e) => {
-                  if (modalidade === 'ENVIO') {
-                    const cep = (document.getElementById('cep') as HTMLInputElement)?.value
-                    const rua = (document.getElementById('rua') as HTMLInputElement)?.value
-                    const numero = (document.getElementById('numero') as HTMLInputElement)?.value
-                    const complemento = (document.getElementById('complemento') as HTMLInputElement)?.value
-                    if (!cep || !rua || !numero) {
-                      e.preventDefault()
-                      alert('Preencha CEP, rua e número.')
-                      return
-                    }
-                    const hidden = document.getElementById('endereco-json') as HTMLInputElement
-                    hidden.name = 'enderecoEntrega'
-                    hidden.value = JSON.stringify({
-                      cep,
-                      rua,
-                      numero,
-                      complemento: complemento || undefined,
-                    })
-                  }
-                }}
                 className="flex w-full items-center justify-center gap-2 bg-[rgb(var(--primary))] py-3.5 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--color-primary-on))] disabled:opacity-50"
               >
                 {pending

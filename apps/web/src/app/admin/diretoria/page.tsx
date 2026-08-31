@@ -144,7 +144,7 @@ async function DiretoriaHeaderLinks({ tenantId }: { tenantId: string }) {
   return (
     <Link
       href={`/portal/departamentos/${ops.departamentoSlug}`}
-      className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+      className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
     >
       Cockpit no portal
     </Link>
@@ -194,7 +194,7 @@ export default async function AdminDiretoriaPage() {
             {perm.podeMembros ? (
               <Link
                 href="/admin/membros"
-                className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Membros
               </Link>
@@ -202,7 +202,7 @@ export default async function AdminDiretoriaPage() {
             {perm.podeRoles ? (
               <Link
                 href="/admin/departamentos"
-                className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Departamentos
               </Link>
@@ -210,7 +210,7 @@ export default async function AdminDiretoriaPage() {
             {isSuperAdmin || hasPermission(effective, PERMISSIONS.AUDIT_VIEW) ? (
               <Link
                 href="/admin/auditoria"
-                className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Auditoria
               </Link>

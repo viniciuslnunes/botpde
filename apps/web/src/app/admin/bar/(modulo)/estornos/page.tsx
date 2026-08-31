@@ -79,7 +79,7 @@ export default async function AdminBarEstornosPage() {
         </div>
         <Link
           href="/admin/bar/vendas"
-          className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Voltar às vendas
         </Link>

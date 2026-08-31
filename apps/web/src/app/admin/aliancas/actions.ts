@@ -6,10 +6,10 @@ import type { Alianca, StatusAlianca } from '@torcida/db'
 import { z } from 'zod'
 import { assertAliancasManage } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
-import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
+import { getTorcidaLineageTenantIds, invalidateHierarchyCache, tenantsAreRivais } from '@/lib/hierarquia'
 import { isTenantRestrito } from '@/lib/isolamento'
 import { ExpectedError } from '@/lib/expected-error'
-import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { notificarUsuariosComPermissao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
 const uuidSchema = z.string().uuid('ID inválido')
@@ -60,6 +60,25 @@ function assertStatus(alianca: Alianca, expected: StatusAlianca): void {
   }
 }
 
+async function nomeDoTenant(id: string): Promise<string> {
+  const t: { nome: string } | null = await db.tenant.findUnique({
+    where: { id },
+    select: { nome: true },
+  })
+  return t?.nome ?? 'uma torcida'
+}
+
+async function reconciliarPropostaAlianca(
+  tenantDestinoId: string,
+  origemNome: string,
+  destinoNome: string,
+): Promise<void> {
+  await reconciliarNotificacoesDoEvento(tenantDestinoId, {
+    tipo: 'ALIANCA_PROPOSTA',
+    corpo: `${origemNome} propôs aliança com ${formatNomeTorcida(destinoNome)}.`,
+  })
+}
+
 /**
  * Propõe aliança: origem = proponente, aliado = destinatário.
  * Unicidade do par é bidirecional (A→B e B→A contam como o mesmo vínculo).
@@ -80,6 +99,14 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     select: { id: true, nome: true, slug: true, afiliacaoId: true },
   })
   if (!aliado) throw new Error('Torcida aliada não encontrada')
+
+  // Rival = inexistente: mesma mensagem, sem notificação, sem linha PENDENTE.
+  if (await tenantsAreRivais(tenantOrigemId, tenantDestinoId)) {
+    throw new Error('Torcida aliada não encontrada')
+  }
+  if (await isTenantRestrito(tenantDestinoId)) {
+    throw new Error('Torcida aliada não encontrada')
+  }
 
   const origemAfiliacao: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
     where: { id: tenantOrigemId },
@@ -149,7 +176,8 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     tipo: 'ALIANCA_PROPOSTA',
     titulo: `Proposta de aliança de ${tenant.nome}`,
     corpo: `${tenant.nome} propôs aliança com ${formatNomeTorcida(aliado.nome)}.`,
-    link: '/admin/aliancas',
+    link: '/admin/aliancas?tab=recebidas',
+    atorId: session.user.id,
   })
 
   revalidatePath('/admin/aliancas')
@@ -203,6 +231,11 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
 
   const alianca = await loadAliancaInTenant(parsed.data, tenant.id)
   if (!alianca) throw new Error('Aliança não encontrada')
+  const outroId =
+    alianca.tenantOrigemId === tenant.id ? alianca.tenantAliadoId : alianca.tenantOrigemId
+  if (await tenantsAreRivais(tenant.id, outroId)) {
+    throw new Error('Aliança não encontrada')
+  }
   if (alianca.tenantAliadoId !== tenant.id) {
     throw new Error('Somente o destinatário da proposta pode aceitá-la')
   }
@@ -231,12 +264,18 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
     },
   })
 
+  await reconciliarPropostaAlianca(
+    tenant.id,
+    await nomeDoTenant(alianca.tenantOrigemId),
+    tenant.nome,
+  )
+
   await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
     tenantId: alianca.tenantOrigemId,
     tipo: 'ALIANCA_ACEITA',
     titulo: `${tenant.nome} aceitou a aliança`,
     corpo: 'A proposta de aliança foi aceita e está ativa.',
-    link: '/admin/aliancas',
+    link: '/admin/aliancas?tab=ativas',
     excetoUserId: session.user.id,
   })
 
@@ -280,12 +319,18 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
     },
   })
 
+  await reconciliarPropostaAlianca(
+    tenant.id,
+    await nomeDoTenant(alianca.tenantOrigemId),
+    tenant.nome,
+  )
+
   await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
     tenantId: alianca.tenantOrigemId,
     tipo: 'ALIANCA_REJEITADA',
     titulo: `${tenant.nome} rejeitou a aliança`,
     corpo: 'A proposta de aliança foi rejeitada.',
-    link: '/admin/aliancas',
+    link: '/admin/aliancas?tab=historico',
     excetoUserId: session.user.id,
   })
 
@@ -332,12 +377,18 @@ export async function cancelarProposta(aliancaId: string): Promise<void> {
     },
   })
 
+  await reconciliarPropostaAlianca(
+    alianca.tenantAliadoId,
+    tenant.nome,
+    await nomeDoTenant(alianca.tenantAliadoId),
+  )
+
   await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
     tenantId: alianca.tenantAliadoId,
     tipo: 'ALIANCA_CANCELADA',
     titulo: `${tenant.nome} cancelou a proposta`,
     corpo: 'A proposta de aliança pendente foi cancelada.',
-    link: '/admin/aliancas',
+    link: '/admin/aliancas?tab=historico',
     excetoUserId: session.user.id,
   })
 
@@ -381,7 +432,7 @@ export async function encerrarAlianca(aliancaId: string): Promise<void> {
     tipo: 'ALIANCA_ENCERRADA',
     titulo: `${tenant.nome} encerrou a aliança`,
     corpo: 'A aliança ativa foi encerrada.',
-    link: '/admin/aliancas',
+    link: '/admin/aliancas?tab=historico',
     excetoUserId: session.user.id,
   })
 

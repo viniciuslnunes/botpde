@@ -27,6 +27,8 @@ import {
   salvarHierarquiaVisivel,
   salvarLojaVisivelNasUnidades,
   salvarAgendaVisivelNasUnidades,
+  salvarBrechoAliados,
+  salvarMemoriaAliados,
   salvarExigirDocumentosCadastro,
   salvarSolicitarPendenciasCadastro,
   salvarPropagarPendenciasCadastroUnidades,
@@ -286,12 +288,21 @@ export function HierarquiaVisivelForm({ visivel }: HierarquiaVisivelFormProps) {
 interface PortalNasUnidadesFormProps {
   lojaVisivel: boolean
   agendaVisivel: boolean
+  brechoAliados?: boolean
+  memoriaAliados?: boolean
 }
 
-export function PortalNasUnidadesForm({ lojaVisivel, agendaVisivel }: PortalNasUnidadesFormProps) {
+export function PortalNasUnidadesForm({
+  lojaVisivel,
+  agendaVisivel,
+  brechoAliados = false,
+  memoriaAliados = false,
+}: PortalNasUnidadesFormProps) {
   const [pending, startTransition] = useTransition()
   const [loja, setLoja] = useState(lojaVisivel)
   const [agenda, setAgenda] = useState(agendaVisivel)
+  const [brecho, setBrecho] = useState(brechoAliados)
+  const [memoria, setMemoria] = useState(memoriaAliados)
 
   function salvarLoja(next: boolean) {
     setLoja(next)
@@ -368,6 +379,74 @@ export function PortalNasUnidadesForm({ lojaVisivel, agendaVisivel }: PortalNasU
               : agenda
                 ? 'Eventos globais da Sede aparecem na agenda das unidades'
                 : 'Cada unidade vê só os próprios eventos (padrão)'}
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={brecho}
+          disabled={pending}
+          onChange={(e) => {
+            const next = e.target.checked
+            setBrecho(next)
+            const fd = new FormData()
+            fd.set('brechoAliados', next ? 'true' : 'false')
+            startTransition(async () => {
+              const ok = await runPersistAction(() => salvarBrechoAliados(fd), {
+                success: next
+                  ? 'Brechó aberto para sócios de torcidas aliadas.'
+                  : 'Brechó restrito à própria torcida (padrão).',
+              })
+              if (!ok) setBrecho(!next)
+            })
+          }}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Permitir troca no brechó com torcidas aliadas
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : brecho
+                ? 'Sócios de aliadas ATIVAS veem anúncios desta torcida e vice-versa. Rivais nunca entram.'
+                : 'Desligado — só sócios desta torcida (sede e unidades) negociam no brechó.'}
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={memoria}
+          disabled={pending}
+          onChange={(e) => {
+            const next = e.target.checked
+            setMemoria(next)
+            const fd = new FormData()
+            fd.set('memoriaAliados', next ? 'true' : 'false')
+            startTransition(async () => {
+              const ok = await runPersistAction(() => salvarMemoriaAliados(fd), {
+                success: next
+                  ? 'Memória aberta para torcidas aliadas (quando elas também ligarem).'
+                  : 'Memória restrita à própria torcida (padrão).',
+              })
+              if (!ok) setMemoria(!next)
+            })
+          }}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Compartilhar a memória pública com torcidas aliadas
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : memoria
+                ? 'As duas sedes precisam ligar. Só posts públicos entram. Rivais e canal restrito nunca.'
+                : 'Desligado — a linha do tempo fica na própria torcida.'}
           </span>
         </span>
       </label>

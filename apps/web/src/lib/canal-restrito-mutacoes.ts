@@ -10,7 +10,7 @@ import {
   invalidarFeedNacional,
 } from '@/lib/comunidade-cache'
 import { invalidateIsolamentoCache } from '@/lib/isolamento'
-import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { notificarUsuariosComPermissao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 
 /**
  * R5 — transições de canal restrito compartilhadas entre a unidade
@@ -165,5 +165,6 @@ export async function reabrirCanal(input: ReabrirCanalInput): Promise<void> {
       titulo: 'O canal da unidade voltou a ser aberto',
       corpo: input.corpoNotificacao,
     }),
+    reconciliarNotificacoesDoEvento(input.tenantId, { tipo: 'CANAL_REATIVACAO_SOLICITADA' }),
   ])
 }

@@ -8,11 +8,18 @@ import { BuscaUsuarioClient } from './busca-usuario-client'
 
 export const metadata: Metadata = { title: 'Usuários — Super Admin' }
 
-export default async function UsuariosSuperAdminPage() {
+export default async function UsuariosSuperAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>
+}) {
   const session = await auth()
   if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
     redirect('/')
   }
+
+  const { id: idRaw } = await searchParams
+  const idInicial = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : undefined
 
   return (
     <div className="flex min-h-full flex-col">
@@ -22,7 +29,7 @@ export default async function UsuariosSuperAdminPage() {
         icon={<UserCheck className="h-5 w-5" />}
       />
       <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
-        <BuscaUsuarioClient />
+        <BuscaUsuarioClient idInicial={idInicial} />
       </div>
     </div>
   )

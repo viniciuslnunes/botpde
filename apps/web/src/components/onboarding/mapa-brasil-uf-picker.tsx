@@ -149,7 +149,7 @@ export function MapaBrasilUfPicker({ ufSelecionada, onUfSelecionar, className = 
         </div>
       </div>
 
-      <div className="relative h-[min(42vh,320px)] overflow-hidden">
+      <div className="relative h-[min(42dvh,320px)] overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.35]"
           style={{

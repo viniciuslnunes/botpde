@@ -171,14 +171,14 @@ export function StoryViewer({ rings, initialRingIndex = 0, onClose }: StoryViewe
               initial="enter"
               animate="center"
               exit="exit"
-              className="flex max-h-[75vh] w-full max-w-sm flex-col items-center gap-4"
+              className="flex max-h-[75dvh] w-full max-w-sm flex-col items-center gap-4"
             >
               {isVideo ? (
                 <video
                   ref={videoRef}
                   src={momento.midiaUrl}
                   playsInline
-                  className="max-h-[65vh] w-full rounded-2xl object-contain"
+                  className="max-h-[65dvh] w-full rounded-2xl object-contain"
                 />
               ) : (
                 <m.img
@@ -187,7 +187,7 @@ export function StoryViewer({ rings, initialRingIndex = 0, onClose }: StoryViewe
                   initial={{ scale: 0.96, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={springGentle}
-                  className="max-h-[65vh] w-full rounded-2xl object-contain"
+                  className="max-h-[65dvh] w-full rounded-2xl object-contain"
                 />
               )}
               {momento.conteudo && (

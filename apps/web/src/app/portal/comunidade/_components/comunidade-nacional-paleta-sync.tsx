@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@torcida/ui/services/theme'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import { designFromPrimary, isCorPadraoPlataforma } from '@torcida/types'
 import { extrairPaletaDeImagem } from '@/lib/extrair-paleta'

@@ -23,6 +23,9 @@ const SECAO_GRUPO_LABEL: Record<SecaoGrupo, string> = {
 
 interface GruposClientProps {
   gruposIniciais: GrupoItem[]
+  podeCriarGrupo?: boolean
+  hintCapacidade?: string | null
+  escopoNacional?: boolean
 }
 
 function compararRelevancia(a: GrupoItem, b: GrupoItem): number {
@@ -32,7 +35,12 @@ function compararRelevancia(a: GrupoItem, b: GrupoItem): number {
   return b.membros - a.membros
 }
 
-export function GruposClient({ gruposIniciais }: GruposClientProps) {
+export function GruposClient({
+  gruposIniciais,
+  podeCriarGrupo = false,
+  hintCapacidade = null,
+  escopoNacional = false,
+}: GruposClientProps) {
   const [grupos, setGrupos] = useState(gruposIniciais)
   const [criando, setCriando] = useState(false)
   const [nome, setNome] = useState('')
@@ -125,7 +133,12 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
     if (!nome.trim()) return
     startTransition(async () => {
       try {
-        const { id } = await criarGrupo(nome.trim(), descricao.trim() || undefined, publica)
+        const { id } = await criarGrupo(
+          nome.trim(),
+          descricao.trim() || undefined,
+          publica,
+          escopoNacional,
+        )
         setGrupos((prev) => [
           {
             id,
@@ -188,16 +201,18 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
           </label>
 
           <div className="flex shrink-0 items-center gap-2">
-            <m.button
-              type="button"
-              onClick={() => setCriando((v) => !v)}
-              whileTap={{ scale: 0.96 }}
-              transition={springSnappy}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Criar grupo</span>
-            </m.button>
+            {podeCriarGrupo ? (
+              <m.button
+                type="button"
+                onClick={() => setCriando((v) => !v)}
+                whileTap={{ scale: 0.96 }}
+                transition={springSnappy}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Criar grupo</span>
+              </m.button>
+            ) : null}
           </div>
         </div>
 
@@ -253,10 +268,13 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
             ? `${grupos.length} ${grupos.length === 1 ? 'grupo' : 'grupos'}`
             : `${filtrados.length} de ${grupos.length} grupos`}
         </p>
+        {hintCapacidade ? (
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">{hintCapacidade}</p>
+        ) : null}
       </div>
 
       <AnimatePresence>
-        {criando && (
+        {criando && podeCriarGrupo && (
           <m.form
             key="criar-grupo"
             onSubmit={criar}
@@ -334,7 +352,7 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
           <MotionEmptyState
             className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
             title="Nenhum grupo ainda."
-            description="Seja o primeiro a criar!"
+            description={podeCriarGrupo ? 'Seja o primeiro a criar!' : 'Ainda não há grupos nesta torcida.'}
           />
         ) : filtrados.length === 0 ? (
           <MotionEmptyState

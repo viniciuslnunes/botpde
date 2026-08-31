@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { Session } from 'next-auth'
 import { assertComunidadeNacional, assertNaoOperador, assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
+import { assertCapacidadeConfianca } from '@/lib/confianca'
 import { isLiveKitConfigured } from '@/lib/env'
 import { deleteLiveKitRoom } from '@/lib/livekit-room'
 import { createSala, encerrarSala as encerrarSalaNoBanco } from '@/lib/salas'
@@ -66,6 +67,8 @@ export async function criarSala(
           'Salas de vídeo indisponíveis: confirme LIVEKIT_API_KEY, LIVEKIT_API_SECRET e LIVEKIT_URL no Railway e faça redeploy.',
       }
     }
+
+    await assertCapacidadeConfianca(session.user.id, tenant.id, 'sala:hospedar')
 
     const parsed = criarSalaSchema.safeParse({
       titulo: readFormString(formData, 'titulo'),

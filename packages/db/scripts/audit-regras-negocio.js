@@ -276,7 +276,7 @@ const ownerPorTenant = await db.$queryRaw`
   JOIN saas_roles r ON r.id = ur.role_id
   JOIN saas_tenants t ON t.id = ur.tenant_id
   WHERE r.is_system AND r.nome = 'owner' GROUP BY t.slug HAVING COUNT(*) > 1`
-ownerPorTenant.length ? alerta('rbac', `Torcida(s) com mais de um owner: ${ownerPorTenant.map((v) => `${v.slug}=${v.n}`).join(', ')}`) : ok('rbac', 'Nenhuma torcida com owner duplicado')
+ownerPorTenant.length ? erro('rbac', `Torcida(s) com mais de um owner (MAX_PRESIDENTES=1): ${ownerPorTenant.map((v) => `${v.slug}=${v.n}`).join(', ')}`) : ok('rbac', 'Nenhuma torcida com owner duplicado')
 
 const roleCrossTenant = await db.$queryRaw`
   SELECT COUNT(*)::int AS n FROM saas_user_roles ur

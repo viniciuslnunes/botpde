@@ -16,6 +16,7 @@ import {
   Video,
 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { temCapacidadeConfianca } from '@/lib/confianca'
 import {
   PERMISSIONS,
   TIPO_EVENTO_LABEL,
@@ -79,7 +80,7 @@ export default async function EventoDetailPage({
   const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   if (!tenant) notFound()
 
-  const evento = await getEventoEmbarque(tenant.id, id)
+  const evento = await getEventoEmbarque(tenant.id, id, undefined, session?.user?.id)
   if (!evento) notFound()
 
   const [meuRsvp, cobrancaEPerms] = await Promise.all([
@@ -93,7 +94,9 @@ export default async function EventoDetailPage({
       ? getUserPermissionsInTenant(session.user.id, tenant.id).then(
           async ({ rolePermissions, overrides }) => {
             const effective = calculateEffectivePermissions(rolePermissions, overrides)
-            const podeCriarSala = hasPermission(effective, PERMISSIONS.MEETINGS_HOST)
+            const podeCriarSala =
+              hasPermission(effective, PERMISSIONS.MEETINGS_HOST) &&
+              (await temCapacidadeConfianca(session.user!.id, tenant.id, 'sala:hospedar'))
             const podeGerir = hasPermission(effective, PERMISSIONS.EVENTS_MANAGE)
             const minhaCobranca =
               evento.tipo === 'CARAVANA'

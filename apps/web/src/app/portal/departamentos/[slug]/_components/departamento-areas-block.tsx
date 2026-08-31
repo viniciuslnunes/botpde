@@ -26,6 +26,7 @@ import { AvatarFoto } from '@/components/media/avatar-foto'
 import type { AreaAcesso } from '@/lib/departamentos-portal-access'
 import { toast } from '@torcida/ui/services/toast'
 import { CanalDepartamentoAvatarField } from '../../_components/canal-departamento-avatar-field'
+import { classeFocoCard, useFocoCard } from '../../_components/departamento-foco'
 import {
   AREA_CHECKLIST_MODELOS,
   checklistItemsFromMeta,
@@ -94,12 +95,15 @@ export function DepartamentoAreasBlock({
   areas,
   podeGerir,
   canaisDisponiveis = [],
+  focoAreaId,
 }: {
   departamentoId: string
   slug: string
   areas: AreaResumo[]
   podeGerir: boolean
   canaisDisponiveis?: Array<{ id: string; nome: string | null }>
+  /** Deep-link `?area=` — destaca o card e abre gente se faltar responsável. */
+  focoAreaId?: string
 }) {
   const [criando, setCriando] = useState(false)
 
@@ -150,6 +154,7 @@ export function DepartamentoAreasBlock({
             area={area}
             podeGerir={podeGerir}
             canaisDisponiveis={canaisDisponiveis}
+            foco={area.id === focoAreaId}
           />
         ))}
       </div>
@@ -177,19 +182,27 @@ function AreaCard({
   area,
   podeGerir,
   canaisDisponiveis,
+  foco,
 }: {
   departamentoId: string
   slug: string
   area: AreaResumo
   podeGerir: boolean
   canaisDisponiveis: Array<{ id: string; nome: string | null }>
+  foco: boolean
 }) {
   const [editando, setEditando] = useState(false)
   const [gerindoPessoas, setGerindoPessoas] = useState(false)
+  const [ultimoFoco, setUltimoFoco] = useState(false)
   const [checklistAberto, setChecklistAberto] = useState(false)
   const [pendingCampanha, startCampanha] = useTransition()
   const confirmAction = useConfirmAction()
   const responsaveis = area.membros.filter((m) => m.papel === 'RESPONSAVEL')
+  if (foco !== ultimoFoco) {
+    setUltimoFoco(foco)
+    if (foco && podeGerir && responsaveis.length === 0) setGerindoPessoas(true)
+  }
+  const focoRef = useFocoCard(foco)
   const ano = new Date().getFullYear()
   const podeAbrirCampanha =
     podeGerir && area.ativa && area.sazonal && !area.campanhaAnoAberta
@@ -199,9 +212,13 @@ function AreaCard({
 
   return (
     <div
+      ref={focoRef}
+      id={`area-${area.id}`}
+      aria-current={foco ? 'true' : undefined}
       className={[
         'rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-4',
         area.ativa ? '' : 'opacity-60',
+        classeFocoCard(foco),
       ].join(' ')}
     >
       <div className="min-w-0">

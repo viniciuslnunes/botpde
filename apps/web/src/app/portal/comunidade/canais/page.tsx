@@ -12,11 +12,13 @@ import {
 import { lerCanalFocoId } from '@/lib/comunidade-canal-foco-cookie'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
+import { temCapacidadeConfianca } from '@/lib/confianca'
 import {
   PERMISSIONS,
   calculateEffectivePermissions,
   formatNomeAfiliacao,
   hasPermission,
+  MENSAGEM_CAPACIDADE_CONFIANCA,
 } from '@torcida/types'
 import type { Metadata } from 'next'
 
@@ -72,9 +74,13 @@ export default async function CanaisPage({
     tenant.id,
   )
   const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
-  const podeCriarCanal =
+  const temPermCanal =
     hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
     hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
+  const temCapCanal = await temCapacidadeConfianca(session.user.id, tenant.id, 'canal:criar')
+  const podeCriarCanal = temPermCanal && temCapCanal
+  const hintCapacidade =
+    temPermCanal && !temCapCanal ? MENSAGEM_CAPACIDADE_CONFIANCA['canal:criar'] : null
 
   const superAdmin = isSuperAdminEmail(session.user.email)
 
@@ -100,6 +106,7 @@ export default async function CanaisPage({
         podeCriarCanal={podeCriarCanal}
         tenantAtualId={tenant.id}
         leituraSuperAdmin={superAdmin}
+        hintCapacidade={hintCapacidade}
       />
     </div>
   )

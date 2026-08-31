@@ -6,12 +6,14 @@ import {
   clampCropOffset,
   clampCropZoom,
   coverScale,
+  cropFrameSizeForAspect,
   DEFAULT_CROP_VIEWPORT,
   exportCroppedImage,
   MAX_CROP_ZOOM,
   MIN_CROP_ZOOM,
   type CropViewport,
 } from '@/lib/image-crop'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 
 type Props = {
   /** Object URL ou data URL da imagem a ajustar. */
@@ -49,7 +51,9 @@ export function ImageCropDialog({
 
   const [viewport, setViewport] = useState<CropViewport>(DEFAULT_CROP_VIEWPORT)
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
-  const [frameSize, setFrameSize] = useState<{ w: number; h: number }>({ w: 320, h: 180 })
+  const [frameSize, setFrameSize] = useState<{ w: number; h: number }>(() =>
+    cropFrameSizeForAspect(aspect),
+  )
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
@@ -64,14 +68,6 @@ export function ImageCropDialog({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !busy) onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onCancel])
 
   function applyViewport(next: CropViewport) {
     const zoom = clampCropZoom(next.zoom)
@@ -149,19 +145,14 @@ export function ImageCropDialog({
   const drawnH = natural ? natural.h * scale : 0
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onCancel()
-      }}
+    <AppModal
+      open
+      onClose={onCancel}
+      size="md"
+      layer="nested"
+      labelledBy={titleId}
+      busy={busy}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-[1.35rem] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl"
-      >
         <div className="flex items-start justify-between gap-3 px-5 pt-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] ring-1 ring-[rgb(var(--border))]">
@@ -187,7 +178,7 @@ export function ImageCropDialog({
           </button>
         </div>
 
-        <div className="space-y-3 px-5 pb-2 pt-4">
+        <AppModalBody className="space-y-3 px-5 pb-2 pt-4">
 
           <div
             ref={frameRef}
@@ -245,7 +236,7 @@ export function ImageCropDialog({
             />
             <ZoomIn className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
           </div>
-        </div>
+        </AppModalBody>
 
         <div className="flex flex-wrap justify-end gap-2 px-5 py-4">
           <button
@@ -266,7 +257,6 @@ export function ImageCropDialog({
             {busy ? 'Processando…' : confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+    </AppModal>
   )
 }

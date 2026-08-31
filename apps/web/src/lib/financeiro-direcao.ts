@@ -8,6 +8,7 @@ import {
   formatDataCompetenciaInput,
   saudeOrcamento,
   STATUS_PROJETO_ABERTOS,
+  hrefHomeDepartamento,
 } from '@torcida/types'
 import { resumirFinanceiro } from '@/lib/financeiro'
 import { resumirInadimplencia } from '@/lib/cobrancas-insights'
@@ -131,7 +132,7 @@ async function fetchDirecaoFinanceiro(tenantId: string): Promise<FinanceiroDirec
       percentual: saude.percentual,
       realizado,
       previsto,
-      href: `/portal/departamentos/${p.departamento.slug}#projetos`,
+      href: hrefHomeDepartamento(p.departamento.slug, 'projetos'),
     })
   }
   projetosAlerta.sort((a, b) => b.percentual - a.percentual)

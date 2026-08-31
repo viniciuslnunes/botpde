@@ -138,6 +138,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
     isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
   const podeReatribuirSede =
     isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
+  const podeEditarLge = podeReatribuirSede
   const podeBloquear = isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_BLOCK)
   const podeApagar = isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_PURGE)
   const bloqueado =
@@ -216,6 +217,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
             aprovadoPorNome={membro.aprovadoPorNome}
             aprovadoEmLabel={aprovadoEmLabel}
             nomeMembro={membro.nome}
+            isSocio={false}
             podeBloquear={podeBloquear}
             userId={membro.userId}
             bloqueado={bloqueado}
@@ -259,6 +261,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
           desligadoEm={membro.desligadoEm}
           espelhado={membro.espelhado}
           aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
+          canEdit={podeEditarLge}
         />
       </MotionReveal>
     </div>

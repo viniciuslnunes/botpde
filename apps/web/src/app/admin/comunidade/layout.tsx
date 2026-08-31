@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { LayoutDashboard, Megaphone, MessagesSquare, Newspaper, ShieldAlert } from 'lucide-react'
+import { MemoriaMark } from '@/components/portal/memoria-mark'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
@@ -22,21 +23,28 @@ export default async function ComunidadeModuloLayout({ children }: { children: R
   const podeCurarNoticias = hasPermission(permissoes, PERMISSIONS.NEWS_CURATE)
 
   // A tabela de denúncias de mensagem pode não existir em bases antigas: catch → 0.
-  const [denunciasPost, denunciasMensagem, noticiasPendentes]: [number, number, number] =
-    await Promise.all([
-      podeModerarPosts
-        ? db.denuncia.count({ where: { tenantId: tenant.id, status: 'PENDENTE' } })
-        : Promise.resolve(0),
-      podeModerarMensagens
-        ? db.denunciaMensagem
-            .count({ where: { tenantId: tenant.id, status: 'PENDENTE' } })
-            .catch(() => 0)
-        : Promise.resolve(0),
-      // Notícia é referência global: filtra pela afiliação do tenant, não por tenantId.
-      podeCurarNoticias && tenant.afiliacaoId
-        ? db.noticia.count({ where: { afiliacaoId: tenant.afiliacaoId, status: 'RASCUNHO' } })
-        : Promise.resolve(0),
-    ])
+  const [denunciasPost, denunciasMensagem, noticiasPendentes, fatosPendentes]: [
+    number,
+    number,
+    number,
+    number,
+  ] = await Promise.all([
+    podeModerarPosts
+      ? db.denuncia.count({ where: { tenantId: tenant.id, status: 'PENDENTE' } })
+      : Promise.resolve(0),
+    podeModerarMensagens
+      ? db.denunciaMensagem
+          .count({ where: { tenantId: tenant.id, status: 'PENDENTE' } })
+          .catch(() => 0)
+      : Promise.resolve(0),
+    // Notícia é referência global: filtra pela afiliação do tenant, não por tenantId.
+    podeCurarNoticias && tenant.afiliacaoId
+      ? db.noticia.count({ where: { afiliacaoId: tenant.afiliacaoId, status: 'RASCUNHO' } })
+      : Promise.resolve(0),
+    podeModerarPosts
+      ? db.memoriaFato.count({ where: { tenantId: tenant.id, status: 'PENDENTE' } }).catch(() => 0)
+      : Promise.resolve(0),
+  ])
 
   const alerta = 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]'
 
@@ -52,6 +60,11 @@ export default async function ComunidadeModuloLayout({ children }: { children: R
     noticias: {
       icon: <Newspaper className={ICONE} />,
       count: noticiasPendentes,
+      countClass: alerta,
+    },
+    memoria: {
+      icon: <MemoriaMark className={ICONE} />,
+      count: fatosPendentes,
       countClass: alerta,
     },
   })

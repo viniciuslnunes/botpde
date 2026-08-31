@@ -112,6 +112,34 @@ vi.mock('@/lib/hierarquia', () => ({
 vi.mock('@/lib/isolamento', () => ({
   getTenantsRestritos: vi.fn(async () => new Set<string>()),
 }))
+// `...args: unknown[]` não é decoração: os wrappers do `vi.mock` abaixo
+// repassam os argumentos com spread, e spread em função declarada sem
+// parâmetros é erro de tipo (TS2556). O rest também mantém os argumentos
+// visíveis para asserção com `toHaveBeenCalledWith`.
+const avaliarBloqueioNovaAssociacaoFn = vi.hoisted(() =>
+  vi.fn(
+    async (
+      ..._args: unknown[]
+    ): Promise<
+      { ok: true } | { ok: false; motivo: 'outra_torcida' | 'ja_socio' | 'pendente' }
+    > => ({ ok: true }),
+  ),
+)
+const torcidaTemLiderancaRealFn = vi.hoisted(() =>
+  vi.fn(async (..._args: unknown[]) => true),
+)
+vi.mock('@/lib/associe-se', () => ({
+  avaliarBloqueioNovaAssociacao: (...args: unknown[]) =>
+    avaliarBloqueioNovaAssociacaoFn(...args),
+  torcidaTemLiderancaReal: (...args: unknown[]) => torcidaTemLiderancaRealFn(...args),
+  MENSAGEM_BLOQUEIO_ASSOCIACAO: {
+    outra_torcida: 'Você já está vinculado a outra torcida.',
+    ja_socio: 'Você já é sócio desta torcida.',
+    pendente: 'Sua solicitação de associação já está em análise nesta torcida.',
+    sem_lideranca: 'Esta torcida ainda não tem presidente associado.',
+    clube_errado: 'Associação só nas organizadas do clube que você escolheu no onboarding.',
+  },
+}))
 const estaBloqueadoNoTenantFn = vi.hoisted(() => vi.fn(async () => false))
 vi.mock('@/lib/membros-sede', () => ({
   criarOuAtualizarPendenciaEspelhoNaSede: criarPendenciaEspelhoFn,
@@ -451,7 +479,12 @@ describe('solicitarVinculo — validação', () => {
     expect(setTenantContextSlugFn).not.toHaveBeenCalled()
     expect(membroCreate).toHaveBeenCalled()
     expect(auditLogCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ acao: 'CADASTRO_SOLICITADO' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          acao: 'CADASTRO_SOLICITADO',
+          detalhes: { origem: 'onboarding' },
+        }),
+      }),
     )
     expect(perfilUpsert).toHaveBeenCalled()
     expect(vincularMembroCanaisFn).toHaveBeenCalledWith({
@@ -624,6 +657,63 @@ describe('solicitarVinculo — validação', () => {
     expect(r.message).toContain('bloqueou seu acesso')
     // Barrado ANTES de qualquer escrita: nada de cadastro nem de espelho.
     expect(criarPendenciaEspelhoFn).not.toHaveBeenCalled()
+  })
+
+  it('recusa associação em outra torcida', async () => {
+    tenantFindFirst.mockResolvedValue({
+      id: UUID,
+      slug: 'torcida-teste',
+      nome: 'Torcida Teste',
+      exigirDocumentosCadastro: true,
+      periodicidadesOnboarding: [],
+    })
+    sedeFindMany.mockResolvedValue([])
+    membroFindUnique.mockResolvedValue(null)
+    avaliarBloqueioNovaAssociacaoFn.mockResolvedValueOnce({
+      ok: false,
+      motivo: 'outra_torcida',
+    })
+
+    const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
+    expect(r.message).toContain('outra torcida')
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('recusa sócio sem presidente no portal', async () => {
+    tenantFindFirst.mockResolvedValue({
+      id: UUID,
+      slug: 'torcida-teste',
+      nome: 'Torcida Teste',
+      exigirDocumentosCadastro: true,
+      periodicidadesOnboarding: [],
+    })
+    sedeFindMany.mockResolvedValue([])
+    membroFindUnique.mockResolvedValue(null)
+    torcidaTemLiderancaRealFn.mockResolvedValueOnce(false)
+
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      caminhoSocio: 'EXISTENTE',
+      numeroAssociado: '123456',
+      anosSocio: 3,
+      dataExpedicaoCarteirinha: '2024-01-10',
+      periodicidadePretendida: 'ANUAL',
+      cep: '01310-100',
+      logradouro: 'Rua das Torcidas',
+      bairro: 'Centro',
+      uf: 'SP',
+      rg: '12.345.678-9',
+      cpf: '111.444.777-35',
+      dataNascimento: '1990-01-01',
+      termoResponsabilidadeAceito: true,
+      fotoDocumentoUrl: PROVA_URL,
+      comprovanteResidenciaUrl: PROVA_URL,
+      telefone: '(11) 98888-7777',
+      email: 'fulano@example.com',
+    })
+    expect(r.message).toContain('presidente')
+    expect(membroCreate).not.toHaveBeenCalled()
   })
 })
 

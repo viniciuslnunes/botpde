@@ -38,6 +38,7 @@
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
+import { nomesPecasPatrimonio } from '../../types/src/patrimonio.js'
 import { assertNotProductionSeed } from './lib/seed-env.js'
 
 assertNotProductionSeed('seed:corinthians-teste-modulos')
@@ -378,6 +379,7 @@ const PATRIMONIO_CATALOGO = [
   { nome: 'Tamborim', categoria: 'INSTRUMENTO', qtd: [10, 25], valor: 160 },
   { nome: 'Chocalho / ganzá', categoria: 'INSTRUMENTO', qtd: [8, 20], valor: 190 },
   { nome: 'Bandeirão da torcida', categoria: 'BANDEIRA', qtd: [1, 3], valor: 3500 },
+  // qtd = número de peças (cada uma vira ficha com foto própria), não lote.
   { nome: 'Bandeira de mastro 2x1,5m', categoria: 'BANDEIRA', qtd: [4, 12], valor: 220 },
   { nome: 'Faixa de arquibancada', categoria: 'BANDEIRA', qtd: [2, 6], valor: 400 },
   { nome: 'Uniforme da bateria', categoria: 'UNIFORME', qtd: [20, 40], valor: 120 },
@@ -404,29 +406,34 @@ async function fasePatrimonio(contexto, resumo) {
 
     const qtdItens = 10 + Math.floor(Math.random() * 6) // 10–15
     const escolhidos = embaralhar(PATRIMONIO_CATALOGO).slice(0, qtdItens)
-    const rows = escolhidos.map((item) => {
+    const rows = []
+    for (const item of escolhidos) {
       const [min, max] = item.qtd
       const quantidade = min + Math.floor(Math.random() * (max - min + 1))
       const responsavel = tenant.aprovados.length > 0 && Math.random() < 0.6 ? pick(tenant.aprovados) : null
-      return {
-        id: crypto.randomUUID(),
-        tenantId: tenant.id,
-        nome: item.nome,
-        categoria: item.categoria,
-        status: pickPonderado([
-          ['DISPONIVEL', 60],
-          ['EM_USO', 25],
-          ['MANUTENCAO', 10],
-          ['BAIXADO', 5],
-        ]),
-        quantidade,
-        localizacao: pick(['Sede — depósito', 'Sede — salão', 'Barracão', 'Com o responsável', null]),
-        valorEstimado: item.valor,
-        observacao: `${MARCA} inventário sintético para teste de volume.`,
-        responsavelId: responsavel?.userId ?? null,
-        criadoPorId: tenant.ownerUserId,
+      const pecaUnica = item.categoria === 'BANDEIRA'
+      const nomes = pecaUnica ? nomesPecasPatrimonio(item.nome, quantidade) : [item.nome]
+      for (const nome of nomes) {
+        rows.push({
+          id: crypto.randomUUID(),
+          tenantId: tenant.id,
+          nome,
+          categoria: item.categoria,
+          status: pickPonderado([
+            ['DISPONIVEL', 60],
+            ['EM_USO', 25],
+            ['MANUTENCAO', 10],
+            ['BAIXADO', 5],
+          ]),
+          quantidade: pecaUnica ? 1 : quantidade,
+          localizacao: pick(['Sede — depósito', 'Sede — salão', 'Barracão', 'Com o responsável', null]),
+          valorEstimado: item.valor,
+          observacao: `${MARCA} inventário sintético para teste de volume.`,
+          responsavelId: responsavel?.userId ?? null,
+          criadoPorId: tenant.ownerUserId,
+        })
       }
-    })
+    }
 
     await createManyBatched('patrimonioItem', rows, `${tenant.slug}: patrimônio`)
     resumo.patrimonio += rows.length

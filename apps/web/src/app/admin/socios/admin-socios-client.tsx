@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -17,9 +17,11 @@ import {
 } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { DatePicker } from '@/components/ui/date-picker'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { AdminTabs } from '@/components/admin/ui'
+import { AdminPendingTabs, AdminRowActions } from '@/components/admin/ui'
+import { MembroOrigemCell } from '@/components/admin/membro-origem-cell'
 import {
   emitirCarteirinha,
   renovarCarteirinha,
@@ -119,17 +121,24 @@ export function EmitirCarteirinhaModal({
   onClose,
   membrosElegiveis,
   initialUserId,
+  proximoNumero,
 }: {
   open: boolean
   onClose: () => void
   membrosElegiveis: MembroElegivelItem[]
   initialUserId?: string | null
+  /** Sugestão quando o sócio ainda não tem nº (caminho «quero me associar»). */
+  proximoNumero?: string
 }) {
   const [pending, startTransition] = useTransition()
   const [userId, setUserId] = useState(initialUserId ?? '')
   const [nome, setNome] = useState(() => {
     const m = membrosElegiveis.find((x) => x.userId === (initialUserId ?? ''))
     return m?.nome ?? ''
+  })
+  const [numeroAssociado, setNumeroAssociado] = useState(() => {
+    const m = membrosElegiveis.find((x) => x.userId === (initialUserId ?? ''))
+    return m?.numeroAssociado?.trim() || proximoNumero || ''
   })
   const [validade, setValidade] = useState(getValidadePadrao)
   const [filtro, setFiltro] = useState('')
@@ -146,28 +155,13 @@ export function EmitirCarteirinhaModal({
     if (ok) onClose()
   }
 
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') void closeForm()
-    }
-    document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const t = window.setTimeout(() => firstFieldRef.current?.focus(), 0)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-      window.clearTimeout(t)
-    }
-    // closeForm fecha sobre confirmDiscard/onClose estáveis o suficiente no ciclo do modal
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reamarra ao abrir/fechar
-  }, [open])
-
   function onSelectMembro(id: string) {
     setUserId(id)
     const m = membrosElegiveis.find((x) => x.userId === id)
-    if (m) setNome(m.nome)
+    if (m) {
+      setNome(m.nome)
+      setNumeroAssociado(m.numeroAssociado?.trim() || proximoNumero || '')
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -185,8 +179,6 @@ export function EmitirCarteirinhaModal({
     })
   }
 
-  if (!open) return null
-
   const idFiltro = `${formIds}-filtro`
   const idNome = `${formIds}-nome`
   const idValidade = `${formIds}-validade`
@@ -203,36 +195,32 @@ export function EmitirCarteirinhaModal({
   const selecionado = membrosElegiveis.find((m) => m.userId === userId)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
-      role="presentation"
-      onClick={() => void closeForm()}
+    <AppModal
+      open={open}
+      onClose={() => void closeForm()}
+      size="lg"
+      labelledBy="emitir-carteirinha-titulo"
+      busy={pending}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="emitir-carteirinha-titulo"
-        className="w-full max-w-md rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3
-            id="emitir-carteirinha-titulo"
-            className="font-semibold text-[rgb(var(--foreground))]"
-          >
-            Emitir carteirinha
-          </h3>
-          <button
-            type="button"
-            onClick={() => void closeForm()}
-            aria-label="Fechar"
-            className="rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgb(var(--border))] px-5 py-4 sm:px-6">
+        <h3
+          id="emitir-carteirinha-titulo"
+          className="font-semibold text-[rgb(var(--foreground))]"
+        >
+          Emitir carteirinha
+        </h3>
+        <button
+          type="button"
+          onClick={() => void closeForm()}
+          aria-label="Fechar"
+          className="rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <AppModalBody className="px-5 py-4 sm:px-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid gap-5 @2xl/modal:grid-cols-2">
           <input type="hidden" name="userId" value={userId} />
 
           <div>
@@ -262,12 +250,13 @@ export function EmitirCarteirinhaModal({
               onChange={(e) => setFiltro(e.target.value)}
               placeholder="Buscar por nome, cidade ou telefone…"
               autoComplete="off"
+              autoFocus={open}
               className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
             />
             <ul
               role="listbox"
               aria-label="Sócios elegíveis"
-              className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))]"
+              className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] @2xl/modal:max-h-[min(22rem,50dvh)]"
             >
               {filtrados.length === 0 ? (
                 <li className="px-3 py-3 text-sm text-[rgb(var(--foreground-muted))]">
@@ -315,102 +304,132 @@ export function EmitirCarteirinhaModal({
             )}
           </div>
 
-          <div>
-            <label
-              htmlFor={idNome}
-              className="block text-sm font-medium text-[rgb(var(--foreground))]"
-            >
-              Nome na carteirinha
-            </label>
-            <input
-              id={idNome}
-              name="nome"
-              required
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome completo"
-              className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-            />
-          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <div>
+              <label
+                htmlFor={idNome}
+                className="block text-sm font-medium text-[rgb(var(--foreground))]"
+              >
+                Nome na carteirinha
+              </label>
+              <input
+                id={idNome}
+                name="nome"
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Nome completo"
+                className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              />
+            </div>
 
-          <div>
-            <label
-              htmlFor={idValidade}
-              className="block text-sm font-medium text-[rgb(var(--foreground))]"
-            >
-              Válida até
-            </label>
-            <DatePicker
-              id={idValidade}
-              name="validade"
-              value={validade}
-              onChange={setValidade}
-              required
-              min={new Date().toISOString().split('T')[0]}
-              aria-label="Válida até"
-              className="mt-1.5"
-            />
-            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-              Padrão: 1 ano a partir de hoje.
-            </p>
-          </div>
+            <div>
+              <label
+                htmlFor={`${formIds}-numero`}
+                className="block text-sm font-medium text-[rgb(var(--foreground))]"
+              >
+                Nº de associado
+              </label>
+              <input
+                id={`${formIds}-numero`}
+                name="numeroAssociado"
+                required
+                inputMode="numeric"
+                pattern="[0-9]+"
+                maxLength={7}
+                value={numeroAssociado}
+                onChange={(e) => setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))}
+                placeholder={proximoNumero ? `Sugestão: ${proximoNumero}` : 'Somente dígitos'}
+                readOnly={Boolean(selecionado?.numeroAssociado?.trim())}
+                className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))] read-only:opacity-70"
+              />
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                {selecionado?.numeroAssociado?.trim()
+                  ? 'Número já informado no cadastro.'
+                  : 'Quem se associou agora ainda não tem nº — atribua aqui na emissão.'}
+              </p>
+            </div>
 
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => void closeForm()}
-              className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pending || !userId}
-              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {pending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-              Emitir
-            </button>
+            <div>
+              <label
+                htmlFor={idValidade}
+                className="block text-sm font-medium text-[rgb(var(--foreground))]"
+              >
+                Válida até
+              </label>
+              <DatePicker
+                id={idValidade}
+                name="validade"
+                value={validade}
+                onChange={setValidade}
+                required
+                min={new Date().toISOString().split('T')[0]}
+                aria-label="Válida até"
+                className="mt-1.5"
+              />
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                Padrão: 1 ano a partir de hoje.
+              </p>
+            </div>
+
+            <div className="mt-auto flex flex-wrap justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => void closeForm()}
+                className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pending || !userId}
+                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Emitir
+              </button>
+            </div>
           </div>
         </form>
-      </div>
-    </div>
+      </AppModalBody>
+    </AppModal>
   )
 }
+
 
 function ValidadeStatus({ socio }: { socio: SocioEmitidoItem }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {socio.vencida ? (
-        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-red-500" />
+        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-danger" />
       ) : socio.vencendo ? (
-        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" />
       ) : (
-        <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-green-500" />
+        <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-success" />
       )}
       <span
         className={[
           'text-sm',
           socio.vencida
-            ? 'text-red-600 dark:text-red-400'
+            ? 'text-danger'
             : socio.vencendo
-              ? 'text-amber-600 dark:text-amber-400'
+              ? 'text-warning'
               : 'text-[rgb(var(--foreground))]',
         ].join(' ')}
       >
         {socio.validadeLabel}
       </span>
       {socio.vencida && (
-        <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
+        <span className="rounded-full bg-[rgb(var(--color-danger)_/_0.16)] px-1.5 py-0.5 text-xs font-medium text-danger">
           Vencida
         </span>
       )}
       {socio.vencendo && (
-        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+        <span className="rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-1.5 py-0.5 text-xs font-medium text-warning">
           Vence em breve
         </span>
       )}
@@ -481,21 +500,18 @@ function SocioActions({
             type="button"
             onClick={handleRenovar}
             className={[
-              'app-action flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700',
-              stacked ? 'flex-1 justify-center' : '',
+              'app-touch-target inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-green-600 px-2.5 text-xs font-medium text-white hover:bg-green-700',
+              stacked ? 'min-w-0 flex-1' : '',
             ].join(' ')}
           >
-            <Check className="h-3 w-3" /> OK
+            <Check className="h-3.5 w-3.5" /> OK
           </button>
           <button
             type="button"
             onClick={() => setRenovando(false)}
-            className={[
-              'app-action rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-              stacked ? 'px-3' : '',
-            ].join(' ')}
+            className="app-touch-target inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -503,38 +519,25 @@ function SocioActions({
   }
 
   return (
-    <div
-      className={
-        stacked
-          ? 'flex gap-2'
-          : 'flex flex-wrap items-center justify-end gap-1'
-      }
-    >
-      <button
-        type="button"
-        onClick={() => setRenovando(true)}
-        className={[
-          'app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]',
-          stacked ? 'flex-1 justify-center' : '',
-        ].join(' ')}
-        title="Renovar validade"
-      >
-        <RefreshCw className="h-3 w-3" />
-        Renovar
-      </button>
-      <button
-        type="button"
-        onClick={() => void handleRevogar()}
-        className={[
-          'app-action flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950',
-          stacked ? 'flex-1 justify-center' : '',
-        ].join(' ')}
-        title="Revogar carteirinha"
-      >
-        <Trash2 className="h-3 w-3" />
-        Revogar
-      </button>
-    </div>
+    <AdminRowActions
+      ariaLabel={`Ações da carteirinha de ${socio.nome}`}
+      fullWidth={stacked}
+      items={[
+        {
+          id: 'renovar',
+          label: 'Renovar',
+          icon: RefreshCw,
+          onSelect: () => setRenovando(true),
+        },
+        {
+          id: 'revogar',
+          label: 'Revogar',
+          icon: Trash2,
+          tone: 'danger',
+          onSelect: () => void handleRevogar(),
+        },
+      ]}
+    />
   )
 }
 
@@ -575,6 +578,7 @@ export function AdminSociosClient({
   cabecalho,
   paginacao,
   temFiltroAtivo,
+  proximoNumero,
 }: {
   socios: SocioEmitidoItem[]
   elegiveis: MembroElegivelItem[]
@@ -607,6 +611,7 @@ export function AdminSociosClient({
   cabecalho: ReactNode
   paginacao: ReactNode
   temFiltroAtivo: boolean
+  proximoNumero?: string
 }) {
   const [emitOpen, setEmitOpen] = useState(false)
   const [emitUserId, setEmitUserId] = useState<string | null>(null)
@@ -631,14 +636,14 @@ export function AdminSociosClient({
       label: 'Solicitações',
       count: contagens.solicitacoes,
       countClass:
-        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
     {
       key: 'aguardando',
       label: 'Aguardando emissão',
       count: contagens.aguardando,
       countClass:
-        'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
     { key: 'todos', label: 'Emitidas', count: contagens.emitidas },
     { key: 'ativos', label: 'Ativos', count: contagens.ativos },
@@ -647,13 +652,14 @@ export function AdminSociosClient({
       label: 'Vencendo',
       count: contagens.vencendo,
       countClass:
-        'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
     {
       key: 'vencidos',
       label: 'Vencidos',
       count: contagens.vencidos,
-      countClass: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      countClass:
+        'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]',
     },
   ]
 
@@ -672,7 +678,7 @@ export function AdminSociosClient({
                   <>
                     {' '}
                     ·{' '}
-                    <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                    <span className="font-medium text-warning">
                       {contagens.solicitacoes} solicitaç
                       {contagens.solicitacoes !== 1 ? 'ões' : 'ão'}
                     </span>
@@ -682,7 +688,7 @@ export function AdminSociosClient({
                   <>
                     {' '}
                     ·{' '}
-                    <span className="font-medium text-amber-700 dark:text-amber-300">
+                    <span className="font-medium text-warning">
                       {contagens.aguardando} aguardando emissão
                     </span>
                   </>
@@ -691,7 +697,7 @@ export function AdminSociosClient({
                   <>
                     {' '}
                     ·{' '}
-                    <span className="font-medium text-amber-800 dark:text-amber-200">
+                    <span className="font-medium text-warning">
                       {contagens.vencendo} próximo
                       {contagens.vencendo !== 1 ? 's' : ''} de inadimplência
                       {' '}
@@ -703,7 +709,7 @@ export function AdminSociosClient({
                   <>
                     {' '}
                     ·{' '}
-                    <span className="font-medium text-red-700 dark:text-red-300">
+                    <span className="font-medium text-danger">
                       {contagens.vencidos} inadimplente
                       {contagens.vencidos !== 1 ? 's' : ''}
                     </span>
@@ -730,7 +736,7 @@ export function AdminSociosClient({
           </div>
 
           <div className="mt-4">
-            <AdminTabs
+            <AdminPendingTabs
               tabs={tabs.map((tab) => ({
                 id: tab.key,
                 label: tab.label,
@@ -843,6 +849,11 @@ export function AdminSociosClient({
                               Aprovado em {membro.aprovadoEmLabel}
                             </p>
                           )}
+                          {membro.detalhe ? (
+                            <div className="mt-1">
+                              <MembroOrigemCell membro={membro.detalhe} />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div
@@ -924,6 +935,15 @@ export function AdminSociosClient({
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
                               {membro.sedeNome ?? '—'}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {membro.detalhe ? (
+                              <MembroOrigemCell membro={membro.detalhe} />
+                            ) : (
+                              <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                                —
+                              </span>
+                            )}
                           </td>
                           <td className="hidden px-4 py-3 lg:table-cell">
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -1027,6 +1047,11 @@ export function AdminSociosClient({
                               .join(' · ')}
                           </p>
                         )}
+                        {socio.detalhe ? (
+                          <div className="mt-1">
+                            <MembroOrigemCell membro={socio.detalhe} />
+                          </div>
+                        ) : null}
                         <div className="mt-2">
                           <ValidadeStatus socio={socio} />
                         </div>
@@ -1089,6 +1114,15 @@ export function AdminSociosClient({
                             {socio.departamentoNome ?? '—'}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          {socio.detalhe ? (
+                            <MembroOrigemCell membro={socio.detalhe} />
+                          ) : (
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              —
+                            </span>
+                          )}
+                        </td>
                         <td className="hidden px-4 py-3 lg:table-cell">
                           <span className="text-xs text-[rgb(var(--foreground-muted))]">
                             {socio.email ?? '—'}
@@ -1129,6 +1163,7 @@ export function AdminSociosClient({
           onClose={() => setEmitOpen(false)}
           membrosElegiveis={elegiveisModal}
           initialUserId={emitUserId}
+          proximoNumero={proximoNumero}
         />
       )}
 

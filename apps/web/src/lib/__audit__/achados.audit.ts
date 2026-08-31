@@ -220,12 +220,15 @@ describe('#2 — comentário respeita o alcance de tenant do post', () => {
     }
 
     // Sócio de outro clube: `unrelated` na malha, e portanto sem alcance.
-    const forasteiro: {
+    // Super-admin não serve de contraste — leitura de plataforma (moderação)
+    // atravessa o alcance de propósito.
+    const { isSuperAdminEmail } = await import('@/lib/tenant-context')
+    const candidatos: Array<{
       userId: string
       tenantId: string
       tenant: { slug: string }
       user: { email: string | null }
-    } | null = await db.saasMembro.findFirst({
+    }> = await db.saasMembro.findMany({
       where: {
         status: 'APROVADO',
         tipo: 'SOCIO',
@@ -243,7 +246,9 @@ describe('#2 — comentário respeita o alcance de tenant do post', () => {
         tenant: { select: { slug: true } },
         user: { select: { email: true } },
       },
+      take: 20,
     })
+    const forasteiro = candidatos.find((c) => !isSuperAdminEmail(c.user.email)) ?? null
     if (!forasteiro) {
       alerta(AREA, 'Sem sócio de outro clube para contraste')
       return

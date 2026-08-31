@@ -3,17 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@torcida/ui'
 import { ImageCropDialog } from '@/components/media/image-crop-dialog'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { uploadMediaToCloudinary, type UploadPurpose } from '@/lib/cloudinary-upload'
 import { useLatestRef } from '@/lib/use-latest-ref'
-
-type UploadPurpose =
-  | 'comunidade'
-  | 'perfil-banner'
-  | 'perfil-avatar'
-  | 'cadastro'
-  | 'sede'
-  | 'patrimonio'
-  | 'clube-escudo'
 
 type Options = {
   aspect?: number

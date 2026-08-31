@@ -466,6 +466,25 @@ export async function assertMembroAtivo(tenantId: string, userId: string): Promi
   }
 }
 
+/**
+ * Typeahead de membros (menção / busca) é leitura. Super-admin sem
+ * `SaasMembro` na TO ativa precisa consultar — o recorte continua sendo o
+ * tenant resolvido + `resolveVisibleTenantIdsForFeed` (rivais fora).
+ * Sócio no próprio tenant real segue o gate de vínculo ativo.
+ */
+export async function assertPodeBuscarNaComunidade(
+  tenantId: string,
+  userId: string,
+  email: string | null | undefined,
+): Promise<void> {
+  if (isSuperAdminEmail(email)) return
+
+  const ativo = await getActiveTenant(userId, email)
+  if (!ativo || ativo.id !== tenantId) return
+  if (ativo.sintetico) return
+  await assertMembroAtivo(tenantId, userId)
+}
+
 /** Publicar no feed: permissão `community:post` + membro APROVADO (e carteirinha válida se sócio). */
 export async function assertPodePublicarNoFeed(): Promise<AuthzResult> {
   const ctx = await assertPermission(PERMISSIONS.COMMUNITY_POST)

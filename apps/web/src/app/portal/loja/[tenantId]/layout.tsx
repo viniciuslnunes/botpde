@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { listLojasDoSocio, podeVerLojaTenant } from '@/lib/loja-lojas'
+import { listLojasDoSocio, podeVerLojaTenant, tenantsVisiveisLoja } from '@/lib/loja-lojas'
 import { resolveTenantLogoUrl } from '@/lib/tenant'
 import { notFound, redirect } from 'next/navigation'
 import { LojaTenantThemeScope } from '../_components/loja-tenant-theme-scope'
@@ -22,19 +22,21 @@ export default async function LojaTenantLayout({
 
   if (!(await podeVerLojaTenant(userId, tenantId, session.user.email))) notFound()
 
+  const visiveisIds = [...(await tenantsVisiveisLoja(userId, session.user.email))]
+
   const [tenant, lojas, sacolaAgg, sacolaPorTenant, pedidosCount, categorias] = await Promise.all([
     db.tenant.findFirst({
       where: { id: tenantId, ativo: true },
       select: { id: true, nome: true, corPrimaria: true, design: true, logoUrl: true },
     }),
-    listLojasDoSocio(userId),
+    listLojasDoSocio(userId, session.user.email),
     db.saasCarrinhoItem.aggregate({
-      where: { userId },
+      where: { userId, tenantId: { in: visiveisIds } },
       _sum: { quantidade: true },
     }),
     db.saasCarrinhoItem.groupBy({
       by: ['tenantId'],
-      where: { userId },
+      where: { userId, tenantId: { in: visiveisIds } },
       _count: { _all: true },
     }),
     db.saasPedido.count({

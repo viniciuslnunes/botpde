@@ -22,7 +22,8 @@ import {
   slugify,
 } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { notificarSafe, notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { reconciliarAlertaEstoqueSeRegularizado } from '@/lib/bar-alertas'
+import { notificarSafe, notificarUsuariosComPermissao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import {
   confirmarVendaBarPaga,
   getTurnoAbertoBar,
@@ -571,6 +572,7 @@ export async function registrarCompraBar(
 
     revalidateBar()
     revalidateFinanceiro()
+    await reconciliarAlertaEstoqueSeRegularizado(tenant.id, produtoId)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao registrar compra' }
@@ -1120,6 +1122,10 @@ export async function quitarFiadoBar(
 
     revalidateBar()
     revalidateFinanceiro()
+    await reconciliarNotificacoesDoEvento(tenant.id, {
+      tipo: 'BAR_FIADO_VENCIDO',
+      link: `/admin/bar/comandas?fiado=${fiado.id}`,
+    })
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao quitar fiado' }
@@ -1188,6 +1194,10 @@ export async function cancelarFiadoBar(
     })
 
     revalidateBar()
+    await reconciliarNotificacoesDoEvento(tenant.id, {
+      tipo: 'BAR_FIADO_VENCIDO',
+      link: `/admin/bar/comandas?fiado=${fiado.id}`,
+    })
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao cancelar fiado' }
@@ -1251,6 +1261,7 @@ export async function registrarAjusteEstoqueBar(
     })
 
     revalidateBar()
+    await reconciliarAlertaEstoqueSeRegularizado(tenant.id, parsed.data.produtoId)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao ajustar estoque' }

@@ -103,15 +103,15 @@ describe('canFollowUser × rivalidade', () => {
     expect(getTenantRelation).toHaveBeenCalledWith('t1', 't2')
   })
 
-  it('torcedor×sócio de torcidas rivais → passa livre', async () => {
+  it('torcedor×sócio de torcidas rivais → bloqueado', async () => {
     mockVinculos([
       { userId: 'u1', tenantId: 't1', tipo: 'TORCEDOR' },
       { userId: 'u2', tenantId: 't2', tipo: 'SOCIO' },
     ])
     getTenantRelation.mockResolvedValue('rival')
-    await expect(canFollowUser('u1', 'u2', 't1')).resolves.toBe(true)
-    // Nenhum par sócio×sócio → rivalidade nem é consultada
-    expect(getTenantRelation).not.toHaveBeenCalled()
+    tenantsAreAllied.mockResolvedValue(true)
+    await expect(canFollowUser('u1', 'u2', 't1')).resolves.toBe(false)
+    expect(getTenantRelation).toHaveBeenCalledWith('t1', 't2')
   })
 
   it('sócio×sócio de torcidas aliadas → permitido', async () => {
@@ -141,9 +141,8 @@ describe('canFollowUser × rivalidade', () => {
     mockVinculos([{ userId: 'u2', tenantId: 't1', tipo: 'SOCIO' }])
     perfilTorcedorFindUnique.mockResolvedValue({ afiliacaoId: 'af1' })
     getTenantIdsPorAfiliacao.mockResolvedValue(['t1', 't9'])
+    getTenantRelation.mockResolvedValue('unrelated')
     await expect(canFollowUser('u1', 'u2', null)).resolves.toBe(true)
-    // Torcedor global não entra no bloqueio de rivalidade (não é sócio)
-    expect(getTenantRelation).not.toHaveBeenCalled()
   })
 
   it('torcedor global não segue sócio de torcida de outro clube', async () => {

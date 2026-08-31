@@ -16,6 +16,8 @@ export const atualizarPerfilSocialSchema = z.object({
   exibirDesde: z.boolean().optional(),
   /** Badge do feed: "Sócio - Nº N". Default true quando omitido no create. */
   exibirNumeroSocioNoFeed: z.boolean().optional(),
+  /** Opt-in: aparecer em "quem estava" na memória após check-in. Default off. */
+  memoriaPresencaVisivel: z.boolean().optional(),
   bannerUrl: cloudinaryUrlSchema.nullable().optional(),
   bannerPos: z.number().int().min(0).max(100).nullable().optional(),
   avatarUrl: cloudinaryUrlSchema.nullable().optional(),

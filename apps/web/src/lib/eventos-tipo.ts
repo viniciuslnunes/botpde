@@ -156,11 +156,18 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
   tenantId: string,
   eventoId: string,
   tipoEsperado?: TipoEvento,
+  userId?: string,
 ): Promise<EventoEmbarqueLite | null> {
+  // Mesmo recorte da lista/Agenda/Memória: evento de ancestral/aliado visível
+  // não pode 404 só porque o tenant ativo é outro.
+  const escopo = userId
+    ? await getEscopoEventosVisiveis(tenantId, userId)
+    : { tenantId }
+
   const row = await db.evento.findFirst({
     where: {
       id: eventoId,
-      tenantId,
+      ...escopo,
       ...(tipoEsperado ? { tipo: tipoEsperado } : {}),
     },
     select: {

@@ -17,6 +17,14 @@ export type ExportacaoDadosUsuario = {
   comentariosTotal: number
   reacoesTotal: number
   pedidos: Array<{ id: string; tenantNome: string; total: string; status: string; criadoEm: string }>
+  confianca: Array<{
+    tenantId: string
+    tenantNome: string
+    score: number
+    nivel: number
+    atualizadoEm: string
+    eventos: Array<{ sinal: string; peso: number; origemTipo: string; criadoEm: string }>
+  }>
 }
 
 /**
@@ -74,9 +82,29 @@ export async function exportarDadosUsuario(userId: string): Promise<ExportacaoDa
     criadoEm: Date
     tenant: { nome: string }
   }
+  type SaldoConfiancaRow = {
+    tenantId: string
+    score: number
+    nivel: number
+    atualizadoEm: Date
+    tenant: { nome: string }
+  }
+  type EventoConfiancaRow = {
+    tenantId: string
+    sinal: string
+    peso: number
+    origemTipo: string
+    criadoEm: Date
+  }
 
-  const [posts, comentariosTotal, reacoesTotal, pedidos]: [PostRow[], number, number, PedidoRow[]] =
-    await Promise.all([
+  const [posts, comentariosTotal, reacoesTotal, pedidos, saldosConfianca, eventosConfianca]: [
+    PostRow[],
+    number,
+    number,
+    PedidoRow[],
+    SaldoConfiancaRow[],
+    EventoConfiancaRow[],
+  ] = await Promise.all([
     db.post.findMany({
       where: { autorId: userId },
       select: {
@@ -100,6 +128,22 @@ export async function exportarDadosUsuario(userId: string): Promise<ExportacaoDa
         criadoEm: true,
         tenant: { select: { nome: true } },
       },
+      orderBy: { criadoEm: 'desc' },
+      take: 200,
+    }),
+    db.confiancaSaldo.findMany({
+      where: { userId },
+      select: {
+        tenantId: true,
+        score: true,
+        nivel: true,
+        atualizadoEm: true,
+        tenant: { select: { nome: true } },
+      },
+    }),
+    db.confiancaEvento.findMany({
+      where: { userId },
+      select: { tenantId: true, sinal: true, peso: true, origemTipo: true, criadoEm: true },
       orderBy: { criadoEm: 'desc' },
       take: 200,
     }),
@@ -137,6 +181,21 @@ export async function exportarDadosUsuario(userId: string): Promise<ExportacaoDa
       total: p.total.toString(),
       status: p.status,
       criadoEm: p.criadoEm.toISOString(),
+    })),
+    confianca: saldosConfianca.map((s) => ({
+      tenantId: s.tenantId,
+      tenantNome: s.tenant.nome,
+      score: s.score,
+      nivel: s.nivel,
+      atualizadoEm: s.atualizadoEm.toISOString(),
+      eventos: eventosConfianca
+        .filter((e) => e.tenantId === s.tenantId)
+        .map((e) => ({
+          sinal: e.sinal,
+          peso: e.peso,
+          origemTipo: e.origemTipo,
+          criadoEm: e.criadoEm.toISOString(),
+        })),
     })),
   }
 }

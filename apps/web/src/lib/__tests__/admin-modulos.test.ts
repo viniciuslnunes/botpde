@@ -8,6 +8,7 @@ import {
   PERMISSIONS,
   primeiraTabPermitida,
   resolverMenuIdDeRota,
+  resolverTabHrefDeRota,
   tabsPermitidasDoModulo,
 } from '@torcida/types'
 
@@ -168,6 +169,15 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
     }
   })
 
+  it('matchPath de tab resolve para o href canônico da etapa', () => {
+    expect(resolverTabHrefDeRota('/admin/bar/estornos')).toBe('/admin/bar/vendas')
+    expect(resolverTabHrefDeRota('/admin/bar/fiado')).toBe('/admin/bar/comandas')
+    expect(resolverTabHrefDeRota('/admin/comunidade/moderacao')).toBe(
+      '/admin/comunidade/moderacao',
+    )
+    expect(resolverTabHrefDeRota('/admin/afiliacoes')).toBe('/admin/afiliacoes')
+  })
+
   it('nenhum cabeçalho de seção repete o nome do seu único item', () => {
     // Resíduo do menu por módulo: enquanto Loja ocupava 5 linhas, a seção
     // "Loja" agrupava; virando uma linha, virou "Loja › Loja".
@@ -276,7 +286,7 @@ describe('tabsPermitidasDoModulo', () => {
   })
 
   it('wildcard do super admin vê tudo', () => {
-    expect(tabsPermitidasDoModulo('comunidade', ['*'])).toHaveLength(5)
+    expect(tabsPermitidasDoModulo('comunidade', ['*'])).toHaveLength(6)
   })
 
   it('módulo inexistente não explode', () => {

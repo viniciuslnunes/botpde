@@ -322,7 +322,7 @@ export function CanalFeedComposition({
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Mais opções do canal"
             aria-expanded={menuOpen}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            className="app-touch-target flex h-8 w-8 items-center justify-center rounded-full border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
@@ -421,7 +421,7 @@ export function CanalFeedComposition({
                           role="menuitem"
                           disabled={pending}
                           onClick={sair}
-                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--color-danger))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                         >
                           <LogOut className="h-4 w-4" />
                           Sair do canal
@@ -629,7 +629,7 @@ function GerenciarMembrosModal({
             Carregando membros…
           </div>
         ) : loadError ? (
-          <p className="py-6 text-center text-sm text-[rgb(var(--color-danger))]">{loadError}</p>
+          <p className="py-6 text-center text-sm text-danger">{loadError}</p>
         ) : (
           <>
             {podeGerenciarMembros && candidatosDisponiveis.length > 0 && (
@@ -801,7 +801,7 @@ function PedidosCanalModal({
             Carregando pedidos…
           </div>
         ) : loadError ? (
-          <p className="py-6 text-center text-sm text-[rgb(var(--color-danger))]">{loadError}</p>
+          <p className="py-6 text-center text-sm text-danger">{loadError}</p>
         ) : (
           <>
             <div className="mb-3 flex gap-1 rounded-lg bg-[rgb(var(--background-subtle))] p-1">
@@ -959,7 +959,7 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
           </button>
         </div>
 
-        <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+        <form action={formAction} className="max-h-[70dvh] space-y-4 overflow-y-auto pr-1">
           <input type="hidden" name="conversaId" value={canal.id} />
           <input type="hidden" name="avatarUrl" value={avatarUrl} />
 

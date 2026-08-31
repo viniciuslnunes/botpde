@@ -11,6 +11,7 @@ import {
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidateTenantCache } from '@/lib/tenant'
+import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 
 export async function salvarDesignTenant(designRaw: unknown) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
@@ -53,6 +54,16 @@ export async function salvarDesignTenant(designRaw: unknown) {
   revalidatePath('/portal')
   invalidateTenantCache(tenant.slug)
 
+  await notificarUsuariosComPermissao(PERMISSIONS.SETTINGS_MANAGE, {
+    tenantId: tenant.id,
+    tipo: 'DESIGN_ATUALIZADO',
+    titulo: 'Identidade visual atualizada',
+    corpo: 'As cores e a identidade da torcida foram alteradas.',
+    link: '/admin/design',
+    atorId: session.user.id,
+    excetoUserId: session.user.id,
+  })
+
   return { ok: true as const, design }
 }
 
@@ -87,6 +98,16 @@ export async function restaurarDesignPadrao() {
   revalidatePath('/admin')
   revalidatePath('/portal')
   invalidateTenantCache(tenant.slug)
+
+  await notificarUsuariosComPermissao(PERMISSIONS.SETTINGS_MANAGE, {
+    tenantId: tenant.id,
+    tipo: 'DESIGN_ATUALIZADO',
+    titulo: 'Identidade visual restaurada',
+    corpo: 'O visual da torcida voltou ao padrão da plataforma.',
+    link: '/admin/design',
+    atorId: session.user.id,
+    excetoUserId: session.user.id,
+  })
 
   return { ok: true as const, design: resolveTenantDesign(design, design.brand.primary) }
 }

@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getActiveTenant } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import { formatarMoedaBRL, formatDataCompetenciaInput } from '@torcida/types'
 import { ReciboPrintButton } from './recibo-print-button'
 import type { Metadata } from 'next'
@@ -14,8 +15,9 @@ export default async function ReciboCobrancaPage({ params }: Props) {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) redirect('/portal/comunidade')
+  const ativo = await getActiveTenant(session.user.id, session.user.email)
+  if (!ativo) redirect('/portal/comunidade')
+  const tenant = await carregarTenantCarteirinha(ativo, session.user.id)
 
   const { id } = await params
 

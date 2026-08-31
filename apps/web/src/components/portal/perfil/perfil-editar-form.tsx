@@ -20,6 +20,10 @@ interface PerfilEditarFormProps {
   exibirDesde: boolean
   /** Sócio com carteirinha: controla "Sócio/Membro - Nº N" no feed. */
   exibirNumeroSocioNoFeed?: boolean
+  /** Opt-in: aparecer em "quem estava" na memória após check-in. */
+  memoriaPresencaVisivel?: boolean
+  /** Unidade real — some no perfil da Comunidade Nacional. */
+  mostrarPresencaMemoria?: boolean
   /** Só mostra o toggle de nº quando há carteirinha. */
   temNumeroSocio?: boolean
   bannerUrl: string | null
@@ -37,6 +41,7 @@ type PerfilPersistPayload = {
   exibirSede: boolean
   exibirDesde: boolean
   exibirNumeroSocioNoFeed: boolean
+  memoriaPresencaVisivel: boolean
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
@@ -62,6 +67,8 @@ export function PerfilEditarForm({
   exibirSede: sedeInicial,
   exibirDesde: desdeInicial,
   exibirNumeroSocioNoFeed: numeroFeedInicial = true,
+  memoriaPresencaVisivel: presencaInicial = false,
+  mostrarPresencaMemoria = true,
   temNumeroSocio = false,
   bannerUrl: bannerInicial,
   bannerPos: bannerPosInicial,
@@ -75,6 +82,7 @@ export function PerfilEditarForm({
   const [exibirSede, setExibirSede] = useState(sedeInicial)
   const [exibirDesde, setExibirDesde] = useState(desdeInicial)
   const [exibirNumeroSocioNoFeed, setExibirNumeroSocioNoFeed] = useState(numeroFeedInicial)
+  const [memoriaPresencaVisivel, setMemoriaPresencaVisivel] = useState(presencaInicial)
   const [bannerUrl, setBannerUrl] = useState(bannerInicial)
   const [bannerPos, setBannerPos] = useState(bannerPosInicial ?? 50)
   const [avatarUrl, setAvatarUrl] = useState(avatarInicial)
@@ -119,6 +127,9 @@ export function PerfilEditarForm({
     if (temNumeroSocio && exibirNumeroSocioNoFeed !== numeroFeedInicial) {
       list.push('Nº de sócio no feed')
     }
+    if (mostrarPresencaMemoria && memoriaPresencaVisivel !== presencaInicial) {
+      list.push('Presença na memória')
+    }
     return list
   }, [
     bio,
@@ -134,6 +145,9 @@ export function PerfilEditarForm({
     exibirNumeroSocioNoFeed,
     numeroFeedInicial,
     temNumeroSocio,
+    memoriaPresencaVisivel,
+    presencaInicial,
+    mostrarPresencaMemoria,
   ])
 
   useUnsavedChanges({
@@ -152,6 +166,7 @@ export function PerfilEditarForm({
       setExibirSede(sedeInicial)
       setExibirDesde(desdeInicial)
       setExibirNumeroSocioNoFeed(numeroFeedInicial)
+      setMemoriaPresencaVisivel(presencaInicial)
       setBannerUrl(bannerInicial)
       setBannerPos(bannerPosInicial ?? 50)
       setAvatarUrl(avatarInicial)
@@ -163,6 +178,7 @@ export function PerfilEditarForm({
     sedeInicial,
     desdeInicial,
     numeroFeedInicial,
+    presencaInicial,
     bannerInicial,
     bannerPosInicial,
     avatarInicial,
@@ -184,6 +200,7 @@ export function PerfilEditarForm({
         exibirSede,
         exibirDesde,
         exibirNumeroSocioNoFeed,
+        memoriaPresencaVisivel,
         bannerUrl: nextBanner,
         bannerPos: nextBanner ? nextPos : null,
         avatarUrl: overrides?.avatarUrl !== undefined ? overrides.avatarUrl : avatarUrl,
@@ -198,6 +215,7 @@ export function PerfilEditarForm({
       exibirSede,
       exibirDesde,
       exibirNumeroSocioNoFeed,
+      memoriaPresencaVisivel,
       bannerUrl,
       bannerPos,
       avatarUrl,
@@ -555,6 +573,16 @@ export function PerfilEditarForm({
             />
             Número de sócio no feed
             <span className="text-xs text-[rgb(var(--foreground-muted))]">(Sócio/Membro - Nº …)</span>
+          </label>
+        )}
+        {mostrarPresencaMemoria && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={memoriaPresencaVisivel}
+              onChange={(e) => setMemoriaPresencaVisivel(e.target.checked)}
+            />
+            Aparecer na memória do dia quando eu fizer check-in
           </label>
         )}
       </div>

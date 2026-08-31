@@ -12,7 +12,7 @@ const ROUTES = [
   { label: 'Comunidade', href: '/portal/comunidade', heading: /Comunidade|Feed da comunidade/i },
   { label: 'Eventos', href: '/portal/eventos', heading: /Eventos/i },
   { label: 'Sedes', href: '/portal/sedes', heading: /Sedes/i },
-  { label: 'Loja', href: '/portal/loja', heading: /Loja oficial/i },
+  { label: 'Lojas', href: '/portal/loja', heading: /Lojas/i },
   { label: 'Mensagens', href: '/portal/mensagens', heading: /Mensagens/i },
 ] as const
 

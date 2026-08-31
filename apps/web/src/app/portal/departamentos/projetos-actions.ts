@@ -28,8 +28,10 @@ import {
   StatusProjetoSchema,
   tituloCampanhaDoAno,
   PERMISSIONS,
+  hrefHomeDepartamento,
 } from '@torcida/types'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
+import { notificarSafe } from '@/lib/notificacoes'
 
 export type ActionState = { ok?: boolean; error?: string }
 
@@ -593,6 +595,16 @@ export async function adicionarParticipanteProjeto(
       },
     })
 
+    await notificarSafe({
+      userId: parsed.data.targetUserId,
+      tenantId: tenant.id,
+      tipo: 'DEPARTAMENTO_ADICIONADO',
+      titulo: `Você entrou no projeto ${projeto.titulo}`,
+      corpo: 'Você foi incluído na equipe deste projeto.',
+      link: hrefHomeDepartamento(parsed.data.slug || depto.slug, 'projetos'),
+      atorId: session.user.id,
+    })
+
     revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)
     return { ok: true }
   } catch (e) {
@@ -632,6 +644,16 @@ export async function removerParticipanteProjeto(
         entidadeId: projeto.id,
         detalhes: { titulo: projeto.titulo, userId: parsed.data.targetUserId },
       },
+    })
+
+    await notificarSafe({
+      userId: parsed.data.targetUserId,
+      tenantId: tenant.id,
+      tipo: 'DEPARTAMENTO_REMOVIDO',
+      titulo: `Você saiu do projeto ${projeto.titulo}`,
+      corpo: 'Você não faz mais parte da equipe deste projeto.',
+      link: hrefHomeDepartamento(parsed.data.slug || depto.slug, 'projetos'),
+      atorId: session.user.id,
     })
 
     revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)

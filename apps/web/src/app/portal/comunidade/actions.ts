@@ -33,6 +33,7 @@ import {
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import { assertCapacidadeConfianca } from '@/lib/confianca'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import {
   CARGO_TORCEDOR,
@@ -549,6 +550,8 @@ export interface PublicarPostState {
   token?: string
   /** Prepend otimista no feed — evita esperar o refetch da API. */
   preview?: PostPublicadoPreview
+  /** Fórum: id do tópico recém-publicado (redirect no composer). */
+  topicoId?: string
 }
 
 export async function publicarPost(
@@ -989,6 +992,7 @@ export interface AtualizarPerfilSocialInput {
   exibirSede: boolean
   exibirDesde: boolean
   exibirNumeroSocioNoFeed?: boolean
+  memoriaPresencaVisivel?: boolean
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
@@ -1240,6 +1244,7 @@ export interface ComentarioPostItem {
 export async function listarComentariosPost(postId: string): Promise<ComentarioPostItem[]> {
   // Aplica primeiro o mesmo alcance de tenant do feed/permalink. Dentro desse
   // alcance vale a escada do post; privacidade de perfil não participa do gate.
+  // Exceção: super-admin (leitura de plataforma / modo operador) — ver abaixo.
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
   const parsed = z.string().uuid().safeParse(postId)
@@ -1259,7 +1264,14 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
 
   const viewerId = session.user.id
   const ehAutor = viewerId === post.autorId
-  let tenantNoAlcance = ehAutor
+  // Leitura de plataforma: super-admin lê os comentários de qualquer post —
+  // é a MESMA leitura que já abre o mural de outra torcida no modo operador
+  // (`getPostsDoCanal({ leituraOperador })`, que não filtra tenant nem
+  // visibilidade). Sem isto o operador via o post e tomava "Post não
+  // encontrado" ao abrir os comentários — moderação cega. Escrever continua
+  // barrado por `resolverContextoEngajamento` (ERRO_MODO_OPERADOR).
+  const leituraPlataforma = isSuperAdminEmail(session.user.email)
+  let tenantNoAlcance = ehAutor || leituraPlataforma
   if (!tenantNoAlcance) {
     // Torcedor/sócio APROVADO no tenant do post (mural da unidade via convite).
     if (await vinculoAprovadoNoTenant(viewerId, post.tenantId)) {
@@ -1276,7 +1288,7 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
   }
   if (!tenantNoAlcance) throw new Error('Post não encontrado')
 
-  let podeVer = ehAutor || post.visibilidade === 'PUBLICO'
+  let podeVer = ehAutor || leituraPlataforma || post.visibilidade === 'PUBLICO'
   if (!podeVer && post.visibilidade === 'TENANT') {
     // Sócio (feed sócios) OU qualquer vínculo APROVADO — o mural da unidade
     // já mostra TENANT ao torcedor inscrito no canal; comentários seguem.
@@ -1954,35 +1966,33 @@ export async function publicarPostEvento(
 }
 
 /**
- * Sócio com tenant real usa `GROUPS_CREATE` no tenant ativo. Sem tenant (ou
- * sem permissão) — fallback para a Comunidade Nacional do clube
- * (`tenantId = tenantSintetico.id`), mesmo critério de acesso de
- * `assertComunidadeNacional`.
+ * Sócio no tenant: `GROUPS_CREATE` e nível De casa. Comunidade Nacional:
+ * passa `nacional: true` — sem eixo local e sem fallback silencioso.
  */
 export async function criarGrupo(
   nome: string,
   descricao?: string,
   publica = true,
+  nacional = false,
 ): Promise<{ id: string }> {
   const parsed = criarGrupoSchema.safeParse({ nome, descricao, publica })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Grupo inválido')
 
-  // O fallback para a CN é um `catch` do gate de permissão — sem esta trava, a
-  // recusa do modo operador cairia justamente nele e a ação passaria.
   await assertNaoOperador()
 
   let session: Session
   let tenantId: string
 
-  try {
+  if (nacional) {
+    const n = await assertComunidadeNacional()
+    session = n.session
+    tenantId = n.tenantSintetico.id
+  } else {
     const ctx = await assertPermission(PERMISSIONS.GROUPS_CREATE)
     await assertMembroAtivo(ctx.tenant.id, ctx.session.user.id)
     session = ctx.session
     tenantId = ctx.tenant.id
-  } catch {
-    const nacional = await assertComunidadeNacional()
-    session = nacional.session
-    tenantId = nacional.tenantSintetico.id
+    await assertCapacidadeConfianca(session.user.id, tenantId, 'grupo:criar')
   }
 
   const conversa: { id: string } = await db.conversa.create({
@@ -3279,6 +3289,8 @@ export async function criarCanalTematico(
   ) {
     throw new Error('Sem permissão para criar canais.')
   }
+
+  await assertCapacidadeConfianca(session.user.id, tenant.id, 'canal:criar')
 
   const parsed = criarCanalTematicoSchema.safeParse({
     nome,

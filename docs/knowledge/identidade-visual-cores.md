@@ -2,9 +2,9 @@
 
 > Inteligência de domínio para o módulo Design e qualquer UI que pinte a
 > marca da torcida. Complementa [`cultura-ideologia.md`](cultura-ideologia.md)
-> (símbolos) e [`aliancas.md`](aliancas.md) (rivalidade só para moderação /
-> nunca sugerir aliado). Aqui o foco é **não pintar a casa com a cor do
-> rival**.
+> (símbolos) e [`aliancas.md`](aliancas.md) (rivalidade: não sugerir aliado,
+> moderar, **e** isolar UX/dados). Aqui o foco é **não pintar a casa com a
+> cor do rival**.
 
 **Consumidores:** `ux-review`, `implementation`, `product-strategy`,
 `qa-verification`, `aliancas-torcidas` (avisos de cor). Spec técnica:
@@ -59,7 +59,9 @@ neutro (`#1d4ed8`) ou tom derivado da marca — nunca emerald “de dashboard”
 5. **Contraste com marca escura**  
    Texto/ícone ativo na topbar e no menu admin **nunca** usa a primária
    crua como foreground se ela for quase preta. Usar `--color-*-fg`
-   (`corMarcaLegivel`) + anel/ring de seleção. Badges soft idem.
+   (`corMarcaLegivel` / `ajustarParaContraste`) + anel/ring de seleção.
+   Badges soft idem. No tema **claro**, P&B fica em papel branco (sem misturar
+   o preto no cinza) e secundária branca ganha fill/anel para o botão não sumir.
 
 6. **Sucesso ≠ verde universal**  
    Default de `actions.success` = azul. Verde só via `derivarAcoesDaMarca`

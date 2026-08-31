@@ -8,7 +8,7 @@ import {
 } from '@torcida/types'
 import { excluirLancamentoFinanceiro } from '@/app/admin/financeiro/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
-import { TablePagination, TableShell } from '@/components/admin/ui'
+import { AdminRowActions, TablePagination, TableShell } from '@/components/admin/ui'
 import { buildAdminHref } from '@/lib/admin-href'
 import { FinanceiroLancamentoForm } from '@/components/financeiro/financeiro-lancamento-form'
 import { Pencil, Trash2, Wallet } from 'lucide-react'
@@ -50,6 +50,7 @@ export function FinanceiroLancamentosLista({
   query?: Record<string, string | undefined>
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  const confirmAction = useConfirmAction()
 
   const from = (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
@@ -135,17 +136,34 @@ export function FinanceiroLancamentosLista({
                       {formatarMoedaBRL(item.valor)}
                     </span>
                     {podeGerir && (
-                      <>
-                        <button
-                          type="button"
-                          title="Editar"
-                          onClick={() => setEditingId(item.id)}
-                          className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <ExcluirButton id={item.id} descricao={item.descricao} />
-                      </>
+                      <AdminRowActions
+                        ariaLabel={`Ações do lançamento ${item.descricao}`}
+                        items={[
+                          {
+                            id: 'editar',
+                            label: 'Editar',
+                            icon: Pencil,
+                            onSelect: () => setEditingId(item.id),
+                          },
+                          {
+                            id: 'excluir',
+                            label: 'Excluir',
+                            icon: Trash2,
+                            tone: 'danger',
+                            onSelect: () => {
+                              void confirmAction({
+                                titulo: `Excluir o lançamento “${item.descricao}”?`,
+                                descricao: 'Exclusão permanente. Esta ação não pode ser desfeita.',
+                                labelConfirmar: 'Excluir',
+                                variante: 'destructive',
+                                cancelled: 'Exclusão cancelada.',
+                                run: () => excluirLancamentoFinanceiro(item.id),
+                                success: 'Lançamento excluído.',
+                              })
+                            },
+                          },
+                        ]}
+                      />
                     )}
                   </div>
                 </td>
@@ -155,29 +173,5 @@ export function FinanceiroLancamentosLista({
         ))}
       </tbody>
     </TableShell>
-  )
-}
-
-function ExcluirButton({ id, descricao }: { id: string; descricao: string }) {
-  const confirmAction = useConfirmAction()
-  return (
-    <button
-      type="button"
-      title="Excluir lançamento"
-      onClick={() => {
-        void confirmAction({
-          titulo: `Excluir o lançamento “${descricao}”?`,
-          descricao: 'Exclusão permanente. Esta ação não pode ser desfeita.',
-          labelConfirmar: 'Excluir',
-          variante: 'destructive',
-          cancelled: 'Exclusão cancelada.',
-          run: () => excluirLancamentoFinanceiro(id),
-          success: 'Lançamento excluído.',
-        })
-      }}
-      className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950"
-    >
-      <Trash2 className="h-4 w-4" />
-    </button>
   )
 }

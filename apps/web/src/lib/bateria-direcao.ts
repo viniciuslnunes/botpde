@@ -188,7 +188,7 @@ async function fetchDirecaoBateria(
         abertosInstr > 0
           ? `${abertosInstr} empréstimo${abertosInstr === 1 ? '' : 's'} aberto${abertosInstr === 1 ? '' : 's'} com foto de saída.`
           : 'Itens marcados EM_USO no inventário.',
-      href: '/admin/patrimonio?categoria=INSTRUMENTO&status=EM_USO',
+          href: '/admin/bateria?tab=instrumentos',
       tom: 'default',
     })
   }

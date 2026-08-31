@@ -1,24 +1,30 @@
 'use client'
 
-import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 import {
   createContext,
   useContext,
   useEffect,
   useMemo,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react'
+import {
+  THEME_DEFAULT,
+  THEME_STORAGE_KEY,
+  type ColorMode,
+} from './theme-script'
 import {
   ACTION_CSS_VARS,
   ACTION_TOKEN_KEYS,
   DEFAULT_ACTIONS,
-  DEFAULT_SURFACE_DARK,
-  DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
   contrasteTextoSobre,
   hexToCssRgb,
+  precisaAnelFill,
   resolveActionTextColors,
   resolveTenantDesign,
+  resolverFillDaMarca,
+  resolverSuperficies,
   SURFACE_CSS_VARS,
   SURFACE_TOKEN_KEYS,
   // Import direto do módulo, não do barrel: ThemeProvider está no root layout, e
@@ -95,198 +101,238 @@ interface ThemeProviderProps {
   tenant?: TenantTheme
 }
 
+function setFillAndRing(
+  set: (name: string, value: string) => void,
+  cssVar: string,
+  fillHex: string,
+  surfaceHex: string,
+): string {
+  const fill = resolverFillDaMarca(fillHex, surfaceHex)
+  set(cssVar, hexToCssRgb(fill))
+  const ringNeeded = precisaAnelFill(fill, surfaceHex)
+  const ring = contrasteTextoSobre(surfaceHex) === 'light' ? '#0a0a0a' : '#fafafa'
+  set(`${cssVar}-ring`, hexToCssRgb(ringNeeded ? ring : fill))
+  set(`${cssVar}-ring-a`, ringNeeded ? '0.45' : '0')
+  return fill
+}
+
+function writeTenantDesignTokens(
+  set: (name: string, value: string) => void,
+  design: TenantDesign,
+  mode: 'light' | 'dark',
+): void {
+  const primary = design.brand.primary
+  set('--color-primary-raw', primary)
+
+  const surfaces = resolverSuperficies(design, mode)
+  const surfaceHex = surfaces.surface
+
+  const secondaryHex =
+    design.brand.secondary ??
+    (contrasteTextoSobre(primary) === 'light' ? '#f4f4f5' : '#27272a')
+
+  const brandFg = design.brandFg ?? { primary: null, secondary: null }
+  const primaryText = resolveActionTextColors(
+    primary,
+    brandFg.primary,
+    surfaceHex,
+  )
+  const secondaryText = resolveActionTextColors(
+    secondaryHex,
+    brandFg.secondary,
+    surfaceHex,
+  )
+
+  setFillAndRing(set, '--color-primary', primary, surfaceHex)
+  set('--primary', hexToCssRgb(primaryText.fill))
+  setFillAndRing(set, '--color-secondary', secondaryHex, surfaceHex)
+  set('--secondary', hexToCssRgb(secondaryText.fill))
+
+  set('--color-primary-fg', hexToCssRgb(primaryText.fg))
+  set('--color-primary-on', hexToCssRgb(primaryText.on))
+  set('--primary-fg', hexToCssRgb(primaryText.fg))
+  set('--color-secondary-fg', hexToCssRgb(secondaryText.fg))
+  set('--color-secondary-on', hexToCssRgb(secondaryText.on))
+  set('--secondary-fg', hexToCssRgb(secondaryText.fg))
+
+  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const actionsFg = design.actionsFg ?? {}
+  for (const key of ACTION_TOKEN_KEYS) {
+    const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
+    const hex = actions[key as keyof typeof actions]
+    const override = (actionsFg as Record<string, string | null | undefined>)[key]
+    const text = resolveActionTextColors(hex, override, surfaceHex)
+    setFillAndRing(set, cssVar, hex, surfaceHex)
+    set(`${cssVar}-fg`, hexToCssRgb(text.fg))
+    set(`${cssVar}-on`, hexToCssRgb(text.on))
+  }
+
+  for (const key of SURFACE_TOKEN_KEYS) {
+    const cssVar = SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]
+    set(cssVar, hexToCssRgb(surfaces[key]))
+  }
+
+  set('--grid-enabled', design.grid.enabled ? '1' : '0')
+  set('--grid-size', `${design.grid.sizePx}px`)
+  set('--grid-opacity', String(design.grid.lineOpacity))
+
+  if (design.grid.baseColor) {
+    set('--grid-base', hexToCssRgb(design.grid.baseColor))
+  } else {
+    set('--grid-base', hexToCssRgb(surfaces.backgroundSubtle))
+  }
+
+  if (design.grid.lineColor) {
+    set('--grid-line', hexToCssRgb(design.grid.lineColor))
+  } else {
+    set('--grid-line', hexToCssRgb(surfaces.foreground))
+  }
+}
+
+function serializeTenantDesignVars(
+  design: TenantDesign,
+  mode: 'light' | 'dark',
+): string {
+  const lines: string[] = []
+  writeTenantDesignTokens((name, value) => {
+    lines.push(`${name}:${value}`)
+  }, design, mode)
+  return lines.join(';')
+}
+
 /**
  * Aplica tokens de design no documentElement.
- * Superfícies usam overrides do modo ativo; grade e marca são globais.
+ * Superfícies usam o modo ativo (marca preenche buracos); fills de marca
+ * empurram L quando branco/preto sumiria no tema.
  */
 export function applyTenantDesign(
   design: TenantDesign,
   mode: 'light' | 'dark' = 'dark',
   root: HTMLElement = document.documentElement,
 ): void {
-  const primary = design.brand.primary
-  const rgb = hexToCssRgb(primary)
-  root.style.setProperty('--color-primary', rgb)
-  root.style.setProperty('--primary', rgb)
-  root.style.setProperty('--color-primary-raw', primary)
-
-  // Sempre define secundária: se o tenant não escolheu, deriva contraste da primária
-  // para botões/badges auxiliares não ficarem “mortos”.
-  const secondaryHex =
-    design.brand.secondary ??
-    (contrasteTextoSobre(primary) === 'light' ? '#f4f4f5' : '#27272a')
-  root.style.setProperty('--color-secondary', hexToCssRgb(secondaryHex))
-  root.style.setProperty('--secondary', hexToCssRgb(secondaryHex))
-
-  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
-  const overrides = mode === 'dark' ? design.dark : design.light
-  const surfaceHex =
-    (overrides as Record<string, string | undefined>).surface ??
-    (defaults as Record<string, string>).surface
-
-  const brandFg = design.brandFg ?? { primary: null, secondary: null }
-  const primaryText = resolveActionTextColors(
-    primary,
-    brandFg.primary,
-    surfaceHex,
+  writeTenantDesignTokens(
+    (name, value) => root.style.setProperty(name, value),
+    design,
+    mode,
   )
-  const secondaryText = resolveActionTextColors(
-    secondaryHex,
-    brandFg.secondary,
-    surfaceHex,
-  )
-
-  root.style.setProperty('--color-primary-fg', hexToCssRgb(primaryText.fg))
-  root.style.setProperty('--color-primary-on', hexToCssRgb(primaryText.on))
-  root.style.setProperty('--primary-fg', hexToCssRgb(primaryText.fg))
-  root.style.setProperty('--color-secondary-fg', hexToCssRgb(secondaryText.fg))
-  root.style.setProperty('--color-secondary-on', hexToCssRgb(secondaryText.on))
-  root.style.setProperty('--secondary-fg', hexToCssRgb(secondaryText.fg))
-
-  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
-  const actionsFg = design.actionsFg ?? {}
-  for (const key of ACTION_TOKEN_KEYS) {
-    const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
-    const hex = actions[key as keyof typeof actions]
-    const override = (actionsFg as Record<string, string | null | undefined>)[key]
-    const text = resolveActionTextColors(hex, override, surfaceHex)
-    root.style.setProperty(cssVar, hexToCssRgb(hex))
-    root.style.setProperty(`${cssVar}-fg`, hexToCssRgb(text.fg))
-    root.style.setProperty(`${cssVar}-on`, hexToCssRgb(text.on))
-  }
-
-  for (const key of SURFACE_TOKEN_KEYS) {
-    const cssVar = SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]
-    const hex =
-      (overrides as Record<string, string | undefined>)[key] ??
-      (defaults as Record<string, string>)[key]
-    root.style.setProperty(cssVar, hexToCssRgb(hex))
-  }
-
-  root.style.setProperty('--grid-enabled', design.grid.enabled ? '1' : '0')
-  root.style.setProperty('--grid-size', `${design.grid.sizePx}px`)
-  root.style.setProperty('--grid-opacity', String(design.grid.lineOpacity))
   root.dataset.grid = design.grid.enabled ? 'on' : 'off'
-
-  if (design.grid.baseColor) {
-    root.style.setProperty('--grid-base', hexToCssRgb(design.grid.baseColor))
-  } else {
-    const subtle =
-      (overrides as Record<string, string | undefined>).backgroundSubtle ??
-      (defaults as Record<string, string>).backgroundSubtle
-    root.style.setProperty('--grid-base', hexToCssRgb(subtle))
-  }
-
-  if (design.grid.lineColor) {
-    root.style.setProperty('--grid-line', hexToCssRgb(design.grid.lineColor))
-  } else {
-    const fg =
-      (overrides as Record<string, string | undefined>).foreground ??
-      (defaults as Record<string, string>).foreground
-    root.style.setProperty('--grid-line', hexToCssRgb(fg))
-  }
 }
 
-/** Gera bloco CSS crítico (SSR) para evitar flash sem JS. */
+/**
+ * CSS crítico sem JS. `:root` = tema claro; `.dark` = tema escuro.
+ * O script de bloqueio no layout raiz põe `.dark`/`.light` no <html>
+ * antes do paint — não despejar o escuro em `:root` (âmbar/rosa de
+ * texto-no-escuro some no papel branco).
+ *
+ * `mode` é ignorado (assinatura antiga); os dois temas saem sempre.
+ * `scope` gera regras no seletor (loja visitada) em vez de :root.
+ */
 export function tenantDesignCriticalCss(
   design: TenantDesign,
-  mode: 'light' | 'dark' = 'dark',
+  _mode: 'light' | 'dark' = 'dark',
+  scope?: string,
 ): string {
-  const primary = design.brand.primary
-  const rgb = hexToCssRgb(primary)
-  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
-  const overrides = mode === 'dark' ? design.dark : design.light
-
-  const lines: string[] = [
-    `--color-primary:${rgb}`,
-    `--primary:${rgb}`,
-    `--color-primary-raw:${primary}`,
-    `--grid-enabled:${design.grid.enabled ? '1' : '0'}`,
-    `--grid-size:${design.grid.sizePx}px`,
-    `--grid-opacity:${design.grid.lineOpacity}`,
-  ]
-
-  const secondaryHex =
-    design.brand.secondary ??
-    (contrasteTextoSobre(primary) === 'light' ? '#f4f4f5' : '#27272a')
-  lines.push(`--color-secondary:${hexToCssRgb(secondaryHex)}`)
-  lines.push(`--secondary:${hexToCssRgb(secondaryHex)}`)
-
-  const surfaceHex =
-    (overrides as Record<string, string | undefined>).surface ??
-    (defaults as Record<string, string>).surface
-  const brandFg = design.brandFg ?? { primary: null, secondary: null }
-  const primaryText = resolveActionTextColors(
-    primary,
-    brandFg.primary,
-    surfaceHex,
-  )
-  const secondaryText = resolveActionTextColors(
-    secondaryHex,
-    brandFg.secondary,
-    surfaceHex,
-  )
-  lines.push(`--color-primary-fg:${hexToCssRgb(primaryText.fg)}`)
-  lines.push(`--color-primary-on:${hexToCssRgb(primaryText.on)}`)
-  lines.push(`--primary-fg:${hexToCssRgb(primaryText.fg)}`)
-  lines.push(`--color-secondary-fg:${hexToCssRgb(secondaryText.fg)}`)
-  lines.push(`--color-secondary-on:${hexToCssRgb(secondaryText.on)}`)
-  lines.push(`--secondary-fg:${hexToCssRgb(secondaryText.fg)}`)
-
-  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
-  const actionsFg = design.actionsFg ?? {}
-  for (const key of ACTION_TOKEN_KEYS) {
-    const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
-    const hex = actions[key as keyof typeof actions]
-    const override = (actionsFg as Record<string, string | null | undefined>)[key]
-    const text = resolveActionTextColors(hex, override, surfaceHex)
-    lines.push(`${cssVar}:${hexToCssRgb(hex)}`)
-    lines.push(`${cssVar}-fg:${hexToCssRgb(text.fg)}`)
-    lines.push(`${cssVar}-on:${hexToCssRgb(text.on)}`)
+  const light = serializeTenantDesignVars(design, 'light')
+  const dark = serializeTenantDesignVars(design, 'dark')
+  if (scope) {
+    return `${scope}{${light}}.dark ${scope},${scope}.dark{${dark}}`
   }
+  return `:root{${light}}.dark{${dark}}`
+}
 
-  for (const key of SURFACE_TOKEN_KEYS) {
-    const hex =
-      (overrides as Record<string, string | undefined>)[key] ??
-      (defaults as Record<string, string>)[key]
-    lines.push(
-      `${SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]}:${hexToCssRgb(hex)}`,
-    )
-  }
-
-  const base =
-    design.grid.baseColor ??
-    (overrides as Record<string, string | undefined>).backgroundSubtle ??
-    (defaults as Record<string, string>).backgroundSubtle
-  const line =
-    design.grid.lineColor ??
-    (overrides as Record<string, string | undefined>).foreground ??
-    (defaults as Record<string, string>).foreground
-  lines.push(`--grid-base:${hexToCssRgb(base)}`)
-  lines.push(`--grid-line:${hexToCssRgb(line)}`)
-
-  return `:root{${lines.join(';')}}`
+function modeFromRoot(root: HTMLElement): ColorMode {
+  return root.classList.contains('dark') ? 'dark' : 'light'
 }
 
 function DesignApplier({ design }: { design: TenantDesign }) {
-  const { resolvedTheme } = useTheme()
-
-  useEffect(() => {
-    const mode = resolvedTheme === 'light' ? 'light' : 'dark'
-    applyTenantDesign(design, mode)
-  }, [design, resolvedTheme])
-
   useEffect(() => {
     const root = document.documentElement
-    const observer = new MutationObserver(() => {
-      const mode = root.classList.contains('dark') ? 'dark' : 'light'
-      applyTenantDesign(design, mode)
-    })
+    const apply = () => applyTenantDesign(design, modeFromRoot(root))
+    apply()
+    const observer = new MutationObserver(apply)
     observer.observe(root, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
   }, [design])
 
   return null
+}
+
+const THEME_EVENT = 'torcida-theme'
+
+function readStoredTheme(): ColorMode {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark'
+  } catch {
+    return THEME_DEFAULT
+  }
+}
+
+function applyColorMode(mode: ColorMode): void {
+  const root = document.documentElement
+  root.classList.remove('light', 'dark')
+  root.classList.add(mode)
+  root.style.colorScheme = mode
+}
+
+function disableTransitions(): void {
+  const css = document.createElement('style')
+  css.appendChild(
+    document.createTextNode(
+      '*,*::before,*::after{-webkit-transition:none!important;transition:none!important}',
+    ),
+  )
+  document.head.appendChild(css)
+  ;(() => window.getComputedStyle(document.body))()
+  window.setTimeout(() => {
+    css.parentNode?.removeChild(css)
+  }, 1)
+}
+
+function subscribeTheme(onChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY || event.key === null) onChange()
+  }
+  window.addEventListener('storage', onStorage)
+  window.addEventListener(THEME_EVENT, onChange)
+  return () => {
+    window.removeEventListener('storage', onStorage)
+    window.removeEventListener(THEME_EVENT, onChange)
+  }
+}
+
+function getServerTheme(): ColorMode {
+  return THEME_DEFAULT
+}
+
+function setTheme(next: string | ((prev: string) => string)): void {
+  const current = readStoredTheme()
+  const raw = typeof next === 'function' ? next(current) : next
+  const mode: ColorMode = raw === 'light' ? 'light' : 'dark'
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, mode)
+  } catch {
+    /* private mode / quota */
+  }
+  disableTransitions()
+  applyColorMode(mode)
+  window.dispatchEvent(new Event(THEME_EVENT))
+}
+
+export function useTheme() {
+  const theme = useSyncExternalStore(
+    subscribeTheme,
+    readStoredTheme,
+    getServerTheme,
+  )
+  return useMemo(
+    () => ({
+      theme,
+      resolvedTheme: theme,
+      setTheme,
+      themes: ['light', 'dark'] as const,
+    }),
+    [theme],
+  )
 }
 
 export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
@@ -308,16 +354,8 @@ export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
 
   return (
     <TenantThemeContext.Provider value={ctxValue}>
-      <NextThemesProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem={false}
-        storageKey="torcida-theme"
-        disableTransitionOnChange
-      >
-        {tenant ? <DesignApplier design={design} /> : null}
-        {children}
-      </NextThemesProvider>
+      {tenant ? <DesignApplier design={design} /> : null}
+      {children}
     </TenantThemeContext.Provider>
   )
 }

@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import { CheckoutForm, type CupomDisponivel } from './checkout-form'
 import { toCheckoutItem, type CheckoutItemSerializado } from '@/lib/loja-serialize'
 import { formatNomeTorcida } from '@torcida/types'
+import { tenantsPermitidosLoja } from '@/lib/loja-lojas'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Checkout' }
@@ -14,13 +15,15 @@ export default async function CheckoutPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
+  const permitidos = await tenantsPermitidosLoja(session.user.id, session.user.email)
+
   const rows: Array<{
     id: string
     quantidade: number
     tamanho: string
     produto: { nome: string; preco: unknown; tenantId: string }
   }> = await db.saasCarrinhoItem.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, tenantId: { in: [...permitidos] } },
     include: { produto: { select: { nome: true, preco: true, tenantId: true } } },
   })
 

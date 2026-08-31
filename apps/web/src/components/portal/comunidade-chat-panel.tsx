@@ -55,6 +55,7 @@ interface ComunidadeChatPanelProps {
   currentUserId: string
   /** Quando false (rail oculta fora do feed), não abre SSE nem polling de inbox. */
   liveUpdates?: boolean
+  podeCriarGrupo?: boolean
 }
 
 type BloqueioInbox = 'nenhum' | 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
@@ -73,6 +74,7 @@ function aplicarBloqueioResumo(data: {
 export function ComunidadeChatPanel({
   currentUserId,
   liveUpdates = true,
+  podeCriarGrupo = false,
 }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
@@ -239,6 +241,7 @@ export function ComunidadeChatPanel({
             inboxPreloaded
             active={expanded}
             onInboxChange={onInboxAtualizada}
+            podeCriarGrupo={podeCriarGrupo}
           />
         )}
         </div>

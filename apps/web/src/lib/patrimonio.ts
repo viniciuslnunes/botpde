@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import type { CategoriaPatrimonioItem, StatusPatrimonioItem } from '@torcida/db'
 import { Prisma } from '@torcida/db'
-import { PATRIMONIO_PAGE_SIZE } from '@torcida/types'
+import { nomesPecasPatrimonio, PATRIMONIO_PAGE_SIZE, patrimonioEhPecaUnica } from '@torcida/types'
 
 export type PatrimonioItemLite = {
   id: string
@@ -13,6 +13,9 @@ export type PatrimonioItemLite = {
   localizacao: string | null
   valorEstimado: Prisma.Decimal | null
   observacao: string | null
+  fotoUrl: string | null
+  /** Catálogo ou, na falta, última evidência de empréstimo — só para a grade. */
+  fotoPreviewUrl: string | null
   meta: Prisma.JsonValue | null
   criadoEm: Date
   atualizadoEm: Date
@@ -117,6 +120,15 @@ export const resumirPatrimonio = cache(async function resumirPatrimonio(
   }
 })
 
+function fotoPreviewDoItem(
+  fotoUrl: string | null,
+  emprestimo?: { fotoSaidaUrl: string; fotoGuardaUrl: string | null } | null,
+): string | null {
+  if (fotoUrl) return fotoUrl
+  if (!emprestimo) return null
+  return emprestimo.fotoGuardaUrl || emprestimo.fotoSaidaUrl || null
+}
+
 export const listarPatrimonio = cache(async function listarPatrimonio(
   tenantId: string,
   opts?: {
@@ -129,7 +141,11 @@ export const listarPatrimonio = cache(async function listarPatrimonio(
   const page = Math.max(1, opts?.filtro?.page ?? 1)
   const where = buildWhere(tenantId, opts?.filtro, opts?.escopoCategoria ?? null)
 
-  const [total, rows]: [number, PatrimonioItemLite[]] = await Promise.all([
+  type Row = Omit<PatrimonioItemLite, 'fotoPreviewUrl'> & {
+    emprestimos: Array<{ fotoSaidaUrl: string; fotoGuardaUrl: string | null }>
+  }
+
+  const [total, rows]: [number, Row[]] = await Promise.all([
     db.patrimonioItem.count({ where }),
     db.patrimonioItem.findMany({
       where,
@@ -145,16 +161,30 @@ export const listarPatrimonio = cache(async function listarPatrimonio(
         localizacao: true,
         valorEstimado: true,
         observacao: true,
+        fotoUrl: true,
         meta: true,
         criadoEm: true,
         atualizadoEm: true,
         responsavel: { select: { id: true, nome: true } },
         criadoPor: { select: { id: true, nome: true } },
+        emprestimos: {
+          orderBy: { abertoEm: 'desc' },
+          take: 1,
+          select: { fotoSaidaUrl: true, fotoGuardaUrl: true },
+        },
       },
     }),
   ])
 
-  return { itens: rows, page, pageSize, total }
+  const itens: PatrimonioItemLite[] = rows.map((row) => {
+    const { emprestimos, ...item } = row
+    return {
+      ...item,
+      fotoPreviewUrl: fotoPreviewDoItem(item.fotoUrl, emprestimos[0] ?? null),
+    }
+  })
+
+  return { itens, page, pageSize, total }
 })
 
 export type PatrimonioEmprestimoLite = {
@@ -243,3 +273,60 @@ export const listarCandidatosResponsavelPatrimonio = cache(
     return out
   },
 )
+
+export type LoteBandeiraExpandivel = {
+  id: string
+  tenantId: string
+  nome: string
+  categoria: string
+  quantidade: number
+  status: StatusPatrimonioItem
+  localizacao: string | null
+  valorEstimado: Prisma.Decimal | number | null
+  observacao: string | null
+  fotoUrl: string | null
+  meta: Prisma.JsonValue | null
+  areaId: string | null
+  responsavelId: string | null
+  criadoPorId: string
+}
+
+/**
+ * Lote de bandeira (`quantidade > 1`) vira N peças com foto/vistoria próprias.
+ * O registro original fica a peça 1 e conserva empréstimos; as cópias
+ * herdam `BAIXADO` se o lote já estava baixado, senão nascem `DISPONIVEL`
+ * — não dá para saber quais das N estavam fora.
+ */
+export async function expandirLoteBandeira(
+  tx: { patrimonioItem: Pick<typeof db.patrimonioItem, 'createMany' | 'update'> },
+  lote: LoteBandeiraExpandivel,
+): Promise<{ criados: number }> {
+  if (!patrimonioEhPecaUnica(lote.categoria) || lote.quantidade <= 1) {
+    return { criados: 0 }
+  }
+  const nomes: string[] = nomesPecasPatrimonio(lote.nome, lote.quantidade)
+  const clones = nomes.slice(1).map((nome) => ({
+    id: crypto.randomUUID(),
+    tenantId: lote.tenantId,
+    nome,
+    categoria: lote.categoria as CategoriaPatrimonioItem,
+    status: lote.status === 'BAIXADO' ? 'BAIXADO' : 'DISPONIVEL',
+    quantidade: 1,
+    localizacao: lote.localizacao,
+    valorEstimado: lote.valorEstimado ?? null,
+    observacao: lote.observacao,
+    fotoUrl: lote.fotoUrl,
+    ...(lote.meta != null ? { meta: lote.meta as Prisma.InputJsonValue } : {}),
+    areaId: lote.areaId,
+    responsavelId: lote.responsavelId,
+    criadoPorId: lote.criadoPorId,
+  }))
+  if (clones.length > 0) {
+    await tx.patrimonioItem.createMany({ data: clones })
+  }
+  await tx.patrimonioItem.update({
+    where: { id: lote.id },
+    data: { quantidade: 1, nome: nomes[0] },
+  })
+  return { criados: clones.length }
+}

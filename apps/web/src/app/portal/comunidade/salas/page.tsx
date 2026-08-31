@@ -9,7 +9,8 @@ import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import { CriarSalaForm } from '@/components/portal/criar-sala-form'
 import { CriarSalaNacionalForm } from '@/components/portal/criar-sala-nacional-form'
 import { SalasListAnimated } from '@/components/portal/salas-list-animated'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, calculateEffectivePermissions, hasPermission, MENSAGEM_CAPACIDADE_CONFIANCA } from '@torcida/types'
+import { temCapacidadeConfianca } from '@/lib/confianca'
 import { db } from '@torcida/db'
 
 export const metadata: Metadata = { title: 'Salas de vídeo' }
@@ -87,6 +88,8 @@ export default async function SalasPage({
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
   const effectivePermissions: string[] = calculateEffectivePermissions(rolePermissions, overrides)
   const canHost = hasPermission(effectivePermissions, PERMISSIONS.MEETINGS_HOST)
+  const podeCriarSala =
+    canHost && (await temCapacidadeConfianca(session.user.id, tenant.id, 'sala:hospedar'))
 
   return (
     <div className="space-y-6">
@@ -103,7 +106,12 @@ export default async function SalasPage({
         </p>
       </div>
 
-      {canHost && <CriarSalaForm eventos={eventos} />}
+      {podeCriarSala && <CriarSalaForm eventos={eventos} />}
+      {canHost && !podeCriarSala ? (
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">
+          {MENSAGEM_CAPACIDADE_CONFIANCA['sala:hospedar']}
+        </p>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">

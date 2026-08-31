@@ -1,17 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { LogOut, Menu, Shield, X } from 'lucide-react'
+import { Lock, LogOut, Menu, Shield, UserCircle2, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
 import { AppBuildMetaSidebar } from '@/components/super-admin/app-build-meta'
+import {
+  NotificationBell,
+  type NotificationItem,
+} from '@/components/portal/notification-bell'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 import { useHidratado } from '@/lib/use-hidratado'
+import {
+  markSuperAdminNavbarNotificationRead,
+  useSuperAdminNavbarContext,
+} from '@/lib/use-super-admin-navbar-context'
 
 interface SuperAdminBadges {
   afiliacoes: number
@@ -27,6 +35,7 @@ interface SuperAdminShellProps {
   clubes: ClubeOpcao[]
   unidades: UnidadeOpcao[]
   badges?: SuperAdminBadges
+  notifications?: NotificationItem[]
   children: React.ReactNode
 }
 
@@ -54,6 +63,32 @@ function SidebarBody({
       <div className="border-t border-[rgb(var(--border))]">
         <AppBuildMetaSidebar />
         <div className="space-y-1 px-3 pb-3 lg:hidden">
+          <Link
+            href="/portal/perfil"
+            onClick={onNavigate}
+            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+            Meu Perfil
+          </Link>
+          <Link
+            href="/admin"
+            prefetch={false}
+            onClick={onNavigate}
+            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            <Lock className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+            Área administrativa
+          </Link>
+          <Link
+            href="/super-admin"
+            prefetch={false}
+            onClick={onNavigate}
+            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+            Área Super Admin
+          </Link>
           <ThemeToggle variant="row" />
         </div>
       </div>
@@ -66,27 +101,54 @@ function SuperAdminTopbar({
   onToggleMobile,
   userName,
   userEmail,
+  notifications,
+  unreadNotifications,
 }: {
   mobileOpen: boolean
   onToggleMobile: () => void
   userName: string | null
   userEmail: string | null
+  notifications: NotificationItem[]
+  unreadNotifications: number
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
+  const userDropRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const firstName = userName?.split(' ')[0] ?? 'Operador'
+  const dropItemClass =
+    'app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
 
-  // Fecha o dropdown ao navegar, no render — em effect o backdrop invisível
-  // sobrevive um frame sobre a página nova.
+  // Fecha o dropdown ao navegar, no render — em effect ele sobrevive um frame
+  // aberto sobre a página nova.
   const [pathnameSincronizado, setPathnameSincronizado] = useState(pathname)
   if (pathname !== pathnameSincronizado) {
     setPathnameSincronizado(pathname)
     setUserDropOpen(false)
   }
 
+  // pointerdown (não backdrop): o header tem `backdrop-blur`, que vira bloco
+  // contentor de `position: fixed` — um `fixed inset-0` aqui cobriria só a
+  // faixa do header, e o clique no corpo da página não fechava o menu.
+  useEffect(() => {
+    if (!userDropOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (userDropRef.current?.contains(e.target as Node)) return
+      setUserDropOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setUserDropOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [userDropOpen])
+
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
-      <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+      <div className="app-inset-x flex h-14 items-center gap-3 sm:[--app-inset-x:1.5rem]">
         <button
           type="button"
           onClick={onToggleMobile}
@@ -96,7 +158,7 @@ function SuperAdminTopbar({
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        <Link href="/super-admin/torcidas" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <Link href="/super-admin/torcidas" className="app-touch-target flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
             <Shield className="h-4 w-4" />
           </div>
@@ -111,15 +173,19 @@ function SuperAdminTopbar({
         </Link>
 
         <div className="ml-auto flex items-center gap-2">
-          <div className="hidden sm:block">
-            <ThemeToggle />
-          </div>
+          <NotificationBell
+            initialItems={notifications}
+            unreadCount={unreadNotifications}
+            verTodasHref="/super-admin/moderacao"
+            verTodasLabel="Ver denúncias da plataforma"
+            onMarkRead={markSuperAdminNavbarNotificationRead}
+          />
 
-          <div className="relative hidden sm:block">
+          <div ref={userDropRef} className="relative hidden sm:block">
             <button
               type="button"
               onClick={() => setUserDropOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
             >
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-[10px] font-bold text-[rgb(var(--color-primary-fg))]">
                 {firstName.charAt(0).toUpperCase()}
@@ -128,36 +194,52 @@ function SuperAdminTopbar({
             </button>
 
             {userDropOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setUserDropOpen(false)}
-                  aria-hidden
-                />
-                <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
-                  {userEmail && (
+              <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                {userEmail && (
+                  <>
                     <p className="truncate px-4 py-2 text-xs text-[rgb(var(--foreground-muted))]">
                       {userEmail}
                     </p>
-                  )}
-                  <div className="my-1 border-t border-[rgb(var(--border))]" />
-                  <Link
-                    href="/portal/comunidade"
-                    onClick={() => setUserDropOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    Voltar ao portal
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => signOut({ callbackUrl: '/entrar' })}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sair
-                  </button>
-                </div>
-              </>
+                    <div className="my-1 border-t border-[rgb(var(--border))]" />
+                  </>
+                )}
+                <Link
+                  href="/portal/perfil"
+                  onClick={() => setUserDropOpen(false)}
+                  className={dropItemClass}
+                >
+                  <UserCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                  Meu Perfil
+                </Link>
+                <Link
+                  href="/admin"
+                  prefetch={false}
+                  onClick={() => setUserDropOpen(false)}
+                  className={dropItemClass}
+                >
+                  <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                  Área administrativa
+                </Link>
+                <Link
+                  href="/super-admin"
+                  prefetch={false}
+                  onClick={() => setUserDropOpen(false)}
+                  className={dropItemClass}
+                >
+                  <Shield className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                  Área Super Admin
+                </Link>
+                <ThemeToggle variant="dropdown" />
+                <div className="my-1 border-t border-[rgb(var(--border))]" />
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: '/entrar' })}
+                  className="app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -250,10 +332,15 @@ export function SuperAdminShell({
   clubes,
   unidades,
   badges,
+  notifications = [],
   children,
 }: SuperAdminShellProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const {
+    notifications: liveNotifications,
+    unreadNotifications,
+  } = useSuperAdminNavbarContext(notifications)
 
   // Fecha o drawer ao navegar, no render (em effect ele fica aberto por um
   // frame sobre a página nova).
@@ -264,12 +351,14 @@ export function SuperAdminShell({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <SuperAdminTopbar
         mobileOpen={mobileOpen}
         onToggleMobile={() => setMobileOpen((v) => !v)}
         userName={userName}
         userEmail={userEmail}
+        notifications={liveNotifications}
+        unreadNotifications={unreadNotifications}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">

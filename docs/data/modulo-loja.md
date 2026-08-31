@@ -17,6 +17,11 @@ pnpm --filter @torcida/db seed:loja-gavioes -- --force-images  # reimportar imag
 
 Bot Discord legado (`BotProduto`/`BotPedido`) permanece separado — não compartilha tabelas SaaS.
 
+**Brechó** (2026-08-30): praça P2P entre sócios da **torcida do portal ativo**.
+No hub `/portal/loja`: listagem de lojas, depois listagem idêntica de brechós
+(acima dos destaques). Isolado do catálogo `SaasProduto` e de outras torcidas.
+Ver `docs/data/modulo-brecho.md`.
+
 ## Entidades (`packages/db/prisma/schema.prisma`, bloco LOJA SaaS)
 
 | Model | Tabela | Papel |
@@ -63,34 +68,55 @@ Diferença vs bot Discord: o bot apaga o canal e arquiva HTML em log; no SaaS o 
 
 Regras puras: `packages/types/src/loja-ticket.js`. Lib: `apps/web/src/lib/loja-ticket.ts`. UI: coluna Ticket em `/admin/loja/pedidos`; arquivo em `/admin/loja/tickets`; link no portal `/portal/loja/pedidos` → `/portal/mensagens?c=…`.
 
-## Visibilidade cross-tenant (portal): lojas por unidade (2026-07-27)
+## Visibilidade cross-tenant (portal): lojas por unidade (2026-07-27, recorte 2026-08-27)
 
-O portal **não usa mais** `getVisibleTenantIds('loja')`/`resolveVisibility` — critério
-agora é membership real: `tenantsPermitidosLoja(userId)` em `apps/web/src/lib/loja-lojas.ts`
-une os tenants onde o usuário é `SaasMembro` `APROVADO` (**sócio** ou **torcedor**
-canônico do convite) com a torcida **raiz** de cada vínculo
-(`getAncestorTenantIds`, último elemento da cadeia) — a loja da torcida principal está
-sempre disponível (exceto canal restrito: só a própria unidade). A Sede controla
-a ponte com `Tenant.lojaVisivelNasUnidades` (default `true`) em
-`/admin/configuracoes/transparencia` — presidente/vice com `SETTINGS_MANAGE`.
+O portal **não mistura catálogos de torcidas diferentes**. Fonte única = **tenant
+ativo** (cookie/`getActiveTenant`, o mesmo da navbar) — Super Admin troca de
+canal, mas a listagem **não** é a união de todos os `SaasMembro` do usuário.
+Presidente dos Gaviões que entra no portal da Mancha vê a worktree da Mancha
+(sede + unidades Caso B) e **nunca** a loja nem o destaque da rival.
 
-- `/portal/loja` lista as lojas (`listLojasDoSocio`), uma por tenant permitido;
-  card marcado `principal: true` quando é a torcida raiz. **Com uma única loja,
-  redireciona** para `/portal/loja/[tenantId]`.
-- `/portal/loja/[tenantId]` é o catálogo de UM tenant — `tenantsPermitidosLoja` valida
-  acesso, senão `notFound()`. Chrome sticky com **store switcher** (quando ≥2 lojas)
-  e tema visual da **loja visitada** (scoped em `LojaTenantThemeScope` — não altera
-  a navbar do contexto ativo do portal). Identidade vem de `Tenant.design` +
+Critério em `escoparLojaAoPortalAtivo` (`apps/web/src/lib/loja-escopo.ts`),
+aplicado por `tenantsVisiveisLoja` / `tenantsPermitidosLoja` em
+`apps/web/src/lib/loja-lojas.ts`:
+
+- **Vitrine** (`tenantsVisiveisLoja`): `getVisibleTenantIds(ativo, 'loja')` —
+  worktree do portal (self + descendentes + ancestrais públicos) com R5.
+  Lojas **aliadas** só entram se o usuário é `SOCIO` APROVADO na worktree ativa.
+  Super-admin sem vínculo (modo operador) lê essa vitrine; não compra.
+- **Compra** (`tenantsPermitidosLoja`): vínculo APROVADO (sócio ou torcedor
+  canônico) **intersectado** com a vitrine do portal. Ponte da Sede continua
+  em `Tenant.lojaVisivelNasUnidades` (default `true`) em
+  `/admin/configuracoes/transparencia` — presidente/vice com `SETTINGS_MANAGE`.
+- Sem portal ativo (torcedor na Comunidade Nacional): cai só nos vínculos,
+  como antes — Super Admin não infla o conjunto.
+
+- `/portal/loja` lista as lojas (`listLojasDoSocio`), uma por tenant **visível
+  no portal ativo**; ordem: torcida principal → unidades da worktree (subsede,
+  depois PDE) → aliados. Card marcado `principal: true` na raiz **desse** portal.
+  **Com uma única loja, redireciona** para `/portal/loja/[tenantId]`.
+- `/portal/loja/[tenantId]` é o catálogo de UM tenant — `podeVerLojaTenant`
+  (vitrine do portal ativo) valida acesso, senão `notFound()`. Chrome sticky
+  com **store switcher** (quando ≥2 lojas do mesmo portal) e tema visual da
+  **loja visitada** (scoped em `LojaTenantThemeScope` — não altera
+  a navbar do contexto ativo). Identidade vem de `Tenant.design` +
   `corPrimaria` da unidade dona do catálogo (`/admin/design`).
-- Sacola/checkout: `assertProdutoVisivel(produtoId, userId)` em
-  `apps/web/src/app/portal/loja/actions.ts` checa `tenantsPermitidosLoja`.
+- Sacola/checkout: `assertProdutoVisivel` checa `tenantsPermitidosLoja` (compra
+  no portal ativo). Itens de outra torcida ficam no carrinho no banco, mas não
+  aparecem nem fecham pedido enquanto o canal for o da rival.
 - Pedido gravado no **tenant DONO do produto** (quem tem estoque e cumpre)
 - Checkout com itens de tenants diferentes → N pedidos com mesmo `grupoCheckoutId`
 - Sacola global **agrupa por loja** na UI; badge pode mostrar `itens·lojas` quando
   há mais de um tenant na sacola.
-- **Vitrine** (`/admin/loja/vitrine`, `store:manage`): capa do hero em
-  `Tenant.design.loja` (`bannerUrl`, `usarDestaqueComoCapa`). O estúdio
-  `/admin/design` **preserva** `design.loja` ao salvar/restaurar identidade.
+- **Vitrine** (`/admin/loja/vitrine` e hover no portal, `store:manage`): capa do
+  hero em `Tenant.design.loja` (`bannerUrl`, `usarDestaqueComoCapa`). Upload
+  Cloudinary usa `purpose: loja` — gate = `podeGerirLoja` / `store:manage`, **não**
+  vínculo de associado. Super Admin opera a vitrine no portal ativo (torcida
+  sem presidente inclusive); `perfil-banner` exigiria `assertMembroAtivo` e
+  bloqueava o operador. No portal, gestor de Materiais/Loja, owner/admin/vice
+  e quem tiver a permissão vê Alterar/Excluir ao passar o mouse (no toque os
+  botões ficam visíveis). O estúdio `/admin/design` **preserva** `design.loja`
+  ao salvar/restaurar identidade.
 
 **Limitação conhecida — "loja por unidade" só existe quando a unidade é tenant
 próprio** (Sede/Subsede/PDE com `Tenant` dedicado, Caso B). Unidades Caso A (Sede
@@ -101,16 +127,17 @@ continuam compartilhando o catálogo/estoque do tenant-mãe — `SaasMembro` é 
 ## Fluxo portal
 
 ```
-/portal/loja → listagem de lojas do sócio (uma por tenant com membership)
+/portal/loja → listagem de lojas do portal ativo (worktree + aliadas se sócio)
 /portal/loja/[tenantId] → catálogo de uma loja (filtros, carrossel destaques)
 /portal/loja/[tenantId]/[produtoId] → detalhe + adicionar à sacola
-/portal/loja/sacola → sacola global (todas as lojas do usuário)
+/portal/loja/sacola → sacola do portal ativo (itens de outra torcida ficam no banco, ocultos)
 /portal/loja/checkout → cupom + retirada/envio → finalizarPedido
 /portal/loja/pedidos → histórico global (multi-item, multi-loja; exibe nome da loja)
 ```
 
-Sacola, checkout e pedidos são **globais por `userId`**, sem filtro de tenant — o
-usuário pode ter itens/pedidos de mais de uma loja simultaneamente.
+Sacola, checkout e pedidos são **globais por `userId` no banco** — o usuário
+pode ter itens/pedidos de mais de uma loja. A **UI do portal** recorta sacola e
+checkout pelo tenant ativo; pedido histórico continua listando todas as compras.
 
 Server actions: `apps/web/src/app/portal/loja/actions.ts`
 
@@ -172,6 +199,7 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 ## Testes
 
 `apps/web/src/lib/__tests__/loja.test.ts` — cupom, desconto, tamanhos, promo.
+`apps/web/src/lib/__tests__/loja-escopo.test.ts` — recorte pelo portal ativo (rival, Super Admin, sócio, aliada).
 `apps/web/src/lib/__tests__/loja-ticket.test.ts` — transições de ticket, claim, fecho, envio.
 
 ## Fora de escopo (fase posterior)

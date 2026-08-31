@@ -8,11 +8,14 @@ import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission, assertPodeDelegar } from '@/lib/authz'
 import { diffAcessoUsuario } from '@/lib/acesso-audit-diff'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
+import { alinhaSedeDoTenantComOwner } from '@/lib/lideranca'
 import {
   ALL_PERMISSIONS,
+  MAX_PRESIDENTES,
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   SYSTEM_ROLES,
+  rotuloCargoMaximo,
   applyPermissionCascade,
   canManageDepartamento,
   calculateEffectivePermissions,
@@ -21,6 +24,7 @@ import {
   permissionsOfRole,
   podeTerVice,
   PAPEL_DEPARTAMENTO,
+  hrefHomeDepartamento,
 } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import {
@@ -140,7 +144,10 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     ),
   )
 
-  const usuarioExiste = await db.user.findUnique({ where: { id: userId }, select: { id: true } })
+  const usuarioExiste: { id: string; nome: string | null } | null = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, nome: true },
+  })
   if (!usuarioExiste) throw new Error('Usuário não encontrado')
 
   const rolesTenant: RoleLite[] = await db.role.findMany({
@@ -170,15 +177,32 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     select: { permission: true, granted: true },
   })
 
+  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id, tipo: 'SEDE' },
+    select: { tipo: true },
+  })
+  const tipoSedeLimite = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
+  const rotuloOwner = rotuloCargoMaximo(tipoSedeLimite)
+
+  const ownerRole: RoleLite | undefined = rolesTenant.find(
+    (r) => r.isSystem && r.nome === SYSTEM_ROLES.OWNER,
+  )
+  if (ownerRole && perfilIds.has(ownerRole.id)) {
+    const outrosOwners: number = await db.userRole.count({
+      where: { tenantId: tenant.id, roleId: ownerRole.id, userId: { not: userId } },
+    })
+    if (outrosOwners >= MAX_PRESIDENTES) {
+      throw new Error(
+        `Esta torcida já tem ${rotuloOwner.toLowerCase()}. Transfira o cargo em Estrutura › Presidência — não é possível haver dois.`,
+      )
+    }
+  }
+
   const viceRole: RoleLite | undefined = rolesTenant.find(
     (r) => r.isSystem && r.nome === SYSTEM_ROLES.VICE,
   )
   if (viceRole && perfilIds.has(viceRole.id)) {
-    const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
-      where: { tenantId: tenant.id, tipo: 'SEDE' },
-      select: { tipo: true },
-    })
-    if (!podeTerVice(sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO')) {
+    if (!podeTerVice(tipoSedeLimite)) {
       throw new Error('Vice-presidente existe apenas na Sede principal da torcida.')
     }
     const outrosVices: number = await db.userRole.count({
@@ -332,6 +356,15 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     })
   }
 
+  const ganhouOwner =
+    ownerRole != null && perfilIds.has(ownerRole.id) && !roleIdsAtuais.has(ownerRole.id)
+  if (ganhouOwner) {
+    await alinhaSedeDoTenantComOwner(tenant.id, {
+      userId,
+      nome: usuarioExiste.nome,
+    })
+  }
+
   invalidatePermissionsCache(userId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)
 
@@ -347,6 +380,8 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
   revalidatePath('/admin/acessos')
   revalidatePath('/admin/hierarquia')
+  revalidatePath('/admin/sedes')
+  revalidatePath('/admin/presidencia')
   revalidatePath('/portal/departamentos')
 }
 
@@ -526,10 +561,11 @@ export async function adicionarMembroDepartamento(
   const { departamentoId, targetUserId } = entrada.data
 
   const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
-  const departamento: { id: string; nome: string } | null = await db.departamento.findFirst({
-    where: { id: departamentoId, tenantId: tenant.id },
-    select: { id: true, nome: true },
-  })
+  const departamento: { id: string; nome: string; slug: string } | null =
+    await db.departamento.findFirst({
+      where: { id: departamentoId, tenantId: tenant.id },
+      select: { id: true, nome: true, slug: true },
+    })
   if (!departamento) throw new Error('Departamento não encontrado')
 
   const roleMembro = await db.role.findFirst({
@@ -577,7 +613,7 @@ export async function adicionarMembroDepartamento(
     tipo: 'DEPARTAMENTO_ADICIONADO',
     titulo: 'Você entrou em um departamento',
     corpo: `Você foi adicionado a ${departamento.nome}.`,
-    link: '/portal/departamentos',
+    link: hrefHomeDepartamento(departamento.slug, 'equipe'),
     atorId: session.user.id,
   })
 
@@ -588,10 +624,11 @@ export async function adicionarMembroDepartamento(
 export async function removerMembroDepartamento(departamentoId: string, targetUserId: string) {
   const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
 
-  const departamento: { id: string; nome: string } | null = await db.departamento.findFirst({
-    where: { id: departamentoId, tenantId: tenant.id },
-    select: { id: true, nome: true },
-  })
+  const departamento: { id: string; nome: string; slug: string } | null =
+    await db.departamento.findFirst({
+      where: { id: departamentoId, tenantId: tenant.id },
+      select: { id: true, nome: true, slug: true },
+    })
   if (!departamento) throw new Error('Departamento não encontrado')
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -629,7 +666,7 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
     tipo: 'DEPARTAMENTO_REMOVIDO',
     titulo: 'Você saiu de um departamento',
     corpo: `Você foi removido de ${departamento.nome}.`,
-    link: '/portal/departamentos',
+    link: hrefHomeDepartamento(departamento.slug),
     atorId: session.user.id,
   })
 

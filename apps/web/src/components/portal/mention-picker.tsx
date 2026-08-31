@@ -58,7 +58,7 @@ export function MentionPicker({
     setCarregando(true)
     try {
       const params = new URLSearchParams({ q: termo })
-      if (escopo === 'nacional') params.set('escopo', 'nacional')
+      if (escopo) params.set('escopo', escopo)
       const res = await fetch(`/api/comunidade/membros?${params}`)
       if (!res.ok) return
       const data = (await res.json()) as { membros: MembroMencao[] }

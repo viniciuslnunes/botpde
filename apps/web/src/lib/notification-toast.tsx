@@ -8,12 +8,30 @@ import { NotificationAvatar } from '@/components/portal/notification-item-visual
  * lateral da comunidade) — exigem `router.refresh()` além do toast. */
 export const TIPOS_QUE_EXIGEM_REFRESH: ReadonlySet<string> = new Set([
   'MEMBRO_APROVADO',
+  'MEMBRO_REPROVADO',
   'ALIANCA_ACEITA',
   'ALIANCA_REJEITADA',
   'ALIANCA_ENCERRADA',
   'ALIANCA_CANCELADA',
   'GRUPO_APROVADO',
+  'GRUPO_REJEITADO',
+  'GRUPO_ADMIN',
+  'GRUPO_REMOVIDO',
   'CANAL_APROVADO',
+  'CANAL_REJEITADO',
+  'SEGUIMENTO_PENDENTE',
+  'ACESSO_ATUALIZADO',
+  'DEPARTAMENTO_ADICIONADO',
+  'DEPARTAMENTO_REMOVIDO',
+  'SEDE_RESPONSAVEL_DEFINIDO',
+  'CANAL_RESTRITO_ATIVADO',
+  'CANAL_REATIVACAO_SOLICITADA',
+  'CANAL_REATIVACAO_RECUSADA',
+  'CANAL_REATIVADO',
+  'EVENTO_CANCELADO',
+  'EVENTO_ALTERADO',
+  'SOLICITACAO_UNIDADE_APROVADA',
+  'SOLICITACAO_UNIDADE_RECUSADA',
 ])
 
 /** Aprovação de sócio: sai da CN e entra na comunidade da torcida. */

@@ -473,11 +473,8 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
       tipoPost: p.tipo,
       ehSocioDeTorcidaReal: Boolean(real),
     })
-    // Clube não resolvido (tenant sem afiliação) mantém o rótulo do post —
-    // mesmo comportamento de antes; o que não pode é ficar sem torcida alguma.
     const rotuloClube = identidadeTorcedor
-      ? ((meta?.afiliacaoId ? rotuloClubePorAfiliacao.get(meta.afiliacaoId) : null) ||
-        formatNomeTorcida(p.tenant.nome))
+      ? (meta?.afiliacaoId ? (rotuloClubePorAfiliacao.get(meta.afiliacaoId) ?? '') : '')
       : null
 
     const tenantBadgeId = emSintetico && real ? real.tenantId : p.tenantId
@@ -516,11 +513,11 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
           : comunicado,
     }
 
+    if (identidadeTorcedor) {
+      return { ...base, tenant: { nome: rotuloClube ?? '', logoUrl: base.tenant.logoUrl } }
+    }
     if (emSintetico && real) {
       return { ...base, tenant: { nome: real.tenantNome, logoUrl: base.tenant.logoUrl } }
-    }
-    if (rotuloClube) {
-      return { ...base, tenant: { nome: rotuloClube, logoUrl: base.tenant.logoUrl } }
     }
     return base
   })

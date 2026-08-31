@@ -74,7 +74,7 @@ export function DepartamentoDiretoriaKpis({ kpis }: { kpis: DiretoriaKpis }) {
           value={kpis.pendentes}
           accent={kpis.pendentes > 0}
           icon={Clock}
-          href={kpis.pendentes > 0 ? '#fila' : undefined}
+          href={kpis.pendentes > 0 ? '?tab=fila' : undefined}
         />
         <Kpi
           label="Ativos"

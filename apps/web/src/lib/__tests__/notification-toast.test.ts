@@ -19,6 +19,7 @@ vi.mock('@/components/portal/notification-item-visual', () => ({
 
 import {
   LINK_APOS_APROVACAO_MEMBRO,
+  TIPOS_QUE_EXIGEM_REFRESH,
   criarVigiaDeNotificacoes,
   redirecionarAposAprovacaoMembro,
 } from '@/lib/notification-toast'
@@ -86,6 +87,23 @@ describe('criarVigiaDeNotificacoes', () => {
     vigia([], vi.fn())
     vigia([notif({ id: 'aprov', tipo: 'MEMBRO_APROVADO', link: '  ' })], vi.fn())
     expect(locationAssign).toHaveBeenCalledWith(LINK_APOS_APROVACAO_MEMBRO)
+  })
+
+  it('tipos que mudam chrome SSR pedem router.refresh', () => {
+    const vigia = criarVigiaDeNotificacoes('/portal/comunidade/notificacoes')
+    vigia([notif({ id: 'seed', tipo: 'MENCAO' })], vi.fn())
+    const precisa = vigia(
+      [
+        notif({ id: 'seed', tipo: 'MENCAO' }),
+        notif({ id: 'acesso', tipo: 'ACESSO_ATUALIZADO', titulo: 'Seu acesso mudou' }),
+      ],
+      vi.fn(),
+    )
+    expect(precisa).toBe(true)
+    expect(toastCustom).toHaveBeenCalled()
+    expect(TIPOS_QUE_EXIGEM_REFRESH.has('ACESSO_ATUALIZADO')).toBe(true)
+    expect(TIPOS_QUE_EXIGEM_REFRESH.has('EVENTO_CANCELADO')).toBe(true)
+    expect(TIPOS_QUE_EXIGEM_REFRESH.has('NOVA_REACAO')).toBe(false)
   })
 })
 

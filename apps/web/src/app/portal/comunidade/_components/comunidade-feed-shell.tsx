@@ -13,6 +13,7 @@ import { ComunidadeComposerSection } from './comunidade-composer-section'
 import { FeedComposerSkeleton, FeedStoriesSkeleton } from '@/components/portal/feed-skeletons'
 import { ComunidadeNacionalComposerSection } from './comunidade-nacional-composer-section'
 import { ComunidadeNacionalBanner } from './comunidade-nacional-banner'
+import { ComunidadePracaFeedCards } from './praca-feed-cards'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { EscopoComunidade, EscoposDisponiveis } from '@/lib/comunidade-escopo'
@@ -296,6 +297,17 @@ export function ComunidadeFeedShell({
               escopo={escopo}
               afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
             />
+
+            <Suspense fallback={null}>
+              <ComunidadePracaFeedCards
+                escopo={escopo}
+                ancora={
+                  modoNacional
+                    ? { tenantId: null, afiliacaoId: tenant.afiliacaoId }
+                    : { tenantId: tenant.id, afiliacaoId: tenant.afiliacaoId }
+                }
+              />
+            </Suspense>
 
             <Suspense
               fallback={

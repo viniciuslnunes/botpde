@@ -128,7 +128,7 @@ export function linkUnidadeComunidade(tenantId: string): string {
   return `/portal/comunidade/unidade/${tenantId}`
 }
 
-/** Preview de posts Públicos de uma torcida (sem gate de aliança). */
+/** Preview de posts Públicos de uma torcida (gate de rivalidade no loader). */
 export function linkTorcidaComunidadePublica(tenantId: string): string {
   return `/portal/comunidade/torcida/${tenantId}`
 }
@@ -236,6 +236,36 @@ export function orPostsDoMuralCanal(
     })
   }
   return ramos
+}
+
+/**
+ * Decide se o mural oficial mistura posts "Só torcida" (`TENANT` sem
+ * `conversaId`) — e de *qual* tenant.
+ *
+ * - Canal da Sede: sim, do tenant do viewer.
+ * - Unidade Caso B (tenant próprio, distinto da mãe / sem canal `SEDE` neste
+ *   tenant): sim, do tenant da unidade.
+ * - Unidade Caso A (PDE/subsede no tenant da mãe): **não**. Misturar aqui
+ *   despeja o feed da organizada inteira no mural de Londrina, Prudente, etc.
+ */
+export function decidirFeedInternoDoMural(opts: {
+  canalOficial: boolean
+  canalId: string
+  oficialSedeId: string | null
+  vinculoTenantId: string | null
+  viewerTenantId: string
+}): { incluir: boolean; feedInternoTenantId: string | null } {
+  if (!opts.canalOficial) return { incluir: false, feedInternoTenantId: null }
+  if (opts.oficialSedeId === opts.canalId) {
+    return { incluir: true, feedInternoTenantId: opts.viewerTenantId }
+  }
+  if (opts.vinculoTenantId && opts.vinculoTenantId !== opts.viewerTenantId) {
+    return { incluir: true, feedInternoTenantId: opts.vinculoTenantId }
+  }
+  if (opts.vinculoTenantId === opts.viewerTenantId && !opts.oficialSedeId) {
+    return { incluir: true, feedInternoTenantId: opts.vinculoTenantId }
+  }
+  return { incluir: false, feedInternoTenantId: null }
 }
 
 export function canalOficialTemPortalProprio(opts: {

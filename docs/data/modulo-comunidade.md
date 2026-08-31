@@ -64,10 +64,17 @@ visibilidade do post).
 | `/portal/comunidade/grupos/[id]` | Página do grupo (mural + link ao chat) |
 | `/portal/comunidade/canais` | Canais oficiais e comunidades temáticas |
 | `/portal/comunidade/canais/[id]` | Detalhe do canal (mural + chat) |
+| `/portal/comunidade/noticias` | Praça de notícias do canal (`?escopo=`) — imprensa só na CN |
+| `/portal/comunidade/noticias/[id]` | Card de imprensa (link + crédito) ou artigo próprio |
+| `/portal/comunidade/forum` | Fórum de tópicos do canal ativo |
+| `/portal/comunidade/forum/[id]` | Tópico + respostas + voto |
 | `/portal/comunidade/unidade/[tenantId]` | Perfil institucional da unidade (sede/subsede/PDE) |
 | `/portal/comunidade/notificacoes` | Central de notificações sociais |
 | `/portal/comunidade/videos` | Reels e posts com vídeo (grade ou vertical) |
 | `/portal/perfil` | Redireciona para o perfil social do usuário logado |
+
+Praça de notícias + fórum (isolamento por canal, imprensa só com link):
+`docs/data/modulo-portal-noticias-forum.md`. Actions em `comunidade/praca-actions.ts`.
 
 ## API
 
@@ -80,7 +87,7 @@ visibilidade do post).
 | `GET /api/comunidade/feed/stream` | Long-poll — ping de novos posts (sem payload) |
 | `GET /api/comunidade/notificacoes?filtro=` | Lista notificações sociais com filtro |
 | `GET /api/conversas/resumo` | Badge de mensagens + bloqueio de inbox (sem lista de conversas) |
-| `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar) |
+| `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar, loja, …) |
 
 ## Server Actions (`comunidade/actions.ts`)
 
@@ -92,6 +99,9 @@ visibilidade do post).
 - `marcarNotificacaoLida`, `marcarTodasNotificacoesLidas`
 - `criarGrupo`, `entrarGrupoPublico`, `pedirEntradaGrupo`, `decidirPedidoGrupo`, `sairGrupo`, `alternarSilencioGrupo`, `publicarPostGrupo`, `publicarMomentoStory`
 - `criarCanalTematico`, `entrarCanal`, `publicarPostCanal`
+
+Praça (`praca-actions.ts`): `criarTopicoAction`, `responderTopicoAction`,
+`votarPracaAction`, `comentarPracaAction`, `publicarArtigoAction`.
 
 Notificações de menção, comentário, reação e repost apontam para
 `/portal/comunidade/post/[id]` via `linkPostComunidade()`.
@@ -116,6 +126,9 @@ cobrir o mesmo conjunto.
 
 Helpers e actions: `apps/web/src/app/portal/comunidade/actions.ts`.
 Performance do hot path: `docs/data/modulo-comunidade-performance.md` § engajamento.
+
+Confiança na torcida (ledger, sem UI no recorte 1) é **outro eixo** — não
+pontua post/reação. Ver `docs/data/modulo-confianca.md`.
 
 ### Publicar post — invariantes (2026-07-17)
 
@@ -545,6 +558,15 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   de tenant mostram o mesmo escudo. Sócio Caso B também é inscrito no canal
   oficial da Sede mãe em `vincularMembroCanaisAposAprovacao` (+ repair).
 
+  **Barra clube → torcida → unidade (2026-08-31)**: o prefixo de escudos é
+  sempre Nacional · torcida · unidade, inclusive para super-admin na Sede.
+  Entrar no canal da Gaviões não esconde a PDE. Outras unidades da mesma
+  worktree abertas no cookie `operador_canais_abertos` ficam na zona móvel
+  — `excluirTenantIds` só omite a Sede (já no 2º slot), nunca a lineage
+  inteira. Sem `SaasMembro` na unidade, o 3º slot vem da primeira PDE/subsede
+  Caso B aberta cuja raiz é a torcida ativa (`slugUnidadePrefixoBarra` em
+  `lib/operador-canais-ordem.ts`).
+
   **Aba da unidade some no portal da Sede (Caso B)**: o canônico
   (`espelhado: false` + `sedeId` da PDE) vive no tenant da unidade; na Sede
   só há espelho sem `sedeId`. `resolverUnidadeDoVinculo` recebe a
@@ -776,6 +798,19 @@ mantém **canais abertos** (cookie `operador_canais_abertos`) com badge X
 (`fecharCanalOperadorAction`); cada visita via select/"Ir ao portal"/troca
 registra o slug. Sem portal próprio (Caso A): botão "Ir ao portal" no menu
 admin abre modal e oferece o admin da unidade (`origem === 'sede'`).
+
+**Comentários do operador (2026-08-30):** `listarComentariosPost` aplicava só o
+alcance de tenant do feed/permalink, então o super-admin via o post pelo mural
+de outra torcida (`getPostsDoCanal({ leituraOperador })` não filtra tenant nem
+visibilidade) e tomava "Post não encontrado" ao abrir os comentários — a seção
+ficava presa em "Carregando comentários…" e a moderação era cega. Agora
+`isSuperAdminEmail` vale como **leitura de plataforma** também nessa action
+(mesmo critério que o feed paginado e `podeVerFeedSocios` já usavam); escrever
+(comentar/reagir/salvar) segue barrado por `resolverContextoEngajamento`. No
+client, `post-engagement.tsx` troca o spinner por mensagem + "Tentar de novo"
+quando a leitura falha, em vez de só um toast que some. **Em aberto:** o
+permalink `/portal/comunidade/post/[id]` (`getPostPorId`) ainda devolve 404
+para o operador no mesmo cenário.
 
 ## O canal selecionado sobrevive à topbar (2026-08-05)
 

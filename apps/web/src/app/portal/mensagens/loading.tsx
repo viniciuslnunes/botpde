@@ -1,7 +1,7 @@
 export default function MensagensLoading() {
   return (
     <div className="animate-pulse">
-      <div className="h-[calc(100vh-8.5rem)] min-h-[24rem] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+      <div className="h-[calc(100dvh-8.5rem)] min-h-[24rem] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
         <div className="flex h-full">
           <div className="w-full space-y-3 border-r border-[rgb(var(--border))] p-4 md:w-80">
             {Array.from({ length: 5 }).map((_, i) => (

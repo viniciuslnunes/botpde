@@ -11,6 +11,7 @@ import {
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
+import { parseAliancaTabId } from '@/lib/alianca-tabs'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
@@ -30,7 +31,13 @@ interface TenantOption {
   } | null
 }
 
-export default async function AdminAliancasPage() {
+export default async function AdminAliancasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const params = await searchParams
+  const initialTab = parseAliancaTabId(params.tab)
   const authz = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE).catch(() => null)
   if (!authz) {
     redirect('/admin')
@@ -97,7 +104,8 @@ export default async function AdminAliancasPage() {
   const aliancas = isSedeRaiz ? aliancasRaw : aliancasRaw.filter((a) => a.status === 'ATIVA')
 
   // Aliança é vínculo entre torcidas: fora unidades promovidas (Caso B, que
-  // herdam o vínculo da sede) e a própria worktree. Ver `filtrarTenantsDeAlianca`.
+  // herdam o vínculo da sede), a própria worktree e rivais (inexistentes).
+  // Ver `filtrarTenantsDeAlianca`.
   const tenantsElegiveis = await filtrarTenantsDeAlianca(rootTenantId, tenantsRaw)
 
   const tenantOptions: TenantOption[] = tenantsElegiveis.map((t) => ({
@@ -152,6 +160,7 @@ export default async function AdminAliancasPage() {
               recomendacoes={recomendacoesSerializadas}
               tenants={tenantOptions}
               readOnly={!isSedeRaiz}
+              initialTab={initialTab}
             />
           </MotionReveal>
         </div>

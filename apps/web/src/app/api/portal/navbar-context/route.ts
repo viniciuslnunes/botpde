@@ -7,6 +7,7 @@ import { tiposInboxPortal } from '@/lib/notificacoes-comunidade'
 import { calculateEffectivePermissions, hasAdminAreaAccess } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
+import { emptyPortalNavBadges } from '@/lib/notificacoes-menu-badges'
 
 export async function GET() {
   try {
@@ -18,18 +19,17 @@ export async function GET() {
     const userId = session.user.id
     const tenantId = await resolveTenantIdPortalComunidade(userId, session.user.email)
     if (!tenantId) {
-      // Super-admin sem torcida/CN: navbar ainda monta; não 404 (evita ruído e
-      // loops de refetch). Contadores vazios + acesso admin de plataforma.
-      if (isSuperAdminEmail(session.user.email)) {
-        return NextResponse.json({
-          unreadMessages: 0,
-          unreadNotifications: 0,
-          hasAdminAreaAccess: true,
-          isAdmin: true,
-          notifications: [],
-        })
-      }
-      return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
+      // Sem tenant (CN sem perfil, cookie vazio): navbar ainda monta.
+      // 404 aqui virava ruído no console a cada refetch.
+      return NextResponse.json({
+        unreadMessages: 0,
+        unreadNotifications: 0,
+        hasAdminAreaAccess: isSuperAdminEmail(session.user.email),
+        isAdmin: isSuperAdminEmail(session.user.email),
+        notifications: [],
+        navBadges: emptyPortalNavBadges(),
+        departamentoNotificacoes: [],
+      })
     }
 
     const isSuperAdmin = isSuperAdminEmail(session.user.email)
@@ -42,7 +42,10 @@ export async function GET() {
 
     const [unreadMessages, inbox] = await Promise.all([
       contarMensagensNaoLidas(userId).catch((): number => 0),
-      getInboxNavbar(tenantId, userId, tiposInbox, 8, { portalComCn: true }),
+      getInboxNavbar(tenantId, userId, tiposInbox, 8, {
+        portalComCn: true,
+        withPortalNavBadges: true,
+      }),
     ])
 
     return NextResponse.json({
@@ -52,6 +55,11 @@ export async function GET() {
       /** @deprecated Use hasAdminAreaAccess — mantido para compatibilidade do client. */
       isAdmin: hasAdminAreaAccessFlag,
       notifications: inbox.notifications.map((n) => ({
+        ...n,
+        criadoEm: n.criadoEm.toISOString(),
+      })),
+      navBadges: inbox.portalNavBadges,
+      departamentoNotificacoes: inbox.departamentoNotificacoes.map((n) => ({
         ...n,
         criadoEm: n.criadoEm.toISOString(),
       })),

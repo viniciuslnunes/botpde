@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import type { AliancaTabId } from '@/lib/alianca-tabs'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Check,
   Handshake,
@@ -38,6 +40,8 @@ import { formatDateTimeShort } from '@/lib/format-datetime'
 import { LogoImage } from '@/components/media/logo-image'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { lookupTabBadge } from '@/lib/notificacoes-menu-badges'
+import { useAdminNavbarSnapshot } from '@/lib/use-admin-navbar-context'
 
 interface TenantOption {
   id: string
@@ -61,9 +65,18 @@ interface AliancaFormsProps {
   tenants: TenantOption[]
   /** Subsede/PDE: só herda a visão das ATIVAs da sede — nunca gerencia. */
   readOnly?: boolean
+  /** Tab vinda de `?tab=` (sino / deep-link). */
+  initialTab?: AliancaTabId | null
 }
 
-type TabId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'propor' | 'historico'
+// Definição movida para `@/lib/alianca-tabs` (módulo SEM `'use client'`):
+// `page.tsx` é Server Component e chamava `parseAliancaTabId` daqui, o que
+// devolve referência de client em vez da função e derrubava a rota inteira.
+// Reexportado para não quebrar quem já importava deste módulo.
+export { parseAliancaTabId, ALIANCA_TAB_IDS } from '@/lib/alianca-tabs'
+export type { AliancaTabId } from '@/lib/alianca-tabs'
+
+type TabId = AliancaTabId
 
 type ThumbSize = 'sm' | 'md'
 
@@ -169,7 +182,10 @@ export function AliancaForms({
   recomendacoes,
   tenants,
   readOnly = false,
+  initialTab = null,
 }: AliancaFormsProps) {
+  const router = useRouter()
+  const { tabBadges } = useAdminNavbarSnapshot()
   const [pending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
@@ -229,7 +245,12 @@ export function AliancaForms({
     return 'propor'
   })()
 
-  const [tab, setTab] = useState<TabId>(defaultTab)
+  const [tab, setTab] = useState<TabId>(initialTab ?? defaultTab)
+
+  function irParaTab(next: TabId): void {
+    setTab(next)
+    router.replace(`/admin/aliancas?tab=${next}`, { scroll: false })
+  }
 
   const tabs: Array<{ id: TabId; label: string; count: number; icon: LucideIcon; highlight?: boolean }> = readOnly
     ? [
@@ -468,18 +489,20 @@ export function AliancaForms({
           {tabs.map((item) => {
             const active = tab === item.id
             const Icon = item.icon
+            const live = lookupTabBadge(tabBadges, `/admin/aliancas?tab=${item.id}`)
+            const count = Math.max(item.count, live)
             return (
               <button
                 key={item.id}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                onClick={() => setTab(item.id)}
+                onClick={() => irParaTab(item.id)}
                 className={[
                   'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                   active
                     ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                    : item.highlight
+                    : item.highlight || live > 0
                       ? 'font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
                       : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
@@ -490,14 +513,16 @@ export function AliancaForms({
                   <span
                     className={[
                       'rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
-                      active
-                        ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                        : item.highlight
-                          ? 'bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]'
-                          : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                      live > 0
+                        ? 'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]'
+                        : active
+                          ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
+                          : item.highlight
+                            ? 'bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]'
+                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                   >
-                    {item.count}
+                    {count}
                   </span>
                 ) : null}
               </button>
@@ -753,7 +778,7 @@ export function AliancaForms({
                     await proporAlianca(selectedTenantId)
                     setSelectedTenantId(null)
                     setSearch('')
-                    setTab('enviadas')
+                    irParaTab('enviadas')
                   }, 'Proposta enviada com sucesso')
                 }}
                 className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-60"

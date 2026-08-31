@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Flag, Landmark } from 'lucide-react'
+import { PATRIMONIO_ACERVO_PAGE_SIZE } from '@torcida/types'
 import { assertAcervoView } from '@/lib/patrimonio-authz'
 import {
   listarCandidatosResponsavelPatrimonio,
@@ -12,13 +13,13 @@ import {
   parseFiltroPatrimonio,
   type PatrimonioSearchParams,
 } from '@/lib/patrimonio-filtros'
-import { PatrimonioItemForm } from '@/components/patrimonio/patrimonio-item-form'
 import {
   PatrimonioItensLista,
   type PatrimonioRow,
 } from '@/components/patrimonio/patrimonio-itens-lista'
 import { PatrimonioResumoCards } from '@/components/patrimonio/patrimonio-resumo-cards'
 import { PatrimonioFiltros } from '@/components/patrimonio/patrimonio-filtros'
+import { fichaVistoriaDoItem } from '@/lib/patrimonio-vistoria-ficha'
 import {
   DevolverPatrimonioForm,
   RetirarPatrimonioForm,
@@ -49,7 +50,7 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
 
   const [resumo, lista, candidatos, meusEmprestimos, disponiveisRetirada] = await Promise.all([
     resumirPatrimonio(tenant.id, escopoCategoria),
-    listarPatrimonio(tenant.id, { filtro, escopoCategoria }),
+    listarPatrimonio(tenant.id, { filtro, escopoCategoria, pageSize: PATRIMONIO_ACERVO_PAGE_SIZE }),
     podeGerir ? listarCandidatosResponsavelPatrimonio(tenant.id) : Promise.resolve([]),
     listarEmprestimosPatrimonio(tenant.id, {
       userId: session.user.id!,
@@ -73,8 +74,11 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
     localizacao: i.localizacao,
     valorEstimado: i.valorEstimado != null ? Number(i.valorEstimado) : null,
     observacao: i.observacao,
+    fotoUrl: i.fotoUrl,
+    fotoPreviewUrl: i.fotoPreviewUrl,
     responsavelId: i.responsavel?.id ?? null,
     responsavelNome: i.responsavel?.nome ?? null,
+    ...fichaVistoriaDoItem(i.meta),
   }))
 
   const query: Record<string, string | undefined> = {
@@ -85,7 +89,7 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <MotionReveal>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -111,7 +115,7 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
           </div>
           <Link
             href={soBandeiras ? '/portal/departamentos/bandeiras' : '/portal/departamentos/patrimonio'}
-            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver departamento
           </Link>
@@ -159,13 +163,11 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
         values={values}
         categoriaTravada={escopoCategoria}
       />
-      {podeGerir && (
-        <PatrimonioItemForm candidatos={candidatos} categoriaTravada={escopoCategoria} />
-      )}
       <PatrimonioItensLista
         itens={itens}
         podeGerir={podeGerir}
         candidatos={candidatos}
+        tenantId={tenant.id}
         total={lista.total}
         page={lista.page}
         pageSize={lista.pageSize}

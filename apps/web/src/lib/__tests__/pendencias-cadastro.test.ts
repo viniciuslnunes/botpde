@@ -54,6 +54,49 @@ describe('checklistCompletudeCadastro', () => {
     expect(byId.uf).toBe(false)
     expect(byId.termo).toBe(false)
   })
+
+  it('«quero me associar»: nº e prova não são obrigatórios', () => {
+    const itens = checklistCompletudeCadastro(
+      base({
+        numeroAssociado: null,
+        imagemProva: null,
+        dataExpedicaoCarteirinha: null,
+        cpf: '123',
+        rg: '456',
+        dataNascimento: '1990-01-01',
+        logradouro: 'Rua A',
+        bairro: 'Centro',
+        uf: 'SP',
+        termoResponsabilidadeAceitoEm: new Date(),
+      }),
+    )
+    const porId = Object.fromEntries(itens.map((i) => [i.id, i]))
+    expect(porId.numeroAssociado?.obrigatorio).toBe(false)
+    expect(porId.prova?.obrigatorio).toBe(false)
+    expect(porId.cpf?.ok).toBe(true)
+    expect(itens.filter((i) => i.obrigatorio && !i.ok)).toEqual([])
+  })
+
+  it('primeira associação completa (LGE) não abre pendência de carteirinha', () => {
+    const m = base({
+      numeroAssociado: null,
+      imagemProva: null,
+      dataExpedicaoCarteirinha: null,
+      periodicidadePretendida: null,
+      cpf: '123',
+      rg: '456',
+      dataNascimento: '1990-01-01',
+      logradouro: 'Rua A',
+      bairro: 'Centro',
+      uf: 'SP',
+      termoResponsabilidadeAceitoEm: new Date(),
+      temCarteirinha: false,
+    })
+    expect(resolverPendenciasCadastro(m)).toEqual([])
+    expect(
+      resumirCompletudeCadastroSocio(m, { exigirDocumentos: false, temCarteirinha: false }).completo,
+    ).toBe(true)
+  })
 })
 
 describe('elegivelPendenciaCadastro', () => {
@@ -75,6 +118,7 @@ describe('resolverPendenciasCadastro via completude', () => {
     const p = resolverPendenciasCadastro(base())
     expect(p).toHaveLength(1)
     expect(p[0]?.codigo).toBe(PENDENCIA_SOCIO_FICHA)
+    expect(p[0]?.href).toBe('/portal/carteirinha?secao=cadastro')
     expect(p[0]?.camposFaltantes).toEqual(
       expect.arrayContaining([
         'cpf',

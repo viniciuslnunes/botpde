@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useTheme } from 'next-themes'
 import { applyTenantDesign, tenantDesignCriticalCss, type TenantDesign } from '@torcida/ui'
+import { useTheme } from '@torcida/ui/services/theme'
 import { resolveTenantDesign } from '@torcida/types'
 
 export type TenantDesignBridgeProps = {
@@ -22,7 +22,7 @@ export function TenantDesignBridge({ corPrimaria, design: designRaw }: TenantDes
   )
 
   const { resolvedTheme } = useTheme()
-  const criticalCss = useMemo(() => tenantDesignCriticalCss(design, 'dark'), [design])
+  const criticalCss = useMemo(() => tenantDesignCriticalCss(design), [design])
 
   useEffect(() => {
     const mode = resolvedTheme === 'light' ? 'light' : 'dark'

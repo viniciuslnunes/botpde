@@ -17,7 +17,13 @@ describe('isComunidadeNavActive', () => {
       false,
     )
     expect(isComunidadeNavActive('/portal/comunidade/canais', '/portal/comunidade/canais')).toBe(true)
-    expect(isComunidadeNavActive('/portal/comunidade/grupos', '/portal/comunidade/grupos')).toBe(true)
+    expect(isComunidadeNavActive('/portal/comunidade/noticias', '/portal/comunidade')).toBe(false)
+    expect(
+      isComunidadeNavActive('/portal/comunidade/noticias', '/portal/comunidade/noticias'),
+    ).toBe(true)
+    expect(isComunidadeNavActive('/portal/comunidade/forum/abc', '/portal/comunidade/forum')).toBe(
+      true,
+    )
     expect(
       isComunidadeNavActive('/portal/comunidade/grupos/abc', '/portal/comunidade/grupos'),
     ).toBe(true)

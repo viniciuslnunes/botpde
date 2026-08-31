@@ -35,7 +35,7 @@ function formatarData(iso: string) {
   )
 }
 
-export function BuscaUsuarioClient() {
+export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   /** Última busca concluída — o termo junto deriva a lista e o "carregando". */
@@ -44,10 +44,11 @@ export function BuscaUsuarioClient() {
     itens: [],
   })
   const [selecionado, setSelecionado] = useState<UsuarioDetalhe | null>(null)
-  const [carregandoDetalhe, setCarregandoDetalhe] = useState(false)
+  const [carregandoDetalhe, setCarregandoDetalhe] = useState(() => Boolean(idInicial))
   const [apagandoId, setApagandoId] = useState<string | null>(null)
   const confirmAction = useConfirmAction()
   const abortRef = useRef<AbortController | null>(null)
+  const detalhePedidoRef = useRef<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 300)
@@ -87,7 +88,7 @@ export function BuscaUsuarioClient() {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  async function selecionar(id: string) {
+  const selecionar = useCallback(async (id: string) => {
     setCarregandoDetalhe(true)
     setSelecionado(null)
     try {
@@ -100,7 +101,14 @@ export function BuscaUsuarioClient() {
     } finally {
       setCarregandoDetalhe(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!idInicial) return
+    if (detalhePedidoRef.current === idInicial) return
+    detalhePedidoRef.current = idInicial
+    void selecionar(idInicial)
+  }, [idInicial, selecionar])
 
   async function apagarCadastro(userId: string, v: UsuarioVinculo) {
     if (!v.membroId) return
@@ -245,7 +253,7 @@ export function BuscaUsuarioClient() {
                         type="button"
                         onClick={() => void apagarCadastro(selecionado.id, v)}
                         disabled={apagandoId === v.membroId}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--color-danger))] transition-colors hover:underline disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-danger transition-colors hover:underline disabled:opacity-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         {apagandoId === v.membroId ? 'Apagando…' : 'Apagar cadastro'}

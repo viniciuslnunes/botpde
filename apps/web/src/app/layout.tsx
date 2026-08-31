@@ -6,6 +6,7 @@ import { DialogProvider } from '@torcida/ui/services/dialog'
 import { ClientToastProvider } from '@/components/providers/client-toast-provider'
 import { UnsavedChangesProvider } from '@/lib/unsaved-changes'
 import { LinkStatusBarSuppressor } from '@/components/link-status-bar-suppressor'
+import { ThemeInitScript } from '@/components/theme-init-script'
 
 export const metadata: Metadata = {
   title: {
@@ -27,8 +28,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <ThemeInitScript />
         <ThemeProvider>
           <DialogProvider>
             <UnsavedChangesProvider>

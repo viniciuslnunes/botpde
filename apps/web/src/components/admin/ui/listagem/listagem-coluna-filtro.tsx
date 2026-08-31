@@ -273,7 +273,7 @@ export function ListagemColunaFiltro({
         }
         onClick={() => setAberto((v) => !v)}
         className={[
-          'inline-flex shrink-0 items-center transition-colors',
+          'app-touch-target inline-flex shrink-0 items-center transition-colors',
           variante === 'barra'
             ? 'gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium'
             : 'h-5 gap-0.5 rounded px-1',

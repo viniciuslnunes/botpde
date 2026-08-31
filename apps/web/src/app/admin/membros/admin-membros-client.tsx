@@ -10,6 +10,7 @@ import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Badge } from '@torcida/ui'
 import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
+import { MembroOrigemCell } from '@/components/admin/membro-origem-cell'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 import {
   construirHrefLimparFiltros,
@@ -77,7 +78,7 @@ const CELULA: Record<
         {!!membro.reprovacoesOutraTorcida && (
           <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
             <TriangleAlert className="h-3 w-3 shrink-0" />
-            Reprovado em outra torcida
+            Reprovado em torcida rival
           </p>
         )}
       </div>
@@ -96,6 +97,7 @@ const CELULA: Record<
       {membro.sedeNome ?? '—'}
     </span>
   ),
+  origem: (membro) => <MembroOrigemCell membro={membro} />,
   cidade: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">
       {membro.cidade ?? '—'}

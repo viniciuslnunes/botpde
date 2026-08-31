@@ -6,6 +6,7 @@ import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { assertMembroConversa } from './mensageria'
+import { temCapacidadeConfianca } from '@/lib/confianca'
 
 export type MotivoInboxBloqueado = 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
 
@@ -113,8 +114,11 @@ export async function assertConversaAccess(conversaId: string) {
   } catch {
     const { staffPodeLerTicketConversa, getTicketPorConversaId, garantirMembroConversaTicket } =
       await import('@/lib/loja-ticket')
+    const { staffPodeLerBrechoConversa } = await import('@/lib/brecho-ticket')
     const { isSuperAdminEmail } = await import('@/lib/tenant-context')
-    const pode = await staffPodeLerTicketConversa(conversaId, session.user.id)
+    const podeLoja = await staffPodeLerTicketConversa(conversaId, session.user.id)
+    const podeBrecho = podeLoja ? false : await staffPodeLerBrechoConversa(conversaId, session.user.id)
+    const pode = podeLoja || podeBrecho
     if (!pode) throw new Error('Você não participa desta conversa.')
 
     // Super-admin sem vínculo: entra na conversa e segue o caminho de membro
@@ -132,7 +136,7 @@ export async function assertConversaAccess(conversaId: string) {
       }
     }
 
-    const ticket = await getTicketPorConversaId(conversaId)
+    const ticket = podeLoja ? await getTicketPorConversaId(conversaId) : null
     const conversa: {
       id: string
       tipo: 'DIRETA' | 'GRUPO' | 'CANAL'
@@ -142,7 +146,7 @@ export async function assertConversaAccess(conversaId: string) {
       where: { id: conversaId },
       select: { id: true, tipo: true, tenantId: true, nome: true },
     })
-    if (!conversa || !ticket) throw new Error('Você não participa desta conversa.')
+    if (!conversa || (!ticket && !podeBrecho)) throw new Error('Você não participa desta conversa.')
 
     return {
       session,
@@ -234,6 +238,22 @@ export async function assertContextoMensageria(): Promise<ContextoMensageria> {
   }
 
   throw new Error('Você precisa de um clube vinculado para acessar as mensagens.')
+}
+
+/** Alinha o botão "Novo grupo" da inbox com o POST /api/conversas (tenant AND; CN livre). */
+export async function podeCriarGrupoInbox(
+  userId: string,
+  email: string | null | undefined,
+): Promise<boolean> {
+  const ctx = await resolverContextoComunidade(userId, email)
+  if (!ctx) return false
+  if (ctx.modo !== 'torcida') return true
+  const status = await getStatusInboxMensageria(userId, ctx.tenant.id)
+  if (!status.podeListar) return true
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, ctx.tenant.id)
+  const efetivas: string[] = calculateEffectivePermissions(rolePermissions, overrides)
+  if (!hasPermission(efetivas, PERMISSIONS.GROUPS_CREATE)) return false
+  return temCapacidadeConfianca(userId, ctx.tenant.id, 'grupo:criar')
 }
 
 /**

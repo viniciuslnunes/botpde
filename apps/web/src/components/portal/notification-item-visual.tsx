@@ -10,6 +10,9 @@ import {
   Megaphone,
   MessageCircle,
   PackageCheck,
+  Palette,
+  Recycle,
+  ScanLine,
   PackageX,
   Repeat2,
   ShieldAlert,
@@ -24,6 +27,7 @@ import {
   Wallet,
   Calendar,
   MapPin,
+  History,
   type LucideIcon,
 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -36,6 +40,7 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   NOVO_COMENTARIO: MessageCircle,
   NOVA_REACAO: Heart,
   COMUNICADO_URGENTE: Megaphone,
+  COMUNICADO_NOVO: Megaphone,
   DENUNCIA_NOVA: ShieldAlert,
   DENUNCIA_RESOLVIDA: ShieldAlert,
   NOVA_MENSAGEM: Mail,
@@ -57,6 +62,9 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   EVENTO_LEMBRETE: Calendar,
   EVENTO_RSVP: Calendar,
   EVENTO_DIA_GESTOR: Calendar,
+  EVENTO_CANCELADO: Calendar,
+  EVENTO_ALTERADO: Calendar,
+  EVENTO_CHECKIN: ScanLine,
   GRUPO_PEDIDO: Users,
   GRUPO_APROVADO: UserCheck,
   GRUPO_REJEITADO: UserX,
@@ -82,12 +90,20 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   BAR_TURNO_DIVERGENCIA: ShieldAlert,
   BAR_ESTORNO_ANOMALO: ShieldAlert,
   PATRIMONIO_RESPONSAVEL_DEFINIDO: UserCog,
+  FINANCEIRO_LANCAMENTO: Wallet,
+  DESIGN_ATUALIZADO: Palette,
   PEDIDO_RECEBIDO: PackageCheck,
   SOLICITACAO_UNIDADE_CRIADA: MapPin,
+  SOLICITACAO_UNIDADE_APROVADA: MapPin,
+  SOLICITACAO_UNIDADE_RECUSADA: MapPin,
   CANAL_RESTRITO_ATIVADO: Lock,
   CANAL_REATIVACAO_SOLICITADA: LockOpen,
   CANAL_REATIVACAO_RECUSADA: ShieldOff,
   CANAL_REATIVADO: LockOpen,
+  BRECHO_INTERESSE: Recycle,
+  BRECHO_DENUNCIA: ShieldAlert,
+  BRECHO_TROCA_CONFIRMADA: PackageCheck,
+  MEMORIA_FATO_DECIDIDA: History,
 }
 
 export interface NotificacaoAtorInfo {
@@ -115,8 +131,10 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   CANAL_PEDIDO: (nome) => `${nome} pediu para entrar no canal`,
   CANAL_APROVADO: (nome) => `${nome} aprovou sua entrada no canal`,
   CANAL_REJEITADO: (nome) => `${nome} recusou sua entrada no canal`,
+  BRECHO_INTERESSE: (nome) => `${nome} se interessou no seu anúncio`,
+  BRECHO_TROCA_CONFIRMADA: (nome) => `${nome} confirmou a troca no brechó`,
+  MEMORIA_FATO_DECIDIDA: (nome) => `${nome} decidiu sobre a memória que você ligou ao dia`,
 }
-
 /**
  * Título de exibição da notificação: usa o nome do ator quando disponível
  * (tipos sociais), senão cai no título salvo (tipos sistêmicos ou registros
@@ -132,6 +150,40 @@ export function formatarTituloNotificacao(item: {
 
   const formatar = TITULO_COM_ATOR[item.tipo]
   return formatar ? formatar(nome) : item.titulo
+}
+
+/**
+ * Data e hora da ação, mais recente primeiro na lista. Relativo curto +
+ * absoluto `dd/mm/aaaa, hh:mm` para a pessoa achar o instante exato.
+ */
+export function formatarQuandoNotificacao(data: Date | string): string {
+  const d = new Date(data)
+  if (Number.isNaN(d.getTime())) return ''
+
+  const abs = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+
+  const diffSeg = Math.round((Date.now() - d.getTime()) / 1000)
+  if (diffSeg < 0) return abs
+  if (diffSeg < 45) return `agora · ${abs}`
+  if (diffSeg < 3600) {
+    const min = Math.max(1, Math.round(diffSeg / 60))
+    return `há ${min} min · ${abs}`
+  }
+  if (diffSeg < 86_400) {
+    const h = Math.max(1, Math.round(diffSeg / 3600))
+    return `há ${h} h · ${abs}`
+  }
+  if (diffSeg < 86_400 * 7) {
+    const dias = Math.max(1, Math.round(diffSeg / 86_400))
+    return `há ${dias} d · ${abs}`
+  }
+  return abs
 }
 
 /**

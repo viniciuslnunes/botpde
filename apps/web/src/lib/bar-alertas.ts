@@ -113,7 +113,7 @@ export async function dispatchAlertasFiadoVencidoBar(now = new Date()): Promise<
       tipo: 'BAR_FIADO_VENCIDO',
       titulo: 'Fiado vencido no Bar',
       corpo: `${devedor} — ${valorFmt} venceu sem pagamento.`,
-      link: '/admin/bar/comandas',
+      link: `/admin/bar/comandas?fiado=${fiado.id}`,
     })
   }
 
@@ -177,9 +177,33 @@ export async function dispatchAlertasComandaVencidaBar(now = new Date()): Promis
       tipo: 'BAR_COMANDA_VENCIDA',
       titulo: 'Comanda vencida no Bar',
       corpo: `${comanda.titularNome} · ${comanda.codigo} — ${valorFmt} venceu sem pagamento.`,
-      link: '/admin/bar/comandas',
+      link: `/admin/bar/comandas?comanda=${comanda.id}`,
     })
   }
 
   return { processados: vencidas.length, notificados }
+}
+
+/** Some o alerta de estoque baixo quando o produto volta ao mínimo. */
+export async function reconciliarAlertaEstoqueSeRegularizado(
+  tenantId: string,
+  produtoId: string,
+): Promise<void> {
+  const produto: { estoque: number; estoqueMinimo: number | null } | null =
+    await db.barProduto.findFirst({
+      where: { id: produtoId, tenantId },
+      select: { estoque: true, estoqueMinimo: true },
+    })
+  if (!produto) return
+  if (produto.estoqueMinimo != null && produto.estoque < produto.estoqueMinimo) return
+
+  try {
+    const { reconciliarNotificacoesDoEvento } = await import('@/lib/notificacoes')
+    await reconciliarNotificacoesDoEvento(tenantId, {
+      tipo: 'BAR_ESTOQUE_BAIXO',
+      link: `/admin/bar/estoque?produtoId=${produtoId}`,
+    })
+  } catch {
+    // best-effort
+  }
 }

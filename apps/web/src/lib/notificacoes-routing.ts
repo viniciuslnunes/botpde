@@ -1,8 +1,10 @@
 import type { TipoNotificacao } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
+import { hrefHomeDepartamento, PERMISSIONS } from '@torcida/types'
 import {
   criarNotificacoesEmLote,
+  criarNotificacoesEmLoteSePendentes,
   listarDestinatariosAdminPorPermissoes,
+  listarUserIdsGestoresDepartamento,
   listarUserIdsMembrosAprovados,
   notificarMembrosAprovados,
   notificarSafe,
@@ -51,7 +53,11 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   CANAL_PEDIDO: { escopo: 'social' },
   CANAL_APROVADO: { escopo: 'social' },
   CANAL_REJEITADO: { escopo: 'social' },
-  COMUNICADO_URGENTE: { escopo: 'hibrido' },
+  COMUNICADO_URGENTE: {
+    escopo: 'hibrido',
+    rota: '/admin/comunidade/comunicados',
+  },
+  COMUNICADO_NOVO: { escopo: 'social' },
   MEMBRO_APROVADO: { escopo: 'hibrido' },
   MEMBRO_REPROVADO: { escopo: 'hibrido' },
   MEMBRO_SOLICITADO: {
@@ -59,13 +65,17 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissoesAdminOr: [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
     rota: '/admin/socios?status=solicitacoes',
   },
-  COBRANCA_PENDENTE: { escopo: 'hibrido' },
+  COBRANCA_PENDENTE: {
+    escopo: 'hibrido',
+  },
   COBRANCA_VENCIDA: {
     escopo: 'hibrido',
     permissaoAdmin: PERMISSIONS.FINANCE_MANAGE,
-    rota: '/admin/financeiro/cobrancas',
+    rota: '/admin/financeiro/cobrancas?status=VENCIDA',
   },
-  EVENTO_LEMBRETE: { escopo: 'hibrido' },
+  EVENTO_LEMBRETE: {
+    escopo: 'hibrido',
+  },
   EVENTO_RSVP: {
     escopo: 'hibrido',
     permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
@@ -76,6 +86,9 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
     rota: '/admin/eventos',
   },
+  EVENTO_CANCELADO: { escopo: 'social' },
+  EVENTO_ALTERADO: { escopo: 'social' },
+  EVENTO_CHECKIN: { escopo: 'social' },
   DENUNCIA_NOVA: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
@@ -85,27 +98,27 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   ALIANCA_PROPOSTA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    rota: '/admin/aliancas',
+    rota: '/admin/aliancas?tab=recebidas',
   },
   ALIANCA_ACEITA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    rota: '/admin/aliancas',
+    rota: '/admin/aliancas?tab=ativas',
   },
   ALIANCA_REJEITADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    rota: '/admin/aliancas',
+    rota: '/admin/aliancas?tab=historico',
   },
   ALIANCA_ENCERRADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    rota: '/admin/aliancas',
+    rota: '/admin/aliancas?tab=historico',
   },
   ALIANCA_CANCELADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    rota: '/admin/aliancas',
+    rota: '/admin/aliancas?tab=historico',
   },
   PEDIDO_CONFIRMADO: { escopo: 'social' },
   PEDIDO_CANCELADO: { escopo: 'social' },
@@ -143,17 +156,40 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
     rota: '/admin/bar/estornos',
   },
-  PATRIMONIO_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
+  PATRIMONIO_RESPONSAVEL_DEFINIDO: {
+    escopo: 'hibrido',
+    rota: '/admin/patrimonio?tab=pendencias',
+  },
+  FINANCEIRO_LANCAMENTO: {
+    escopo: 'hibrido',
+    permissaoAdmin: PERMISSIONS.FINANCE_MANAGE,
+    rota: '/admin/financeiro/lancamentos',
+  },
+  DESIGN_ATUALIZADO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.SETTINGS_MANAGE,
+    rota: '/admin/design',
+  },
   PEDIDO_RECEBIDO: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
     rota: '/admin/loja/pedidos',
+  },
+  BRECHO_INTERESSE: { escopo: 'social' },
+  BRECHO_TROCA_CONFIRMADA: { escopo: 'social' },
+  MEMORIA_FATO_DECIDIDA: { escopo: 'social' },
+  BRECHO_DENUNCIA: {
+    escopo: 'hibrido',
+    permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
+    rota: '/admin/loja/brecho',
   },
   SOLICITACAO_UNIDADE_CRIADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.AFFILIATION_MANAGE,
     rota: '/admin/afiliacoes',
   },
+  SOLICITACAO_UNIDADE_APROVADA: { escopo: 'social' },
+  SOLICITACAO_UNIDADE_RECUSADA: { escopo: 'social' },
   // R5 — canal restrito. A unidade recebe o pedido da Sede em Configurações
   // (é lá que a liderança decide); a Sede recebe o desfecho em /admin/sedes.
   CANAL_RESTRITO_ATIVADO: {
@@ -178,7 +214,11 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   },
 }
 
-export { agregarBadgesPorMenu, menuIdParaTipo } from '@/lib/notificacoes-menu-badges'
+export {
+  agregarBadgesDeInbox,
+  agregarBadgesPorMenu,
+  menuIdParaTipo,
+} from '@/lib/notificacoes-menu-badges'
 
 /** Tipos puramente sociais — sino do portal para qualquer membro ativo. */
 export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = (
@@ -356,8 +396,8 @@ export async function notificarDenunciaMensagem(params: {
   })
 }
 
-/** Comunicado urgente: membros aprovados + admins de comunicados (sem duplicar). */
-export async function notificarComunicadoUrgente(destino: DestinoNotificacao): Promise<number> {
+/** Comunicado: membros aprovados + quem publica/gerencia a comunidade (sem duplicar). */
+export async function notificarComunicado(destino: DestinoNotificacao): Promise<number> {
   try {
     const [membroIds, adminIds] = await Promise.all([
       listarUserIdsMembrosAprovados(destino.tenantId),
@@ -377,6 +417,50 @@ export async function notificarComunicadoUrgente(destino: DestinoNotificacao): P
         corpo: destino.corpo,
         link: destino.link,
         atorId: destino.atorId,
+      })),
+    )
+  } catch {
+    return 0
+  }
+}
+
+/** @deprecated Use `notificarComunicado`. */
+export const notificarComunicadoUrgente = notificarComunicado
+
+/**
+ * Avisa gestores da área (e quem tem `roles:manage`) de um pedido no cockpit.
+ * Idempotente por `(destinatário, tipo, link, atorId)` — o mesmo sócio não
+ * re-dispara enquanto a notificação anterior estiver pendente.
+ */
+export async function notificarGestoresDepartamento(opts: {
+  tenantId: string
+  departamentoId: string
+  slug: string
+  tab: 'pedidos' | 'equipe' | 'areas' | 'projetos' | 'fila'
+  tipo: TipoNotificacao
+  titulo: string
+  corpo: string
+  atorId?: string
+  excetoUserId?: string
+}): Promise<number> {
+  try {
+    const targets = await listarUserIdsGestoresDepartamento(
+      opts.tenantId,
+      opts.departamentoId,
+      opts.excetoUserId,
+    )
+    const destinatarios = opts.atorId
+      ? targets.filter((id) => id !== opts.atorId)
+      : targets
+    return criarNotificacoesEmLoteSePendentes(
+      destinatarios.map((userId) => ({
+        userId,
+        tenantId: opts.tenantId,
+        tipo: opts.tipo,
+        titulo: opts.titulo,
+        corpo: opts.corpo,
+        link: hrefHomeDepartamento(opts.slug, opts.tab),
+        atorId: opts.atorId,
       })),
     )
   } catch {

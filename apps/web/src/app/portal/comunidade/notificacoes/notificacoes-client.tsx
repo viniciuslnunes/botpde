@@ -8,7 +8,7 @@ import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { marcarTodasNotificacoesLidas } from '@/app/portal/comunidade/actions'
 import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
-import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
+import { NotificationAvatar, formatarTituloNotificacao, formatarQuandoNotificacao } from '@/components/portal/notification-item-visual'
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
@@ -18,6 +18,8 @@ import {
   markNavbarNotificationsRead,
   refreshNavbarContext,
 } from '@/lib/use-navbar-context'
+import { useNotificationStream } from '@/lib/use-notification-stream'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 const FILTROS: Array<{ id: FiltroNotificacaoSocial; label: string }> = [
   { id: 'todas', label: 'Todas' },
@@ -26,12 +28,6 @@ const FILTROS: Array<{ id: FiltroNotificacaoSocial; label: string }> = [
   { id: 'reacoes', label: 'Reações' },
   { id: 'seguimento', label: 'Seguimento' },
 ]
-
-function formatarData(data: Date | string) {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(data),
-  )
-}
 
 /** Chave de dia local (ano/mês/dia) para comparação sem bug de fuso. */
 function chaveDiaLocal(data: Date): string {
@@ -72,9 +68,13 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
   const [itens, setItens] = useState<NotificacaoSocialItem[]>(inicial)
   const [carregando, setCarregando] = useState(false)
   const [pending, startTransition] = useTransition()
+  const filtroRef = useLatestRef(filtro)
 
-  const carregar = useCallback(async (novoFiltro: FiltroNotificacaoSocial) => {
-    setCarregando(true)
+  const carregar = useCallback(async (
+    novoFiltro: FiltroNotificacaoSocial,
+    opts?: { silencioso?: boolean },
+  ) => {
+    if (!opts?.silencioso) setCarregando(true)
     try {
       const res = await fetch(
         `/api/comunidade/notificacoes?filtro=${encodeURIComponent(novoFiltro)}`,
@@ -83,11 +83,16 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
       const data = (await res.json()) as { notificacoes: NotificacaoSocialItem[] }
       setItens(data.notificacoes)
     } catch {
-      toast.error('Não foi possível carregar as notificações.')
+      if (!opts?.silencioso) toast.error('Não foi possível carregar as notificações.')
     } finally {
-      setCarregando(false)
+      if (!opts?.silencioso) setCarregando(false)
     }
   }, [])
+
+  useNotificationStream(() => {
+    void carregar(filtroRef.current, { silencioso: true })
+    void refreshNavbarContext(true)
+  })
 
   function mudarFiltro(novo: FiltroNotificacaoSocial) {
     setFiltro(novo)
@@ -133,7 +138,9 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
       )
       for (const id of idsNaoLidos) markNavbarNotificationRead(id)
       startTransition(() => {
-        void marcarNotificacoesLidasPorIds(idsNaoLidos)
+        void marcarNotificacoesLidasPorIds(idsNaoLidos).then(() => {
+          void refreshNavbarContext(true)
+        })
       })
     }, NOTIFICATION_AUTO_READ_DELAY_MS)
 
@@ -257,13 +264,11 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
                           <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
                             {formatarTituloNotificacao(item)}
                           </p>
-                          {item.corpo && (
-                            <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                              {item.corpo}
-                            </p>
-                          )}
+                          <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                            {item.corpo?.trim() || item.titulo}
+                          </p>
                           <p className="mt-1.5 text-[10px] text-[rgb(var(--foreground-muted))]">
-                            {formatarData(item.criadoEm)}
+                            {formatarQuandoNotificacao(item.criadoEm)}
                           </p>
                         </span>
                         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />

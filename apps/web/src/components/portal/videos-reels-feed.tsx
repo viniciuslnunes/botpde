@@ -196,7 +196,7 @@ export function VideosReelsFeed({
         'snap-y snap-mandatory overflow-y-auto overscroll-y-contain',
         fullscreen
           ? 'fixed inset-0 z-50 bg-black'
-          : 'h-[min(78vh,720px)] rounded-2xl bg-black',
+          : 'h-[min(78dvh,720px)] rounded-2xl bg-black',
       ].join(' ')}
     >
       {fullscreen && onClose && (

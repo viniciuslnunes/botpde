@@ -12,6 +12,7 @@ import {
   validarRg,
 } from '@torcida/types'
 import { getTenantFromHost } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import { recalcularAdimplencia } from '@/lib/cobrancas'
 import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'
 import {
@@ -21,7 +22,7 @@ import {
   PENDENCIAS_CADASTRO_CODIGOS,
   type PendenciaCadastroCodigo,
 } from '@/lib/pendencias-cadastro'
-import { carregarPendenciasCadastro, servicoPendenciasCadastroAtivo } from '@/lib/pendencias-cadastro-server'
+import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
 import { resumirCompletudeCadastroSocio } from '@/lib/completude-cadastro-socio'
 import { notificarUsuario } from '@/lib/notificacoes-routing'
 import { UFS_BRASIL } from '@/lib/ufs-brasil'
@@ -47,9 +48,10 @@ export async function completarDadosAssociacao(
   _prev: CompletarAssociacaoState,
   formData: FormData,
 ): Promise<CompletarAssociacaoState> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const [session, host] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) return { message: 'Faça login para continuar.' }
-  if (!tenant) return { message: 'Torcida não encontrada.' }
+  if (!host) return { message: 'Torcida não encontrada.' }
+  const tenant = await carregarTenantCarteirinha(host, session.user.id)
 
   const membro = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
@@ -86,9 +88,6 @@ export async function completarDadosAssociacao(
   })
   if (!membro || !elegivelPendenciaCadastro(membro)) {
     return { message: 'Só sócios aprovados podem completar estes dados.' }
-  }
-  if (!(await servicoPendenciasCadastroAtivo(tenant.id))) {
-    return { message: 'A solicitação de dados pendentes está desligada nesta unidade.' }
   }
 
   const errors: Record<string, string[]> = {}
@@ -283,7 +282,7 @@ export async function completarDadosAssociacao(
       entidade: 'SaasMembro',
       entidadeId: membro.id,
       detalhes: {
-        origem: 'portal_pendencia',
+        origem: 'portal_ficha',
         completo: preview.completo,
         faltando: preview.faltando.map((f) => f.id),
       },
@@ -338,9 +337,10 @@ export async function completarDadosAssociacao(
 export async function dispensarPendenciaCadastro(
   codigo: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const [session, host] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) return { ok: false, message: 'Faça login para continuar.' }
-  if (!tenant) return { ok: false, message: 'Torcida não encontrada.' }
+  if (!host) return { ok: false, message: 'Torcida não encontrada.' }
+  const tenant = await carregarTenantCarteirinha(host, session.user.id)
 
   if (!(PENDENCIAS_CADASTRO_CODIGOS as readonly string[]).includes(codigo)) {
     return { ok: false, message: 'Pendência inválida.' }

@@ -159,17 +159,13 @@ async function avaliarCanFollowComDados(
 
   if (seguidorTenants.length === 0 || seguidoTenants.length === 0) return false
 
-  for (const vinculoSeguidor of seguidorVinculos) {
-    if (vinculoSeguidor.tipo !== 'SOCIO') continue
-    for (const vinculoSeguido of seguidoVinculos) {
-      if (vinculoSeguido.tipo !== 'SOCIO') continue
-      if (vinculoSeguidor.tenantId === vinculoSeguido.tenantId) continue
-      const key = [vinculoSeguidor.tenantId, vinculoSeguido.tenantId].sort().join(':')
+  // Qualquer par de tenants (sócio ou torcedor): rival é inexistente.
+  for (const tenantSeguidor of seguidorTenants) {
+    for (const tenantSeguido of seguidoTenants) {
+      if (tenantSeguidor === tenantSeguido) continue
+      const key = [tenantSeguidor, tenantSeguido].sort().join(':')
       if (!relationCache.has(key)) {
-        relationCache.set(
-          key,
-          await getTenantRelation(vinculoSeguidor.tenantId, vinculoSeguido.tenantId),
-        )
+        relationCache.set(key, await getTenantRelation(tenantSeguidor, tenantSeguido))
       }
       if (saoRivais(relationCache.get(key)!)) return false
     }

@@ -1,0 +1,3206 @@
+{
+ "descricao": "Cores predominantes do escudo de cada clube, extraídas via Cloudinary Admin API. PROPOSTA revisável: cor de escudo não é necessariamente a cor da marca da torcida.",
+ "fonte": "Cloudinary Admin API — /resources/image/upload/{public_id}?colors=true",
+ "geradoEm": "2026-08-28T01:08:38.113Z",
+ "parametros": {
+  "participacaoMinima": 3,
+  "maxCores": 3,
+  "distanciaFusao": 60
+ },
+ "total": 250,
+ "clubes": [
+  {
+   "nome": "Club de Regatas Vasco da Gama",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/club-de-regatas-vasco-da-gama-rj",
+   "primary": "#080808",
+   "secondary": "#F4F4F4",
+   "accent": "#7E7E7E",
+   "participacoes": [
+    30.1,
+    21.2,
+    4.6
+   ]
+  },
+  {
+   "nome": "Corinthians",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/corinthians-sp-2",
+   "primary": "#FDFCFC",
+   "secondary": "#DF2C21",
+   "accent": "#060606",
+   "participacoes": [
+    25.1,
+    12,
+    9.3
+   ]
+  },
+  {
+   "nome": "Cruzeiro",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/cruzeiro-mg-2",
+   "primary": "#0061AA",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    47.9,
+    25.8
+   ]
+  },
+  {
+   "nome": "Clube Atlético Mineiro",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/atletico-mg-mg-2",
+   "primary": "#010101",
+   "secondary": "#FCFCFC",
+   "accent": null,
+   "participacoes": [
+    39.5,
+    14.2
+   ]
+  },
+  {
+   "nome": "Clube de Regatas Flamengo",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/flamengo-rj-2",
+   "primary": "#ED1C24",
+   "secondary": "#000000",
+   "accent": "#FFFDFD",
+   "participacoes": [
+    32.2,
+    29.4,
+    4.4
+   ]
+  },
+  {
+   "nome": "Grêmio",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/gremio-rs",
+   "primary": "#1C191D",
+   "secondary": "#FDFDFD",
+   "accent": "#1091CD",
+   "participacoes": [
+    21.4,
+    19.9,
+    10.4
+   ]
+  },
+  {
+   "nome": "Paysandu Sport Club",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/paysandu-pa",
+   "primary": "#0394D5",
+   "secondary": "#FFFFFF",
+   "accent": "#7CCCEB",
+   "participacoes": [
+    48.8,
+    14.7,
+    6.6
+   ]
+  },
+  {
+   "nome": "Remo",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/remo-pa",
+   "primary": "#000C28",
+   "secondary": "#FEFEFE",
+   "accent": "#D0D1D6",
+   "participacoes": [
+    29.7,
+    10.9,
+    4.5
+   ]
+  },
+  {
+   "nome": "Sport Club do Recife",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/sport-pe",
+   "primary": "#171717",
+   "secondary": "#EB1C24",
+   "accent": "#F9D802",
+   "participacoes": [
+    18,
+    12.1,
+    10
+   ]
+  },
+  {
+   "nome": "Fluminense Football Club",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/fluminense-football-club-rj",
+   "primary": "#F8F2F4",
+   "secondary": "#880B28",
+   "accent": "#000000",
+   "participacoes": [
+    21.1,
+    16.7,
+    12.6
+   ]
+  },
+  {
+   "nome": "Santa Cruz",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/santa-cruz-pe",
+   "primary": "#1C191D",
+   "secondary": "#FEFCFC",
+   "accent": "#E31717",
+   "participacoes": [
+    25.8,
+    19.3,
+    15
+   ]
+  },
+  {
+   "nome": "São Paulo FC",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-paulo-fc-sp",
+   "primary": "#FEFDFD",
+   "secondary": "#010A27",
+   "accent": "#B20E16",
+   "participacoes": [
+    31.2,
+    25.1,
+    7
+   ]
+  },
+  {
+   "nome": "Sociedade Esportiva Palmeiras",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sociedade-esportiva-palmeiras-sp",
+   "primary": "#FFFFFF",
+   "secondary": "#016634",
+   "accent": "#CEE2D8",
+   "participacoes": [
+    30.3,
+    27.4,
+    13.4
+   ]
+  },
+  {
+   "nome": "Botafogo de Futebol e Regatas",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/botafogo-rj-2",
+   "primary": "#010101",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    43.2,
+    21.9
+   ]
+  },
+  {
+   "nome": "Ceará Sporting Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/ceara-ce-2",
+   "primary": "#010101",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    43.7,
+    25.3
+   ]
+  },
+  {
+   "nome": "ABC",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/abc-rn",
+   "primary": "#030000",
+   "secondary": "#FAFAFA",
+   "accent": null,
+   "participacoes": [
+    51.5,
+    13.3
+   ]
+  },
+  {
+   "nome": "Botafogo-PB",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/botafogo-pb-pb-2",
+   "primary": "#010101",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    43.2,
+    21.9
+   ]
+  },
+  {
+   "nome": "Clube Náutico Capiberibe",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/nautico-pe",
+   "primary": "#FFFCFC",
+   "secondary": "#E20720",
+   "accent": "#EF7986",
+   "participacoes": [
+    38.8,
+    35.6,
+    4.9
+   ]
+  },
+  {
+   "nome": "Coritiba Foot Ball Club",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/coritiba-pr-2",
+   "primary": "#006553",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    48.4,
+    25
+   ]
+  },
+  {
+   "nome": "Fortaleza",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/fortaleza-ce-2",
+   "primary": "#005AA9",
+   "secondary": "#FFFFFF",
+   "accent": "#FF1613",
+   "participacoes": [
+    25.6,
+    23.6,
+    11
+   ]
+  },
+  {
+   "nome": "Associação Atlética Flamengo",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/associacao-atletica-flamengo-sp",
+   "primary": "#3F0100",
+   "secondary": "#CB8F44",
+   "accent": null,
+   "participacoes": [
+    51.1,
+    33.7
+   ]
+  },
+  {
+   "nome": "Avaí",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/avai-sc-2",
+   "primary": "#00679A",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    36.6,
+    33.3
+   ]
+  },
+  {
+   "nome": "Bahia",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/bahia-ba-2",
+   "primary": "#0164AC",
+   "secondary": "#FFFFFF",
+   "accent": "#EE2D23",
+   "participacoes": [
+    39.2,
+    29.4,
+    5.6
+   ]
+  },
+  {
+   "nome": "Centro Sportivo Alagoano",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/centro-sportivo-alagoano-al",
+   "primary": "#FFFFFF",
+   "secondary": "#00356A",
+   "accent": null,
+   "participacoes": [
+    25.6,
+    24.5
+   ]
+  },
+  {
+   "nome": "Clube Atlético Paranaense",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-paranaense-pr",
+   "primary": "#040404",
+   "secondary": "#B0010B",
+   "accent": "#EFEBEC",
+   "participacoes": [
+    17.2,
+    16.2,
+    4.4
+   ]
+  },
+  {
+   "nome": "Clube de Regatas Brasil",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/clube-de-regatas-brasil-al",
+   "primary": "#E31717",
+   "secondary": "#FFFDFD",
+   "accent": "#EF7E7E",
+   "participacoes": [
+    39.5,
+    30.4,
+    4.4
+   ]
+  },
+  {
+   "nome": "Ferroviário Atlético Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/ferroviario-ce",
+   "primary": "#020000",
+   "secondary": "#F0EFEF",
+   "accent": "#ED1B22",
+   "participacoes": [
+    21,
+    14.1,
+    5.5
+   ]
+  },
+  {
+   "nome": "Figueirense",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/figueirense-sc-2",
+   "primary": "#FEFEFE",
+   "secondary": "#010101",
+   "accent": null,
+   "participacoes": [
+    31.4,
+    26.5
+   ]
+  },
+  {
+   "nome": "Goytacaz Futebol Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/goytacaz-futebol-clube-rj",
+   "primary": "#FFFFFF",
+   "secondary": "#056CB4",
+   "accent": "#6DA7D2",
+   "participacoes": [
+    29.3,
+    27.5,
+    7.9
+   ]
+  },
+  {
+   "nome": "Guarany Sporting Club de Sobral",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/guarany-de-sobral-ce",
+   "primary": "#DD0120",
+   "secondary": "#1C1A1E",
+   "accent": "#FBEFF1",
+   "participacoes": [
+    31.3,
+    25.6,
+    4.3
+   ]
+  },
+  {
+   "nome": "Santos",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/santos-sp",
+   "primary": "#1C191D",
+   "secondary": "#FDFDFD",
+   "accent": null,
+   "participacoes": [
+    32.3,
+    24.9
+   ]
+  },
+  {
+   "nome": "Sport Club Internacional",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/internacional-rs",
+   "primary": "#FFFAFA",
+   "secondary": "#FF070A",
+   "accent": "#FE7B7F",
+   "participacoes": [
+    36.4,
+    32.7,
+    7
+   ]
+  },
+  {
+   "nome": "Vila Nova",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/vila-nova-go",
+   "primary": "#E2021A",
+   "secondary": "#FEF9F9",
+   "accent": "#F07F8C",
+   "participacoes": [
+    24.8,
+    13.6,
+    3
+   ]
+  },
+  {
+   "nome": "América Futebol Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/america-futebol-clube-rj",
+   "primary": "#FFFCFC",
+   "secondary": "#FF0303",
+   "accent": "#FF8484",
+   "participacoes": [
+    40.4,
+    33.6,
+    6.2
+   ]
+  },
+  {
+   "nome": "ASA",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/asa-al",
+   "primary": "#0A0A0A",
+   "secondary": "#F3F3F3",
+   "accent": "#828282",
+   "participacoes": [
+    38.4,
+    33.6,
+    6.4
+   ]
+  },
+  {
+   "nome": "Bangu Atlético Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/bangu-rj",
+   "primary": "#E2061B",
+   "secondary": "#FDF4F5",
+   "accent": "#ED757B",
+   "participacoes": [
+    29.8,
+    26.8,
+    12.5
+   ]
+  },
+  {
+   "nome": "Campinense",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/campinense-pb",
+   "primary": "#E1DFDF",
+   "secondary": "#D2080D",
+   "accent": "#0B0A0A",
+   "participacoes": [
+    49.1,
+    16.7,
+    6.7
+   ]
+  },
+  {
+   "nome": "Central Sport Club",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/central-pe",
+   "primary": "#F6F6F6",
+   "secondary": "#121214",
+   "accent": "#7B7B7B",
+   "participacoes": [
+    37.4,
+    24.7,
+    6
+   ]
+  },
+  {
+   "nome": "Chapecoense",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/chapecoense-sc-2",
+   "primary": "#0D8E3A",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    49.8,
+    21.3
+   ]
+  },
+  {
+   "nome": "Clube Atlético Sorocaba",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-sorocaba-sp",
+   "primary": "#E81021",
+   "secondary": "#FEFD16",
+   "accent": "#FDF9F8",
+   "participacoes": [
+    32.4,
+    28.5,
+    7.5
+   ]
+  },
+  {
+   "nome": "Club Sportivo Sergipe",
+   "uf": "SE",
+   "publicId": "torcida/catalogo/escudos/club-sportivo-sergipe-se",
+   "primary": "#FFFEFE",
+   "secondary": "#CC0B0E",
+   "accent": null,
+   "participacoes": [
+    22.8,
+    13.2
+   ]
+  },
+  {
+   "nome": "Democrata",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/democrata-mg",
+   "primary": "#010101",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    28.8,
+    26
+   ]
+  },
+  {
+   "nome": "Esporte Clube Taubaté",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-taubate-sp",
+   "primary": "#015197",
+   "secondary": "#DDE7F0",
+   "accent": "#6991BD",
+   "participacoes": [
+    49.3,
+    17.7,
+    9.7
+   ]
+  },
+  {
+   "nome": "Flamengo-PI",
+   "uf": "PI",
+   "publicId": "torcida/catalogo/escudos/flamengo-pi-pi-2",
+   "primary": "#ED1C24",
+   "secondary": "#000000",
+   "accent": "#FFFDFD",
+   "participacoes": [
+    32.2,
+    29.4,
+    4.4
+   ]
+  },
+  {
+   "nome": "Grêmio Esportivo Brasil",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/gremio-esportivo-brasil-rs",
+   "primary": "#1B1918",
+   "secondary": "#D30123",
+   "accent": "#FCFCFC",
+   "participacoes": [
+    24.5,
+    13.3,
+    10.9
+   ]
+  },
+  {
+   "nome": "Grêmio Esportivo Osasco",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/gremio-esportivo-osasco-sp",
+   "primary": "#FFFDFD",
+   "secondary": "#235E2B",
+   "accent": "#F21104",
+   "participacoes": [
+    24.9,
+    17.4,
+    14.9
+   ]
+  },
+  {
+   "nome": "Guarani",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/guarani-sp",
+   "primary": "#006C51",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    33.1,
+    14
+   ]
+  },
+  {
+   "nome": "Guaratinguetá Esporte Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/guaratingueta-esporte-clube-sp",
+   "primary": "#37377E",
+   "secondary": "#D0CFE0",
+   "accent": "#FEFCFC",
+   "participacoes": [
+    31.7,
+    14.9,
+    11.6
+   ]
+  },
+  {
+   "nome": "Moto Club de São Luís",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/moto-club-de-sao-luis-ma",
+   "primary": "#010101",
+   "secondary": "#FD0000",
+   "accent": "#FAFAFA",
+   "participacoes": [
+    21.3,
+    17.3,
+    4.4
+   ]
+  },
+  {
+   "nome": "Pelotas",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/pelotas-rs",
+   "primary": "#2E1282",
+   "secondary": "#F7D201",
+   "accent": null,
+   "participacoes": [
+    29.8,
+    22.9
+   ]
+  },
+  {
+   "nome": "Sampaio Corrêa",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/sampaio-correa-ma",
+   "primary": "#07913F",
+   "secondary": "#FDF201",
+   "accent": "#D5261C",
+   "participacoes": [
+    20.7,
+    14.8,
+    10.4
+   ]
+  },
+  {
+   "nome": "Santo André",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/santo-andre-sp",
+   "primary": "#EFED03",
+   "secondary": "#048901",
+   "accent": "#B9B3C9",
+   "participacoes": [
+    12.6,
+    9,
+    7.6
+   ]
+  },
+  {
+   "nome": "São José-SP",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-jose-sp-sp",
+   "primary": "#000000",
+   "secondary": "#074BF9",
+   "accent": "#FDEE02",
+   "participacoes": [
+    28.2,
+    19,
+    14.8
+   ]
+  },
+  {
+   "nome": "São Raimundo-AM",
+   "uf": "AM",
+   "publicId": "torcida/catalogo/escudos/sao-raimundo-am-am",
+   "primary": "#173488",
+   "secondary": "#DADEEB",
+   "accent": "#000000",
+   "participacoes": [
+    26.9,
+    18.6,
+    10.5
+   ]
+  },
+  {
+   "nome": "Vitória",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/vitoria-ba",
+   "primary": "#FEFCFC",
+   "secondary": "#1B181C",
+   "accent": "#E31717",
+   "participacoes": [
+    19,
+    18.6,
+    14.5
+   ]
+  },
+  {
+   "nome": "Volta Redonda",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/volta-redonda-rj",
+   "primary": "#030303",
+   "secondary": "#F5F5F5",
+   "accent": "#E7BD55",
+   "participacoes": [
+    51,
+    17.4,
+    3.2
+   ]
+  },
+  {
+   "nome": "Alagoinhas Atlético Clube",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/alagoinhas-atletico-clube-ba",
+   "primary": "#FEFDFD",
+   "secondary": "#FF0101",
+   "accent": "#020202",
+   "participacoes": [
+    23.5,
+    14.7,
+    13.9
+   ]
+  },
+  {
+   "nome": "Alecrim",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/alecrim-rn",
+   "primary": "#E8E8E8",
+   "secondary": "#038427",
+   "accent": "#4A885C",
+   "participacoes": [
+    43,
+    10,
+    4
+   ]
+  },
+  {
+   "nome": "América Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/america-futebol-clube-sp",
+   "primary": "#EF051F",
+   "secondary": "#FFFBFB",
+   "accent": "#F4828D",
+   "participacoes": [
+    35,
+    30.3,
+    3.4
+   ]
+  },
+  {
+   "nome": "América-MG",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/america-mg-mg-2",
+   "primary": "#FFFFFF",
+   "secondary": "#006638",
+   "accent": null,
+   "participacoes": [
+    38.9,
+    20.1
+   ]
+  },
+  {
+   "nome": "Americano",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/americano-rj",
+   "primary": "#F7F6F6",
+   "secondary": "#363233",
+   "accent": null,
+   "participacoes": [
+    25.2,
+    7.7
+   ]
+  },
+  {
+   "nome": "América-PE",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/america-pe-pe",
+   "primary": "#277626",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    42.1,
+    34.7
+   ]
+  },
+  {
+   "nome": "Associação Atlética caldense",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/associacao-atletica-caldense-mg",
+   "primary": "#E4E6E7",
+   "secondary": "#004F1D",
+   "accent": null,
+   "participacoes": [
+    47.3,
+    28
+   ]
+  },
+  {
+   "nome": "Associação Atlética Portuguesa",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/associacao-atletica-portuguesa-sp",
+   "primary": "#FFFDFD",
+   "secondary": "#FF0215",
+   "accent": "#037831",
+   "participacoes": [
+    27,
+    15.4,
+    10
+   ]
+  },
+  {
+   "nome": "Associacao Cultural e Desportiva Potiguar",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/associacao-cultural-e-desportiva-potiguar-rn",
+   "primary": "#C5080C",
+   "secondary": "#E6E1E1",
+   "accent": "#D56B6D",
+   "participacoes": [
+    34.9,
+    20.5,
+    3.4
+   ]
+  },
+  {
+   "nome": "Associação Cultural Esporte Clube Baraúnas",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/associacao-cultural-esporte-clube-baraunas-rn",
+   "primary": "#FEFDFD",
+   "secondary": "#06853E",
+   "accent": "#D60505",
+   "participacoes": [
+    27.1,
+    17.9,
+    12.9
+   ]
+  },
+  {
+   "nome": "Associação Desportiva Cabofriense",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/associacao-desportiva-cabofriense-rj",
+   "primary": "#2D8536",
+   "secondary": "#F7F1F1",
+   "accent": "#EB0B0A",
+   "participacoes": [
+    13.9,
+    8.9,
+    4.9
+   ]
+  },
+  {
+   "nome": "Atlético Rio Negro Clube",
+   "uf": "AM",
+   "publicId": "torcida/catalogo/escudos/atletico-rio-negro-clube-am",
+   "primary": "#030303",
+   "secondary": "#E1E1E1",
+   "accent": null,
+   "participacoes": [
+    36.8,
+    24.7
+   ]
+  },
+  {
+   "nome": "Auto Esporte",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/auto-esporte-pb",
+   "primary": "#B82722",
+   "secondary": "#DCCACA",
+   "accent": "#D25B57",
+   "participacoes": [
+    16.3,
+    12.2,
+    11.4
+   ]
+  },
+  {
+   "nome": "Bacabal",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/bacabal-ma",
+   "primary": "#FFFFFF",
+   "secondary": "#263D82",
+   "accent": "#57AC57",
+   "participacoes": [
+    42.2,
+    26.3,
+    3.2
+   ]
+  },
+  {
+   "nome": "Botafogo-SP",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/botafogo-sp-sp-2",
+   "primary": "#010101",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    43.2,
+    21.9
+   ]
+  },
+  {
+   "nome": "Castanhal",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/castanhal-pa",
+   "primary": "#000000",
+   "secondary": "#F5D600",
+   "accent": "#847400",
+   "participacoes": [
+    36,
+    23.2,
+    4.4
+   ]
+  },
+  {
+   "nome": "Caucaia Esporte Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/caucaia-esporte-clube-ce",
+   "primary": "#010101",
+   "secondary": "#FF0000",
+   "accent": "#FDFDFD",
+   "participacoes": [
+    33.3,
+    15.8,
+    11.2
+   ]
+  },
+  {
+   "nome": "Caxias",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/caxias-rs-2",
+   "primary": "#8C0051",
+   "secondary": "#0171BC",
+   "accent": "#FFFFFF",
+   "participacoes": [
+    41.1,
+    14.1,
+    7.1
+   ]
+  },
+  {
+   "nome": "Clube Atlético Linense",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-linense-sp",
+   "primary": "#D30B10",
+   "secondary": "#E2E0E0",
+   "accent": null,
+   "participacoes": [
+    48.8,
+    20
+   ]
+  },
+  {
+   "nome": "Clube Esportivo Sete de Setembro",
+   "uf": "MS",
+   "publicId": "torcida/catalogo/escudos/clube-esportivo-sete-de-setembro-ms",
+   "primary": "#E7EF1F",
+   "secondary": "#098B40",
+   "accent": "#DCDCDC",
+   "participacoes": [
+    36.2,
+    15.6,
+    5.5
+   ]
+  },
+  {
+   "nome": "Comercial-SP",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/comercial-sp-sp",
+   "primary": "#F8F5F5",
+   "secondary": "#0C0B0B",
+   "accent": "#D1151D",
+   "participacoes": [
+    31.1,
+    16.6,
+    15.3
+   ]
+  },
+  {
+   "nome": "Confiança",
+   "uf": "SE",
+   "publicId": "torcida/catalogo/escudos/confianca-se-2",
+   "primary": "#FEFDFC",
+   "secondary": "#005292",
+   "accent": null,
+   "participacoes": [
+    42.9,
+    29.6
+   ]
+  },
+  {
+   "nome": "Duque de Caxias",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/duque-de-caxias-rj",
+   "primary": "#37458B",
+   "secondary": "#EF9623",
+   "accent": "#C2C6DB",
+   "participacoes": [
+    32.7,
+    12.4,
+    8
+   ]
+  },
+  {
+   "nome": "Esporte Clube Noroeste",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-noroeste-sp",
+   "primary": "#FCF5F4",
+   "secondary": "#D22820",
+   "accent": "#D67873",
+   "participacoes": [
+    50.7,
+    12.6,
+    12.5
+   ]
+  },
+  {
+   "nome": "Esporte Clube Ypiranga",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-ypiranga-ba",
+   "primary": "#20A366",
+   "secondary": "#C9E6D4",
+   "accent": "#64BE93",
+   "participacoes": [
+    28.5,
+    25,
+    11.9
+   ]
+  },
+  {
+   "nome": "Estrela do Norte",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/estrela-do-norte-es",
+   "primary": "#252223",
+   "secondary": "#EBEBEA",
+   "accent": "#C5904F",
+   "participacoes": [
+    21.7,
+    11.8,
+    6.3
+   ]
+  },
+  {
+   "nome": "Fluminense de Feira",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/fluminense-de-feira-ba",
+   "primary": "#942C30",
+   "secondary": "#F1E5E6",
+   "accent": "#015429",
+   "participacoes": [
+    16.5,
+    15.5,
+    14.4
+   ]
+  },
+  {
+   "nome": "Friburguense Atlético Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/friburguense-rj",
+   "primary": "#413669",
+   "secondary": "#FDFAFA",
+   "accent": "#D6D4DF",
+   "participacoes": [
+    37,
+    16.5,
+    8.6
+   ]
+  },
+  {
+   "nome": "Guarani Esporte Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/guarani-esporte-clube-mg",
+   "primary": "#FFFFFE",
+   "secondary": "#07863B",
+   "accent": "#75BC93",
+   "participacoes": [
+    70.7,
+    12.6,
+    6.7
+   ]
+  },
+  {
+   "nome": "Ipanema Atletico clube",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/ipanema-atletico-clube-al",
+   "primary": "#EFE82D",
+   "secondary": "#01CA5E",
+   "accent": "#00883F",
+   "participacoes": [
+    33.7,
+    17.1,
+    11.8
+   ]
+  },
+  {
+   "nome": "Itabuna",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/itabuna-ba",
+   "primary": "#016AB3",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    24.3,
+    19.2
+   ]
+  },
+  {
+   "nome": "Itapajé Futebol Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/itapaje-futebol-clube-ce",
+   "primary": "#060461",
+   "secondary": "#F7F5F0",
+   "accent": "#39100B",
+   "participacoes": [
+    31.7,
+    24.6,
+    11.5
+   ]
+  },
+  {
+   "nome": "Ituano Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/ituano-futebol-clube-sp",
+   "primary": "#050505",
+   "secondary": "#E1041A",
+   "accent": "#F1F1F1",
+   "participacoes": [
+    23.3,
+    9.2,
+    7.8
+   ]
+  },
+  {
+   "nome": "Jabaquara Atlético clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/jabaquara-atletico-clube-sp",
+   "primary": "#D92417",
+   "secondary": "#F6EA36",
+   "accent": "#000000",
+   "participacoes": [
+    17.7,
+    9,
+    4.5
+   ]
+  },
+  {
+   "nome": "Joinville",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/joinville-sc",
+   "primary": "#F4F1F1",
+   "secondary": "#181110",
+   "accent": "#CB0303",
+   "participacoes": [
+    20.3,
+    15.2,
+    6.6
+   ]
+  },
+  {
+   "nome": "Linhares Futebol Clube",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/linhares-futebol-clube-es",
+   "primary": "#0C76BC",
+   "secondary": "#55BB67",
+   "accent": "#35346F",
+   "participacoes": [
+    16.7,
+    9.3,
+    8.9
+   ]
+  },
+  {
+   "nome": "Madureira",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/madureira-rj",
+   "primary": "#13017B",
+   "secondary": "#B30100",
+   "accent": "#FADF16",
+   "participacoes": [
+    27.5,
+    18.2,
+    16.6
+   ]
+  },
+  {
+   "nome": "Maracanã Esporte Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/maracana-esporte-clube-ce",
+   "primary": "#272071",
+   "secondary": "#FFFFFF",
+   "accent": "#0193CE",
+   "participacoes": [
+    15.5,
+    11.7,
+    10
+   ]
+  },
+  {
+   "nome": "Mixto",
+   "uf": "MT",
+   "publicId": "torcida/catalogo/escudos/mixto-mt",
+   "primary": "#050505",
+   "secondary": "#F2F2F2",
+   "accent": null,
+   "participacoes": [
+    17.5,
+    11.4
+   ]
+  },
+  {
+   "nome": "Nacional-AM",
+   "uf": "AM",
+   "publicId": "torcida/catalogo/escudos/nacional-am-am",
+   "primary": "#080808",
+   "secondary": "#F7F7F7",
+   "accent": "#EC0A10",
+   "participacoes": [
+    34.9,
+    20.7,
+    12.1
+   ]
+  },
+  {
+   "nome": "Novo Hamburgo",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/novo-hamburgo-rs",
+   "primary": "#0596DA",
+   "secondary": "#FEFEFE",
+   "accent": "#77C5EA",
+   "participacoes": [
+    27.1,
+    26.1,
+    6.3
+   ]
+  },
+  {
+   "nome": "Palmas Futebol e Regatas",
+   "uf": "TO",
+   "publicId": "torcida/catalogo/escudos/palmas-futebol-e-regatas-to",
+   "primary": "#E6960F",
+   "secondary": "#07306B",
+   "accent": "#E5E4E4",
+   "participacoes": [
+    15.9,
+    10.3,
+    7.2
+   ]
+  },
+  {
+   "nome": "Parnahyba Sport Club",
+   "uf": "PI",
+   "publicId": "torcida/catalogo/escudos/parnahyba-sport-club-pi",
+   "primary": "#13245A",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    29.2,
+    22.6
+   ]
+  },
+  {
+   "nome": "Paulista Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/paulista-futebol-clube-sp",
+   "primary": "#0D0D0D",
+   "secondary": "#F5F5F5",
+   "accent": "#7D7D7D",
+   "participacoes": [
+    43.8,
+    28.5,
+    7.3
+   ]
+  },
+  {
+   "nome": "Ponte Preta",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/ponte-preta-sp",
+   "primary": "#040404",
+   "secondary": "#FAFAFA",
+   "accent": null,
+   "participacoes": [
+    38.4,
+    30.2
+   ]
+  },
+  {
+   "nome": "Quixadá Futebol Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/quixada-futebol-clube-ce",
+   "primary": "#424A9B",
+   "secondary": "#09A34F",
+   "accent": "#FAEB15",
+   "participacoes": [
+    26.5,
+    12.7,
+    12.1
+   ]
+  },
+  {
+   "nome": "Rio Branco Atlético Clube",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/rio-branco-atletico-clube-es",
+   "primary": "#010101",
+   "secondary": "#E6E6E6",
+   "accent": null,
+   "participacoes": [
+    49.2,
+    22.4
+   ]
+  },
+  {
+   "nome": "River Atlético Clube",
+   "uf": "PI",
+   "publicId": "torcida/catalogo/escudos/river-atletico-clube-pi",
+   "primary": "#FEFEFE",
+   "secondary": "#1F1A17",
+   "accent": "#CE271F",
+   "participacoes": [
+    28.8,
+    22.9,
+    9.6
+   ]
+  },
+  {
+   "nome": "São Bento",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-bento-sp",
+   "primary": "#FEFEFE",
+   "secondary": "#6799C7",
+   "accent": "#085EA6",
+   "participacoes": [
+    51.1,
+    13.9,
+    12.6
+   ]
+  },
+  {
+   "nome": "São Bernardo Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-bernardo-futebol-clube-sp",
+   "primary": "#060604",
+   "secondary": "#FAE60F",
+   "accent": "#FDFCFD",
+   "participacoes": [
+    34.5,
+    24.6,
+    6.1
+   ]
+  },
+  {
+   "nome": "São Raimundo-PA",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/sao-raimundo-pa-pa",
+   "primary": "#173488",
+   "secondary": "#DADEEB",
+   "accent": "#000000",
+   "participacoes": [
+    26.9,
+    18.6,
+    10.5
+   ]
+  },
+  {
+   "nome": "Tupi",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/tupi-mg",
+   "primary": "#EBEBEB",
+   "secondary": "#2C2829",
+   "accent": "#060102",
+   "participacoes": [
+    22.1,
+    15.9,
+    3.9
+   ]
+  },
+  {
+   "nome": "União Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/uniao-futebol-clube-sp",
+   "primary": "#FDFAFA",
+   "secondary": "#153681",
+   "accent": "#D9251D",
+   "participacoes": [
+    48.3,
+    33,
+    12.7
+   ]
+  },
+  {
+   "nome": "União Recreativa dos Trabalhadores",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/uniao-recreativa-dos-trabalhadores-mg",
+   "primary": "#E3E3E3",
+   "secondary": "#0A0C6B",
+   "accent": "#2E318E",
+   "participacoes": [
+    36.1,
+    26.8,
+    10.5
+   ]
+  },
+  {
+   "nome": "Villa Nova Atlético Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/villa-nova-atletico-clube-mg",
+   "primary": "#C10101",
+   "secondary": "#E3E2E2",
+   "accent": null,
+   "participacoes": [
+    42.9,
+    29
+   ]
+  },
+  {
+   "nome": "América-AM",
+   "uf": "AM",
+   "publicId": "torcida/catalogo/escudos/america-am-am",
+   "primary": "#DA232A",
+   "secondary": "#FCF0F0",
+   "accent": "#E77276",
+   "participacoes": [
+    31.7,
+    29.7,
+    20.4
+   ]
+  },
+  {
+   "nome": "Anápolis FC",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/anapolis-fc-go-2",
+   "primary": "#FEFEFE",
+   "secondary": "#010101",
+   "accent": "#D82229",
+   "participacoes": [
+    29.6,
+    26.9,
+    12.3
+   ]
+  },
+  {
+   "nome": "Aracati Esporte Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/aracati-esporte-clube-ce",
+   "primary": "#D8271B",
+   "secondary": "#F7B908",
+   "accent": "#D67671",
+   "participacoes": [
+    32.9,
+    28.4,
+    10
+   ]
+  },
+  {
+   "nome": "Araguaína Futebol e Regatas",
+   "uf": "TO",
+   "publicId": "torcida/catalogo/escudos/araguaina-futebol-e-regatas-to",
+   "primary": "#FEFEFE",
+   "secondary": "#0084D9",
+   "accent": "#090149",
+   "participacoes": [
+    23.1,
+    10.4,
+    9.2
+   ]
+  },
+  {
+   "nome": "Araxá Esporte Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/araxa-esporte-clube-mg",
+   "primary": "#090909",
+   "secondary": "#F6F6F6",
+   "accent": "#767676",
+   "participacoes": [
+    27.8,
+    24.1,
+    4
+   ]
+  },
+  {
+   "nome": "Associação Atlética Coruripe",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/associacao-atletica-coruripe-al",
+   "primary": "#0C6904",
+   "secondary": "#045594",
+   "accent": "#EDEDED",
+   "participacoes": [
+    21.7,
+    20,
+    17.7
+   ]
+  },
+  {
+   "nome": "Associação Atlética Francana",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/associacao-atletica-francana-sp",
+   "primary": "#FFFFFF",
+   "secondary": "#06902E",
+   "accent": null,
+   "participacoes": [
+    22.8,
+    17.2
+   ]
+  },
+  {
+   "nome": "Associação Desportiva Cabense",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/associacao-desportiva-cabense-pe",
+   "primary": "#FDFCFC",
+   "secondary": "#03B2FD",
+   "accent": "#8BD5F4",
+   "participacoes": [
+    33.3,
+    33.1,
+    3.1
+   ]
+  },
+  {
+   "nome": "Associação Desportiva São Benedito",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/associacao-desportiva-sao-benedito-ce",
+   "primary": "#138FBD",
+   "secondary": "#D3D5E6",
+   "accent": "#FEFDFD",
+   "participacoes": [
+    25,
+    21.5,
+    8.2
+   ]
+  },
+  {
+   "nome": "Associação Esportiva Araçatuba",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/associacao-esportiva-aracatuba-sp",
+   "primary": "#FB5203",
+   "secondary": "#020202",
+   "accent": null,
+   "participacoes": [
+    11.7,
+    6.2
+   ]
+  },
+  {
+   "nome": "Associação Sportiva Sociedade Unida",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/associacao-sportiva-sociedade-unida-rn",
+   "primary": "#046336",
+   "secondary": "#F9F8F8",
+   "accent": "#FBF305",
+   "participacoes": [
+    24.8,
+    23.8,
+    8
+   ]
+  },
+  {
+   "nome": "Associação Trairiense de Futebol",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/associacao-trairiense-de-futebol-ce",
+   "primary": "#9ECD51",
+   "secondary": "#D7D3E7",
+   "accent": "#FDFDFC",
+   "participacoes": [
+    27.5,
+    21.1,
+    9.8
+   ]
+  },
+  {
+   "nome": "Atlético Clube Corintians",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/atletico-clube-corintians-rn",
+   "primary": "#0B0B0B",
+   "secondary": "#E50000",
+   "accent": "#EDEDED",
+   "participacoes": [
+    25.5,
+    18.4,
+    16.1
+   ]
+  },
+  {
+   "nome": "Atlético Clube de Paranavaí",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/atletico-clube-de-paranavai-pr",
+   "primary": "#B7112C",
+   "secondary": null,
+   "accent": null,
+   "participacoes": [
+    40.1
+   ]
+  },
+  {
+   "nome": "Atlético Clube Goianiense",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/atletico-go-go-2",
+   "primary": "#FDFDFD",
+   "secondary": "#010101",
+   "accent": "#FE0101",
+   "participacoes": [
+    28.3,
+    12.6,
+    10.1
+   ]
+  },
+  {
+   "nome": "Barretos Esporte Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/barretos-esporte-clube-sp",
+   "primary": "#028F42",
+   "secondary": "#BC241A",
+   "accent": "#BFE0CC",
+   "participacoes": [
+    30,
+    17.9,
+    5.8
+   ]
+  },
+  {
+   "nome": "Batatais Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/batatais-futebol-clube-sp",
+   "primary": "#FDF6F7",
+   "secondary": "#DE234E",
+   "accent": "#E9708C",
+   "participacoes": [
+    37.5,
+    13.4,
+    12.2
+   ]
+  },
+  {
+   "nome": "Boavista Sport Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/boavista-rj",
+   "primary": "#FFFFFF",
+   "secondary": "#3B9235",
+   "accent": "#D6E8D5",
+   "participacoes": [
+    31.5,
+    23.9,
+    9
+   ]
+  },
+  {
+   "nome": "Bonsucesso Futebol Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/bonsucesso-futebol-clube-rj",
+   "primary": "#0E65AD",
+   "secondary": "#DA372B",
+   "accent": "#964556",
+   "participacoes": [
+    34.4,
+    21.8,
+    3.8
+   ]
+  },
+  {
+   "nome": "Brasiliense",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/brasiliense-df",
+   "primary": "#F4D701",
+   "secondary": "#F7F7F7",
+   "accent": "#2D2E30",
+   "participacoes": [
+    39.7,
+    14.9,
+    9.2
+   ]
+  },
+  {
+   "nome": "Brusque",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/brusque-sc-2",
+   "primary": "#FCE104",
+   "secondary": "#000000",
+   "accent": "#E43033",
+   "participacoes": [
+    30,
+    9.8,
+    8.3
+   ]
+  },
+  {
+   "nome": "Cametá Sport Club",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/cameta-pa",
+   "primary": "#FDFBFB",
+   "secondary": "#C5C2D7",
+   "accent": "#120A5A",
+   "participacoes": [
+    13.5,
+    10.1,
+    8.5
+   ]
+  },
+  {
+   "nome": "Campinas Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/campinas-futebol-clube-sp",
+   "primary": "#F8F7F6",
+   "secondary": "#06067F",
+   "accent": "#D6CB76",
+   "participacoes": [
+    51.3,
+    22.2,
+    9.8
+   ]
+  },
+  {
+   "nome": "Campo Grande Atlético Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/campo-grande-atletico-clube-rj",
+   "primary": "#FDFDFD",
+   "secondary": "#040404",
+   "accent": null,
+   "participacoes": [
+    51.8,
+    36.6
+   ]
+  },
+  {
+   "nome": "Cascavel Clube Recreativo",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/cascavel-clube-recreativo-pr",
+   "primary": "#004890",
+   "secondary": "#AE293D",
+   "accent": "#969369",
+   "participacoes": [
+    25.1,
+    19.7,
+    13.6
+   ]
+  },
+  {
+   "nome": "Ceilândia EC",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/ceilandia-ec-df",
+   "primary": "#090909",
+   "secondary": "#F2F2F2",
+   "accent": "#7B7B7B",
+   "participacoes": [
+    41,
+    29.5,
+    7.8
+   ]
+  },
+  {
+   "nome": "Ceres Futebol Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/ceres-futebol-clube-rj",
+   "primary": "#FEFEFE",
+   "secondary": "#0792E0",
+   "accent": "#79CBEE",
+   "participacoes": [
+    26.9,
+    25.2,
+    4.4
+   ]
+  },
+  {
+   "nome": "Clube Atlético Colatinense",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-colatinense-es",
+   "primary": "#F5F5F4",
+   "secondary": "#2B2826",
+   "accent": "#7F7C7A",
+   "participacoes": [
+    65.3,
+    19.5,
+    11.4
+   ]
+  },
+  {
+   "nome": "Clube Atlético do Porto",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-do-porto-pe",
+   "primary": "#FAFAFA",
+   "secondary": "#182145",
+   "accent": "#0D0D0D",
+   "participacoes": [
+    50.1,
+    14.1,
+    9.3
+   ]
+  },
+  {
+   "nome": "Clube Atlético Lemense",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-lemense-sp",
+   "primary": "#FFFFFF",
+   "secondary": "#033589",
+   "accent": "#C9C7DE",
+   "participacoes": [
+    47.3,
+    24,
+    13.8
+   ]
+  },
+  {
+   "nome": "Clube Atlético Penapolense",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-penapolense-sp",
+   "primary": "#DAD9D9",
+   "secondary": "#D10B0E",
+   "accent": "#060865",
+   "participacoes": [
+    29.2,
+    28.5,
+    5.1
+   ]
+  },
+  {
+   "nome": "Clube Atlético Taboão da Serra",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-taboao-da-serra-sp",
+   "primary": "#CB0C0B",
+   "secondary": "#171717",
+   "accent": "#D95150",
+   "participacoes": [
+    26,
+    10.4,
+    4.7
+   ]
+  },
+  {
+   "nome": "Clube Atlético Taquaritinga",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-taquaritinga-sp",
+   "primary": "#0C0D0A",
+   "secondary": "#079030",
+   "accent": "#DF0113",
+   "participacoes": [
+    18.8,
+    9.2,
+    8.7
+   ]
+  },
+  {
+   "nome": "Clube Atlético Tricordiano",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-tricordiano-mg",
+   "primary": "#7A0404",
+   "secondary": "#E3DEDE",
+   "accent": null,
+   "participacoes": [
+    54.7,
+    15
+   ]
+  },
+  {
+   "nome": "Clube Atlético Votuporanguense",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/clube-atletico-votuporanguense-sp",
+   "primary": "#020202",
+   "secondary": "#FCFCFC",
+   "accent": null,
+   "participacoes": [
+    26.9,
+    20.3
+   ]
+  },
+  {
+   "nome": "Clube Esportivo de Bento Gonçalves",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/clube-esportivo-de-bento-goncalves-rs",
+   "primary": "#EAEAEA",
+   "secondary": "#032A80",
+   "accent": null,
+   "participacoes": [
+    38.4,
+    27.8
+   ]
+  },
+  {
+   "nome": "Clube Esportivo Naviraiense",
+   "uf": "MS",
+   "publicId": "torcida/catalogo/escudos/clube-esportivo-naviraiense-ms",
+   "primary": "#FEFDFD",
+   "secondary": "#FE9600",
+   "accent": "#020202",
+   "participacoes": [
+    25.9,
+    11.9,
+    11
+   ]
+  },
+  {
+   "nome": "Clube Recreativo e Atlético Catalano",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/clube-recreativo-e-atletico-catalano-go",
+   "primary": "#FFFFFF",
+   "secondary": "#1799D5",
+   "accent": null,
+   "participacoes": [
+    22.5,
+    17.4
+   ]
+  },
+  {
+   "nome": "Colo Colo Futebol e Regatas",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/colo-colo-futebol-e-regatas-ba",
+   "primary": "#F4F5F6",
+   "secondary": "#01409F",
+   "accent": "#FFC202",
+   "participacoes": [
+    28.7,
+    20,
+    4.6
+   ]
+  },
+  {
+   "nome": "Corumbaense Futebol Clube",
+   "uf": "MS",
+   "publicId": "torcida/catalogo/escudos/corumbaense-futebol-clube-ms",
+   "primary": "#F9F9F9",
+   "secondary": "#121212",
+   "accent": "#797979",
+   "participacoes": [
+    31.5,
+    23.4,
+    4.1
+   ]
+  },
+  {
+   "nome": "Cotia Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/cotia-futebol-clube-sp",
+   "primary": "#FCFCFB",
+   "secondary": "#174B8F",
+   "accent": "#EDC21C",
+   "participacoes": [
+    45,
+    27.6,
+    6.7
+   ]
+  },
+  {
+   "nome": "Crato",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/crato-ce",
+   "primary": "#2122A0",
+   "secondary": "#FEFBFB",
+   "accent": "#28613B",
+   "participacoes": [
+    32.4,
+    24.8,
+    11
+   ]
+  },
+  {
+   "nome": "Criciúma",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/criciuma-sc-2",
+   "primary": "#FCC500",
+   "secondary": "#000000",
+   "accent": "#FFFFFF",
+   "participacoes": [
+    24,
+    10.4,
+    7.3
+   ]
+  },
+  {
+   "nome": "Cruzeiro Esporte Clube",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/cruzeiro-esporte-clube-pb",
+   "primary": "#032F94",
+   "secondary": "#FDFDFD",
+   "accent": "#010101",
+   "participacoes": [
+    44.5,
+    26.8,
+    10.2
+   ]
+  },
+  {
+   "nome": "Cuiabá",
+   "uf": "MT",
+   "publicId": "torcida/catalogo/escudos/cuiaba-mt-2",
+   "primary": "#066534",
+   "secondary": "#FDE718",
+   "accent": null,
+   "participacoes": [
+    38,
+    17.9
+   ]
+  },
+  {
+   "nome": "Esporte Clube Água Santa",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-agua-santa-sp",
+   "primary": "#15111D",
+   "secondary": "#E8AB20",
+   "accent": "#FDFCFA",
+   "participacoes": [
+    22.6,
+    19.3,
+    17.5
+   ]
+  },
+  {
+   "nome": "Esporte Clube Águia Negra",
+   "uf": "MS",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-aguia-negra-ms",
+   "primary": "#F4F3F3",
+   "secondary": "#202223",
+   "accent": "#DA2C24",
+   "participacoes": [
+    29.4,
+    22.2,
+    6.2
+   ]
+  },
+  {
+   "nome": "Esporte Clube Internacional de Santa Maria",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-internacional-de-santa-maria-rs",
+   "primary": "#FDFBFB",
+   "secondary": "#9B0202",
+   "accent": null,
+   "participacoes": [
+    45.4,
+    27.7
+   ]
+  },
+  {
+   "nome": "Esporte Clube Limoeiro",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-limoeiro-ce",
+   "primary": "#233C7B",
+   "secondary": "#FFFFFF",
+   "accent": "#C9CFDF",
+   "participacoes": [
+    35.3,
+    22,
+    3.4
+   ]
+  },
+  {
+   "nome": "Esporte Clube Mamoré",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-mamore-mg",
+   "primary": "#DFDFDF",
+   "secondary": "#004302",
+   "accent": "#2D7E3B",
+   "participacoes": [
+    36.5,
+    34,
+    6.1
+   ]
+  },
+  {
+   "nome": "Esporte Clube Rio Verde",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-rio-verde-go",
+   "primary": "#F6F6F6",
+   "secondary": "#014410",
+   "accent": null,
+   "participacoes": [
+    21.5,
+    18.1
+   ]
+  },
+  {
+   "nome": "Esporte Clube XV de Novembro",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-xv-de-novembro-sp",
+   "primary": "#FEFEFE",
+   "secondary": "#010101",
+   "accent": null,
+   "participacoes": [
+    31,
+    22.6
+   ]
+  },
+  {
+   "nome": "Esporte Clube XV de Piracicaba",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/esporte-clube-xv-de-piracicaba-sp",
+   "primary": "#0B0B0B",
+   "secondary": "#DADADA",
+   "accent": "#838383",
+   "participacoes": [
+    39.4,
+    36.8,
+    8.4
+   ]
+  },
+  {
+   "nome": "Esporte de Patos",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/esporte-de-patos-pb",
+   "primary": "#FFFDFD",
+   "secondary": "#EA3238",
+   "accent": null,
+   "participacoes": [
+    35.8,
+    24.3
+   ]
+  },
+  {
+   "nome": "Estanciano Esporte Clube",
+   "uf": "SE",
+   "publicId": "torcida/catalogo/escudos/estanciano-esporte-clube-se",
+   "primary": "#00852B",
+   "secondary": "#E4DB00",
+   "accent": "#F0F0F0",
+   "participacoes": [
+    32.3,
+    29.1,
+    4.9
+   ]
+  },
+  {
+   "nome": "Ferroviário Esporte Clube do Cabo",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/ferroviario-esporte-clube-do-cabo-pe",
+   "primary": "#FEFCFC",
+   "secondary": "#DA2119",
+   "accent": "#00923E",
+   "participacoes": [
+    37.2,
+    18.8,
+    13.8
+   ]
+  },
+  {
+   "nome": "Formiga Esporte Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/formiga-esporte-clube-mg",
+   "primary": "#FFFFFF",
+   "secondary": "#0E0EFC",
+   "accent": "#7C7CF5",
+   "participacoes": [
+    77.5,
+    12.7,
+    9.8
+   ]
+  },
+  {
+   "nome": "Francisco Beltrão Futebol Clube",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/francisco-beltrao-futebol-clube-pr",
+   "primary": "#FFFFFF",
+   "secondary": "#144284",
+   "accent": "#87A6D0",
+   "participacoes": [
+    45.5,
+    31.9,
+    8.4
+   ]
+  },
+  {
+   "nome": "Funorte Esporte Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/funorte-esporte-clube-mg",
+   "primary": "#FEFDFC",
+   "secondary": "#25116C",
+   "accent": "#D8241B",
+   "participacoes": [
+    39.2,
+    15.7,
+    15.6
+   ]
+  },
+  {
+   "nome": "Goianésia Esporte Clube",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/goianesia-esporte-clube-go",
+   "primary": "#F9FBF8",
+   "secondary": "#617B4A",
+   "accent": "#E4C7C9",
+   "participacoes": [
+    57.5,
+    12.4,
+    11.1
+   ]
+  },
+  {
+   "nome": "Goiás",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/goias-go",
+   "primary": "#01481E",
+   "secondary": "#FDFDFD",
+   "accent": "#D1DED6",
+   "participacoes": [
+    45.9,
+    14.3,
+    10.8
+   ]
+  },
+  {
+   "nome": "Gremio Atlético Farroupilha",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/gremio-atletico-farroupilha-rs",
+   "primary": "#F9F7F6",
+   "secondary": "#252324",
+   "accent": "#888280",
+   "participacoes": [
+    61.2,
+    17.1,
+    6.8
+   ]
+  },
+  {
+   "nome": "Grêmio Catanduvense de Futebol",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/gremio-catanduvense-de-futebol-sp",
+   "primary": "#FEFEFE",
+   "secondary": "#343061",
+   "accent": "#FDF112",
+   "participacoes": [
+    46,
+    20.8,
+    3.4
+   ]
+  },
+  {
+   "nome": "Grêmio Novorizontino",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/gremio-novorizontino-sp",
+   "primary": "#040404",
+   "secondary": "#F7F7F7",
+   "accent": "#F6E32F",
+   "participacoes": [
+    34.2,
+    18.1,
+    16.4
+   ]
+  },
+  {
+   "nome": "Hercílio Luz",
+   "uf": "SC",
+   "publicId": "torcida/catalogo/escudos/hercilio-luz-sc",
+   "primary": "#BC1C17",
+   "secondary": "#F9EDED",
+   "accent": "#D26966",
+   "participacoes": [
+    32.2,
+    32,
+    16.6
+   ]
+  },
+  {
+   "nome": "Horizonte Futebol Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/horizonte-futebol-clube-ce",
+   "primary": "#393B84",
+   "secondary": "#E4DD11",
+   "accent": "#C3C3D3",
+   "participacoes": [
+    22.9,
+    15.1,
+    8.1
+   ]
+  },
+  {
+   "nome": "Icasa",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/icasa-ce",
+   "primary": "#046633",
+   "secondary": "#FEFEFE",
+   "accent": "#CEE1D7",
+   "participacoes": [
+    35.1,
+    17.3,
+    8.4
+   ]
+  },
+  {
+   "nome": "Independente Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/independente-futebol-clube-sp",
+   "primary": "#F2F1F1",
+   "secondary": "#2F2B29",
+   "accent": "#7C7A78",
+   "participacoes": [
+    33.4,
+    26,
+    7.1
+   ]
+  },
+  {
+   "nome": "Inhumas Futebol Clube",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/inhumas-futebol-clube-go",
+   "primary": "#890604",
+   "secondary": "#EBE9E9",
+   "accent": null,
+   "participacoes": [
+    40,
+    27.4
+   ]
+  },
+  {
+   "nome": "Internacional Esporte Clube",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/internacional-esporte-clube-pr",
+   "primary": "#F4F3F3",
+   "secondary": "#2A2625",
+   "accent": "#83807F",
+   "participacoes": [
+    61.1,
+    24.4,
+    10.7
+   ]
+  },
+  {
+   "nome": "Ipatinga",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/ipatinga-mg",
+   "primary": "#EEEDED",
+   "secondary": "#D9050F",
+   "accent": "#017F2B",
+   "participacoes": [
+    20.1,
+    8.5,
+    5.2
+   ]
+  },
+  {
+   "nome": "Iraty Sport Club",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/iraty-sport-club-pr",
+   "primary": "#F8FCFD",
+   "secondary": "#01416F",
+   "accent": "#0597D3",
+   "participacoes": [
+    43.6,
+    22.8,
+    8.4
+   ]
+  },
+  {
+   "nome": "Itaperuna Esporte Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/itaperuna-esporte-clube-rj",
+   "primary": "#EBE6E2",
+   "secondary": "#9E8E69",
+   "accent": "#23201E",
+   "participacoes": [
+    35.5,
+    25,
+    22.5
+   ]
+  },
+  {
+   "nome": "Itapipoca Esporte Clube",
+   "uf": "CE",
+   "publicId": "torcida/catalogo/escudos/itapipoca-esporte-clube-ce",
+   "primary": "#FCFDF6",
+   "secondary": "#655CCA",
+   "accent": "#382DC8",
+   "participacoes": [
+    35.1,
+    10.8,
+    9.5
+   ]
+  },
+  {
+   "nome": "Itumbiara",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/itumbiara-go",
+   "primary": "#08458B",
+   "secondary": "#FC0817",
+   "accent": "#129746",
+   "participacoes": [
+    12.9,
+    11.3,
+    5.8
+   ]
+  },
+  {
+   "nome": "Jaboticabal Atlético",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/jaboticabal-atletico-sp",
+   "primary": "#FAFAFA",
+   "secondary": "#1C1C1C",
+   "accent": "#7B7B7B",
+   "participacoes": [
+    72.2,
+    18.9,
+    5.7
+   ]
+  },
+  {
+   "nome": "Ji-Paraná Futebol Clube",
+   "uf": "RO",
+   "publicId": "torcida/catalogo/escudos/ji-parana-futebol-clube-ro",
+   "primary": "#FFFFFF",
+   "secondary": "#3D7BB6",
+   "accent": null,
+   "participacoes": [
+    42.6,
+    23
+   ]
+  },
+  {
+   "nome": "Juventude",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/juventude-rs",
+   "primary": "#348631",
+   "secondary": "#D3E5D3",
+   "accent": null,
+   "participacoes": [
+    32.2,
+    22
+   ]
+  },
+  {
+   "nome": "Juventude Esporte Clube",
+   "uf": "TO",
+   "publicId": "torcida/catalogo/escudos/juventude-esporte-clube-to",
+   "primary": "#FEEBE9",
+   "secondary": "#EE8687",
+   "accent": "#E31919",
+   "participacoes": [
+    50.3,
+    36.9,
+    9.4
+   ]
+  },
+  {
+   "nome": "Lagarto Futebol Clube",
+   "uf": "SE",
+   "publicId": "torcida/catalogo/escudos/lagarto-futebol-clube-se",
+   "primary": "#FF0504",
+   "secondary": "#FCFEFE",
+   "accent": "#036302",
+   "participacoes": [
+    37.1,
+    33.6,
+    9.2
+   ]
+  },
+  {
+   "nome": "Londrina",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/londrina-pr",
+   "primary": "#FEFEFE",
+   "secondary": "#059AFF",
+   "accent": "#016734",
+   "participacoes": [
+    30,
+    10.5,
+    3.1
+   ]
+  },
+  {
+   "nome": "Macaé",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/macae-rj",
+   "primary": "#FCFCFC",
+   "secondary": "#F9D924",
+   "accent": "#D0D0E4",
+   "participacoes": [
+    40.1,
+    8.8,
+    8.4
+   ]
+  },
+  {
+   "nome": "Maranhão Atlético Clube",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/maranhao-ac-ma",
+   "primary": "#DA331C",
+   "secondary": "#F3F2F2",
+   "accent": "#234776",
+   "participacoes": [
+    18.4,
+    16.7,
+    14.4
+   ]
+  },
+  {
+   "nome": "Maringá",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/maringa-pr",
+   "primary": "#000000",
+   "secondary": null,
+   "accent": null,
+   "participacoes": [
+    34.4
+   ]
+  },
+  {
+   "nome": "Mirassol Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/mirassol-futebol-clube-sp",
+   "primary": "#FDED00",
+   "secondary": "#01712D",
+   "accent": "#C1CF0B",
+   "participacoes": [
+    30.8,
+    26.8,
+    6.2
+   ]
+  },
+  {
+   "nome": "Mogi Mirim Esporte Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/mogi-mirim-esporte-clube-sp",
+   "primary": "#FCF3F2",
+   "secondary": "#DB271F",
+   "accent": "#E87671",
+   "participacoes": [
+    30.7,
+    28,
+    11.9
+   ]
+  },
+  {
+   "nome": "Morrinhos Futebol Clube",
+   "uf": "GO",
+   "publicId": "torcida/catalogo/escudos/morrinhos-futebol-clube-go",
+   "primary": "#EAE8E8",
+   "secondary": "#C41618",
+   "accent": "#2B903D",
+   "participacoes": [
+    31.6,
+    27.5,
+    14.3
+   ]
+  },
+  {
+   "nome": "Nacional Atlético Clube",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/nacional-atletico-clube-pb",
+   "primary": "#FFFFFF",
+   "secondary": "#206633",
+   "accent": null,
+   "participacoes": [
+    38,
+    23.3
+   ]
+  },
+  {
+   "nome": "Nova Iguaçu",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/nova-iguacu-rj",
+   "primary": "#1E1815",
+   "secondary": "#EAE9E8",
+   "accent": "#E4851A",
+   "participacoes": [
+    19.6,
+    14.3,
+    11.1
+   ]
+  },
+  {
+   "nome": "Olaria Atlético Clube",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/olaria-rj",
+   "primary": "#0C1A6F",
+   "secondary": "#CFD2E2",
+   "accent": "#414C8E",
+   "participacoes": [
+    36.1,
+    13,
+    8.2
+   ]
+  },
+  {
+   "nome": "Olinda Futebol Clube",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/olinda-futebol-clube-pe",
+   "primary": "#0878BB",
+   "secondary": "#DF7416",
+   "accent": "#96754D",
+   "participacoes": [
+    32.6,
+    13.8,
+    7.6
+   ]
+  },
+  {
+   "nome": "Operário-PR",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/operario-ferroviario-esporte-clube-pr",
+   "primary": "#0F0F0F",
+   "secondary": "#E6E6E6",
+   "accent": "#828282",
+   "participacoes": [
+    24.4,
+    20,
+    8.1
+   ]
+  },
+  {
+   "nome": "Paraná Clube",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/parana-clube-pr",
+   "primary": "#FFFCFC",
+   "secondary": "#1C4189",
+   "accent": "#E11638",
+   "participacoes": [
+    18.8,
+    18.1,
+    14.5
+   ]
+  },
+  {
+   "nome": "Pesqueira Futebol Clube",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/pesqueira-futebol-clube-pe",
+   "primary": "#E1E1E0",
+   "secondary": "#051B90",
+   "accent": "#AF8A06",
+   "participacoes": [
+    28.1,
+    19.9,
+    9.2
+   ]
+  },
+  {
+   "nome": "Petrolina Social Futebol Clube",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/petrolina-social-futebol-clube-pe",
+   "primary": "#BD231C",
+   "secondary": "#F7F9EE",
+   "accent": "#DBA513",
+   "participacoes": [
+    18.4,
+    7.2,
+    5.7
+   ]
+  },
+  {
+   "nome": "Resende",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/resende-rj",
+   "primary": "#0D0D0D",
+   "secondary": "#F5F5F4",
+   "accent": "#828282",
+   "participacoes": [
+    26.5,
+    23.8,
+    5.1
+   ]
+  },
+  {
+   "nome": "Rio Branco Esporte Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/rio-branco-esporte-clube-sp",
+   "primary": "#F5F4F3",
+   "secondary": "#292624",
+   "accent": "#817E7C",
+   "participacoes": [
+    64.2,
+    20.7,
+    6.1
+   ]
+  },
+  {
+   "nome": "Rio Branco Sport Club",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/rio-branco-sport-club-pr",
+   "primary": "#F1EFEF",
+   "secondary": "#F10303",
+   "accent": null,
+   "participacoes": [
+    38.6,
+    36.7
+   ]
+  },
+  {
+   "nome": "Rio Claro Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/rio-claro-futebol-clube-sp",
+   "primary": "#0B106C",
+   "secondary": "#2C3692",
+   "accent": "#E2E2E2",
+   "participacoes": [
+    42,
+    23.6,
+    17.7
+   ]
+  },
+  {
+   "nome": "Rio Preto Esporte Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/rio-preto-esporte-clube-sp",
+   "primary": "#03913F",
+   "secondary": "#FEFEFE",
+   "accent": "#38A266",
+   "participacoes": [
+    34.3,
+    19.8,
+    3.5
+   ]
+  },
+  {
+   "nome": "Salgueiro Atlético Clube",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/salgueiro-pe",
+   "primary": "#FEFCFC",
+   "secondary": "#004526",
+   "accent": "#DB0605",
+   "participacoes": [
+    14,
+    12.1,
+    6.9
+   ]
+  },
+  {
+   "nome": "São Carlos Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-carlos-futebol-clube-sp",
+   "primary": "#FEFEFD",
+   "secondary": "#1F234B",
+   "accent": "#B0B2C6",
+   "participacoes": [
+    33.5,
+    19.3,
+    4.8
+   ]
+  },
+  {
+   "nome": "São Cristovão Futebol e Regatas",
+   "uf": "RJ",
+   "publicId": "torcida/catalogo/escudos/sao-cristovao-futebol-e-regatas-rj",
+   "primary": "#F4F4F4",
+   "secondary": "#100F0F",
+   "accent": "#E883AE",
+   "participacoes": [
+    34.9,
+    34.2,
+    9.3
+   ]
+  },
+  {
+   "nome": "São José-RS",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/sao-jose-rs-rs",
+   "primary": "#000000",
+   "secondary": "#074BF9",
+   "accent": "#FDEE02",
+   "participacoes": [
+    28.2,
+    19,
+    14.8
+   ]
+  },
+  {
+   "nome": "Sertãozinho Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sertaozinho-futebol-clube-sp",
+   "primary": "#931C1E",
+   "secondary": "#F4E9E8",
+   "accent": "#BD7572",
+   "participacoes": [
+    31.1,
+    13.3,
+    4.4
+   ]
+  },
+  {
+   "nome": "Sobradinho",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/sobradinho-df",
+   "primary": "#030605",
+   "secondary": "#EEBC15",
+   "accent": "#DEDEDE",
+   "participacoes": [
+    37.3,
+    22.2,
+    6.5
+   ]
+  },
+  {
+   "nome": "Social Futebol Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/social-futebol-clube-mg",
+   "primary": "#020202",
+   "secondary": "#FEFEFE",
+   "accent": null,
+   "participacoes": [
+    35.5,
+    31.5
+   ]
+  },
+  {
+   "nome": "Sociedade Atletico Ceilandense",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/sociedade-atletico-ceilandense-df",
+   "primary": "#FFFFFF",
+   "secondary": "#2B6BA2",
+   "accent": "#FF0101",
+   "participacoes": [
+    31.4,
+    16.6,
+    5.4
+   ]
+  },
+  {
+   "nome": "Sociedade Desportiva Serra Futebol Clube",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/sociedade-desportiva-serra-futebol-clube-es",
+   "primary": "#FDFCFC",
+   "secondary": "#020202",
+   "accent": "#FE0303",
+   "participacoes": [
+    21.6,
+    13.5,
+    6.5
+   ]
+  },
+  {
+   "nome": "Sociedade Esportiva Gama",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/sociedade-esportiva-gama-df",
+   "primary": "#0B664B",
+   "secondary": "#ECECEC",
+   "accent": null,
+   "participacoes": [
+    51,
+    36.5
+   ]
+  },
+  {
+   "nome": "Sociedade Esportiva River Plate",
+   "uf": "SE",
+   "publicId": "torcida/catalogo/escudos/sociedade-esportiva-river-plate-se",
+   "primary": "#EEEDED",
+   "secondary": "#868283",
+   "accent": "#1F1C1D",
+   "participacoes": [
+    26,
+    11,
+    8.2
+   ]
+  },
+  {
+   "nome": "Sociedade Esportiva Vila Aurora",
+   "uf": "MT",
+   "publicId": "torcida/catalogo/escudos/sociedade-esportiva-vila-aurora-mt",
+   "primary": "#07143D",
+   "secondary": "#FFFFFF",
+   "accent": "#000000",
+   "participacoes": [
+    32.9,
+    25.1,
+    5
+   ]
+  },
+  {
+   "nome": "Sociedade Esportiva Ypiranga Futebol Clube",
+   "uf": "PE",
+   "publicId": "torcida/catalogo/escudos/sociedade-esportiva-ypiranga-futebol-clube-pe",
+   "primary": "#F8F8F8",
+   "secondary": "#424494",
+   "accent": "#070989",
+   "participacoes": [
+    57.8,
+    13.6,
+    4
+   ]
+  },
+  {
+   "nome": "Sociedade Imperatriz de Desportos",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/sociedade-imperatriz-de-desportos-ma",
+   "primary": "#C20E09",
+   "secondary": "#E0DBDA",
+   "accent": null,
+   "participacoes": [
+    34.2,
+    21.8
+   ]
+  },
+  {
+   "nome": "Sousa",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/sousa-pb",
+   "primary": "#F8F2F2",
+   "secondary": "#097E3D",
+   "accent": "#E5787A",
+   "participacoes": [
+    33.8,
+    9.2,
+    9
+   ]
+  },
+  {
+   "nome": "Sport Clube Corinthians Alagoano",
+   "uf": "AL",
+   "publicId": "torcida/catalogo/escudos/sport-clube-corinthians-alagoano-al",
+   "primary": "#FD140C",
+   "secondary": "#0E0E0E",
+   "accent": "#E9E4E4",
+   "participacoes": [
+    22.2,
+    19,
+    8.8
+   ]
+  },
+  {
+   "nome": "Sport Clube Santa Cruz",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/sport-clube-santa-cruz-rn",
+   "primary": "#039040",
+   "secondary": "#DA2319",
+   "accent": "#FEFCFC",
+   "participacoes": [
+    29,
+    22.2,
+    21
+   ]
+  },
+  {
+   "nome": "Sport Club Genus de Porto Velho",
+   "uf": "RO",
+   "publicId": "torcida/catalogo/escudos/sport-club-genus-de-porto-velho-ro",
+   "primary": "#841B1B",
+   "secondary": "#F7F4F4",
+   "accent": "#F9EE17",
+   "participacoes": [
+    18.6,
+    5.4,
+    3.6
+   ]
+  },
+  {
+   "nome": "Sport Club Juiz de Fora",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/sport-club-juiz-de-fora-mg",
+   "primary": "#FFFFFF",
+   "secondary": "#67C08C",
+   "accent": "#109C4A",
+   "participacoes": [
+    52.6,
+    19,
+    8.9
+   ]
+  },
+  {
+   "nome": "Sport Club São José Ltda",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/sport-club-sao-jose-ltda-pr",
+   "primary": "#F8F7F6",
+   "secondary": "#2A2827",
+   "accent": "#83807E",
+   "participacoes": [
+    72.8,
+    7.8,
+    6.9
+   ]
+  },
+  {
+   "nome": "Sport Club São Paulo",
+   "uf": "RS",
+   "publicId": "torcida/catalogo/escudos/sport-club-sao-paulo-rs",
+   "primary": "#779F75",
+   "secondary": "#BE0148",
+   "accent": "#FFFFFF",
+   "participacoes": [
+    35.5,
+    19.5,
+    12.7
+   ]
+  },
+  {
+   "nome": "Treze",
+   "uf": "PB",
+   "publicId": "torcida/catalogo/escudos/treze-pb",
+   "primary": "#F6F5F5",
+   "secondary": "#2C2B2A",
+   "accent": "#828181",
+   "participacoes": [
+    26.4,
+    13.9,
+    4.7
+   ]
+  },
+  {
+   "nome": "Tuna Luso Brasileira",
+   "uf": "PA",
+   "publicId": "torcida/catalogo/escudos/tuna-luso-brasileira-pa",
+   "primary": "#FFFFFF",
+   "secondary": "#019342",
+   "accent": "#FE0103",
+   "participacoes": [
+    26.6,
+    18.9,
+    7.7
+   ]
+  },
+  {
+   "nome": "Tupí Futebol Clube",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/tupi-futebol-clube-sp",
+   "primary": "#EBEBEB",
+   "secondary": "#2C2829",
+   "accent": "#060102",
+   "participacoes": [
+    22.1,
+    15.9,
+    3.9
+   ]
+  },
+  {
+   "nome": "União",
+   "uf": "MT",
+   "publicId": "torcida/catalogo/escudos/uniao-mt",
+   "primary": "#DE181D",
+   "secondary": "#FDF8F8",
+   "accent": "#E97275",
+   "participacoes": [
+    34.7,
+    15.3,
+    3.6
+   ]
+  },
+  {
+   "nome": "Valeriodoce Esporte Clube",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/valeriodoce-esporte-clube-mg",
+   "primary": "#DA241C",
+   "secondary": "#FFFCFC",
+   "accent": null,
+   "participacoes": [
+    30.3,
+    12.6
+   ]
+  },
+  {
+   "nome": "Vitória-ES",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/vitoria-es-es",
+   "primary": "#012A7B",
+   "secondary": "#FFFFFF",
+   "accent": null,
+   "participacoes": [
+    30.1,
+    14.4
+   ]
+  },
+  {
+   "nome": "Ypiranga Clube",
+   "uf": "AP",
+   "publicId": "torcida/catalogo/escudos/ypiranga-clube-ap",
+   "primary": "#F1B601",
+   "secondary": "#221D1B",
+   "accent": "#8C6B0C",
+   "participacoes": [
+    32.3,
+    21.2,
+    4.2
+   ]
+  },
+  {
+   "nome": "4 de Julho",
+   "uf": "PI",
+   "publicId": "torcida/catalogo/escudos/4-de-julho-pi",
+   "primary": "#FEFAFB",
+   "secondary": "#EE0620",
+   "accent": "#F58185",
+   "participacoes": [
+    37.4,
+    35.4,
+    4
+   ]
+  },
+  {
+   "nome": "Cascavel",
+   "uf": "PR",
+   "publicId": "torcida/catalogo/escudos/cascavel-pr",
+   "primary": "#D8DAE0",
+   "secondary": "#2A2A2D",
+   "accent": "#D8CE16",
+   "participacoes": [
+    29.9,
+    15.8,
+    15.2
+   ]
+  },
+  {
+   "nome": "Gama",
+   "uf": "DF",
+   "publicId": "torcida/catalogo/escudos/gama-df",
+   "primary": "#088E40",
+   "secondary": "#CFE7D8",
+   "accent": "#FEFEFE",
+   "participacoes": [
+    37.4,
+    19.2,
+    9.4
+   ]
+  },
+  {
+   "nome": "Moto Club",
+   "uf": "MA",
+   "publicId": "torcida/catalogo/escudos/moto-club-ma",
+   "primary": "#070707",
+   "secondary": "#F60000",
+   "accent": "#E6E6E6",
+   "participacoes": [
+    33.3,
+    18.5,
+    6.2
+   ]
+  },
+  {
+   "nome": "Rio Branco-ES",
+   "uf": "ES",
+   "publicId": "torcida/catalogo/escudos/rio-branco-es-es",
+   "primary": "#FDF9F8",
+   "secondary": "#E3230D",
+   "accent": "#EB7E71",
+   "participacoes": [
+    26.6,
+    12.4,
+    8
+   ]
+  },
+  {
+   "nome": "River-PI",
+   "uf": "PI",
+   "publicId": "torcida/catalogo/escudos/river-pi-pi",
+   "primary": "#080808",
+   "secondary": "#F6F5F5",
+   "accent": "#BD0405",
+   "participacoes": [
+    16.2,
+    13.1,
+    5.8
+   ]
+  },
+  {
+   "nome": "Santa Cruz-RN",
+   "uf": "RN",
+   "publicId": "torcida/catalogo/escudos/santa-cruz-rn-rn",
+   "primary": "#020202",
+   "secondary": "#FCFCFC",
+   "accent": "#E50308",
+   "participacoes": [
+    32.4,
+    19,
+    10.1
+   ]
+  },
+  {
+   "nome": "São Caetano",
+   "uf": "SP",
+   "publicId": "torcida/catalogo/escudos/sao-caetano-sp",
+   "primary": "#018127",
+   "secondary": "#012F7E",
+   "accent": "#DBD7D7",
+   "participacoes": [
+    21.9,
+    11.6,
+    10.4
+   ]
+  },
+  {
+   "nome": "Serrano-BA",
+   "uf": "BA",
+   "publicId": "torcida/catalogo/escudos/serrano-ba-ba",
+   "primary": "#82020B",
+   "secondary": "#D00A0E",
+   "accent": "#F2DCDC",
+   "participacoes": [
+    18.6,
+    15.2,
+    14.5
+   ]
+  },
+  {
+   "nome": "URT",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/urt-mg",
+   "primary": "#27146D",
+   "secondary": "#D2CEE0",
+   "accent": "#FEFEFE",
+   "participacoes": [
+    16.2,
+    11,
+    10.7
+   ]
+  },
+  {
+   "nome": "Villa Nova",
+   "uf": "MG",
+   "publicId": "torcida/catalogo/escudos/villa-nova-mg",
+   "primary": "#D10304",
+   "secondary": "#FDF5F5",
+   "accent": "#E47474",
+   "participacoes": [
+    23.3,
+    14.6,
+    5.3
+   ]
+  }
+ ]
+}

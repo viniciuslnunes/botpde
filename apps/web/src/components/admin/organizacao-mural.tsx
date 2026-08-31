@@ -455,8 +455,8 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
           Hierarquia ainda vazia
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
-          Atribua Presidente, Vice e departamentos em Controle de acesso. Aprove membros para
-          aparecerem como sócios ou torcedores na base da árvore.
+          Atribua o Presidente em Estrutura › Presidência. Vice e departamentos ficam em Controle
+          de acesso. Aprove membros para aparecerem como sócios ou torcedores na base da árvore.
         </p>
         <Link
           href="/admin/acessos?secao=pessoas"
@@ -556,6 +556,19 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
       </div>
 
       <div className="flex flex-col items-center pb-4">
+        {tree.presidentes.length > 1 && (
+          <div className="mb-4 w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+            Esta torcida admite apenas um {tree.rotuloPresidente.toLowerCase()}. Há{' '}
+            {tree.presidentes.length} no cargo. Consolide em{' '}
+            <Link
+              href="/admin/presidencia"
+              className="font-semibold underline underline-offset-2"
+            >
+              Estrutura › Presidência
+            </Link>
+            .
+          </div>
+        )}
         <section className="flex w-full flex-col items-center" aria-label={tree.rotuloPresidente}>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
             {tree.rotuloPresidente}

@@ -224,6 +224,14 @@ model Tenant {
   /// até a liderança liberar. Só a raiz SEDE consome este toggle.
   agendaVisivelNasUnidades Boolean @default(false) @map("agenda_visivel_nas_unidades")
 
+  /// Sede: sócios da linhagem podem negociar no brechó com torcidas aliadas.
+  /// Default false — presidente liga em Transparência. Só a raiz SEDE consome.
+  brechoAliados Boolean @default(false) @map("brecho_aliados")
+
+  /// Sede: memória pública compartilhada com torcidas aliadas (bilateral).
+  /// Default false — presidente liga em Transparência. Só a raiz SEDE consome.
+  memoriaAliados Boolean @default(false) @map("memoria_aliados")
+
 
 
   // Tenant sintético: container de posts de torcedores globais do clube
@@ -278,6 +286,13 @@ model Tenant {
 
   pedidoTickets     SaasPedidoTicket[]
 
+  brechoLojas            BrechoLoja[]
+  brechoAnuncios         BrechoAnuncio[]
+  brechoAnunciosOrigem   BrechoAnuncio[] @relation("BrechoAnuncioOrigem")
+  brechoInteresses       BrechoInteresse[]
+  brechoTrocas           BrechoTroca[]
+  denunciasBrecho        DenunciaBrecho[] @relation("DenunciaBrechoTenant")
+
   sedes             Sede[]
 
   eventos           Evento[]
@@ -301,6 +316,8 @@ model Tenant {
   bloqueados        Bloqueado[]
 
   posts             Post[]
+
+  memoriaFatos      MemoriaFato[]
 
   advertencias      Advertencia[]
 
@@ -370,6 +387,16 @@ model Tenant {
 
   solicitacoesReativacao  SolicitacaoReativacaoCanal[] @relation("TenantSolicitacoesReativacao")
 
+  artigosPortal           ArtigoPortal[]
+
+  forumTopicos            ForumTopico[]
+
+  forumScoreSaldos       ForumScoreSaldo[]
+
+  confiancaEventos       ConfiancaEvento[]
+
+  confiancaSaldos        ConfiancaSaldo[]
+
 
   /// Canal restrito (R5): por decisão da liderança da unidade, o tenant sai da
   /// malha de INTERAÇÃO (comunidade nacional, aliados, salas, lojas, DMs,
@@ -425,8 +452,24 @@ model Tenant {
 
   suportePlataformaPorId String?   @map("suporte_plataforma_por_id")
 
+  /// Setor da torcida no estádio do time apoiado. Só a raiz SEDE grava;
+  /// unidades herdam na leitura (`resolverSetorArquibancada`). Copy: sempre
+  /// “Setor Norte/Sul/Leste/Oeste” — nunca “Gol Norte”. Ver docs/data/setor-arquibancada.md.
+  setorArquibancada      SetorArquibancada? @map("setor_arquibancada")
+  setorArquibancadaGeral Boolean            @default(false) @map("setor_arquibancada_geral")
+  setorArquibancadaNome  String?            @map("setor_arquibancada_nome")
+  setorArquibancadaPortao String?           @map("setor_arquibancada_portao")
+
   @@map("saas_tenants")
 
+}
+
+/// Cabeceira/lateral onde a organizada se concentra. Null = ainda não cadastrado.
+enum SetorArquibancada {
+  NORTE
+  SUL
+  LESTE
+  OESTE
 }
 
 
@@ -514,6 +557,10 @@ model User {
   sedesResponsavel     Sede[]               @relation("SedeResponsavel")
 
   posts                Post[]
+
+  memoriaFatos         MemoriaFato[]
+
+  memoriaFatosAprovados MemoriaFato[]       @relation("MemoriaFatoAprovador")
 
   auditLogs            AuditLog[]           @relation("AuditAtor")
 
@@ -627,6 +674,36 @@ model User {
   pedidoTicketsAtendente       SaasPedidoTicket[]    @relation("PedidoTicketAtendente")
 
   pedidoTicketsFechados        SaasPedidoTicket[]    @relation("PedidoTicketFechadoPor")
+
+  brechoLojas                  BrechoLoja[]
+  brechoLojasCongeladas         BrechoLoja[]          @relation("BrechoLojaCongeladaPor")
+  brechoAnuncios               BrechoAnuncio[]       @relation("BrechoAnuncioVendedor")
+  brechoInteresses             BrechoInteresse[]     @relation("BrechoInteresseInteressado")
+  brechoTrocasVendedor         BrechoTroca[]          @relation("BrechoTrocaVendedor")
+  brechoTrocasInteressado      BrechoTroca[]          @relation("BrechoTrocaInteressado")
+  denunciasBrecho              DenunciaBrecho[]      @relation("DenunciaBrechoDenunciante")
+  denunciasBrechoResolvidas    DenunciaBrecho[]      @relation("DenunciaBrechoResolvidoPor")
+  denunciasBrechoAtendidas     DenunciaBrecho[]      @relation("DenunciaBrechoAtendente")
+
+  artigosPortal                 ArtigoPortal[]
+
+  forumTopicos                  ForumTopico[]
+
+  forumRespostas                ForumResposta[]
+
+  pracaVotos                    PracaVoto[]
+
+  pracaComentarios              PracaComentario[]
+
+  forumScoreEventos            ForumScoreEvento[]
+
+  forumScoreSaldos              ForumScoreSaldo[]
+
+  confiancaEventos             ConfiancaEvento[]
+
+  confiancaSaldos              ConfiancaSaldo[]
+
+  membrosFonteVerificada        SaasMembro[]          @relation("FonteVerificadaPor")
 
 
   // Controle de acesso lista pessoas por vínculo com a torcida ordenando por
@@ -1455,6 +1532,12 @@ model SaasMembro {
 
   barComandas BarComanda[]
 
+  fonteVerificadaEm     DateTime? @map("fonte_verificada_em")
+
+  fonteVerificadaPorId String?   @map("fonte_verificada_por_id")
+
+  fonteVerificadaPor    User?     @relation("FonteVerificadaPor", fields: [fonteVerificadaPorId], references: [id], onDelete: SetNull)
+
 
 
   @@unique([tenantId, userId])
@@ -2272,6 +2355,8 @@ model Evento {
 
   posts     Post[]
 
+  memoriaFatos MemoriaFato[]
+
   cobrancas CobrancaAssociacao[]
 
 
@@ -2736,6 +2821,191 @@ enum ModalidadeEntrega {
 
 
 
+/// Brechó P2P entre sócios da linhagem (praça nacional da Sede raiz).
+/// Nunca lista PatrimonioItem. Ver docs/data/modulo-brecho.md.
+
+model BrechoLoja {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  nome    String
+  bio     String? @db.VarChar(280)
+  fotoUrl String? @map("foto_url")
+  /// Capa da vitrine P2P no hub (16:9). Distinta de fotoUrl (avatar/logo).
+  capaUrl String? @map("capa_url")
+
+  ativa        Boolean   @default(true)
+  congeladaEm  DateTime? @map("congelada_em")
+  congeladaPorId String? @map("congelada_por_id")
+  congeladaPor   User?   @relation("BrechoLojaCongeladaPor", fields: [congeladaPorId], references: [id], onDelete: SetNull)
+
+  trocasConcluidas   Int @default(0) @map("trocas_concluidas")
+  contrapartesUnicas Int @default(0) @map("contrapartes_unicas")
+  scoreConfianca     Int @default(0) @map("score_confianca")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  anuncios  BrechoAnuncio[]
+  denuncias DenunciaBrecho[]
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, scoreConfianca])
+  @@index([tenantId, ativa])
+  @@map("saas_brecho_lojas")
+}
+
+model BrechoAnuncio {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  lojaId String     @map("loja_id")
+  loja   BrechoLoja @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+
+  vendedorId String @map("vendedor_id")
+  vendedor   User   @relation("BrechoAnuncioVendedor", fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  origemTenantId String @map("origem_tenant_id")
+  origemTenant   Tenant @relation("BrechoAnuncioOrigem", fields: [origemTenantId], references: [id], onDelete: Restrict)
+
+  titulo      String
+  descricao   String            @db.VarChar(2000)
+  modalidade  BrechoModalidade
+  categoria   BrechoCategoria
+  tamanho     String?
+  preco       Decimal?         @db.Decimal(10, 2)
+  aceitoTroca String?          @map("aceito_troca") @db.VarChar(400)
+  imagensUrl  String[]         @map("imagens_url")
+  status      BrechoAnuncioStatus @default(ATIVO)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  interesses BrechoInteresse[]
+  denuncias  DenunciaBrecho[]
+
+  @@index([tenantId, status, criadoEm])
+  @@index([lojaId, status])
+  @@index([vendedorId])
+  @@map("saas_brecho_anuncios")
+}
+
+model BrechoInteresse {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  anuncioId String        @map("anuncio_id")
+  anuncio   BrechoAnuncio @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+
+  interessadoId String @map("interessado_id")
+  interessado   User   @relation("BrechoInteresseInteressado", fields: [interessadoId], references: [id], onDelete: Cascade)
+
+  conversaId String   @unique @map("conversa_id")
+  conversa   Conversa @relation(fields: [conversaId], references: [id], onDelete: Restrict)
+
+  vendedorConfirmouEm    DateTime? @map("vendedor_confirmou_em")
+  interessadoConfirmouEm DateTime? @map("interessado_confirmou_em")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  troca     BrechoTroca?
+  denuncias DenunciaBrecho[]
+
+  @@unique([anuncioId, interessadoId])
+  @@index([tenantId, criadoEm])
+  @@map("saas_brecho_interesses")
+}
+
+model BrechoTroca {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  interesseId String          @unique @map("interesse_id")
+  interesse   BrechoInteresse @relation(fields: [interesseId], references: [id], onDelete: Cascade)
+
+  vendedorId String @map("vendedor_id")
+  vendedor   User   @relation("BrechoTrocaVendedor", fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  interessadoId String @map("interessado_id")
+  interessado   User   @relation("BrechoTrocaInteressado", fields: [interessadoId], references: [id], onDelete: Cascade)
+
+  status      BrechoTrocaStatus @default(ABERTA)
+  concluidaEm DateTime?         @map("concluida_em")
+
+  @@index([tenantId, status])
+  @@index([vendedorId, status])
+  @@index([interessadoId, status])
+  @@map("saas_brecho_trocas")
+}
+
+model DenunciaBrecho {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation("DenunciaBrechoTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  denuncianteId String @map("denunciante_id")
+  denunciante   User   @relation("DenunciaBrechoDenunciante", fields: [denuncianteId], references: [id], onDelete: Cascade)
+
+  motivo String
+  status StatusDenuncia @default(PENDENTE)
+
+  anuncioId String?        @map("anuncio_id")
+  anuncio   BrechoAnuncio? @relation(fields: [anuncioId], references: [id], onDelete: SetNull)
+
+  lojaId String?     @map("loja_id")
+  loja   BrechoLoja? @relation(fields: [lojaId], references: [id], onDelete: SetNull)
+
+  interesseId String?          @map("interesse_id")
+  interesse   BrechoInteresse? @relation(fields: [interesseId], references: [id], onDelete: SetNull)
+
+  atendenteId String? @map("atendente_id")
+  atendente   User?   @relation("DenunciaBrechoAtendente", fields: [atendenteId], references: [id], onDelete: SetNull)
+  atendidoEm  DateTime? @map("atendido_em")
+
+  resolvidoPorId String? @map("resolvido_por_id")
+  resolvidoPor   User?   @relation("DenunciaBrechoResolvidoPor", fields: [resolvidoPorId], references: [id], onDelete: SetNull)
+  resolvidoEm    DateTime? @map("resolvido_em")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, status, criadoEm])
+  @@map("saas_denuncias_brecho")
+}
+
+enum BrechoModalidade {
+  TROCA
+  DOACAO
+  VENDA
+}
+
+enum BrechoCategoria {
+  CAMISA
+  BERMUDA
+  PATCH
+  BANDEIRA_PESSOAL
+  OUTRO
+}
+
+enum BrechoAnuncioStatus {
+  ATIVO
+  RESERVADO
+  CONCLUIDO
+  OCULTO
+  REMOVIDO
+}
+
+enum BrechoTrocaStatus {
+  ABERTA
+  CONCLUIDA
+}
+
 enum StatusPedido {
 
   PENDENTE
@@ -2884,9 +3154,53 @@ model Afiliacao {
 
   torcedoresEstimadosFonte String?                  @map("torcedores_estimados_fonte")
 
-  /// IBOPE_DIGITAL = total publicado no Ranking Digital; LIMITE_ATE = fora do Top 50 (teto conservador).
+  /// IBOPE_DIGITAL = total publicado no Ranking Digital; PESQUISA = Datafolha x base IBGE;
+  /// LIMITE_ATE = fora do Top 50 (teto conservador).
 
   torcedoresEstimadosTipo  TorcedoresEstimadosTipo? @map("torcedores_estimados_tipo")
+
+  /// ─── Ficha do clube (seed offline; ver docs/knowledge/fontes-dados-clubes.md) ───
+  /// Só o ANO: as fontes marcam precisão de ano com 1º de janeiro, e gravar
+  /// data cheia inventaria um dia que ninguém publicou.
+
+  fundacaoAno       Int?     @map("fundacao_ano")
+
+  estadio           String?
+
+  estadioCapacidade Int?     @map("estadio_capacidade")
+
+  estadioLat        Float?   @map("estadio_lat")
+
+  estadioLng        Float?   @map("estadio_lng")
+
+  siteOficial       String?  @map("site_oficial")
+
+  /// Cores do clube. `coresFonte` distingue curadoria (`design:CLUBE_PALETAS`) de
+  /// derivação automática do escudo (`escudo:cloudinary`) — a segunda é proposta.
+
+  corPrimaria       String?  @map("cor_primaria")
+
+  corSecundaria     String?  @map("cor_secundaria")
+
+  corAcento         String?  @map("cor_acento")
+
+  coresFonte        String?  @map("cores_fonte")
+
+  /// Ids externos estáveis — desempatam homônimos que nome+UF não separa
+  /// (Bahia x Bahia de Feira, Democrata GV x Democrata SL).
+
+  wikidataQid       String?  @map("wikidata_qid")
+
+  ogolId            String?  @map("ogol_id")
+
+  /// Ranking Nacional de Clubes da CBF: prova de atividade profissional recente
+  /// e critério de relevância para ordenar o catálogo.
+
+  rncPosicao        Int?     @map("rnc_posicao")
+
+  rncPontos         Int?     @map("rnc_pontos")
+
+  rncEdicao         String?  @map("rnc_edicao")
 
   /// Arquivado (false) sai da seleção de onboarding/switcher sem apagar histórico.
   /// Clube nunca é excluído enquanto tiver vínculo — `Partida`/`Noticia` são Cascade.
@@ -2907,6 +3221,10 @@ model Afiliacao {
 
   noticias           Noticia[]
 
+  forumTopicos       ForumTopico[]
+
+  forumScoreSaldos  ForumScoreSaldo[]
+
   torcedores         PerfilTorcedor[]
 
   rivalClubeA        RivalidadeClube[]  @relation("RivalClubeA")
@@ -2920,6 +3238,8 @@ model Afiliacao {
   /// Listagem do catálogo (`/super-admin/clubes`): ordena por nome, faceta por UF/série.
 
   @@index([nome])
+
+  @@index([rncPontos])
 
   @@index([estado])
 
@@ -2952,6 +3272,24 @@ model TorcidaConhecida {
   clubeNomeOriginal String?  @map("clube_nome_original")
 
   fundacao          String?
+
+  /// Ano extraído de `fundacao` (a fonte colaborativa grava a data com dia e
+  /// mês desconhecidos como curingas, "23/10/1992" e variantes; só o ano é
+  /// confiável em toda a base).
+  /// NÃO escrever a sequência asterisco-barra aqui: o `///` do Prisma vira
+  /// bloco JSDoc no `index.d.ts` gerado, e ela fecha o comentário no meio —
+  /// o resto do arquivo passa a ser lido como código e o `tsc` quebra com
+  /// "Unterminated regular expression literal" a 60 mil linhas de distância.
+
+  fundacaoAno       Int?     @map("fundacao_ano")
+
+  /// Registro na federação estadual — ver docs/knowledge/contexto-legal.md.
+
+  situacaoRegistro  SituacaoRegistroTorcida @default(DESCONHECIDO) @map("situacao_registro")
+
+  registroFonte     String?  @map("registro_fonte")
+
+  registroEm        DateTime? @map("registro_em")
 
   sede              String?
 
@@ -2997,7 +3335,39 @@ enum TorcedoresEstimadosTipo {
 
   IBOPE_DIGITAL
 
+  /// Pesquisa de opinião (Datafolha) convertida pela base populacional do IBGE.
+
+  PESQUISA
+
   LIMITE_ATE
+
+}
+
+
+/// Situação do registro da torcida junto à federação estadual. Ausência da lista
+/// NÃO prova inexistência — por isso `SEM_REGISTRO_CONHECIDO`, não "irregular".
+
+enum SituacaoRegistroTorcida {
+
+  REGISTRADA_FEDERACAO
+
+  SEM_REGISTRO_CONHECIDO
+
+  DESCONHECIDO
+
+}
+
+
+/// Alcance da rivalidade. Só MUNICIPAL e ESTADUAL isolam torcidas: clássico
+/// INTERESTADUAL é rivalidade de calendário e apagaria a malha nacional à toa.
+
+enum EscopoRivalidade {
+
+  MUNICIPAL
+
+  ESTADUAL
+
+  INTERESTADUAL
 
 }
 
@@ -3076,6 +3446,17 @@ model RivalidadeClube {
   afiliacaoAId String   @map("afiliacao_a_id")
 
   afiliacaoBId String   @map("afiliacao_b_id")
+
+  /// MUNICIPAL/ESTADUAL isolam; INTERESTADUAL fica registrado como contexto e
+  /// NÃO deve ser semeado (ver `seed:rivalidades-clubes`).
+
+  escopo       EscopoRivalidade @default(ESTADUAL)
+
+  /// Nome do clássico ("Ba-Vi", "Re-Pa") — usado em copy e moderação.
+
+  classico     String?
+
+  fonte        String?
 
   criadoEm     DateTime @default(now()) @map("criado_em")
 
@@ -3323,6 +3704,8 @@ model Post {
 
   feedTimeline FeedTimeline[]
 
+  memoriaFatos MemoriaFato[]
+
 
 
   @@index([tenantId, criadoEm])
@@ -3398,6 +3781,9 @@ model PerfilMembro {
   /// No feed: badge "Sócio/Membro - Nº N". Default true (número visível); o sócio desliga em Sobre.
   exibirNumeroSocioNoFeed Boolean @default(true) @map("exibir_numero_socio_no_feed")
 
+  /// Opt-in: aparecer em "quem estava" na memória do dia (check-in real). Default off.
+  memoriaPresencaVisivel Boolean @default(false) @map("memoria_presenca_visivel")
+
 
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -3415,6 +3801,70 @@ model PerfilMembro {
   @@unique([userId, tenantId])
 
   @@map("saas_perfis_membro")
+
+}
+
+
+
+enum StatusMemoriaFato {
+
+  PENDENTE
+
+  APROVADA
+
+  REJEITADA
+
+}
+
+
+
+enum VisibilidadeMemoriaFato {
+
+  PUBLICO
+
+  TENANT
+
+}
+
+
+
+/// Fato atrasado da Memória: liga um relato a um dia civil sem reescrever
+/// `Post.criadoEm`. Só `APROVADA` entra na espinha. Nunca PRIVADO.
+model MemoriaFato {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  autorId  String @map("autor_id")
+
+  /// Midnight SP persistido como `startOfZonedDayUtc` (03:00 UTC daquele dia).
+  dia DateTime
+
+  conteudo     String
+  midiaUrls    String[] @default([]) @map("midia_urls")
+  visibilidade VisibilidadeMemoriaFato @default(PUBLICO)
+  status       StatusMemoriaFato       @default(PENDENTE)
+
+  postId   String? @map("post_id")
+  eventoId String? @map("evento_id")
+
+  aprovadoPorId  String?   @map("aprovado_por_id")
+  decididoEm     DateTime? @map("decidido_em")
+  motivoRejeicao String?   @map("motivo_rejeicao")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor       User    @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  aprovadoPor User?   @relation("MemoriaFatoAprovador", fields: [aprovadoPorId], references: [id], onDelete: SetNull)
+  post        Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
+  evento      Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, dia])
+  @@index([tenantId, dia])
+  @@index([autorId, criadoEm])
+  @@map("saas_memoria_fatos")
 
 }
 
@@ -4054,6 +4504,30 @@ enum TipoNotificacao {
 
   CANAL_REATIVADO
 
+  EVENTO_CANCELADO
+
+  EVENTO_ALTERADO
+
+  SOLICITACAO_UNIDADE_APROVADA
+
+  SOLICITACAO_UNIDADE_RECUSADA
+
+  COMUNICADO_NOVO
+
+  FINANCEIRO_LANCAMENTO
+
+  DESIGN_ATUALIZADO
+
+  EVENTO_CHECKIN
+
+  BRECHO_INTERESSE
+
+  BRECHO_DENUNCIA
+
+  BRECHO_TROCA_CONFIRMADA
+
+  MEMORIA_FATO_DECIDIDA
+
 }
 
 
@@ -4145,6 +4619,8 @@ model Conversa {
   sedeCanal Sede? @relation("SedeCanal")
 
   pedidoTicket SaasPedidoTicket?
+
+  brechoInteresse BrechoInteresse?
 
 
 
@@ -4541,6 +5017,221 @@ enum StatusNoticia {
 
   REJEITADA
 
+}
+
+
+
+// ─── PRAÇA (notícias próprias + fórum; imprensa continua em Noticia) ────────
+
+enum ForumEscopo {
+  CLUBE
+  TORCIDA
+}
+
+enum ForumTopicoStatus {
+  VISIVEL
+  OCULTO
+  REMOVIDO
+}
+
+enum ArtigoPortalStatus {
+  RASCUNHO
+  PUBLICADO
+  OCULTO
+}
+
+enum ArtigoOrigem {
+  OFICIAL
+  VERIFICADA
+}
+
+enum PracaAlvoTipo {
+  ARTIGO
+  NOTICIA
+  TOPICO
+  RESPOSTA
+}
+
+/// Artigo editorial da torcida/unidade — nunca da imprensa (isso é Noticia).
+/// tenantId obrigatório: unidade não vaza para Sede nem irmã.
+model ArtigoPortal {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  autorId  String @map("autor_id")
+
+  titulo   String
+  resumo   String?
+  corpo    String
+  capaUrl  String? @map("capa_url")
+
+  origem       ArtigoOrigem        @default(OFICIAL)
+  status       ArtigoPortalStatus  @default(RASCUNHO)
+  publicadoEm  DateTime?           @map("publicado_em")
+  criadoEm     DateTime            @default(now()) @map("criado_em")
+  atualizadoEm DateTime            @updatedAt @map("atualizado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor  User   @relation(fields: [autorId], references: [id])
+
+  @@index([tenantId, status, publicadoEm])
+  @@map("saas_artigos_portal")
+}
+
+/// Tópico de fórum. CLUBE = afiliacaoId; TORCIDA = tenantId. XOR no app.
+model ForumTopico {
+  id          String @id @default(uuid())
+  escopo      ForumEscopo
+  tenantId    String?     @map("tenant_id")
+  afiliacaoId String?     @map("afiliacao_id")
+  autorId     String      @map("autor_id")
+
+  titulo          String
+  corpo           String
+  /// Anexos do composer (mesmo formato de Post.midiaUrls).
+  midiaUrls       String[] @default([]) @map("midia_urls")
+  visitas         Int     @default(0)
+  respostasCount  Int     @default(0) @map("respostas_count")
+  gostei          Int     @default(0)
+  naoGostei       Int     @default(0) @map("nao_gostei")
+  fixado          Boolean @default(false)
+  status          ForumTopicoStatus @default(VISIVEL)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  tenant    Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  afiliacao Afiliacao?     @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+  autor     User           @relation(fields: [autorId], references: [id])
+  respostas ForumResposta[]
+
+  @@index([tenantId, status, atualizadoEm])
+  @@index([afiliacaoId, status, atualizadoEm])
+  @@map("saas_forum_topicos")
+}
+
+model ForumResposta {
+  id        String  @id @default(uuid())
+  topicoId  String  @map("topico_id")
+  autorId   String  @map("autor_id")
+  parentId  String? @map("parent_id")
+  conteudo  String
+  oculto    Boolean  @default(false)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  topico  ForumTopico   @relation(fields: [topicoId], references: [id], onDelete: Cascade)
+  autor   User          @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  parent  ForumResposta?  @relation("ForumRespostaThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies ForumResposta[] @relation("ForumRespostaThread")
+
+  @@index([topicoId, criadoEm])
+  @@map("saas_forum_respostas")
+}
+
+/// Voto +1/−1 em artigo, notícia (card nosso), tópico ou resposta.
+model PracaVoto {
+  id       String        @id @default(uuid())
+  userId   String         @map("user_id")
+  alvoTipo PracaAlvoTipo @map("alvo_tipo")
+  alvoId   String        @map("alvo_id")
+  valor    Int
+  criadoEm DateTime      @default(now()) @map("criado_em")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, alvoTipo, alvoId])
+  @@index([alvoTipo, alvoId])
+  @@map("saas_praca_votos")
+}
+
+/// Comentário no card de artigo ou de notícia (fórum usa ForumResposta).
+model PracaComentario {
+  id        String        @id @default(uuid())
+  autorId   String        @map("autor_id")
+  alvoTipo  PracaAlvoTipo @map("alvo_tipo")
+  alvoId    String        @map("alvo_id")
+  conteudo  String
+  oculto    Boolean        @default(false)
+  criadoEm  DateTime      @default(now()) @map("criado_em")
+
+  autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([alvoTipo, alvoId, criadoEm])
+  @@map("saas_praca_comentarios")
+}
+
+model ForumScoreEvento {
+  id          String   @id @default(uuid())
+  userId      String    @map("user_id")
+  escopoChave String    @map("escopo_chave")
+  sinal       String
+  peso        Int
+  origemTipo  String     @map("origem_tipo")
+  origemId    String     @map("origem_id")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, escopoChave, criadoEm])
+  @@map("saas_forum_score_eventos")
+}
+
+model ForumScoreSaldo {
+  id                 String   @id @default(uuid())
+  userId             String    @map("user_id")
+  escopoChave        String    @map("escopo_chave")
+  tenantId           String?   @map("tenant_id")
+  afiliacaoId        String?   @map("afiliacao_id")
+  score              Int       @default(0)
+  topicos            Int       @default(0)
+  respostas          Int       @default(0)
+  gosteiRecebidos    Int       @default(0) @map("gostei_recebidos")
+  naoGosteiRecebidos Int       @default(0) @map("nao_gostei_recebidos")
+  atualizadoEm       DateTime  @updatedAt @map("atualizado_em")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  afiliacao Afiliacao? @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, escopoChave])
+  @@index([escopoChave, score])
+  @@map("saas_forum_score_saldos")
+}
+
+/// Confiança na torcida (eixo local). Ledger append-only; saldo materializado.
+/// Não concede permissão — ver packages/types/src/confianca.js.
+
+model ConfiancaEvento {
+  id         String   @id @default(uuid())
+  userId     String    @map("user_id")
+  tenantId   String    @map("tenant_id")
+  sinal      String
+  peso       Int
+  origemTipo String    @map("origem_tipo")
+  origemId   String    @map("origem_id")
+  criadoEm   DateTime  @default(now()) @map("criado_em")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([sinal, origemTipo, origemId])
+  @@index([userId, tenantId, criadoEm])
+  @@map("saas_confianca_eventos")
+}
+
+model ConfiancaSaldo {
+  id           String   @id @default(uuid())
+  userId       String    @map("user_id")
+  tenantId     String    @map("tenant_id")
+  score        Int       @default(0)
+  nivel        Int       @default(0)
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, nivel])
+  @@map("saas_confianca_saldos")
 }
 
 
@@ -5013,6 +5704,10 @@ model PatrimonioItem {
   valorEstimado Decimal? @map("valor_estimado") @db.Decimal(12, 2)
 
   observacao   String?
+
+  /// Foto de catálogo (Cloudinary). Distinta das evidências de empréstimo
+  /// (`fotoSaidaUrl` / `fotoGuardaUrl` em PatrimonioEmprestimo).
+  fotoUrl String? @map("foto_url")
 
   /// Extensões por categoria, sem tabela nova. Hoje: `meta.vistoria` do
   /// departamento de Bandeiras (medidas, mastro, órgão, validade da

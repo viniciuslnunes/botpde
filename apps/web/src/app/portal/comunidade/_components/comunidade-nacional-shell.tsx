@@ -131,9 +131,17 @@ export async function ComunidadeNacionalShell({
 
       {noticias.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            Notícias do clube
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Notícias do clube
+            </h2>
+            <Link
+              href="/portal/comunidade/noticias?escopo=nacional"
+              className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            >
+              Ver todas
+            </Link>
+          </div>
           <ul className="space-y-3">
             {noticias.slice(0, 12).map((n) => (
               <li
@@ -146,6 +154,7 @@ export async function ComunidadeNacionalShell({
                     {n.resumo}
                   </p>
                 )}
+                <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">{n.fonte}</p>
                 {n.url && (
                   <a
                     href={n.url}

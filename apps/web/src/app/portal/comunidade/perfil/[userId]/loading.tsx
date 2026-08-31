@@ -53,8 +53,8 @@ export default function PerfilComunidadeLoading() {
         aria-hidden="true"
         className="flex gap-6 border-b border-[rgb(var(--border))] px-1 pb-3 pt-1"
       >
-        {['w-12', 'w-20', 'w-12', 'w-16'].map((w) => (
-          <div key={w} className={`skeleton-track-soft h-3.5 rounded-full ${w}`} />
+        {['w-12', 'w-20', 'w-12', 'w-16'].map((w, i) => (
+          <div key={i} className={`skeleton-track-soft h-3.5 rounded-full ${w}`} />
         ))}
       </div>
 

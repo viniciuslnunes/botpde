@@ -131,6 +131,17 @@ describe('filtrarTorcidasElegiveis', () => {
     )
     expect(elegiveis.map((t) => t.id)).toEqual(['camisa-12', 'coringao-chopp'])
   })
+
+  it('omite rival — inexistente na busca de aliança', () => {
+    const candidatos = [{ id: 'camisa-12' }, { id: 'mancha-verde' }, { id: 'remocada' }]
+    const elegiveis = filtrarTorcidasElegiveis(
+      candidatos,
+      new Set(),
+      new Set(['gavioes']),
+      new Set(['mancha-verde']),
+    )
+    expect(elegiveis.map((t) => t.id)).toEqual(['camisa-12', 'remocada'])
+  })
 })
 
 const findFirstAlianca = vi.hoisted(() => vi.fn())
@@ -143,6 +154,8 @@ const createAudit = vi.hoisted(() => vi.fn())
 const assertPermission = vi.hoisted(() => vi.fn())
 const invalidateHierarchyCache = vi.hoisted(() => vi.fn())
 const revalidatePath = vi.hoisted(() => vi.fn())
+const tenantsAreRivais = vi.hoisted(() => vi.fn(async () => false))
+const notificarUsuariosComPermissao = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('@torcida/db', () => ({
   db: {
@@ -165,6 +178,7 @@ vi.mock('@/lib/authz', () => ({
 vi.mock('@/lib/hierarquia', () => ({
   invalidateHierarchyCache,
   getTorcidaLineageTenantIds: vi.fn(async (id: string) => [id]),
+  tenantsAreRivais,
 }))
 
 vi.mock('next/cache', () => ({
@@ -175,6 +189,11 @@ vi.mock('next/cache', () => ({
 // o tenant nunca está isolado, então `assertCanalNaoRestrito` é no-op.
 vi.mock('@/lib/isolamento', () => ({
   isTenantRestrito: vi.fn(async () => false),
+}))
+
+vi.mock('@/lib/notificacoes', () => ({
+  notificarUsuariosComPermissao,
+  reconciliarNotificacoesDoEvento: vi.fn(async () => {}),
 }))
 
 import {
@@ -195,6 +214,9 @@ describe('proporAlianca — co-irmã bloqueada', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
   })
 
   it('recusa proposta entre organizadas do mesmo time', async () => {
@@ -216,6 +238,44 @@ describe('proporAlianca — co-irmã bloqueada', () => {
 
     await expect(proporAlianca(camisa12)).rejects.toThrow(/co-irmãs/i)
     expect(createAlianca).not.toHaveBeenCalled()
+  })
+})
+
+describe('proporAlianca — rival inexistente', () => {
+  beforeEach(() => {
+    findFirstAlianca.mockReset()
+    createAlianca.mockReset()
+    findFirstTenant.mockReset()
+    findUniqueTenant.mockReset()
+    createAudit.mockReset()
+    assertPermission.mockReset()
+    invalidateHierarchyCache.mockReset()
+    revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    notificarUsuariosComPermissao.mockReset()
+  })
+
+  it('não cria proposta nem notifica — mesma mensagem de torcida ausente', async () => {
+    const gavioes = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const mancha = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+
+    assertPermission.mockResolvedValue({
+      session: { user: { id: 'user-1' } },
+      tenant: { id: gavioes, nome: 'Gavioes', slug: 'pde-gavioes-fiel' },
+    })
+    findFirstTenant.mockResolvedValue({
+      id: mancha,
+      nome: 'Mancha Verde',
+      slug: 'mancha-verde',
+      afiliacaoId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    })
+    findUniqueTenant.mockResolvedValue({ afiliacaoId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' })
+    tenantsAreRivais.mockResolvedValue(true)
+
+    await expect(proporAlianca(mancha)).rejects.toThrow(/não encontrada/i)
+    expect(createAlianca).not.toHaveBeenCalled()
+    expect(createAudit).not.toHaveBeenCalled()
+    expect(notificarUsuariosComPermissao).not.toHaveBeenCalled()
   })
 })
 
@@ -243,6 +303,9 @@ describe('proporAlianca — semântica origem/aliado', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
 
     assertPermission.mockResolvedValue({
       session: { user: { id: 'user-1' } },
@@ -305,6 +368,9 @@ describe('aceitarAlianca', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
   })
 
   it('só o destinatário (tenantAliadoId) pode aceitar', async () => {
@@ -361,6 +427,9 @@ describe('proporAliancaFromRecomendacao', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
 
     assertPermission.mockResolvedValue({
       session: { user: { id: 'user-1' } },
@@ -446,6 +515,9 @@ describe('cancelarProposta', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
   })
 
   it('cancela quando o remetente tem proposta PENDENTE', async () => {
@@ -504,6 +576,9 @@ describe('encerrarAlianca', () => {
     assertPermission.mockReset()
     invalidateHierarchyCache.mockReset()
     revalidatePath.mockReset()
+    tenantsAreRivais.mockReset()
+    tenantsAreRivais.mockResolvedValue(false)
+    notificarUsuariosComPermissao.mockReset()
   })
 
   it('só encerra alianças ATIVAS', async () => {

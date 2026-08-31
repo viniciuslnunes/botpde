@@ -9,12 +9,14 @@ import {
   assertTenantOwner,
 } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
+import { reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { getAncestorTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { generateInviteSlug } from '@/lib/invite-slug'
 import { getEstadoCanalRestrito, getSolicitacaoRespondivel } from '@/lib/canal-restrito'
+import { resolverTenantRaizId } from '@/lib/membros-sede'
 import {
   notificarSedeSobreCanal,
   propagarMudancaDeIsolamento,
@@ -29,6 +31,7 @@ import {
   isDepartamentoLegado,
   PERMISSIONS,
   SalvarPeriodicidadesOnboardingSchema,
+  SalvarSetorArquibancadaSchema,
   slugifyDepartamento,
 } from '@torcida/types'
 import { z } from 'zod'
@@ -273,6 +276,76 @@ export async function salvarAgendaVisivelNasUnidades(formData: FormData) {
   invalidateTenantCache(tenant.slug)
 }
 
+/**
+ * Sede: permitir (ou não) troca no brechó com torcidas aliadas.
+ * Default off — presidente liga. Só na raiz.
+ */
+export async function salvarBrechoAliados(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('Só a Sede principal controla o brechó com aliadas.')
+  }
+
+  const habilitado = formData.get('brechoAliados') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { brechoAliados: habilitado },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'BRECHO_ALIADOS_ALTERADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { habilitado },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/configuracoes/transparencia')
+  revalidatePath('/portal/loja/brecho')
+  invalidateTenantCache(tenant.slug)
+}
+
+/**
+ * Sede: compartilhar memória pública com torcidas aliadas (bilateral).
+ * Default off — presidente liga. Só na raiz.
+ */
+export async function salvarMemoriaAliados(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('Só a Sede principal controla a memória com aliadas.')
+  }
+
+  const habilitado = formData.get('memoriaAliados') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { memoriaAliados: habilitado },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'MEMORIA_ALIADOS_ALTERADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { habilitado },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/configuracoes/transparencia')
+  revalidatePath('/portal/memoria')
+  invalidateTenantCache(tenant.slug)
+}
+
 /** Onboarding SOCIO: exige (ou não) foto do RG e comprovante de residência. */
 export async function salvarExigirDocumentosCadastro(formData: FormData) {
   const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
@@ -329,6 +402,7 @@ export async function salvarSolicitarPendenciasCadastro(formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/portal', 'layout')
+  revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cadastro/associacao')
   invalidateTenantCache(tenant.slug)
 }
@@ -367,6 +441,7 @@ export async function salvarPropagarPendenciasCadastroUnidades(formData: FormDat
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/portal', 'layout')
+  revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cadastro/associacao')
   invalidateTenantCache(tenant.slug)
 }
@@ -591,6 +666,7 @@ export async function responderReativacaoCanal(formData: FormData): Promise<void
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/sedes')
+  await reconciliarNotificacoesDoEvento(tenant.id, { tipo: 'CANAL_REATIVACAO_SOLICITADA' })
   await notificarSedeSobreCanal(tenant.id, session.user.id, {
     tipo: 'CANAL_REATIVACAO_RECUSADA',
     titulo: `${formatNomeTorcida(tenant.nome)} recusou reabrir o canal`,
@@ -827,6 +903,74 @@ export async function salvarAfiliacao(formData: FormData): Promise<void> {
   })
 
   revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal')
+  invalidateTenantCache(tenant.slug)
+}
+
+export async function salvarSetorArquibancada(formData: FormData): Promise<void> {
+  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  const { session, tenant } = ctx
+  await assertOwnerOuSuportePlataforma(ctx)
+
+  const raizId = await resolverTenantRaizId(tenant.id)
+  if (raizId !== tenant.id) {
+    throw new ExpectedError('O setor na arquibancada é definido pela Sede. Unidades herdam o valor.')
+  }
+
+  const parsed = SalvarSetorArquibancadaSchema.safeParse({
+    cardeal: String(formData.get('cardeal') ?? ''),
+    geral: String(formData.get('geral') ?? ''),
+    nomeLocal: String(formData.get('nomeLocal') ?? ''),
+    portao: String(formData.get('portao') ?? ''),
+  })
+  if (!parsed.success) {
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Escolha o setor na arquibancada.')
+  }
+
+  const anterior: {
+    setorArquibancada: string | null
+    setorArquibancadaGeral: boolean
+    setorArquibancadaNome: string | null
+    setorArquibancadaPortao: string | null
+  } | null = await db.tenant.findUnique({
+    where: { id: tenant.id },
+    select: {
+      setorArquibancada: true,
+      setorArquibancadaGeral: true,
+      setorArquibancadaNome: true,
+      setorArquibancadaPortao: true,
+    },
+  })
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: {
+      setorArquibancada: parsed.data.cardeal,
+      setorArquibancadaGeral: parsed.data.geral,
+      setorArquibancadaNome: parsed.data.nomeLocal,
+      setorArquibancadaPortao: parsed.data.portao,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_SETOR_ARQUIBANCADA_ATUALIZADO',
+      detalhes: {
+        de: anterior,
+        para: {
+          setorArquibancada: parsed.data.cardeal,
+          setorArquibancadaGeral: parsed.data.geral,
+          setorArquibancadaNome: parsed.data.nomeLocal,
+          setorArquibancadaPortao: parsed.data.portao,
+        },
+      },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/onboarding')
   revalidatePath('/portal')
   invalidateTenantCache(tenant.slug)
 }

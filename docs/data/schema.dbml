@@ -515,6 +515,10 @@ Table saas_tenants {
   suporte_plataforma boolean [not null]
   suporte_plataforma_desde timestamp
   suporte_plataforma_por_id varchar
+  setor_arquibancada SetorArquibancada
+  setor_arquibancada_geral boolean [not null]
+  setor_arquibancada_nome varchar
+  setor_arquibancada_portao varchar
 }
 
 Table saas_users {

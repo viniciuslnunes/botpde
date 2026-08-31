@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from 'react'
 import {
   resolverChromeCanalMural,
+  resolverFeedInternoDoMural,
   type CanalItem,
 } from '@/lib/canais'
 import { FeedComposerSkeleton, FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
@@ -55,9 +56,17 @@ export async function CanalFeedView({
   leituraOperador?: boolean
   buscaChrome?: ReactNode
 }) {
-  const chrome = await resolverChromeCanalMural(canal, viewerTenantId, permissoes, {
-    leituraOperador,
-  })
+  const [chrome, feedInterno] = await Promise.all([
+    resolverChromeCanalMural(canal, viewerTenantId, permissoes, {
+      leituraOperador,
+    }),
+    resolverFeedInternoDoMural({
+      canalId: canal.id,
+      canalOficial: canal.canalOficial,
+      userId: currentUser.id,
+      viewerTenantId,
+    }),
+  ])
 
   return (
     <CanalFeedComposition
@@ -92,7 +101,8 @@ export async function CanalFeedView({
             cursor={cursor}
             filtro="canal"
             conversaId={canal.id}
-            incluirFeedInterno={canal.canalOficial}
+            incluirFeedInterno={feedInterno.incluir}
+            feedInternoTenantId={feedInterno.feedInternoTenantId}
             podeCompartilhar={podeCompartilhar}
           />
         </Suspense>

@@ -8,6 +8,7 @@ import {
   ordemArrastavelSemFixos,
   reordenarCanaisOperador,
   slugsHierarquiaFixos,
+  slugUnidadePrefixoBarra,
   temUnidadeFixaOperador,
 } from '@/lib/operador-canais-ordem'
 
@@ -100,6 +101,45 @@ describe('slugsHierarquiaFixos', () => {
   })
 })
 
+describe('slugUnidadePrefixoBarra', () => {
+  const pde = { slug: 'pde-fiel-baixada', ehUnidade: true, raizId: 'gavioes-id' }
+  const camisa = { slug: 'camisa-12', ehUnidade: false, raizId: 'camisa-id' }
+  const outraPde = { slug: 'pde-leste', ehUnidade: true, raizId: 'gavioes-id' }
+
+  it('contexto (vínculo / tenant ativo) ganha da cookie', () => {
+    expect(
+      slugUnidadePrefixoBarra({
+        slugUnidadeContexto: 'pde-fiel-baixada',
+        slugTorcida: 'gavioes',
+        canaisAbertos: [camisa, outraPde],
+        raizIdTorcida: 'gavioes-id',
+      }),
+    ).toBe('pde-fiel-baixada')
+  })
+
+  it('sem vínculo: 3º slot é a primeira unidade da worktree na cookie', () => {
+    expect(
+      slugUnidadePrefixoBarra({
+        slugUnidadeContexto: null,
+        slugTorcida: 'gavioes',
+        canaisAbertos: [camisa, pde, outraPde],
+        raizIdTorcida: 'gavioes-id',
+      }),
+    ).toBe('pde-fiel-baixada')
+  })
+
+  it('unidade de outra torcida não vira 3º slot da worktree ativa', () => {
+    expect(
+      slugUnidadePrefixoBarra({
+        slugUnidadeContexto: null,
+        slugTorcida: 'gavioes',
+        canaisAbertos: [{ slug: 'pde-camisa', ehUnidade: true, raizId: 'camisa-id' }],
+        raizIdTorcida: 'gavioes-id',
+      }),
+    ).toBeNull()
+  })
+})
+
 describe('temUnidadeFixaOperador', () => {
   it('sócio: fixa quando há escopo unidade', () => {
     expect(
@@ -112,7 +152,7 @@ describe('temUnidadeFixaOperador', () => {
     ).toBe(true)
   })
 
-  it('super-admin na Sede: vínculo residual NÃO fixa a unidade', () => {
+  it('super-admin na Sede: unidade permanece no 3º slot', () => {
     expect(
       temUnidadeFixaOperador({
         superAdmin: true,
@@ -120,10 +160,10 @@ describe('temUnidadeFixaOperador', () => {
         slugUnidade: 'sub-sede-rio-claro',
         atualSlug: 'gavioes',
       }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  it('super-admin na própria unidade: fixa (sem X enquanto estiver nela)', () => {
+  it('super-admin na própria unidade: fixa', () => {
     expect(
       temUnidadeFixaOperador({
         superAdmin: true,
@@ -155,7 +195,7 @@ describe('temUnidadeFixaOperador', () => {
 })
 
 describe('idsCanaisHierarquiaFixosNaBarra', () => {
-  it('super-admin na Sede: só sede — unidade residual entra na 4+', () => {
+  it('super-admin na Sede: sede + unidade do 3º slot ficam fora da 4+', () => {
     expect(
       idsCanaisHierarquiaFixosNaBarra({
         canalIdTorcida: 'canal-gavioes',
@@ -165,7 +205,7 @@ describe('idsCanaisHierarquiaFixosNaBarra', () => {
         slugUnidade: 'sub-sede-rio-claro',
         atualSlug: 'gavioes',
       }),
-    ).toEqual(['canal-gavioes'])
+    ).toEqual(['canal-gavioes', 'canal-rio-claro'])
   })
 
   it('sócio: sede + unidade do vínculo ficam fora da 4+', () => {

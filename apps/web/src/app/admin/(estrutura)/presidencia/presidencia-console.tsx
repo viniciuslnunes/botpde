@@ -93,6 +93,12 @@ function BlocoPresidencia({
               : 'Esta unidade está sem presidente.'}{' '}
             Quem assume passa a ter acesso total; você continua como administrador.
           </p>
+          {presidentes.length > 1 && (
+            <p className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+              Há {presidentes.length} presidentes. A torcida admite apenas um — transferir para
+              alguém (ou para você, se o sucessor já for presidente) consolida o cargo.
+            </p>
+          )}
         </div>
       </header>
 

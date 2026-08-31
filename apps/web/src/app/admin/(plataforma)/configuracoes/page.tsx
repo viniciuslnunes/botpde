@@ -3,8 +3,9 @@ import { db } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { isExpectedError } from '@/lib/expected-error'
-import { CreditCard, Flag, IdCard, LifeBuoy, Link2, Lock, Radio, Settings } from 'lucide-react'
+import { CreditCard, Flag, IdCard, LifeBuoy, Link2, Lock, MapPin, Radio, Settings } from 'lucide-react'
 import { ConviteForm } from './_components/convite-form'
+import { SetorArquibancadaForm } from './_components/setor-arquibancada-form'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getEstadoCanalRestrito } from '@/lib/canal-restrito'
 import {
@@ -19,6 +20,7 @@ import { AdminTabs, adminTabIds, type AdminTabItem } from '@/components/admin/ui
 import { ConfigSectionCard } from './_components/config-section-card'
 import { getConfigContexto } from './_lib/contexto'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
+import { resolverSetorArquibancada } from '@/lib/setor-arquibancada'
 import { sedePropagaPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
 import type { Metadata } from 'next'
 
@@ -157,11 +159,26 @@ export default async function ConfiguracoesGeralPage({
           )
       : []
 
-  const isRaiz = ativa === 'cadastro' ? (await resolverTenantRaizId(tenant.id)) === tenant.id : false
+  const precisaRaiz = ativa === 'cadastro' || ativa === 'afiliacao'
+  const raizId = precisaRaiz ? await resolverTenantRaizId(tenant.id) : tenant.id
+  const isRaiz = raizId === tenant.id
   const sobPropagacaoSede =
     ativa === 'cadastro' && !isRaiz && canManagePendenciasCadastro
       ? await sedePropagaPendenciasCadastro(tenant.id)
       : false
+
+  const setorArquibancada =
+    ativa === 'afiliacao' && podeEditarConfigDeOwner
+      ? await resolverSetorArquibancada(tenant.id)
+      : null
+  let sedeNomeSetor: string | null = null
+  if (ativa === 'afiliacao' && podeEditarConfigDeOwner && !isRaiz) {
+    const raizNome: { nome: string } | null = await db.tenant.findUnique({
+      where: { id: raizId },
+      select: { nome: true },
+    })
+    sedeNomeSetor = raizNome?.nome ?? null
+  }
 
   // Canal oficial provisiona sob demanda: só resolve na própria seção, e uma
   // falha aqui vira mensagem no card em vez de derrubar a página.
@@ -247,14 +264,36 @@ export default async function ConfiguracoesGeralPage({
         ) : null}
 
         {ativa === 'afiliacao' ? (
-          <ConfigSectionCard
-            icon={<Flag className={ICONE} />}
-            title="Afiliação"
-            description="Defina qual time a torcida apoia para contexto global de notícias"
-            ownerOnly
-          >
-            <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
-          </ConfigSectionCard>
+          <>
+            <ConfigSectionCard
+              icon={<Flag className={ICONE} />}
+              title="Afiliação"
+              description="Defina qual time a torcida apoia para contexto global de notícias"
+              ownerOnly
+            >
+              <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
+            </ConfigSectionCard>
+            <ConfigSectionCard
+              icon={<MapPin className={ICONE} />}
+              title="Setor na arquibancada"
+              description={
+                isRaiz
+                  ? 'Onde a torcida se concentra no estádio do time apoiado. Unidades herdam este valor.'
+                  : 'Herdado da Sede — só a liderança da Sede altera.'
+              }
+              ownerOnly
+              index={1}
+            >
+              <SetorArquibancadaForm
+                cardeal={setorArquibancada?.cardeal ?? null}
+                geral={setorArquibancada?.geral ?? false}
+                nomeLocal={setorArquibancada?.nomeLocal ?? null}
+                portao={setorArquibancada?.portao ?? null}
+                somenteLeitura={!isRaiz}
+                sedeNome={sedeNomeSetor ? formatNomeTorcida(sedeNomeSetor) : null}
+              />
+            </ConfigSectionCard>
+          </>
         ) : null}
 
         {ativa === 'cadastro' ? (

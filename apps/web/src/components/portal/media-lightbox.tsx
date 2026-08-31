@@ -129,14 +129,14 @@ export function MediaLightbox({ urls, index, caption, onClose, onIndexChange }: 
             onClick={(e) => e.stopPropagation()}
             onMouseEnter={() => setCaptionVisible(false)}
             onMouseLeave={() => setCaptionVisible(true)}
-            className="relative max-h-[90vh] max-w-full cursor-grab active:cursor-grabbing"
+            className="relative max-h-[90dvh] max-w-full cursor-grab active:cursor-grabbing"
           >
             <m.div variants={lightboxContent} initial="hidden" animate="show" exit="exit" transition={springSnappy}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt=""
-                className="max-h-[90vh] max-w-full rounded-lg object-contain select-none"
+                className="max-h-[90dvh] max-w-full rounded-lg object-contain select-none"
                 draggable={false}
               />
             </m.div>

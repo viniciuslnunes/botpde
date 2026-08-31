@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -68,6 +68,7 @@ function AdminTopbar({
   unreadNotifications,
   mobileOpen,
   onToggleMobile,
+  isSuperAdmin,
 }: {
   tenantNome: string
   tenantCor: string
@@ -79,23 +80,44 @@ function AdminTopbar({
   unreadNotifications: number
   mobileOpen: boolean
   onToggleMobile: () => void
+  isSuperAdmin: boolean
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
+  const userDropRef = useRef<HTMLDivElement>(null)
   const firstName = userName?.split(' ')[0] ?? 'Admin'
   const pathname = usePathname()
 
-  // Soft-nav não remonta o shell: fecha dropdowns para não deixar
-  // `fixed inset-0` invisível do header (z-50) cobrindo o sidebar.
-  // No render: em effect o overlay sobrevive um frame depois de navegar.
+  // Soft-nav não remonta o shell: fecha o dropdown ao navegar. No render — em
+  // effect ele sobrevive um frame aberto sobre a página nova.
   const [pathnameSincronizado, setPathnameSincronizado] = useState(pathname)
   if (pathname !== pathnameSincronizado) {
     setPathnameSincronizado(pathname)
     setUserDropOpen(false)
   }
 
+  // pointerdown (não backdrop): o header tem `backdrop-blur`, que vira bloco
+  // contentor de `position: fixed` — um `fixed inset-0` aqui cobriria só a
+  // faixa do header, e o clique no corpo da página não fechava o menu.
+  useEffect(() => {
+    if (!userDropOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (userDropRef.current?.contains(e.target as Node)) return
+      setUserDropOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setUserDropOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [userDropOpen])
+
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
-      <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+      <div className="app-inset-x flex h-14 items-center gap-3 sm:[--app-inset-x:1.5rem]">
         <button
           type="button"
           onClick={onToggleMobile}
@@ -105,7 +127,7 @@ function AdminTopbar({
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <Link href="/admin" className="app-touch-target flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
           {tenantLogoUrl ? (
             <LogoMiniatura
               src={tenantLogoUrl}
@@ -140,15 +162,12 @@ function AdminTopbar({
             verTodasLabel="Ver alertas operacionais"
             onMarkRead={markAdminNavbarNotificationRead}
           />
-          <div className="hidden sm:block">
-            <ThemeToggle />
-          </div>
 
-          <div className="relative hidden sm:block">
+          <div ref={userDropRef} className="relative hidden sm:block">
             <button
               type="button"
               onClick={() => setUserDropOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
             >
               {userAvatar ? (
                 canOptimizeImageUrl(userAvatar) ? (
@@ -180,44 +199,49 @@ function AdminTopbar({
             </button>
 
             {userDropOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
+              <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                <Link
+                  href="/portal/perfil"
                   onClick={() => setUserDropOpen(false)}
-                  aria-hidden
-                />
-                <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                  Meu Perfil
+                </Link>
+                <Link
+                  href="/portal/comunidade"
+                  onClick={() => setUserDropOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                  Voltar ao portal
+                </Link>
+                {isSuperAdmin && (
                   <Link
-                    href="/portal/perfil"
+                    href="/super-admin"
+                    prefetch={false}
                     onClick={() => setUserDropOpen(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >
-                    <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                    Meu Perfil
+                    <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                    Área Super Admin
                   </Link>
-                  <Link
-                    href="/portal/comunidade"
-                    onClick={() => setUserDropOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                    Voltar ao portal
-                  </Link>
-                  <div className="my-1 border-t border-[rgb(var(--border))]" />
-                  <p className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
-                    <Shield className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
-                    Área Admin
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => signOut({ callbackUrl: '/entrar' })}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sair
-                  </button>
-                </div>
-              </>
+                )}
+                <ThemeToggle variant="dropdown" />
+                <div className="my-1 border-t border-[rgb(var(--border))]" />
+                <p className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+                  <Shield className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
+                  Área Admin
+                </p>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: '/entrar' })}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -263,7 +287,7 @@ export function AdminShell({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <TenantDesignBridge corPrimaria={tenantCor} design={tenantDesign} />
       {!immersivePdv && (
         <AdminTopbar
@@ -277,6 +301,7 @@ export function AdminShell({
           unreadNotifications={unreadNotifications}
           mobileOpen={mobileOpen}
           onToggleMobile={() => setMobileOpen((v) => !v)}
+          isSuperAdmin={isSuperAdmin}
         />
       )}
 

@@ -2,6 +2,13 @@
 
 > Inteligência para enriquecer `Afiliacao` no onboarding. **Consulta 2026-07-13.**
 > Dados operacionais: `docs/data/torcedores-estimados.md`.
+>
+> **Ampliação 2026-08-27:** este doc cobre a camada digital (IBOPE) e as APIs de
+> jogos. Para a **fonte certa de cada campo de clube** — existência profissional
+> (CBF RNC), cidade (Wikidata/Ogol/IBGE), tamanho de torcida por pesquisa
+> (Datafolha), registro de torcida (federação estadual) e CNPJ —, ver
+> [`fontes-dados-clubes.md`](fontes-dados-clubes.md); o cruzamento medido com o
+> banco está em [`docs/data/auditoria-catalogo-clubes.md`](../data/auditoria-catalogo-clubes.md).
 
 ## IBOPE Repucom — Ranking Digital dos Clubes Brasileiros
 
@@ -44,8 +51,16 @@ maiores bases digitais nas demais divisões.
 | 49º | Botafogo-PB | **471.612** (menor total publicado no Top 50) |
 
 **Insight de produto:** o piso do Top 50 IBOPE (~472 mil inscritos) é **ordens de
-magnitude acima** do teto conservador que usamos para clubes fora do ranking
-(10 mil torcedores). Nunca misturar os dois tiers na copy sem qualificar.
+magnitude acima** de qualquer estimativa razoável para clube fora do ranking.
+Nunca misturar os dois tiers na copy sem qualificar.
+
+**Estado real medido (2026-08-27):** os 274 clubes fora do Top 50 estão todos
+gravados com `torcedores_estimados = 471.612` (o piso do IBOPE) e tipo
+`LIMITE_ATE`. A UI não expõe esse número — `format-contagem.ts` devolve
+*"base digital não estimada"* —, mas o valor no banco não significa nada.
+Substituto com fonte: tier `PESQUISA` (Datafolha × base IBGE 16+) em
+`packages/db/src/data/torcedores-pesquisa-datafolha.js`. Ver
+[`docs/data/auditoria-catalogo-clubes.md`](../data/auditoria-catalogo-clubes.md) §3.
 
 ### Contexto 2026 — limpeza no Instagram
 
@@ -61,7 +76,7 @@ Dois tiers em `Afiliacao` (seed offline, nunca API em runtime):
 |------|-----------|-------|------------|
 | `IBOPE_DIGITAL` | Top 50 (total publicado ou integrante conhecido) | Inscritos reais | `67,5 mi inscritos digitais` |
 | `PLATAFORMA` | Clube com usuários aprovados no SaaS | Contagem real | `142 torcedores na plataforma` |
-| `LIMITE_ATE` | Sem dado próprio | Menor valor conhecido (IBOPE × plataforma) | `até X torcedores ou menos` |
+| `LIMITE_ATE` | Sem dado próprio | Menor valor conhecido (IBOPE × plataforma) | **`base digital não estimada`** (a copy "até X ou menos" não existe mais no código) |
 
 **Presença na plataforma** (sócios/torcedores online) vem do sistema
 (`User.ultimoAcessoEm`, agregação por clube canônico) — separado da estimativa web.

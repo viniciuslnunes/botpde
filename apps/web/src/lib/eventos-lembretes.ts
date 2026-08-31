@@ -1,6 +1,7 @@
 import { db } from '@torcida/db'
 import { criarNotificacoesEmLote } from '@/lib/notificacoes'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
+import { hrefAdminEvento, slugDepartamentoDoEvento } from '@/lib/eventos-admin-href'
 import { PERMISSIONS } from '@torcida/types'
 
 const JANELA_MS = 15 * 60 * 1000 // ±15 min em torno do alvo
@@ -34,6 +35,8 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
     tenantId: string
     titulo: string
     data: Date
+    tipo: string
+    projeto: { departamento: { slug: string } | null } | null
     rsvps: Array<{ userId: string }>
     _count: { rsvps: number }
   }
@@ -46,6 +49,8 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         tenantId: true,
         titulo: true,
         data: true,
+        tipo: true,
+        projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },
           select: { userId: true },
@@ -60,6 +65,8 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         tenantId: true,
         titulo: true,
         data: true,
+        tipo: true,
+        projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },
           select: { userId: true },
@@ -74,6 +81,8 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         tenantId: true,
         titulo: true,
         data: true,
+        tipo: true,
+        projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },
           select: { userId: true },
@@ -129,7 +138,11 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         tipo: 'EVENTO_DIA_GESTOR',
         titulo: `Hoje: ${ev.titulo}`,
         corpo: `${ev._count.rsvps} confirmados · ${embarcados} com check-in`,
-        link: `/admin/eventos/${ev.id}`,
+        link: hrefAdminEvento({
+          id: ev.id,
+          tipo: ev.tipo,
+          departamentoSlug: slugDepartamentoDoEvento(ev),
+        }),
       })
     }
   }

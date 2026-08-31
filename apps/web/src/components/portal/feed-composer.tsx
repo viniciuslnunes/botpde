@@ -37,6 +37,8 @@ import {
   publicarPostNacional,
   type PublicarPostState,
 } from '@/app/portal/comunidade/actions'
+import { criarTopicoComposerAction } from '@/app/portal/comunidade/praca-actions'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import {
   publicarComunicadoComposer,
   atualizarComunicadoComposer,
@@ -158,6 +160,12 @@ interface FeedComposerProps {
    * com `canal` e `comunicado`.
    */
   nacional?: boolean
+  /**
+   * Fórum (CN, torcida ou unidade): o mesmo composer do feed, mas publica
+   * `ForumTopico` em vez de Post. Sem alcance/enquete/evento. Mutuamente
+   * exclusivo com `canal` / `nacional` / `comunicado`.
+   */
+  forum?: EscopoComunidade
   /** Cargo/sede/depto do autor — prepend otimista no feed. */
   autorBadges?: {
     cargoNome: string | null
@@ -189,6 +197,7 @@ export function FeedComposer({
   eventoIdInicial,
   canal,
   nacional = false,
+  forum,
   autorBadges,
   comunicado = false,
 }: FeedComposerProps) {
@@ -213,6 +222,7 @@ export function FeedComposer({
       eventoIdInicial={eventoIdInicial}
       canal={canal}
       nacional={nacional}
+      forum={forum}
       autorBadges={autorBadges}
       comunicado={comunicado}
     />
@@ -231,6 +241,7 @@ function FeedComposerActive({
   eventoIdInicial,
   canal,
   nacional = false,
+  forum,
   autorBadges,
   comunicado = false,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
@@ -256,6 +267,10 @@ function FeedComposerActive({
     PublicarPostState,
     FormData
   >(publicarPostNacional, INITIAL_STATE)
+  const [forumState, forumAction, forumPending] = useActionState<PublicarPostState, FormData>(
+    criarTopicoComposerAction,
+    INITIAL_STATE,
+  )
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
   const [comunicadoState, comunicadoAction, comunicadoPending] = useActionState<
     ComunicadoComposerState,
@@ -269,14 +284,18 @@ function FeedComposerActive({
 
   const token = comunicado
     ? (comunicadoState.token ?? 'novo')
-    : canal
+    : forum
+      ? (forumState.token ?? 'novo')
+      : canal
       ? (canalState.token ?? 'novo')
       : nacional
         ? (nacionalState.token ?? 'novo')
         : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
   const state = comunicado
     ? comunicadoState
-    : canal
+    : forum
+      ? forumState
+      : canal
       ? canalState
       : nacional
         ? nacionalState
@@ -388,6 +407,12 @@ function FeedComposerActive({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comunicado, comunicadoState.success, comunicadoState.token])
 
+  useEffect(() => {
+    if (!forum || !forumState.success || !forumState.topicoId) return
+    toast.success('Tópico publicado.')
+    router.push(`/portal/comunidade/forum/${forumState.topicoId}?escopo=${forum}`)
+  }, [forum, forumState.success, forumState.token, forumState.topicoId, router])
+
   return (
     <div id="feed-composer" className="scroll-mt-24">
     <ComposerBody
@@ -402,18 +427,21 @@ function FeedComposerActive({
       eventAction={eventAction}
       canalAction={canalAction}
       nacionalAction={nacionalAction}
+      forumAction={forumAction}
       comunicadoAction={comunicadoAction}
       postPending={postPending}
       pollPending={pollPending}
       eventPending={eventPending}
       canalPending={canalPending}
       nacionalPending={nacionalPending}
+      forumPending={forumPending}
       comunicadoPending={comunicadoPending}
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
       nacional={nacional}
+      forum={forum}
       comunicado={comunicado}
       onPrependOtimista={registrarPrependOtimista}
       serverError={
@@ -452,12 +480,14 @@ function ComposerBody({
   eventAction,
   canalAction,
   nacionalAction,
+  forumAction,
   comunicadoAction,
   postPending,
   pollPending,
   eventPending,
   canalPending,
   nacionalPending,
+  forumPending,
   comunicadoPending,
   serverError,
   eventos,
@@ -465,6 +495,7 @@ function ComposerBody({
   eventoIdInicial,
   canal,
   nacional = false,
+  forum,
   comunicado = false,
   onPrependOtimista,
 }: {
@@ -478,12 +509,14 @@ function ComposerBody({
   eventAction: (payload: FormData) => void
   canalAction: (payload: FormData) => void
   nacionalAction: (payload: FormData) => void
+  forumAction: (payload: FormData) => void
   comunicadoAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
   eventPending: boolean
   canalPending: boolean
   nacionalPending: boolean
+  forumPending: boolean
   comunicadoPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
@@ -491,6 +524,7 @@ function ComposerBody({
   eventoIdInicial?: string
   canal?: CanalComposerAlvo
   nacional?: boolean
+  forum?: EscopoComunidade
   comunicado?: boolean | ComunicadoEdicaoAlvo
   onPrependOtimista: (opts: {
     conteudo: string
@@ -499,8 +533,8 @@ function ComposerBody({
   }) => void
 }) {
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
-  /** Enquete/evento/alcance só no feed da torcida — canal, CN e comunicado não. */
-  const ferramentasTorcida = !canal && !comunicado && !nacional
+  /** Enquete/evento/alcance só no feed da torcida — canal, CN, fórum e comunicado não. */
+  const ferramentasTorcida = !canal && !comunicado && !nacional && !forum
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
       ? eventoIdInicial
@@ -580,7 +614,9 @@ function ComposerBody({
   const enviando = medias.some((m) => m.url === null && !m.error)
   const pending = comunicado
     ? comunicadoPending
-    : canal
+    : forum
+      ? forumPending
+      : canal
       ? canalPending
       : nacional
         ? nacionalPending
@@ -692,6 +728,14 @@ function ComposerBody({
     fd.set('conteudo', serializarMencoes(texto, mencoes))
     // Estado React (não só o hidden) — evita midias vazias se o DOM estiver stale.
     fd.set('midias', JSON.stringify(finalMidias))
+
+    if (forum) {
+      fd.set('escopo', forum)
+      startTransition(() => {
+        forumAction(fd)
+      })
+      return
+    }
 
     if (comunicado) {
       fd.set('titulo', titulo.trim())
@@ -934,6 +978,7 @@ function ComposerBody({
     >
       <FileDropOverlay active={fileDrag.active} />
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
+      {forum ? <input type="hidden" name="escopo" value={forum} /> : null}
       {canal ? (
         <input type="hidden" name="conversaId" value={canal.conversaId} />
       ) : comunicado ? null : (
@@ -974,7 +1019,9 @@ function ComposerBody({
               >
                 {comunicado
                   ? 'Novo comunicado oficial…'
-                  : canal
+                  : forum
+                    ? `Comece um tópico, ${firstName}…`
+                    : canal
                     ? `Publicar em ${canal.nome ?? 'canal'}…`
                     : `No que você tá pensando, ${firstName}?`}
               </m.button>
@@ -1021,7 +1068,9 @@ function ComposerBody({
                   placeholder={
                     comunicado
                       ? 'Escreva o comunicado oficial para a torcida…'
-                      : canal
+                      : forum
+                        ? `Comece um tópico, ${firstName}… Use @ para mencionar e # para hashtags`
+                        : canal
                         ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
                         : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
                   }
@@ -1035,7 +1084,7 @@ function ComposerBody({
               query={mencaoQuery}
               onSelect={inserirMencao}
               onClose={() => setMencaoQuery(null)}
-              escopo={nacional ? 'nacional' : undefined}
+              escopo={forum === 'nacional' || nacional ? 'nacional' : undefined}
               anchorRef={composerFieldRef}
             />
           )}
@@ -1776,6 +1825,8 @@ function ComposerBody({
                         ? 'Salvar alterações'
                         : comunicado
                           ? 'Publicar comunicado'
+                          : forum
+                            ? 'Publicar tópico'
                           : modoEnquete
                             ? 'Publicar enquete'
                             : modoEvento

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { db } from '@torcida/db'
 import { canFollowUser } from '../social'
 import { avaliarAcessoDm } from '../mensageria'
+import { getTenantRelation } from '../hierarquia'
 
 vi.mock('@torcida/db', () => ({
   db: {
@@ -10,6 +11,8 @@ vi.mock('@torcida/db', () => ({
     bloqueioUsuario: { findFirst: vi.fn() },
     conversa: { findFirst: vi.fn() },
     perfilTorcedor: { findUnique: vi.fn() },
+    rivalidadeClube: { count: vi.fn(async () => 0) },
+    tenant: { findUnique: vi.fn() },
   },
 }))
 
@@ -127,5 +130,15 @@ describe('avaliarAcessoDm', () => {
     vi.mocked(db.userRole.findFirst).mockResolvedValue({ id: 'cargo' })
     const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
     expect(acesso).toBe('direto')
+  })
+
+  it('torcedor × sócio de torcidas rivais bloqueia DM', async () => {
+    vi.mocked(db.saasMembro.findMany).mockResolvedValue([
+      { userId: remetente, tenantId: 't-gavioes' },
+      { userId: destinatario, tenantId: 't-mancha' },
+    ] as never)
+    vi.mocked(getTenantRelation).mockResolvedValue('rival')
+    const acesso = await avaliarAcessoDm(remetente, destinatario, null)
+    expect(acesso).toBe('bloqueado')
   })
 })

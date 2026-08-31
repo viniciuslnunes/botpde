@@ -1,11 +1,12 @@
 import { Repeat2, Pin, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
-import { linkPostComunidade } from '@/lib/comunidade-social'
+import { linkPostComunidade, linkTopicoForum } from '@/lib/comunidade-social'
 import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
+import { ForumFeedEngagement } from './forum-feed-engagement'
 import { PostMedia } from './post-media'
 import { PostLegacyImage } from './post-legacy-image'
 import { FeedPostMenu } from './feed-post-menu'
@@ -22,6 +23,9 @@ import { PostEventoEmbed } from './post-evento-embed'
 import { ComunicadoShareButton } from './comunicado-share-button'
 import type { PostSocialItem } from '@/lib/feed'
 import { formatAutorCargoBadge, formatAutorUnidadeBadge } from '@/lib/autor-badges-format'
+import { PracaOrigemBadge } from '@/app/portal/comunidade/_components/praca-origem-badge'
+import { ForumTopicoMenu } from '@/app/portal/comunidade/_components/forum-topico-menu'
+import { editarTopico } from '@/app/portal/comunidade/praca-actions'
 
 interface FeedPostCardProps {
   post: PostSocialItem
@@ -44,6 +48,10 @@ export function FeedPostCard({
   podeCompartilhar = true,
 }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
+  const forum = post.forum
+  const permalink = forum
+    ? linkTopicoForum(post.id, forum.escopo)
+    : linkPostComunidade(post.id)
   const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
   const isComunicadoOficial = post.tipo === 'INSTITUCIONAL' && Boolean(post.comunicadoOrigemId)
   const cargoBadge = isComunicadoOficial
@@ -53,10 +61,10 @@ export function FeedPostCard({
     ? linkTorcidaComunidadePublica(post.tenantId)
     : `/portal/comunidade/perfil/${post.autor.id}`
   const headerNome = isComunicadoOficial ? post.tenant.nome : (post.autor.nome ?? 'Membro')
-  const tenantBadge = showTenantBadge && !isComunicadoOficial ? post.tenant.nome : null
+  const tenantBadge = showTenantBadge && !isComunicadoOficial && !forum ? post.tenant.nome : null
   // Unidade que repete a torcida (Caso B, ou Sede raiz "Sede — <Torcida>") não
   // vira badge — compara com a torcida do post mesmo quando ela não é exibida.
-  const unidadeBadge = isComunicadoOficial
+  const unidadeBadge = isComunicadoOficial || forum
     ? null
     : formatAutorUnidadeBadge(post.autor.sedeNome, post.tenant.nome)
   const headerAvatar = isComunicadoOficial ? post.tenant.logoUrl : post.autor.avatarUrl
@@ -79,6 +87,12 @@ export function FeedPostCard({
         conteudo={post.conteudo}
         midiaUrls={post.midiaUrls}
         podeEditar={author && !isComunicadoOficial}
+        escopoMencao={forum?.escopo === 'nacional' ? 'nacional' : undefined}
+        salvarFn={
+          forum
+            ? (id, conteudo, anexos) => editarTopico(id, conteudo, anexos, forum.escopo)
+            : undefined
+        }
       >
       <header className="flex items-center gap-3">
         <ComunidadePrefetchLink href={headerHref}>
@@ -112,6 +126,7 @@ export function FeedPostCard({
                 {cargoBadge}
               </span>
             )}
+            {forum && <PracaOrigemBadge origem="forum" />}
             {post.fixado && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                 <Pin className="h-3 w-3" />
@@ -136,7 +151,7 @@ export function FeedPostCard({
             </ComunidadePrefetchLink>
           )}
           <ComunidadePrefetchLink
-            href={linkPostComunidade(post.id)}
+            href={permalink}
             className="text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
             <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
@@ -144,7 +159,10 @@ export function FeedPostCard({
             </time>
           </ComunidadePrefetchLink>
         </div>
-        {mostrarMenu && (
+        {mostrarMenu && forum && author && (
+          <ForumTopicoMenu topicoId={post.id} escopo={forum.escopo} />
+        )}
+        {mostrarMenu && !forum && (
           <FeedPostMenu
             postId={post.id}
             fixado={post.fixado}
@@ -154,7 +172,9 @@ export function FeedPostCard({
       </header>
 
       {post.titulo && (
-        <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">{post.titulo}</h3>
+        <ComunidadePrefetchLink href={permalink}>
+          <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">{post.titulo}</h3>
+        </ComunidadePrefetchLink>
       )}
 
       {post.postOrigemId && (
@@ -224,17 +244,28 @@ export function FeedPostCard({
         </>
       )}
 
-      <PostEngagement
-        postId={post.id}
-        totalReacoes={post.totalReacoes}
-        totalComentarios={post.totalComentarios}
-        minhaReacao={post.minhaReacao}
-        currentUser={currentUser}
-        isAuthor={author}
-        isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
-        salvoInicial={salvo}
-        podeCompartilhar={podeCompartilhar}
-      />
+      {forum ? (
+        <ForumFeedEngagement
+          topicoId={post.id}
+          escopo={forum.escopo}
+          totalReacoes={post.totalReacoes}
+          totalComentarios={post.totalComentarios}
+          minhaReacao={post.minhaReacao === 'CURTIR' ? 'CURTIR' : null}
+          currentUser={currentUser}
+        />
+      ) : (
+        <PostEngagement
+          postId={post.id}
+          totalReacoes={post.totalReacoes}
+          totalComentarios={post.totalComentarios}
+          minhaReacao={post.minhaReacao}
+          currentUser={currentUser}
+          isAuthor={author}
+          isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
+          salvoInicial={salvo}
+          podeCompartilhar={podeCompartilhar}
+        />
+      )}
 
       {post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId && (
         <div className="mt-1 flex justify-end">

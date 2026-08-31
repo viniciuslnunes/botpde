@@ -17,7 +17,9 @@ const purposeSchema = z.enum([
   'sede',
   'mensagem',
   'patrimonio',
+  'brecho',
   'clube-escudo',
+  'loja',
 ])
 
 const bodySchema = z.object({
@@ -31,6 +33,8 @@ const bodySchema = z.object({
  * purpose define a pasta de destino.
  * `cadastro` — onboarding (comprovante de vínculo), sem exigir membro ativo.
  * `sede` — foto de unidade; exige `SEDES_MANAGE`.
+ * `loja` — capa/produto da vitrine; exige `store:manage` (ou Super Admin),
+ *   não vínculo de associado. Torcida sem liderança continua operável.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -95,6 +99,33 @@ export async function POST(request: NextRequest) {
     } else if (purpose === 'patrimonio') {
       const { tenant } = await assertPermission(PERMISSIONS.PATRIMONY_VIEW)
       folder = `torcida/${tenant.id}/patrimonio`
+    } else if (purpose === 'brecho') {
+      const { assertSocioBrecho } = await import('@/lib/brecho-escopo')
+      const ctx = await assertSocioBrecho()
+      folder = `torcida/${ctx.raizId}/brecho/${session.user.id}`
+    } else if (purpose === 'loja') {
+      // Capa e produto da loja: gate = `store:manage` no tenant da vitrine
+      // (gestor / cargo de sistema / Super Admin). `perfil-banner` exige
+      // associado ativo e bloqueava o operador da plataforma em torcida
+      // sem presidente — a action `atualizarCapaLoja` já usa `podeGerirLoja`.
+      if (tenantIdCadastro) {
+        const torcida = await db.tenant.findFirst({
+          where: { id: tenantIdCadastro, ativo: true },
+          select: { id: true },
+        })
+        if (!torcida) {
+          return NextResponse.json({ error: 'Torcida não encontrada.' }, { status: 404 })
+        }
+        const { podeGerirLoja } = await import('@/lib/loja-lojas')
+        const pode = await podeGerirLoja(session.user.id, torcida.id, session.user.email)
+        if (!pode) {
+          return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+        }
+        folder = `torcida/${torcida.id}/loja`
+      } else {
+        const { tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+        folder = `torcida/${tenant.id}/loja`
+      }
     } else if (
       tenantIdCadastro
       && (purpose === 'perfil-banner' || purpose === 'perfil-avatar')

@@ -2,6 +2,7 @@ import { db, type Prisma } from '@torcida/db'
 import Link from 'next/link'
 import {
   PERMISSIONS,
+  hrefHomeDepartamento,
   labelStatusProjeto,
   labelTipoProjeto,
   progressoMeta,
@@ -23,7 +24,7 @@ import {
   montarWhereListagem,
   resumirPaginacao,
 } from '@/lib/listagem/query'
-import { Target } from 'lucide-react'
+import { ArrowUpRight, Target } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Projetos — Departamentos' }
@@ -116,6 +117,10 @@ export default async function DepartamentoProjetosPage({
         filtrosCompactos={[{ filtroId: 'status' }, { filtroId: 'tipo' }]}
       />
 
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Clique no projeto para abrir no departamento — cadastro, meta e status ficam no cockpit.
+      </p>
+
       {projetos.length === 0 ? (
         <ListagemVazia
           spec={SPEC}
@@ -129,7 +134,7 @@ export default async function DepartamentoProjetosPage({
             ),
             title: 'Nenhum projeto cadastrado',
             description:
-              'Campanhas, projetos e ações são cadastrados pelo gestor no portal do departamento — aqui fica a visão consolidada da torcida.',
+              'Campanhas, projetos e ações são cadastrados pelo gestor no departamento. Abra um departamento na Visão para criar o primeiro.',
           }}
         />
       ) : (
@@ -160,19 +165,33 @@ export default async function DepartamentoProjetosPage({
               return (
                 <tr key={p.id} className="border-t border-[rgb(var(--border))]">
                   <td className="px-4 py-3">
-                    <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
-                      {p.titulo}
-                    </span>
-                    {p.area && (
-                      <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                        {p.area.nome}
+                    <Link
+                      href={hrefHomeDepartamento(p.departamento.slug, 'projetos', {
+                        projeto: p.id,
+                      })}
+                      className="group inline-flex max-w-md items-start gap-1.5"
+                      aria-label={`Abrir ${p.titulo} em ${p.departamento.nome}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-[rgb(var(--foreground))] group-hover:underline">
+                          {p.titulo}
+                        </span>
+                        {p.area && (
+                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                            {p.area.nome}
+                          </span>
+                        )}
                       </span>
-                    )}
+                      <ArrowUpRight
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                        aria-hidden
+                      />
+                    </Link>
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/portal/departamentos/${p.departamento.slug}#projetos`}
-                      className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
+                      href={hrefHomeDepartamento(p.departamento.slug, 'projetos')}
+                      className="app-touch-line inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"

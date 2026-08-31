@@ -15,6 +15,10 @@ import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { listarOcorrenciasFuturasSerie, parseEscopoSerie } from '@/lib/eventos-serie'
 import { resolvePartidaIdFromForm } from '@/app/admin/partidas/actions'
 import { carregarCobrancasVagaEvento } from '@/lib/eventos-tipo'
+import { notificarInscritosEvento, notificarCheckInEvento } from '@/lib/eventos-notificacoes'
+import { linksEventoParaReconciliar } from '@/lib/eventos-admin-href'
+import { reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
+import { registrarSinalConfiancaSafe } from '@/lib/confianca'
 
 export type EventoState = {
   ok?: boolean
@@ -214,10 +218,12 @@ export async function editarEvento(
     id: string
     tenantId: string
     data: Date
+    local: string | null
+    titulo: string
     serieId: string | null
   } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { id: true, tenantId: true, data: true, serieId: true },
+    select: { id: true, tenantId: true, data: true, local: true, titulo: true, serieId: true },
   })
 
   if (!existing || existing.tenantId !== tenant.id) {
@@ -260,6 +266,7 @@ export async function editarEvento(
   }
 
   let afetados = 1
+  let idsAfetados: string[] = [existing.id]
   if (escopo === 'futuras' && existing.serieId) {
     const ocorrencias = await listarOcorrenciasFuturasSerie({
       tenantId: tenant.id,
@@ -277,6 +284,7 @@ export async function editarEvento(
       })
     }
     afetados = ocorrencias.length
+    idsAfetados = ocorrencias.map((o) => o.id)
   } else {
     await db.evento.update({
       where: { id: existing.id },
@@ -303,6 +311,24 @@ export async function editarEvento(
     },
   })
 
+  const dataMudou = existing.data.getTime() !== dataComp.getTime()
+  const localMudou = (existing.local ?? '') !== (local ?? '')
+  if (dataMudou || localMudou) {
+    const quando = dataComp.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    await notificarInscritosEvento({
+      tenantId: tenant.id,
+      eventoIds: idsAfetados,
+      tipo: 'EVENTO_ALTERADO',
+      titulo: `Evento alterado: ${titulo}`,
+      corpo: dataMudou
+        ? `Nova data: ${quando}${local ? ` · ${local}` : ''}.`
+        : `Novo local: ${local ?? 'a definir'}.`,
+      link: `/portal/eventos/${eventoId}`,
+      atorId: session.user.id,
+      excetoUserId: session.user.id,
+    })
+  }
+
   const redirectTo = formData.get('redirectTo')
   revalidateEventoPaths(eventoId, tipo)
   if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
@@ -326,6 +352,7 @@ export async function registrarCheckIn(
   const evento: {
     tenantId: string
     tipo: string
+    titulo: string
     valorVaga: { toNumber(): number } | number | null
     checkInExigePagamento: boolean
   } | null = await db.evento.findUnique({
@@ -333,6 +360,7 @@ export async function registrarCheckIn(
     select: {
       tenantId: true,
       tipo: true,
+      titulo: true,
       valorVaga: true,
       checkInExigePagamento: true,
     },
@@ -376,7 +404,13 @@ export async function registrarCheckIn(
     }
   }
 
-  await db.eventoRsvp.upsert({
+  const rsvpAtual: { checkedInAt: Date | null } | null = await db.eventoRsvp.findUnique({
+    where: { eventoId_userId: { eventoId, userId } },
+    select: { checkedInAt: true },
+  })
+  const jaEmbarcado = Boolean(rsvpAtual?.checkedInAt)
+
+  const rsvpCheckin: { id: string } = await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId } },
     update: { checkedInAt: new Date(), checkedInPorId: session.user.id },
     create: {
@@ -386,6 +420,7 @@ export async function registrarCheckIn(
       checkedInAt: new Date(),
       checkedInPorId: session.user.id,
     },
+    select: { id: true },
   })
 
   await db.auditLog.create({
@@ -403,6 +438,22 @@ export async function registrarCheckIn(
       },
     },
   })
+
+  registrarSinalConfiancaSafe({
+    userId,
+    tenantId: tenant.id,
+    sinal: 'CHECKIN',
+    origemId: rsvpCheckin.id,
+  })
+  if (!jaEmbarcado) {
+    await notificarCheckInEvento({
+      tenantId: tenant.id,
+      eventoId,
+      titulo: evento.titulo,
+      userId,
+      atorId: session.user.id,
+    })
+  }
 
   revalidateEventoPaths(eventoId, evento.tipo)
   return aviso ? { ok: true, aviso } : { ok: true }
@@ -443,6 +494,7 @@ export async function registrarCheckInPorQr(
   const evento: {
     tenantId: string
     tipo: string
+    titulo: string
     valorVaga: { toNumber(): number } | number | null
     checkInExigePagamento: boolean
   } | null = await db.evento.findUnique({
@@ -450,6 +502,7 @@ export async function registrarCheckInPorQr(
     select: {
       tenantId: true,
       tipo: true,
+      titulo: true,
       valorVaga: true,
       checkInExigePagamento: true,
     },
@@ -491,7 +544,13 @@ export async function registrarCheckInPorQr(
     }
   }
 
-  await db.eventoRsvp.upsert({
+  const rsvpQr: { checkedInAt: Date | null } | null = await db.eventoRsvp.findUnique({
+    where: { eventoId_userId: { eventoId, userId: socio.userId } },
+    select: { checkedInAt: true },
+  })
+  const jaEmbarcadoQr = Boolean(rsvpQr?.checkedInAt)
+
+  const rsvpQrRow: { id: string } = await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId: socio.userId } },
     update: { checkedInAt: new Date(), checkedInPorId: session.user.id, status: 'CONFIRMADO' },
     create: {
@@ -501,6 +560,7 @@ export async function registrarCheckInPorQr(
       checkedInAt: new Date(),
       checkedInPorId: session.user.id,
     },
+    select: { id: true },
   })
 
   await db.auditLog.create({
@@ -518,6 +578,22 @@ export async function registrarCheckInPorQr(
       },
     },
   })
+
+  registrarSinalConfiancaSafe({
+    userId: socio.userId,
+    tenantId: tenant.id,
+    sinal: 'CHECKIN',
+    origemId: rsvpQrRow.id,
+  })
+  if (!jaEmbarcadoQr) {
+    await notificarCheckInEvento({
+      tenantId: tenant.id,
+      eventoId,
+      titulo: evento.titulo,
+      userId: socio.userId,
+      atorId: session.user.id,
+    })
+  }
 
   revalidateEventoPaths(eventoId, evento.tipo)
   return aviso ? { ok: true, nome: socio.nome, aviso } : { ok: true, nome: socio.nome }
@@ -623,11 +699,12 @@ export async function excluirEvento(
     id: string
     tenantId: string
     tipo: string
+    titulo: string
     data: Date
     serieId: string | null
   } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { id: true, tenantId: true, tipo: true, data: true, serieId: true },
+    select: { id: true, tenantId: true, tipo: true, titulo: true, data: true, serieId: true },
   })
 
   if (!existing || existing.tenantId !== tenant.id) {
@@ -642,6 +719,28 @@ export async function excluirEvento(
       aPartirDe: existing.data,
     })
     idsExcluidos = ocorrencias.map((o) => o.id)
+  }
+
+  await reconciliarNotificacoesDoEvento(tenant.id, {
+    tipos: ['EVENTO_LEMBRETE', 'EVENTO_RSVP', 'EVENTO_DIA_GESTOR', 'EVENTO_CHECKIN'],
+    links: idsExcluidos.flatMap((id) => linksEventoParaReconciliar(id)),
+  })
+
+  await notificarInscritosEvento({
+    tenantId: tenant.id,
+    eventoIds: idsExcluidos,
+    tipo: 'EVENTO_CANCELADO',
+    titulo: `Evento cancelado: ${existing.titulo}`,
+    corpo:
+      idsExcluidos.length > 1
+        ? 'Esta ocorrência e as próximas da série foram canceladas.'
+        : 'O evento foi cancelado pela diretoria.',
+    link: '/portal/eventos',
+    atorId: session.user.id,
+    excetoUserId: session.user.id,
+  })
+
+  if (escopo === 'futuras' && existing.serieId) {
     await db.evento.deleteMany({
       where: { id: { in: idsExcluidos }, tenantId: tenant.id },
     })

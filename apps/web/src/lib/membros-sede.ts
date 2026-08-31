@@ -510,6 +510,40 @@ export async function encontrarConflitoTelefone(
   return rows[0] ?? null
 }
 
+/**
+ * Próximo nº livre na lineage (max carteirinha × max ficha numérica + 1).
+ * Sugestão para emissão de quem entrou por «quero me associar» — a unicidade
+ * real é revalidada com lock na hora de gravar.
+ */
+export async function sugerirProximoNumeroAssociado(tenantId: string): Promise<string> {
+  const lineage: string[] = await getTorcidaLineageTenantIds(tenantId)
+  const ids = lineage.length > 0 ? lineage : [tenantId]
+
+  const [maxSocio, maxMembroRows]: [
+    { _max: { numeroSocio: number | null } },
+    Array<{ max: number | bigint | null }>,
+  ] = await Promise.all([
+    db.saasSocio.aggregate({
+      where: { tenantId: { in: ids } },
+      _max: { numeroSocio: true },
+    }),
+    db.$queryRaw<Array<{ max: number | bigint | null }>>`
+      SELECT MAX(CAST(m.numero_associado AS INTEGER)) AS max
+      FROM saas_membros m
+      WHERE m.tenant_id IN (${Prisma.join(ids)})
+        AND m.espelhado = false
+        AND m.desligado_em IS NULL
+        AND m.status <> 'REPROVADO'
+        AND m.numero_associado ~ '^[0-9]+$'
+    `,
+  ])
+
+  const maxMembro = Number(maxMembroRows[0]?.max ?? 0)
+  const maxCarteirinha = maxSocio._max.numeroSocio ?? 0
+  const base = Math.max(maxCarteirinha, Number.isFinite(maxMembro) ? maxMembro : 0)
+  return String(base + 1)
+}
+
 export async function validarNumeroAssociadoUnicoNaTorcida(
   tx: Prisma.TransactionClient,
   tenantOrigemId: string,

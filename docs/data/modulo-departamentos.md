@@ -278,9 +278,10 @@ Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).
 Materiais/Loja e Comunicação não ganham app próprio — copy + CTA para o módulo
 portal (`departamento-thin.js`) e widgets compostos (agenda, comunicados, pedidos).
 
-**Fase 5 — Cockpit:** cada home de área tem missão (registry), nav de subáreas por
-âncora, próxima ação só com urgência real e painel de domínio acima da equipe no
-mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
+**Fase 5 — Cockpit:** cada home de área tem missão (registry), tabs por `?tab=`
+(Painel / Áreas / Projetos / Equipe / Fila / Pedidos), lista ranqueada de
+fluxos no Painel e painel de domínio na aba ativa. Detalhe:
+`proposta-departamentos-portal-admin.md` § Fase 5.
 
 **Onda 4 (MVP):** canal da área (auto-provisionado + sync de roster), vaga paga em caravana
 (`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).
@@ -342,10 +343,13 @@ renomeado/desativado). É semente, não trava: a torcida cria as próprias área
 
 - **Portal** — `/portal/departamentos/[slug]`: o gate e as flags saem de um
   loader único `getDepartamentoContexto` (`[slug]/_lib/contexto.ts`), no mesmo
-  padrão de `configuracoes/_lib/contexto.ts`. Blocos que a pessoa não pode
-  gerir aparecem **`blocked` com motivo** (`DepartamentoSectionCard`), não
-  somem — descoberta acima de invisibilidade. Bloco `#areas` e `#equipe`
-  segmentada por área.
+  padrão de `configuracoes/_lib/contexto.ts`. O cockpit usa o mesmo sistema de
+  tabs do admin (`AdminTabs` + `?tab=`): Painel (rótulo do domínio) · Áreas ·
+  Projetos · Equipe, mais Fila (Diretoria) e Pedidos (gestor). Só a aba visível
+  consulta o banco pesado; âncoras antigas (`#areas`, `#projetos`) redirecionam
+  para a query. Blocos que a pessoa não pode gerir aparecem **`blocked` com
+  motivo** (`DepartamentoSectionCard`), não somem — descoberta acima de
+  invisibilidade.
 - **Hub** — o card mostra missão, chips das áreas em que a pessoa atua e um KPI
   contextual, cada um gateado pela permissão correspondente.
 - **Admin** — módulo `/admin/departamentos` (tabs Visão / Áreas / Equipes),
@@ -492,15 +496,34 @@ não é feature do Social.
 
 ### Superfícies
 
-Portal: bloco `#projetos` no cockpit, com filtro por área, barra de meta, barra
+Portal: aba `?tab=projetos` no cockpit, com filtro por área, barra de meta, barra
 de orçamento (vermelha no estouro), badge "Na janela" e **eventos da Agenda
 vinculados** (deep-link). **Abrir campanha do ano** (2026-08-03+): em área
 `sazonal` ativa, o gestor cria com um clique um `Projeto` `CAMPANHA` do ano
 corrente (`slug` = `{área}-{ano}`, janela 1º jan–31 dez, `recorrenteAnual`,
-status `ATIVO`/`PLANEJADO`) — sem auto-criar evento; idempotente. CTA no
-bloco `#areas` e atalho em `#projetos`. A **próxima ação** do cockpit prioriza,
-após filas: orçamento estourado → projeto na janela → área sazonal sem
-campanha do ano → hooks de plugin (ensaio/caravana/financeiro).
+status `ATIVO`/`PLANEJADO`) — sem auto-criar evento; idempotente. CTA na aba
+Áreas e atalho em Projetos. A **próxima ação** do cockpit (aba Painel) é uma
+lista ranqueada de receitas de domínio (`departamento-fluxos.js`). O loader
+monta fatos do tenant; o ranker corta por papel: **gestor** vê até 5 passos;
+**membro** vê 1 passo que a permissão dele cobre.
+
+**Fase 2 — Ativar fluxo + 3 alavancas.** Cinco receitas materializam primitivas
+em um clique (sem tabela nova, sem conceder permissão): campanha do ano →
+`Projeto` CAMPANHA + checklist da área; jogo fora sem caravana → `Evento`
+CARAVANA ligado à `Partida`; ensaio da semana → `Evento` ENSAIO; escala de
+bandeira → `Evento` GERAL + `partidaId` (sem lista paralela) e checklist
+`escala-de-jogo` se a frente existir; ensaios de rua (Carnaval) → `Evento`
+GERAL. Gestor pode **Adiar 7 dias** (`meta.fluxos.adiadoAte`). As 3 alavancas
+ficam em `Departamento.meta.fluxos` (UI “Receitas desta área”, só gestor):
+**vale nesta torcida** (`desligados`), **quando** (meses civis, horizonte de
+jogo, dia da semana, âncora do desfile) e **quem responde** (`gestor` | `area`
+— só copy, não muda o gate). Save imediato; sem `StickyPersistBar`.
+
+**Fase 3 — Calendário sugere antes de faltar o processo.** Campanha só entra
+na janela civil (+ 1 mês de antecedência, ou meses da alavanca); caravana/
+escala olham `Partida` no horizonte; ensaio some se já há um nesta semana;
+Carnaval dispara barracão e ensaio de rua a 45 dias do desfile
+(`FLUXO_DESFILE_ANTECEDENCIA_DIAS`). Copiloto NLP continua fora.
 
 Admin: tab **Projetos** em `/admin/departamentos`
 (`LISTAGEM_DEPARTAMENTO_PROJETOS`), leitura consolidada — cadastro é do gestor,

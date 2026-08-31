@@ -62,7 +62,12 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
 
   return (
     <div className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-      <div className="relative aspect-[16/7] min-h-[9rem] bg-[rgb(var(--background-subtle))] sm:aspect-[21/8]">
+      {/* `w-full` não é redundante: com largura automática, o `min-h-[9rem]`
+          vira a dimensão definida e o `aspect-[16/7]` devolve a LARGURA a
+          partir dela — em 320px dava 329px num card de 284, e o
+          `overflow-hidden` do card cortava 45px. Fixando a largura, a razão
+          passa a calcular a altura, que é o que se quer. */}
+      <div className="relative aspect-[16/7] min-h-[9rem] w-full bg-[rgb(var(--background-subtle))] sm:aspect-[21/8]">
         {heroUrl ? (
           <Image
             src={heroUrl}

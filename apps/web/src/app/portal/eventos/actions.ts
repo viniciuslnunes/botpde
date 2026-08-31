@@ -9,6 +9,7 @@ import { capacidadeEfetiva, lotacaoCheia, contarOcupacaoEvento } from '@/lib/eve
 import { notificarSafe } from '@/lib/notificacoes'
 import { promoverProximoDaEspera } from '@/lib/eventos-waitlist'
 import { garantirCobrancaVagaCaravana } from '@/lib/caravana-vaga'
+import { hrefAdminEvento, slugDepartamentoDoEvento } from '@/lib/eventos-admin-href'
 import { temValorVaga } from '@torcida/types'
 import type { RsvpStatus } from '@torcida/db'
 
@@ -38,6 +39,7 @@ export async function responderRsvp(
       capacidade: true,
       valorVaga: true,
       sede: { select: { capacidade: true } },
+      projeto: { select: { departamento: { select: { slug: true } } } },
     },
   })
 
@@ -116,7 +118,11 @@ export async function responderRsvp(
       tipo: 'EVENTO_RSVP',
       titulo: 'Nova confirmação',
       corpo: `Alguém confirmou presença em “${evento.titulo}”.`,
-      link: `/admin/eventos/${eventoId}`,
+      link: hrefAdminEvento({
+        id: eventoId,
+        tipo: evento.tipo,
+        departamentoSlug: slugDepartamentoDoEvento(evento),
+      }),
       atorId: session.user.id,
     })
   }

@@ -67,6 +67,9 @@ Ver `docs/data/modulo-eventos.md` (commit `36071fa`).
    **Performance (2026-07-16):** feed escalável, timeline materializada, busca
    `pg_trgm` e plano futuro C–F — `docs/data/modulo-comunidade-performance.md`.
 3. Métricas/dashboards (engajamento, presença, crescimento) sobre a base real.
+   **Motor de confiança (2026-08-30):** recorte 1 (ledger, sem UI) em
+   `docs/data/modulo-confianca.md` — alimenta presença/adimplência; dashboard
+   em si continua neste item.
 4. Mobile (React Native/Expo sobre tRPC); convergência bot → tRPC/Prisma (sai do raw `pg`).
 5. **Grafo nacional de relacionamento entre torcidas** (aliados/rivais) e aprendizado
    de padrões de rivalidade/confronto — **entregue antecipadamente**

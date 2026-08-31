@@ -3,7 +3,9 @@ import {
   clampCropOffset,
   clampCropZoom,
   coverScale,
+  cropFrameSizeForAspect,
   DEFAULT_CROP_VIEWPORT,
+  LOJA_CAPA_ASPECT,
   MAX_CROP_ZOOM,
   MIN_CROP_ZOOM,
 } from '@/lib/image-crop'
@@ -30,5 +32,16 @@ describe('image-crop', () => {
     expect(clampCropZoom(0.75)).toBe(0.75)
     expect(clampCropZoom(1)).toBe(1)
     expect(clampCropZoom(3)).toBe(MAX_CROP_ZOOM)
+  })
+
+  it('inicia o frame do crop no mesmo aspecto da janela CSS', () => {
+    expect(cropFrameSizeForAspect(16 / 9)).toEqual({ w: 320, h: 180 })
+    expect(cropFrameSizeForAspect(1, 320)).toEqual({ w: 320, h: 320 })
+    const banner = cropFrameSizeForAspect(3)
+    expect(banner.w / banner.h).toBeCloseTo(3)
+  })
+
+  it('usa 16:9 na capa da loja (igual aos cards da vitrine)', () => {
+    expect(LOJA_CAPA_ASPECT).toBeCloseTo(16 / 9)
   })
 })

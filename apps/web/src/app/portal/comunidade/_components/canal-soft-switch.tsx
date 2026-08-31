@@ -28,6 +28,7 @@ import {
 } from '@/app/portal/comunidade/socio-canais-actions'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
 import { CanalFeedComposition } from '../canais/[id]/canal-feed-composition'
+import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 
 const FEED_ENDPOINT = '/api/comunidade/feed'
 
@@ -70,6 +71,20 @@ function idDaUrlCanais(pathname: string): string | null {
 }
 
 export function CanalSoftSwitchProvider({
+  seed,
+  children,
+}: {
+  seed: CanalSoftSwitchSeed
+  children: ReactNode
+}) {
+  return (
+    <ComunidadeQueryProvider>
+      <CanalSoftSwitchProviderView seed={seed}>{children}</CanalSoftSwitchProviderView>
+    </ComunidadeQueryProvider>
+  )
+}
+
+function CanalSoftSwitchProviderView({
   seed,
   children,
 }: {

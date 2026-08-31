@@ -63,6 +63,7 @@ interface CanaisClientProps {
   tenantAtualId: string
   /** Super-admin: Abrir sem pedir entrada (overlay de leitura). */
   leituraSuperAdmin?: boolean
+  hintCapacidade?: string | null
 }
 
 function lerGeoSalva(): LocalizacaoOnboarding | null {
@@ -117,6 +118,7 @@ export function CanaisClient({
   podeCriarCanal,
   tenantAtualId,
   leituraSuperAdmin = false,
+  hintCapacidade = null,
 }: CanaisClientProps) {
   const [canais, setCanais] = useState(canaisIniciais)
   const [criando, setCriando] = useState(false)
@@ -570,7 +572,7 @@ export function CanaisClient({
         </div>
 
         {geoStatus === 'error' && !localizacao ? (
-          <p className="text-xs text-[rgb(var(--color-danger))]">
+          <p className="text-xs text-danger">
             Permita a localização no navegador para ordenar por proximidade.
           </p>
         ) : null}
@@ -583,10 +585,13 @@ export function CanaisClient({
           {filtroUf ? ` · ${filtroUf}` : null}
           {filtroCidade ? ` · ${filtroCidade}` : null}
         </p>
+        {hintCapacidade ? (
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">{hintCapacidade}</p>
+        ) : null}
       </div>
 
       <AnimatePresence>
-        {criando && (
+        {criando && podeCriarCanal && (
           <m.form
             key="criar-canal"
             onSubmit={criar}

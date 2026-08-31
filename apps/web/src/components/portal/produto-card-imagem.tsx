@@ -6,13 +6,15 @@ import { ShoppingBag } from 'lucide-react'
 import { resolveProdutoImagens } from '@/lib/produto-imagem'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
-const CARD_IMG_CLASS =
+const CARD_IMG =
   'object-cover object-[center_18%] transition-opacity duration-300'
 
 interface ProdutoCardImagemProps {
   imagensUrl: string[]
   alt: string
   className?: string
+  /** Padrão `aspect-square`. Hub/brechó de loja oficial usa 16/9. */
+  aspectClass?: string
 }
 
 function ProdutoImg({
@@ -35,7 +37,7 @@ function ProdutoImg({
         alt={alt}
         fill
         sizes="(max-width: 640px) 50vw, 33vw"
-        className={[CARD_IMG_CLASS, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
+        className={[CARD_IMG, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
         referrerPolicy="no-referrer"
         onError={onError}
         onLoad={onLoad}
@@ -48,7 +50,7 @@ function ProdutoImg({
     <img
       src={src}
       alt={alt}
-      className={['absolute inset-0 h-full w-full', CARD_IMG_CLASS, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
+      className={['absolute inset-0 h-full w-full', CARD_IMG, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
       referrerPolicy="no-referrer"
       loading="lazy"
       decoding="async"
@@ -58,7 +60,12 @@ function ProdutoImg({
   )
 }
 
-export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardImagemProps) {
+export function ProdutoCardImagem({
+  imagensUrl,
+  alt,
+  className,
+  aspectClass = 'aspect-square',
+}: ProdutoCardImagemProps) {
   const imagens = resolveProdutoImagens(imagensUrl)
   const [hover, setHover] = useState(false)
   const [failed, setFailed] = useState<Set<number>>(() => new Set())
@@ -74,7 +81,8 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
     return (
       <div
         className={[
-          'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
+          'relative w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
+          aspectClass,
           className,
         ]
           .filter(Boolean)
@@ -90,7 +98,8 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
   return (
     <div
       className={[
-        'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
+        'relative w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
+        aspectClass,
         className,
       ]
         .filter(Boolean)

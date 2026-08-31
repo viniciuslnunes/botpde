@@ -28,7 +28,7 @@ export function ExportarLgeButton() {
           toast.success('Exportação LGE concluída.')
         })
       }
-      className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60"
+      className="app-touch-target rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60"
     >
       {pending ? 'Exportando…' : 'Exportar LGE (CSV)'}
     </button>

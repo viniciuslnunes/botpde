@@ -35,3 +35,27 @@ export function ordenarPar(aId, bId) {
 export function saoRivais(relation) {
   return relation === 'rival'
 }
+
+/**
+ * Escopos de `RivalidadeClube` que ISOLAM (par some do universo de interação).
+ *
+ * Por que não é todo par gravado: clássico interestadual (Flamengo x São Paulo,
+ * Corinthians x Cruzeiro) é rivalidade de calendário e de mídia — tratá-lo como
+ * isolamento apagaria boa parte da malha nacional entre torcidas sem ganho
+ * nenhum de segurança. `INTERESTADUAL` fica gravado como contexto (rotular
+ * jogo, moderação) e não entra na conta.
+ *
+ * Decisão de 2026-08-27, medida em `docs/data/auditoria-catalogo-clubes.md` §4.
+ * Para voltar atrás, basta incluir 'INTERESTADUAL' aqui.
+ *
+ * @type {readonly ('MUNICIPAL'|'ESTADUAL'|'INTERESTADUAL')[]}
+ */
+export const ESCOPOS_RIVALIDADE_ISOLANTE = ['MUNICIPAL', 'ESTADUAL']
+
+/**
+ * @param {string | null | undefined} escopo
+ * @returns {boolean}
+ */
+export function escopoIsola(escopo) {
+  return ESCOPOS_RIVALIDADE_ISOLANTE.includes(/** @type {never} */ (escopo))
+}

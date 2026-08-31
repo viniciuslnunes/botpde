@@ -21,6 +21,7 @@ const ROTAS = [
   { nome: '02-busca', path: '/portal/comunidade/busca' },
   { nome: '03-loja', path: '/portal/loja' },
   { nome: '04-eventos', path: '/portal/eventos' },
+  { nome: '04b-memoria', path: '/portal/memoria' },
   { nome: '05-carteirinha', path: '/portal/carteirinha' },
   { nome: '06-sedes', path: '/portal/sedes' },
   { nome: '07-mensagens', path: '/portal/mensagens' },

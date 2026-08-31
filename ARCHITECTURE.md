@@ -318,7 +318,7 @@ terceiros que o MVP não precisa.
 | 1 | ~~`src/` legado na raiz~~ | ✅ Removido em definitivo (2026-07-06, VIN-9), decisão conjunta após análise: confirmado idêntico a `apps/bot/src` (diff vazio), zero configs de build/deploy referenciando o `src/` da raiz (Railway do `bot-pde` roda com Root Directory `apps/bot`), nenhum dos dois tocado desde a migração pro monorepo. Remover não apaga histórico do Git (`git log --all -- src/` continua funcionando). Achado colateral corrigido junto: `apps/bot/src/assets/` estava no `.gitignore`, deixando `pdelogo.png` (usado em runtime por `apps/bot/src/events/ready.js`) sem nenhuma cópia versionada — corrigido antes da remoção (git detectou como rename, preservando o blob) | — |
 | 2 | ~~`dbo-bot-pde`~~ | ✅ Confirmado: mesmo banco de `torcida-web`, sem ação necessária | — |
 | 3 | ~~Visibilidade cross-tenant~~ | ✅ Feito (2026-07-03): `resolveVisibility`/`canViewRecurso` (`packages/types`) + `getTenantRelation`/`getTenantHierarquia` (`apps/web/src/lib/hierarquia.ts`) + página `/admin/hierarquia` provando o fluxo real | — |
-| 22 | ~~Aplicar `resolveVisibility` em mais telas~~ | ✅ Feito (2026-07-05) para comunidade e eventos; ✅ Feito (2026-07-10) para loja (superado em 2026-07-27: portal trocou o catálogo mesclado por listagem de lojas por unidade via `tenantsPermitidosLoja` — ver `docs/data/modulo-loja.md`) | — |
+| 22 | ~~Aplicar `resolveVisibility` em mais telas~~ | ✅ Feito (2026-07-05) para comunidade e eventos; ✅ Feito (2026-07-10) para loja; ✅ Recorte 2026-08-27: listagem do portal segue o tenant ativo (`escoparLojaAoPortalAtivo`) — Super Admin não leva o catálogo da torcida-casa ao trocar de canal (`docs/data/modulo-loja.md`, §5.28) | — |
 | 25 | ~~PRD "torcida organizada" — 8 regras de negócio~~ | ✅ Feito (2026-07-05), sem reescrever a arquitetura (decisão de escopo do usuário): (1) `SaasMembro.sedeId` — vínculo territorial explícito, escolhido no cadastro quando o tenant tem mais de uma `Sede`; (2)+(3)+(4) `Announcement`/`AnnouncementRead` (novo, distinto de `Post`) — comunicado oficial com prioridade/pin, gated por nova permissão `announcements:publish` (separada de `community:manage`), sempre ordenado acima do mural local em `getFeedComunidade()`; (5) moderação segue restrita ao próprio tenant (mesmo padrão de `tenantId` nas queries; itens herdados de ancestrais renderizam sem controles de edição); (6) eventos globais vs. restritos a uma unidade via `Evento.sedeId` + `SaasMembro.sedeId`; (7) `EventoRsvp.checkedInAt/checkedInPorId` — check-in real independente do status de RSVP, com botão dedicado em `/admin/eventos/[id]`; (8) `assertMembroAtivo()` (novo, `authz.ts`) bloqueia RSVP de membro pendente/reprovado ou sócio com carteirinha vencida. ⚠️ Nova permissão exige rodar `repair-system-role-permissions.js` depois do `db push` (mesmo padrão do item 18) | — |
 | 23 | ~~Bug crítico: `usuarioId` em vez de `atorId` no AuditLog~~ | ✅ Corrigido (2026-07-03): `admin/eventos/actions.ts`, `admin/sedes/actions.ts` e `portal/cadastro/actions.ts` gravavam `auditLog.create({ data: { usuarioId: ... } })`, mas o campo do schema é `atorId`. Sem `try/catch`, isso quebrava em runtime (Prisma "unknown argument") **depois** do registro principal já ter sido salvo — ou seja, criar/editar evento, criar/editar/ativar sede e enviar cadastro de torcedor todos quebravam com erro 500 mesmo tendo escrito o dado. TypeScript não acusava por causa do mesmo teto de inferência descrito na seção 5.2 (o objeto `data` silenciosamente virava `any`) | — |
 | 24 | ~~Ciclo na árvore de Sede~~ | ✅ Corrigido (2026-07-03): `editarSede` deixava escolher qualquer sede como pai, inclusive uma descendente da própria sede — isso criaria um ciclo que travaria para sempre `getTenantRelation`/`getTenantHierarquia` (recursão infinita). Adicionado `wouldCreateSedeCycle()` em `apps/web/src/lib/hierarquia.ts`, chamado em `editarSede` antes de gravar; `descendantTenantIds` também ganhou um guard de `visitados` como defesa em profundidade | — |
@@ -1268,9 +1268,14 @@ Festa das Crianças, Inclusão Digital). Spec:
   do departamento lista os próximos eventos do projeto; o thin Social
   prioriza essa agenda quando há vínculo.
 - **Campanha do ano (atalho sazonal).** Área `sazonal` ativa →
-  `abrirCampanhaDoAno` cria `Projeto` CAMPANHA `{área}-{ano}` com janela do
-  ano civil e `recorrenteAnual`, sem auto-criar evento. Próxima ação do
-  cockpit inclui orçamento estourado / na janela / área sem campanha.
+  `abrirCampanhaDoAno` (aba Áreas) ou **Ativar fluxo** no Painel cria
+  `Projeto` CAMPANHA `{área}-{ano}` + aplica checklist-modelo da área, sem
+  auto-criar evento. Outras receitas ativáveis: caravana ligada à `Partida`
+  fora, ensaio da semana, escala de bandeira (`Evento` GERAL + `partidaId`) e
+  ensaio de rua no Carnaval (`fluxos-actions.ts`). Prefs em
+  `Departamento.meta.fluxos` (vale / quando / quem). O calendário nacional
+  (mês civil, `Partida`, data do desfile) dispara a sugestão **antes** de
+  faltar o processo.
 - **Plugins F8:** Bateria `#escala` compõe Agenda (RSVP/presença); Social
   nudge de rateio; thin prioriza `Evento.projetoId` do departamento.
 
@@ -1367,7 +1372,9 @@ comentário. Nunca é critério de autorização.
 Mural do operador: `getCanalLeituraDireta` + `getPostsDoCanal({ leituraOperador })`
 (sem vínculo/`MembroConversa`). Super-admin troca cookie sem vínculo via
 `trocarTorcidaAction`. Barra multi-canal: cookie `operador_canais_abertos` +
-badge X (`fecharCanalOperadorAction`). Admin: botão "Ir ao portal" sob
+badge X (`fecharCanalOperadorAction`). Prefixo fixo **clube → torcida →
+unidade** mesmo com o portal na Sede; outras unidades da worktree abertas
+ficam na zona móvel (não se exclui a lineage inteira). Admin: botão "Ir ao portal" sob
 Afiliações; Caso A (`origem === 'sede'`) abre modal em vez do portal.
 
 ### 5.20 Responsividade mobile — auditoria medida em 320/390 (2026-08-05)
@@ -1414,6 +1421,108 @@ layout de Comunidade/admin, rodar
 Charts: `e2e/charts.measure.ts` (mesmas pré-condições) — falha se overflow > 2px
 ou texto vazar da coluna do MiniBarChart.
 
+#### 5.20.1 Segunda rodada — o que o estouro horizontal não pega (2026-08-27)
+
+> Guia prático (as quatro classes de alvo, as regras globais, o que
+> deliberadamente **não** se corrige e as 6 armadilhas de método):
+> `docs/frontend/mobile-first.md`. Esta seção é a decisão; aquele é o como-fazer.
+
+A rodada de 2026-08-05 zerou **estouro**. Mas "não estoura" não é "funciona no
+telefone": sobravam três defeitos que nenhuma medição de largura revela, e que
+são os que denunciam site-que-não-é-app. Cobertura nova em
+`e2e/responsivo.measure.ts` (30 rotas, em **320/390/430**, mais **768 tablet** e
+**844×390 paisagem**). Tablet e paisagem não são luxo: o botão de usuário do
+topbar é `hidden sm:block`, então **só existe acima de 640px** — as três
+larguras de telefone nunca o viam, e ele estava em ~32px. Paisagem é também o
+proxy testável do teclado virtual (o Playwright não emula o teclado do iOS, mas
+viewport baixa reproduz o layout espremido). Um segundo teste mede **estado
+aberto**: abre o modal e confere lá dentro — em paisagem o painel fica em
+358px de 390 (`92dvh`), enquanto o `92vh` antigo deixaria o rodapé de ações
+inalcançável.
+
+- **Zoom no foco do iOS.** Campo com fonte < 16px faz o Safari ampliar a página
+  ao focar e **não** desfazer ao sair. Havia ~144 pontos e nenhum componente
+  `Input` central — então a correção é uma regra só, em `globals.css`:
+  `@media (pointer: coarse)` põe `font-size: 16px` em input/select/textarea
+  (fora os que não abrem teclado). No mouse `text-sm` segue valendo.
+  A correção é a **fonte**, nunca `maximum-scale=1` no viewport — isso mataria
+  o zoom por gesto (WCAG 1.4.4).
+- **`100vh` ≠ altura visível.** `vh` é a viewport com a barra do navegador
+  retraída, então `h-screen` + `overflow-hidden` no `AdminShell` deixava o pé
+  da tela **inalcançável** no celular. Todo `vh` virou `dvh` (24 pontos), menos
+  o que está atrás de `lg:`/`xl:` — no desktop as duas unidades são iguais.
+- **Safe-area.** No mobile o `AppModal` é bottom sheet (`items-end` + `p-0`),
+  então o rodapé de ações encostava no home indicator (34px). O padding vai no
+  **painel**, não em cada rodapé: `sticky bottom-0` ancora no container de
+  rolagem, e quem conhece a distância até a borda da tela é o painel. Mesmo
+  tratamento nas folhas inline e na barra fixa de checkout da sacola (onde a
+  folga do conteúdo também passou a crescer com o inset).
+- **Alvo de toque nos dois eixos.** `.app-action` só impunha `min-height`, então
+  botão de ícone (`h-9 w-9`) ficava **36×44**: passava na altura, falhava na
+  largura — era o caso do hambúrguer e do sino em toda tela de admin. Ganhou
+  `min-width` sob `pointer: coarse`. Para UI densa (abas de módulo, paginação
+  de listagem) existe `.app-touch-target`, que cresce **só** no toque: usar
+  `.app-action` ali engordaria a tabela de quem opera no desktop. Link de texto
+  solto no card ("Ver departamento", cabeçalho de coluna ordenável) usa
+  `.app-touch-line`: a área vira 44px por pseudo-elemento e a diagramação não
+  muda — mas só onde o link está sozinho na linha, porque a faixa se sobrepõe
+  na vertical e perto de outro controle roubaria o toque.
+  **O `min-width` é `:not(.min-w-0)` — e isso não é detalhe.** A regra é
+  unlayered e vencia o `min-w-0` do Tailwind, então um botão declarado
+  `min-w-0 flex-1` (o `AcaoCard` do card de patrimônio) perdia a capacidade de
+  encolher e o `<article>` `overflow-hidden` passava a **cortar** 20px em
+  320px. Foi regressão introduzida pela própria correção de alvo e só apareceu
+  porque a auditoria rodou de novo depois — quem declara `min-w-0` está
+  dizendo "preciso encolher", e a válvula respeita isso.
+- **Estouro do checkout (320px).** `grid gap-8 lg:grid-cols-2` sem
+  `[&>*]:min-w-0`: o min-content do resumo do pedido virava o piso da coluna.
+  É o mesmo `min-width: auto` de item de grid da rodada anterior — sinal de que
+  a armadilha reaparece a cada layout novo, não de que faltou fix antes.
+
+Duas armadilhas de método que custaram caro e valem para a próxima auditoria:
+
+1. **Sem `hasTouch`/`isMobile` a medição mente.** É o que faz o Chrome casar
+   `@media (pointer: coarse)`. Sem isso mede-se a versão "mouse" do layout
+   mobile: `.app-action` reporta 40px em vez de 44, e o piso de 16px nem entra
+   em vigor. O relatório vira uma lista de defeitos falsos.
+2. **Relatório limpo pode ser dev server morto.** O Turbopack recompilando 28
+   rotas sob o Playwright estourou o heap (13,7 GB) e todas as páginas voltaram
+   vazias — o que o relatório registrou como "zero defeitos". Por isso a
+   auditoria grava `totalElementos` por rota, e a varredura é **rota-major**
+   (compila uma vez, mede as três larguras).
+3. **O dev server serve CSS obsoleto sem mudar o nome do chunk.** Uma regra
+   nova em `globals.css` não entrou no bundle, mas a URL (`..._globals_<hash>
+   .css`) continuou idêntica — a auditoria mediu 32px em elementos que já
+   tinham a classe de 44px e "provou" que a correção não funcionava.
+   `touch` não resolve (o hash é do conteúdo). Ao auditar CSS global, **baixe
+   o chunk e confira a regra** antes de acreditar no relatório:
+   `curl -s localhost:3000/_next/static/chunks/apps_web_src_app_globals_*.css
+   | grep <regra>`. Se faltar, force um rebuild com mudança real de conteúdo.
+
+Safe-area **não** é medível em headless: sem notch, `env(safe-area-inset-bottom)`
+resolve para 0 e o padding correto fica indistinguível do errado. Virou lint
+estático — `scripts/lint-mobile.mjs`, ligado no CI como `lint:mobile`, sem
+precisar de app nem de banco. Três regras: safe-area em barra fixa de rodapé,
+`vh` fora de breakpoint desktop, e **recorte lateral** (`viewportFit: 'cover'`
++ paisagem = o notch come ~44px de um lado, e `px-4` esconde o conteúdo embaixo
+dele; `.app-inset-x` resolve, com folga base em `--app-inset-x`).
+Como esse lint é a **única** rede para safe-area, ele próprio é testado:
+`src/lib/__tests__/lint-mobile.test.ts` roda o script contra fixtures e exige
+que dispare nas três violações e fique quieto nas duas exceções legítimas
+(`vh` atrás de `lg:`; drawer `top-N`, cujo inset é do conteúdo). Lint que nunca
+dispara é pior que nenhum — dá sensação de cobertura.
+
+**Rota dinâmica: id vem do banco, não de varredura da UI** (`scripts/rotas-dinamicas.mjs`,
+`pnpm --filter @torcida/web rotas:dinamicas`). A auditoria antes procurava
+`<a href>` para o detalhe na página de listagem e achava 2 de 8 famílias. A
+causa não era falta de dado semeado — era a premissa: canal abre com `<button>`
++ `router.push` (`AbrirCanalNaBarraLink`), `/portal/sedes` é master-detail na
+própria página e **nada** no app aponta para `/portal/sedes/[id]`, e
+`/admin/torcedores/[id]` só é linkado de dentro de um modal. Com os ids saindo
+do banco são 7 famílias, e as queries são **escopadas ao tenant do usuário de
+teste**: sem isso o primeiro registro pode ser de outra torcida, a rota
+redireciona e mede-se a página errada achando que mediu a certa.
+
 ### 5.21 Troca de gestão — presidência e liderança de unidade (2026-08-06)
 
 Presidente de torcida não é vitalício: a gestão troca a cada 3–4 anos. Até aqui
@@ -1452,10 +1561,13 @@ Sede que também é sócio real da subsede tem vínculo legítimo. Carteirinha
 unidade que o produto tem:
 
 - **Caso B** (Sede raiz e unidade promovida): liderança é o cargo de sistema
-  `owner`. Trocar move `UserRole`, garante `SaasMembro` APROVADO, vincula canais
-  e alinha `Sede.responsavelUserId` da unidade do tenant.
+  `owner`. **No máximo um** por tenant (`MAX_PRESIDENTES = 1`) — atribuir um
+  segundo pelo painel de Acessos é recusado; a troca passa por Estrutura ›
+  Presidência (`transferirLideranca`), que demove o anterior. A ficha da
+  unidade (`/admin/sedes/[id]`) lê o owner, não só `Sede.responsavelUserId`
+  (os dois ficam alinhados na transferência).
 - **Caso A** (subsede/PDE sem portal): não há cargo — liderança é
-  `Sede.responsavelUserId`, identidade sem RBAC próprio.
+  `Sede.responsavelUserId`, identidade sem RBAC próprio (já singular).
 
 Sempre com `AuditLog` (`LIDERANCA_TRANSFERIDA`, `LIDERANCA_UNIDADE_TRANSFERIDA`,
 `LIDERANCA_UNIDADE_REMOVIDA`, `OWNER_REMOVIDO`) e notificação aos dois lados.
@@ -1692,6 +1804,109 @@ medida; guia com receitas e armadilhas: `docs/frontend/react-compiler.md`.
   bailout do `useVirtualizer` — e 17 `set-state-in-effect` onde a reescrita mexe
   em fluxo de verdade (restauração de rascunho do `wizard`, medição do
   `anchored-popover`). Atacar **um por vez**, com conferência de tela.
+
+### 5.28 Loja segue o tenant ativo (2026-08-27)
+
+A listagem `/portal/loja` unia **todos** os `SaasMembro` APROVADO do usuário.
+Super Admin (presidente dos Gaviões) que trocava o canal para a Mancha via
+`torcida_ctx` via a navbar certa e o catálogo errado: cards e destaques da
+rival. A Comunidade já tinha fonte única = tenant ativo (§5.19); a loja não.
+
+**Regra:** vitrine = worktree do portal ativo (`getVisibleTenantIds(ativo,
+'loja')`) + aliados só se sócio dessa worktree. Compra = vínculo intersectado
+com essa vitrine. Super-admin operador **lê** o catálogo que está operando e
+**não** compra sem vínculo. Nenhum tenant rival/unrelated entra, mesmo com
+membership na torcida-casa. Função pura `escoparLojaAoPortalAtivo`
+(`lib/loja-escopo.ts`); invariantes em `lib/__tests__/loja-escopo.test.ts`.
+
+### 5.29 Catálogo de clubes — fonte por campo e rivalidade com escopo (2026-08-27)
+
+O catálogo era nome + UF + escudo + série. A auditoria contra fontes externas
+(`docs/data/auditoria-catalogo-clubes.md`) mostrou três buracos com efeito de
+produto: **91 clubes do Ranking Nacional de Clubes da CBF não existiam** (o
+torcedor do Retrô ou do Amazonas não achava o time no onboarding); **10% das
+cidades não eram município** (vinham do endereço da torcida — "Estádio Moça
+Bonita", "571 Curitiba"); e `RivalidadeClube` tinha **12 pares, todos do lote
+de teste** — Re-Pa, Ba-Vi, Clássico-Rei e Atletiba não isolavam nada.
+
+**Decisões:**
+
+1. **Uma fonte por campo, cada uma com o que ela mede** (catálogo avaliado em
+   `docs/knowledge/fontes-dados-clubes.md`): CBF/RNC = existência profissional e
+   relevância; Wikidata = fundação, estádio, capacidade, coordenada, site;
+   Ogol = fundação e id externo; malha do IBGE = validador de cidade;
+   Datafolha × Censo = torcedores; escudo no Cloudinary = cor. Cada campo novo
+   de `Afiliacao` guarda também a procedência (`coresFonte`, `rncEdicao`,
+   `wikidataQid`, `ogolId`).
+2. **Rivalidade tem escopo.** `EscopoRivalidade` = `MUNICIPAL | ESTADUAL |
+   INTERESTADUAL`, e só os dois primeiros isolam
+   (`ESCOPOS_RIVALIDADE_ISOLANTE` em `@torcida/types`). Clássico interestadual
+   (Flamengo × São Paulo) fica gravado como contexto: tratá-lo como isolamento
+   apagaria boa parte da malha nacional entre torcidas sem ganho de segurança.
+   Mais: nem todo clássico intraestadual isola — o dataset marca `isola` e o
+   critério é **mesma cidade ou clássico nomeado** (Guarani × São Paulo é jogo
+   tradicional, não conflito de torcida).
+3. **Nome + UF não é chave.** Homônimo (Bahia × Bahia de Feira, Democrata GV ×
+   SL) é resolvido por id externo e cidade; `chaveCanonicaClube` resolve alias
+   em ciclo escolhendo representante estável, e `indexarClubes` devolve as
+   colisões em vez de escondê-las — seed pula e reporta em vez de sobrescrever
+   o clube errado.
+4. **Torcida ganha situação de registro.** `SituacaoRegistroTorcida` a partir da
+   lista publicada pela federação estadual (FPF). O enum é
+   `SEM_REGISTRO_CONHECIDO`, não "irregular": ausência da lista não prova
+   inexistência.
+
+Aplicação por seeds idempotentes (`seed:clubes-rnc`, `seed:ficha-clubes`,
+`seed:rivalidades-clubes`, `seed:torcidas-registro`, `repair:clubes-curados`),
+medição contínua por `audit:catalogo-clubes` e invariantes puros em
+`test:catalogo-clubes`.
+
+### 5.30 Memória — linha do tempo (2026-08-30)
+
+Superfície `/portal/memoria`: o eixo é o **dia civil** (fuso SP), não o feed.
+**Fases 1–5 entregues:** unidade + linhagem + clube (Partida abre o dia no
+recorte clube; só `PUBLICO`/`alcanceNacional`); fato atrasado (`MemoriaFato`,
+nunca reescreve `Post.criadoEm`); aliados bilaterais (`Tenant.memoriaAliados`
+default off, `settings:manage` na raiz); “quem estava” só com check-in +
+opt-in (`PerfilMembro.memoriaPresencaVisivel`) no mesmo tenant. O recorte
+segue o canal da Comunidade (cookie / top bar): CN = só clube (sem caravana
+de unidade); torcida = linhagem; unidade = a unidade com chip opcional para
+a torcida. Espinha pagina o mês civil (todos os dias, busca de data). Ícone
+na top bar também na CN (`?escopo=clube`). Fila em `/admin/comunidade/memoria`.
+Recurso `memoria` é `publico` e **não** cascateia em R5. Contrato:
+`packages/types/src/memoria.js`. Doc: `docs/data/modulo-memoria.md`.
+
+### 5.31 Brechó P2P entre sócios (2026-08-30)
+
+Troca informal de camisa e material **pessoal** entre sócios é prática
+cotidiana; bandeirão / trapo / uniforme de jogo **não** — são `PatrimonioItem`
+com vistoria e escala. O brechó é uma praça nova, não uma `SaasCategoria`
+do catálogo oficial: `BrechoLoja` + `BrechoAnuncio` na Sede raiz, sócio
+aprovado na linhagem, R5 como a loja (unidade isolada não entra na praça
+nacional). Aliados desligados (`Tenant.brechoAliados`, owner da raiz).
+Interesse abre `Conversa` GRUPO; denúncia chama `STORE_*` de qualquer unidade
+da linhagem. Score de confiança só no servidor, com peso em contraparte única.
+Na UI o ranking é **0–5 estrelas relativas à praça** (5 = maior score ativo
+da unidade) mais o número de **trocas** (venda, troca ou doação confirmada).
+No hub `/portal/loja` a listagem é a mesma em toda torcida: grade de lojas
+oficiais, depois a praça do brechó (card da torcida + as duas vitrines de
+sócio mais confiáveis, com capa) acima dos destaques. Isolamento = raiz
+do tenant ativo. Quem não é sócio da linhagem vê o card da praça, mas o
+feed recusa. Doc: `docs/data/modulo-brecho.md`.
+Regras puras em `packages/types/src/brecho.js`.
+
+### 5.32 Confiança na torcida — ledger (2026-08-30)
+
+Confiança **não** é permissão. `assertPermission` continua o único gate admin;
+o score é um segundo eixo, sempre AND restritivo:
+`groups:create`/`channels:manage`/`meetings:host` **e**
+`temCapacidade(nivel, …)` no tenant (não na Comunidade Nacional). Eixo **local**
+(`ConfiancaEvento` + `ConfiancaSaldo` por tenant): check-in, mensalidade paga,
+aprovação/reprovação com laudo. Post/reação peso zero. Cargo `owner`/`admin`/`vice`
+dá piso de nível 2 (lido ao vivo no gate). Score privado; badge de nível no
+perfil; sem ranking. Distinto do score do brechó e do `ForumScoreSaldo`.
+Doc: `docs/data/modulo-confianca.md`. Regras puras em
+`packages/types/src/confianca.js`.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

@@ -10,6 +10,7 @@ import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/acti
 import {
   NotificationAvatar,
   formatarTituloNotificacao,
+  formatarQuandoNotificacao,
 } from '@/components/portal/notification-item-visual'
 import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
@@ -24,12 +25,6 @@ export interface NotificationItem {
   lida: boolean
   criadoEm: Date | string
   ator: { id: string; nome: string | null; avatarUrl: string | null } | null
-}
-
-function formatarData(data: Date | string) {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(data),
-  )
 }
 
 function itemsSignatureOf(items: NotificationItem[]): string {
@@ -191,13 +186,11 @@ export function NotificationBell({
                           <p className="text-sm font-medium text-[rgb(var(--foreground))]">
                             {formatarTituloNotificacao(item)}
                           </p>
-                          {item.corpo && (
-                            <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                              {item.corpo}
-                            </p>
-                          )}
+                          <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                            {item.corpo?.trim() || item.titulo}
+                          </p>
                           <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">
-                            {formatarData(item.criadoEm)}
+                            {formatarQuandoNotificacao(item.criadoEm)}
                           </p>
                         </span>
                       </span>

@@ -53,9 +53,10 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
   const [pending, startTransition] = useTransition()
 
 
-  const naTelaDeAtualizacao = pendencias.some(
-    (p) => pathname === p.href || pathname.startsWith(`${p.href}/`),
-  )
+  const naTelaDeAtualizacao = pendencias.some((p) => {
+    const path = (p.href.split('#')[0] ?? p.href).split('?')[0] ?? p.href
+    return pathname === path || pathname.startsWith(`${path}/`)
+  })
   const principal = pendencias[0] ?? null
   const aberta =
     mounted &&
@@ -116,7 +117,7 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
       aria-labelledby={tituloId}
       data-pendencia-cadastro="aberta"
     >
-      <div className="relative max-h-[min(90vh,42rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl">
+      <div className="relative max-h-[min(90dvh,42rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
             <IdCard className="h-5 w-5" aria-hidden />
@@ -208,14 +209,14 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
             type="button"
             disabled={pending || !ciencia}
             onClick={dispensar}
-            className="rounded-xl border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+            className="app-action rounded-xl border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
           >
             Ocultar aviso
           </button>
           <button
             type="button"
             onClick={irAtualizar}
-            className="rounded-xl bg-[rgb(var(--color-primary))] px-4 py-2.5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]"
+            className="btn-primary app-action inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold"
           >
             Atualizar cadastro
           </button>

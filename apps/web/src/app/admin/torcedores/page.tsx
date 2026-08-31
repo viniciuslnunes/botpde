@@ -12,7 +12,8 @@ import {
 import { assertPermission } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { getAncestorTenantIds, tenantsAreRivais } from '@/lib/hierarquia'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { alertasRecrutamentoCrossTenant } from '@/lib/membro-alertas-cross-tenant'
 import {
   distribuirMembros,
   resumirFilaPendentes,
@@ -34,7 +35,7 @@ import {
 import {
   AdminChartPeriodFilter,
   AdminExpansionPanel,
-  AdminTabs,
+  AdminPendingTabs,
   ListagemPaginacao,
   ListagemTh,
   ListagemToolbar,
@@ -64,6 +65,7 @@ import {
 } from '@/lib/listagem/query'
 import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { mapToAdminMembroItem } from '@/lib/admin-membro-map'
+import { carregarResumoRecrutamento } from '@/lib/membro-recrutamento-logs'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { AdminMembrosTable } from '@/app/admin/membros/admin-membros-client'
 import { ExportarLgeButton } from '@/app/admin/membros/exportar-lge-button'
@@ -84,6 +86,7 @@ const SPEC = LISTAGEM_TORCEDORES
 const COLUNA_CLASSE: Record<string, string> = {
   departamento: 'hidden md:table-cell',
   sede: 'hidden lg:table-cell',
+  origem: '',
   cidade: 'hidden xl:table-cell',
   status: 'hidden sm:table-cell',
   criadoEm: 'hidden 2xl:table-cell',
@@ -678,72 +681,21 @@ export default async function TorcedoresPage({
     .filter((m: (typeof membros)[number]) => m.tipo === 'SOCIO')
     .map((m: (typeof membros)[number]) => m.userId)
   const membroIds = membros.map((m: (typeof membros)[number]) => m.id)
-  type LogMembro = {
-    entidadeId: string | null
-    acao: string
-    detalhes: unknown
-    criadoEm: Date
-  }
 
-  // As três leituras secundárias são independentes → um round-trip só.
-  // - rival: sócio já aprovado como sócio em torcida rival (booleano p/ o client);
-  // - reprovações: contagem de reprovações em recrutamento de outra torcida;
-  // - logs: tentativas + motivo da última reprovação (AuditLog, sem mudar schema).
-  const [sociosOutrosTenants, reprovacoesOutrosTenants, logsMembros]: [
-    { userId: string; tenantId: string }[],
-    { userId: string }[],
-    LogMembro[],
+  // Rival/reprovação só em torcidas rivais (LGPD: decisão de outro clube
+  // não-rival não vaza). Logs: tentativas, motivo da última reprovação e canal
+  // de entrada (convite × onboarding).
+  const [alertasCross, resumoRecrutamento]: [
+    Awaited<ReturnType<typeof alertasRecrutamentoCrossTenant>>,
+    Awaited<ReturnType<typeof carregarResumoRecrutamento>>,
   ] = await Promise.all([
-    userIdsSocios.length > 0
-      ? db.saasMembro.findMany({
-          where: {
-            userId: { in: userIdsSocios },
-            status: 'APROVADO',
-            tipo: 'SOCIO',
-            tenantId: { not: tenant.id },
-          },
-          select: { userId: true, tenantId: true },
-        })
-      : Promise.resolve([]),
-    userIdsSocios.length > 0
-      ? db.saasMembro.findMany({
-          where: {
-            userId: { in: userIdsSocios },
-            status: 'REPROVADO',
-            tipo: 'SOCIO',
-            tenantId: { not: tenant.id },
-          },
-          select: { userId: true },
-        })
-      : Promise.resolve([]),
-    membroIds.length > 0
-      ? db.auditLog.findMany({
-          where: {
-            tenantId: tenant.id,
-            entidade: 'SaasMembro',
-            entidadeId: { in: membroIds },
-            acao: { in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'] },
-          },
-          orderBy: { criadoEm: 'desc' },
-          select: { entidadeId: true, acao: true, detalhes: true, criadoEm: true },
-        })
-      : Promise.resolve([]),
+    alertasRecrutamentoCrossTenant(tenant.id, userIdsSocios),
+    carregarResumoRecrutamento(tenant.id, membroIds),
   ])
-
-  // Rival: resolve a rivalidade dos tenants distintos encontrados.
-  let userIdsComRivalSocio = new Set<string>()
-  if (sociosOutrosTenants.length > 0) {
-    const outrosTenantIds = [...new Set(sociosOutrosTenants.map((s) => s.tenantId))]
-    const checagens = await Promise.all(
-      outrosTenantIds.map(
-        async (id) => [id, await tenantsAreRivais(tenant.id, id)] as const,
-      ),
-    )
-    const tenantsRivais = new Set(checagens.filter(([, rival]) => rival).map(([id]) => id))
-    userIdsComRivalSocio = new Set(
-      sociosOutrosTenants.filter((s) => tenantsRivais.has(s.tenantId)).map((s) => s.userId),
-    )
-  }
+  const { userIdsComRivalSocio, reprovacoesRivalPorUser: reprovacoesOutraTorcidaPorUser } =
+    alertasCross
+  const { tentativasPorMembro, motivoReprovacaoPorMembro, origemCanalPorMembro } =
+    resumoRecrutamento
 
   // Área pretendida × área em vigor: com a fila first-wins da torcida, o nível
   // que não decidiu fica com a área pendente até efetivar aqui.
@@ -764,34 +716,6 @@ export default async function TorcedoresPage({
     select: { userId: true },
   })
   const bloqueadosUserIds = [...new Set(bloqueios.map((b) => b.userId))]
-
-  const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
-  for (const r of reprovacoesOutrosTenants) {
-    reprovacoesOutraTorcidaPorUser.set(
-      r.userId,
-      (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
-    )
-  }
-  const tentativasPorMembro = new Map<string, number>()
-  const motivoReprovacaoPorMembro = new Map<string, string>()
-  for (const log of logsMembros) {
-    if (!log.entidadeId) continue
-    if (log.acao === 'CADASTRO_SOLICITADO' || log.acao === 'RECADASTRO_SOLICITADO') {
-      tentativasPorMembro.set(log.entidadeId, (tentativasPorMembro.get(log.entidadeId) ?? 0) + 1)
-    }
-    // Logs em ordem decrescente — o primeiro MEMBRO_REPROVADO é o mais recente.
-    if (log.acao === 'MEMBRO_REPROVADO' && !motivoReprovacaoPorMembro.has(log.entidadeId)) {
-      const detalhes = log.detalhes
-      if (
-        detalhes &&
-        typeof detalhes === 'object' &&
-        'motivo' in detalhes &&
-        typeof (detalhes as { motivo: unknown }).motivo === 'string'
-      ) {
-        motivoReprovacaoPorMembro.set(log.entidadeId, (detalhes as { motivo: string }).motivo)
-      }
-    }
-  }
 
   const unidadeOrigemIds = [
     ...new Set(
@@ -891,7 +815,7 @@ export default async function TorcedoresPage({
             </div>
           </div>
 
-        <AdminTabs
+        <AdminPendingTabs
           tabs={tabs.map((tab) => ({
             id: tab.status,
             label: tab.label,
@@ -1026,6 +950,7 @@ export default async function TorcedoresPage({
                 atualizadoEm: membro.atualizadoEm,
                 espelhado: membro.espelhado,
                 aprovadoNaUnidadeTenantId: membro.aprovadoNaUnidadeTenantId,
+                importacaoId: membro.importacaoId,
                 user: {
                   email: membro.user.email,
                   avatarUrl: membro.user.avatarUrl,
@@ -1050,6 +975,7 @@ export default async function TorcedoresPage({
                     : undefined,
                 tentativas: tentativasPorMembro.get(membro.id) ?? 1,
                 ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
+                origemCanal: origemCanalPorMembro.get(membro.id) ?? null,
                 areasEfetivadas: areasEfetivadasPorUser.get(membro.userId) ?? new Set<string>(),
               },
             ),

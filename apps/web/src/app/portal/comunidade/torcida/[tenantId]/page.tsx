@@ -6,6 +6,7 @@ import { getPostIdsSalvos, getPostsPublicosDoTenant } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { LogoImage } from '@/components/media/logo-image'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
+import { linhaSetorArquibancada, resolverSetorArquibancada } from '@/lib/setor-arquibancada'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Torcida — Comunidade' }
@@ -21,9 +22,10 @@ export default async function TorcidaComunidadePublicaPage({
   const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
   if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 
-  const [perfil, salvoIds] = await Promise.all([
+  const [perfil, salvoIds, setor] = await Promise.all([
     getPostsPublicosDoTenant(targetTenantId, session.user.id, tenant.id),
     getPostIdsSalvos(session.user.id, tenant.id),
+    resolverSetorArquibancada(targetTenantId),
   ])
   if (!perfil) notFound()
 
@@ -72,6 +74,11 @@ export default async function TorcidaComunidadePublicaPage({
               {perfil.tenant.nome}
             </h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">@{perfil.tenant.slug}</p>
+            {linhaSetorArquibancada(setor) ? (
+              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+                {linhaSetorArquibancada(setor)}
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
               Sem posts restritos a sócio desta torcida.
             </p>

@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
-import { getActiveTenant } from '@/lib/tenant'
+import { assertPodeBuscarNaComunidade } from '@/lib/authz'
 import {
   resolverContextoComunidade,
   resolverEscopoComunidade,
+  resolverTenantIdBuscaComunidade,
 } from '@/lib/comunidade-contexto'
 import { buscarMembrosComunidade } from '@/lib/comunidade-busca'
 
 /**
  * Typeahead de menções no composer. Aceita `?escopo=nacional` para a
  * Comunidade Nacional (torcedor global / aba Nacional) — mesmo padrão da
- * busca unificada; sem isso `assertMembroAtivo` quebra no tenant sintético.
+ * busca unificada.
+ *
+ * Autorização: leitura. Super-admin sem `SaasMembro` na TO ativa consulta;
+ * o recorte é o tenant do escopo + `resolveVisibleTenantIdsForFeed`
+ * (hierarquia + aliados; rivais fora; operador numa TO real não vê coirmãs).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,30 +34,17 @@ export async function GET(request: NextRequest) {
 
     const escopoDesejado = resolverEscopoComunidade(ctx, escopoParam)
     const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
-
-    let tenantId: string | null = null
-    if (escopo === 'nacional' && ctx.tenantSintetico) {
-      tenantId = ctx.tenantSintetico.id
-    } else if (ctx.modo === 'torcida') {
-      tenantId = ctx.tenant.id
-      await assertMembroAtivo(tenantId, session.user.id)
-    } else if (ctx.torcidaReal) {
-      tenantId = ctx.torcidaReal.id
-    } else if (ctx.tenantSintetico) {
-      tenantId = ctx.tenantSintetico.id
-    } else {
-      const ativo = await getActiveTenant(session.user.id, session.user.email)
-      if (ativo) {
-        tenantId = ativo.id
-        if (!ativo.sintetico) await assertMembroAtivo(tenantId, session.user.id)
-      }
-    }
+    const tenantId = resolverTenantIdBuscaComunidade(ctx, escopo)
 
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant não resolvido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
-    const membros = await buscarMembrosComunidade(tenantId, session.user.id, q)
+    await assertPodeBuscarNaComunidade(tenantId, session.user.id, session.user.email)
+
+    const membros = await buscarMembrosComunidade(tenantId, session.user.id, q, {
+      modo: 'rapida',
+    })
 
     return NextResponse.json({ membros })
   } catch (error) {

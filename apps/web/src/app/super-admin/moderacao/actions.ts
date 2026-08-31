@@ -5,9 +5,22 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarSafe, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 
 const denunciaIdSchema = z.object({ denunciaId: z.string().min(1) })
+
+async function reconciliarDenunciaNova(
+  tenantId: string | null,
+  denuncianteId: string,
+  motivo: string,
+): Promise<void> {
+  if (!tenantId) return
+  await reconciliarNotificacoesDoEvento(tenantId, {
+    tipo: 'DENUNCIA_NOVA',
+    atorId: denuncianteId,
+    corpo: motivo.slice(0, 140),
+  })
+}
 
 async function exigirSuperAdmin() {
   const session = await auth()
@@ -24,9 +37,11 @@ export async function resolverDenunciaSuperAdminAction(denunciaId: string): Prom
 
   const denuncia = await db.denuncia.findFirst({
     where: { id: parsed.data.denunciaId, status: 'PENDENTE' },
-    select: { id: true, tenantId: true, postId: true, denuncianteId: true },
+    select: { id: true, tenantId: true, postId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await reconciliarDenunciaNova(denuncia.tenantId, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({
@@ -64,9 +79,11 @@ export async function descartarDenunciaSuperAdminAction(denunciaId: string): Pro
 
   const denuncia = await db.denuncia.findFirst({
     where: { id: parsed.data.denunciaId, status: 'PENDENTE' },
-    select: { id: true, tenantId: true, denuncianteId: true },
+    select: { id: true, tenantId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await reconciliarDenunciaNova(denuncia.tenantId, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({
@@ -103,9 +120,11 @@ export async function resolverDenunciaMensagemSuperAdminAction(denunciaId: strin
 
   const denuncia = await db.denunciaMensagem.findFirst({
     where: { id: parsed.data.denunciaId, status: 'PENDENTE' },
-    select: { id: true, tenantId: true, mensagemId: true, denuncianteId: true },
+    select: { id: true, tenantId: true, mensagemId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await reconciliarDenunciaNova(denuncia.tenantId, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({
@@ -143,9 +162,11 @@ export async function descartarDenunciaMensagemSuperAdminAction(denunciaId: stri
 
   const denuncia = await db.denunciaMensagem.findFirst({
     where: { id: parsed.data.denunciaId, status: 'PENDENTE' },
-    select: { id: true, tenantId: true, denuncianteId: true },
+    select: { id: true, tenantId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await reconciliarDenunciaNova(denuncia.tenantId, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({

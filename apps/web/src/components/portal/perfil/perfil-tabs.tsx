@@ -29,7 +29,7 @@ export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
             href={`/portal/comunidade/perfil/${userId}?aba=${aba.id}`}
             aria-current={ativo ? 'page' : undefined}
             className={[
-              'relative -mb-px shrink-0 pb-3 pt-1 text-sm font-semibold transition-colors',
+              'app-touch-target relative -mb-px shrink-0 pb-3 pt-1 text-sm font-semibold transition-colors',
               ativo
                 ? 'text-[rgb(var(--foreground))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',

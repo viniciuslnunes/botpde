@@ -117,7 +117,7 @@ export function StickyPersistBar({
         ? createPortal(
             // z-20 < sidebar admin (z-60): barra nunca cobre o menu.
             // pointer-events no enter/exit evita ghost em opacity:0.
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
+            <div className="app-inset-x pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 [--app-inset-x:0.75rem] sm:[--app-inset-x:1rem]">
               <AnimatePresence>
                 {visible ? (
                   <m.div

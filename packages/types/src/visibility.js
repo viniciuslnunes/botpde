@@ -22,6 +22,12 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
   eventos: SENSIBILIDADE.PUBLICO,
   comunidade: SENSIBILIDADE.PUBLICO,
   /**
+   * Linha do tempo (`/portal/memoria`). Social, não institucional: canal
+   * restrito (R5) **não** cascateia memória. Aliado só vê com as duas flags
+   * `memoriaAliados` — ver `aliadoPodeVerMemoria` e `docs/data/modulo-memoria.md`.
+   */
+  memoria: SENSIBILIDADE.PUBLICO,
+  /**
    * Comunicado oficial (`Announcement`). Mesma sensibilidade de `comunidade`,
    * mas recurso PRÓPRIO de propósito: com canal restrito (R5) a unidade deixa
    * de ver o FEED da Sede e continua recebendo os COMUNICADOS dela. Sem essa
@@ -145,4 +151,27 @@ export function relationFromLineage(targetIsAncestorOfActor, targetIsDescendantO
   if (targetIsAncestorOfActor) return 'descendant'
   if (targetIsDescendantOfActor) return 'ancestor'
   return 'unrelated'
+}
+
+/**
+ * Descoberta de torcida (busca de aliança, preview de posts públicos, typeahead).
+ * Rival é inexistente — 404 / lista vazia, nunca 403.
+ * Hierarquia e aliados seguem o contrato de `canViewRecurso('comunidade')`.
+ * `unrelated` (não-rival) pode ver a vitrine pública para avaliar aliança;
+ * o caller ainda corta canal restrito (R5) e rivalidade crua mascarada pelo isolamento.
+ *
+ * @param {import('./visibility.js').TenantRelation} relation
+ * @returns {boolean}
+ */
+export function podeDescobrirTorcida(relation) {
+  if (relation === 'rival') return false
+  if (
+    relation === 'self' ||
+    relation === 'ancestor' ||
+    relation === 'descendant' ||
+    relation === 'allied'
+  ) {
+    return true
+  }
+  return relation === 'unrelated'
 }

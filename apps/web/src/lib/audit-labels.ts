@@ -113,6 +113,11 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   DENUNCIA_MENSAGEM_DESCARTADA: 'Denúncia de mensagem descartada',
   NOTICIA_APROVADA: 'Notícia aprovada',
   NOTICIA_REJEITADA: 'Notícia rejeitada',
+  ARTIGO_PUBLICADO: 'Artigo publicado na praça',
+  FONTE_VERIFICADA_CONCEDIDA: 'Fonte verificada concedida',
+  FONTE_VERIFICADA_REVOGADA: 'Fonte verificada revogada',
+  TOPICO_FIXADO: 'Tópico do fórum fixado ou desafixado',
+  TOPICO_OCULTO: 'Tópico do fórum ocultado',
 
   // Acesso / governança
   ACESSO_USUARIO_ATUALIZADO: 'Acesso de usuário atualizado',
@@ -168,6 +173,14 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   CLUBE_EXCLUIDO: 'Clube excluído',
   CLUBE_RIVALIDADE_ADICIONADA: 'Rivalidade adicionada',
   CLUBE_RIVALIDADE_REMOVIDA: 'Rivalidade removida',
+
+  // Patrimônio / bandeiras / bateria
+  PATRIMONIO_ITEM_CRIADO: 'Item de inventário cadastrado',
+  PATRIMONIO_ITEM_EDITADO: 'Item de inventário editado',
+  PATRIMONIO_ITEM_BAIXADO: 'Item baixado do inventário',
+  PATRIMONIO_ITEM_EXCLUIDO: 'Item excluído permanentemente',
+  PATRIMONIO_EMPRESTIMO_ABERTO: 'Empréstimo de patrimônio aberto',
+  PATRIMONIO_EMPRESTIMO_DEVOLVIDO: 'Empréstimo de patrimônio devolvido',
 }
 
 export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
@@ -183,6 +196,8 @@ export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
   Announcement: 'Comunicado',
   Denuncia: 'Denúncia',
   Noticia: 'Notícia',
+  ArtigoPortal: 'Artigo da praça',
+  ForumTopico: 'Tópico do fórum',
   Role: 'Cargo',
   Departamento: 'Departamento',
   Tenant: 'Torcida',
@@ -204,6 +219,8 @@ export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
   BarCaixaTurno: 'Turno de caixa (Bar)',
   BarMovimentacaoEstoque: 'Movimentação de estoque (Bar)',
   Afiliacao: 'Clube',
+  PatrimonioItem: 'Patrimônio',
+  PatrimonioEmprestimo: 'Empréstimo de patrimônio',
 }
 
 export function labelAcaoAuditoria(acao: string): string {

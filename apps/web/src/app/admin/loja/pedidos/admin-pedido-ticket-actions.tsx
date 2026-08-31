@@ -6,6 +6,7 @@ import { MessageSquare, UserCheck, XCircle } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import { atenderTicketPedido, fecharTicketPedido } from '@/app/admin/loja/actions'
 import { STATUS_PEDIDO_TICKET } from '@torcida/types'
+import { AdminRowActions, type AdminRowActionItem } from '@/components/admin/ui'
 
 export interface PedidoTicketUi {
   id: string
@@ -68,48 +69,46 @@ export function AdminPedidoTicketActions({ ticket, podeGerir }: AdminPedidoTicke
     })
   }
 
+  const items: AdminRowActionItem[] = []
+  if (ticket.status === 'ABERTO') {
+    items.push({
+      id: 'atender',
+      label: pending ? 'Abrindo…' : 'Atender',
+      icon: UserCheck,
+      disabled: pending,
+      onSelect: atender,
+    })
+  }
+  if (ticket.status === 'ATENDENDO' || ticket.status === 'FECHADO') {
+    items.push({
+      id: 'chat',
+      label: 'Chat',
+      icon: MessageSquare,
+      onSelect: irAoChat,
+    })
+  }
+  if (ticket.status !== 'FECHADO' && podeGerir) {
+    items.push({
+      id: 'fechar',
+      label: 'Fechar ticket',
+      icon: XCircle,
+      tone: 'muted',
+      disabled: pending,
+      onSelect: fechar,
+    })
+  }
+
   return (
-    <div className="flex flex-col items-start gap-1.5">
-      <Badge variant={variant}>{info.label}</Badge>
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex items-center gap-2">
+        <Badge variant={variant}>{info.label}</Badge>
+        <AdminRowActions ariaLabel={`Ações do ticket (${info.label})`} items={items} />
+      </div>
       {ticket.atendenteNome && ticket.status !== 'ABERTO' && (
         <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
           Atendente: {ticket.atendenteNome}
         </p>
       )}
-      <div className="flex flex-wrap gap-1">
-        {ticket.status === 'ABERTO' && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={atender}
-            className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--primary))] px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
-          >
-            <UserCheck className="h-3 w-3" />
-            Atender
-          </button>
-        )}
-        {(ticket.status === 'ATENDENDO' || ticket.status === 'FECHADO') && (
-          <button
-            type="button"
-            onClick={irAoChat}
-            className="inline-flex items-center gap-1 rounded-md border border-[rgb(var(--border))] px-2 py-1 text-[11px] font-medium hover:bg-[rgb(var(--background-subtle))]"
-          >
-            <MessageSquare className="h-3 w-3" />
-            Chat
-          </button>
-        )}
-        {ticket.status !== 'FECHADO' && podeGerir && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={fechar}
-            className="inline-flex items-center gap-1 rounded-md border border-[rgb(var(--border))] px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-          >
-            <XCircle className="h-3 w-3" />
-            Fechar ticket
-          </button>
-        )}
-      </div>
       {erro && <p className="text-[11px] text-red-600">{erro}</p>}
     </div>
   )

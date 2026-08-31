@@ -7,6 +7,7 @@ export type PatrimonioSearchParams = {
   q?: string
   page?: string
   incluirBaixados?: string
+  tab?: string
 }
 
 export function parseFiltroPatrimonio(sp: PatrimonioSearchParams): {

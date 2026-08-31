@@ -1,7 +1,16 @@
 import { redirect } from 'next/navigation'
 import { Users } from 'lucide-react'
-import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
+import {
+  formatNomeAfiliacao,
+  formatNomeTorcida,
+  PERMISSIONS,
+  calculateEffectivePermissions,
+  hasPermission,
+  MENSAGEM_CAPACIDADE_CONFIANCA,
+} from '@torcida/types'
 import { auth } from '@/lib/auth'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { temCapacidadeConfianca } from '@/lib/confianca'
 import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comunidade-contexto'
 import { lerMarcaCanalFoco } from '@/lib/comunidade-canal-foco-cookie'
 import { getGruposDoTenant } from '@/lib/feed'
@@ -38,7 +47,7 @@ export default async function GruposPage({
           subtitulo={`Comunidades temáticas da torcida nacional de ${nomeClube}`}
         />
 
-        <GruposClient gruposIniciais={grupos} />
+        <GruposClient gruposIniciais={grupos} podeCriarGrupo escopoNacional />
       </div>
     )
   }
@@ -46,10 +55,17 @@ export default async function GruposPage({
   if (ctx.modo !== 'torcida') redirect('/portal/comunidade/grupos?escopo=nacional')
 
   const tenant = ctx.tenant
-  const [grupos, marcaFoco] = await Promise.all([
+  const [grupos, marcaFoco, perms] = await Promise.all([
     getGruposDoTenant(tenant.id, session.user.id),
     lerMarcaCanalFoco(),
+    getUserPermissionsInTenant(session.user.id, tenant.id),
   ])
+  const efetivas = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
+  const temPermGrupo = hasPermission(efetivas, PERMISSIONS.GROUPS_CREATE)
+  const temCapGrupo = await temCapacidadeConfianca(session.user.id, tenant.id, 'grupo:criar')
+  const podeCriarGrupo = temPermGrupo && temCapGrupo
+  const hintCapacidade =
+    temPermGrupo && !temCapGrupo ? MENSAGEM_CAPACIDADE_CONFIANCA['grupo:criar'] : null
   // Caso A: subtítulo segue o canal em foco (PDE), não o nome da Sede na sessão.
   const nomeContexto = marcaFoco?.nome ?? formatNomeTorcida(tenant.nome)
 
@@ -61,7 +77,11 @@ export default async function GruposPage({
         subtitulo={`Comunidades temáticas da ${nomeContexto}`}
       />
 
-      <GruposClient gruposIniciais={grupos} />
+      <GruposClient
+        gruposIniciais={grupos}
+        podeCriarGrupo={podeCriarGrupo}
+        hintCapacidade={hintCapacidade}
+      />
     </div>
   )
 }

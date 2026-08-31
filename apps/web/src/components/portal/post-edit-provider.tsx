@@ -115,6 +115,8 @@ interface PostEditProviderProps {
   podeEditar: boolean
   /** Comunidade Nacional — typeahead de menção no escopo do clube. */
   escopoMencao?: 'nacional'
+  /** Fórum: persiste no tópico em vez de `editarPost`. */
+  salvarFn?: (id: string, conteudo: string, midias: string[]) => Promise<void>
   children: ReactNode
 }
 
@@ -129,6 +131,7 @@ export function PostEditProvider({
   midiaUrls,
   podeEditar,
   escopoMencao,
+  salvarFn,
   children,
 }: PostEditProviderProps) {
   const router = useRouter()
@@ -216,7 +219,8 @@ export function PostEditProvider({
     const anexosNovos = [...anexos]
     startTransition(async () => {
       try {
-        await editarPost(postId, conteudoNovo, anexosNovos)
+        if (salvarFn) await salvarFn(postId, conteudoNovo, anexosNovos)
+        else await editarPost(postId, conteudoNovo, anexosNovos)
         setConteudoAtual(conteudoNovo)
         setMidiasAtuais(ensureSocialEmbedInMidias(conteudoNovo, anexosNovos))
         setEditando(false)
@@ -227,7 +231,7 @@ export function PostEditProvider({
         toast.error(err instanceof Error ? err.message : 'Não foi possível editar.')
       }
     })
-  }, [anexos, mencoes, podeSalvar, postId, router, texto])
+  }, [anexos, mencoes, podeSalvar, postId, router, salvarFn, texto])
 
   const alterarTexto = useCallback((valor: string, cursor?: number) => {
     const { texto: legivel, mencoes: coladas } = paraTextoLegivel(valor)

@@ -89,9 +89,11 @@ export default async function ConfiguracoesTransparenciaPage({
             description="Presidente e vices controlam se a Sede aparece no portal de PDE/subsede. Cada unidade mantém catálogo e estoque próprios — este interruptor só libera a ponte até a loja da torcida principal."
           >
             <PortalNasUnidadesForm
-              key={`${tenant.lojaVisivelNasUnidades}-${tenant.agendaVisivelNasUnidades}`}
+              key={`${tenant.lojaVisivelNasUnidades}-${tenant.agendaVisivelNasUnidades}-${tenant.brechoAliados}-${tenant.memoriaAliados}`}
               lojaVisivel={tenant.lojaVisivelNasUnidades}
               agendaVisivel={tenant.agendaVisivelNasUnidades}
+              brechoAliados={tenant.brechoAliados}
+              memoriaAliados={tenant.memoriaAliados}
             />
           </ConfigSectionCard>
         ) : null}

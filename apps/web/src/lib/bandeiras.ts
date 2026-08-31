@@ -31,8 +31,16 @@ const JANELA_JOGO_DIAS = 14
 export type BandeiraItemLite = {
   id: string
   nome: string
+  categoria: string
   status: string
+  quantidade: number
   localizacao: string | null
+  valorEstimado: number | null
+  observacao: string | null
+  fotoUrl: string | null
+  fotoPreviewUrl: string | null
+  responsavelId: string | null
+  responsavelNome: string | null
   temVistoria: boolean
   vistoriaVencendo: boolean
   /** Ficha completa para preencher o formulário sem uma segunda consulta. */
@@ -72,7 +80,7 @@ async function fetchDirecaoBandeiras(tenantId: string): Promise<BandeirasOpsResu
     resumirPatrimonio(tenantId, 'BANDEIRA'),
     listarPatrimonio(tenantId, {
       filtro: { page: 1 },
-      pageSize: 60,
+      pageSize: 120,
       escopoCategoria: 'BANDEIRA',
     }),
     listarEmprestimosPatrimonio(tenantId, {
@@ -94,8 +102,16 @@ async function fetchDirecaoBandeiras(tenantId: string): Promise<BandeirasOpsResu
     return {
       id: i.id,
       nome: i.nome,
+      categoria: i.categoria,
       status: i.status,
+      quantidade: i.quantidade,
       localizacao: i.localizacao,
+      valorEstimado: i.valorEstimado != null ? Number(i.valorEstimado) : null,
+      observacao: i.observacao,
+      fotoUrl: i.fotoUrl,
+      fotoPreviewUrl: i.fotoPreviewUrl,
+      responsavelId: i.responsavel?.id ?? null,
+      responsavelNome: i.responsavel?.nome ?? null,
       temVistoria: vistoria !== null,
       vistoriaVencendo: vistoriaVencendo(vistoria, {
         ref: agora,

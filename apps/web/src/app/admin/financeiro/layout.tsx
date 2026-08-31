@@ -52,7 +52,7 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
         actions={
           <Link
             href="/portal/financeiro"
-            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver no portal
           </Link>

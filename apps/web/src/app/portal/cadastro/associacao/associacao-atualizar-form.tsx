@@ -64,19 +64,30 @@ export type OperacaoView = {
   aprovadoEmLabel: string | null
   adimplente: boolean
   carteirinhaValidadeLabel: string | null
+  carteirinhaNumeroLabel: string | null
+  carteirinhaEmitidaEmLabel: string | null
+  carteirinhaNome: string | null
   statusLabel: string
 }
 
+type TabId = 'resumo' | 'cadastro' | 'documentos' | 'associacao' | 'operacao'
+
 type Props = {
+  tenantId: string
   valores: ValoresAssociacaoForm
   periodicidades: string[]
   exigirDocumentos: boolean
   temCarteirinha: boolean
   prefillOrigemNome?: string | null
   operacao: OperacaoView
+  /** Aba inicial (carteirinha: resumo quando a ficha já está em dia). */
+  tabInicial?: TabId
+  /**
+   * Embutido na carteirinha: a ficha é permanente (ver/editar a qualquer
+   * momento), não um fluxo de pendência avulso.
+   */
+  embutido?: boolean
 }
-
-type TabId = 'resumo' | 'cadastro' | 'documentos' | 'associacao' | 'operacao'
 
 const TAB_DO_CAMPO: Record<CompletudeItemId, TabId> = {
   numeroAssociado: 'cadastro',
@@ -135,12 +146,14 @@ function UploadDocumento({
   label,
   hint,
   value,
+  tenantId,
   onChange,
 }: {
   name: string
   label: string
   hint?: string
   value: string
+  tenantId: string
   onChange: (url: string) => void
 }) {
   const [busy, start] = useTransition()
@@ -166,7 +179,7 @@ function UploadDocumento({
         onFile={(file) => {
           start(async () => {
             try {
-              const url = await uploadMediaToCloudinary(file, undefined, 'cadastro')
+              const url = await uploadMediaToCloudinary(file, undefined, 'cadastro', tenantId)
               onChange(url)
               toast.success('Arquivo enviado.')
             } catch (err) {
@@ -297,16 +310,19 @@ function ProgressoBarra({ ok, total }: { ok: number; total: number }) {
 }
 
 export function AssociacaoAtualizarForm({
+  tenantId,
   valores,
   periodicidades,
   exigirDocumentos,
   temCarteirinha,
   prefillOrigemNome,
   operacao,
+  tabInicial = 'cadastro',
+  embutido = false,
 }: Props) {
   const router = useRouter()
   const [state, action, pending] = useActionState(completarDadosAssociacao, initial)
-  const [tab, setTab] = useState<TabId>('cadastro')
+  const [tab, setTab] = useState<TabId>(tabInicial)
 
   const [numeroAssociado, setNumeroAssociado] = useState(valores.numeroAssociado)
   const [cpf, setCpf] = useState(valores.cpf ? maskCpf(valores.cpf) : '')
@@ -435,13 +451,13 @@ export function AssociacaoAtualizarForm({
     }
     if (state.emitida) {
       toast.success(state.message ?? 'Carteirinha emitida.')
-      router.push('/portal/carteirinha')
+      if (!embutido) router.push('/portal/carteirinha')
       router.refresh()
       return
     }
     toast.success(state.message ?? 'Cadastro completo.')
     router.refresh()
-  }, [state, router])
+  }, [state, router, embutido])
 
   function focarCampo(id: CompletudeItemId) {
     const destino = TAB_DO_CAMPO[id]
@@ -506,16 +522,38 @@ export function AssociacaoAtualizarForm({
         </p>
       ) : null}
 
-      <div className="flex gap-3 rounded-2xl border border-[rgb(var(--color-primary)_/_0.3)] bg-[linear-gradient(135deg,rgb(var(--color-primary)_/_0.12),rgb(var(--background)_/_0.2))] p-3.5 sm:p-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]">
-          <ShieldCheck className="h-4 w-4" aria-hidden />
+      <div
+        className={[
+          'flex gap-3 rounded-2xl border p-3.5 sm:p-4',
+          resumo.completo
+            ? 'border-[rgb(var(--color-success)_/_0.35)] bg-[rgb(var(--color-success)_/_0.08)]'
+            : 'border-[rgb(var(--color-primary)_/_0.3)] bg-[linear-gradient(135deg,rgb(var(--color-primary)_/_0.12),rgb(var(--background)_/_0.2))]',
+        ].join(' ')}
+      >
+        <div
+          className={[
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+            resumo.completo
+              ? 'bg-[rgb(var(--color-success)_/_0.18)] text-[rgb(var(--color-success-fg))]'
+              : 'bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]',
+          ].join(' ')}
+        >
+          {resumo.completo ? (
+            <CheckCircle2 className="h-4 w-4" aria-hidden />
+          ) : (
+            <ShieldCheck className="h-4 w-4" aria-hidden />
+          )}
         </div>
         <div className="min-w-0 space-y-1 text-sm leading-relaxed">
-          <p className="font-semibold text-[rgb(var(--foreground))]">Por que atualizar</p>
+          <p className="font-semibold text-[rgb(var(--foreground))]">
+            {resumo.completo ? 'Cadastro em dia' : 'Por que atualizar'}
+          </p>
           <p className="text-[rgb(var(--foreground-muted))]">
-            {temCarteirinha
-              ? 'Completar a ficha garante que a torcida confirme sua vigência corretamente. Ignorar o aviso deixa o cadastro inadimplente até você atualizar.'
-              : 'Expedição e plano definem a validade da carteirinha. Completar emite/regulariza a vigência; ocultar o aviso marca inadimplência até preencher.'}
+            {resumo.completo
+              ? 'Ficha completa. Você pode revisar ou alterar os dados a qualquer momento — a carteirinha e a vigência usam o que está aqui.'
+              : temCarteirinha
+                ? 'Completar a ficha garante que a torcida confirme sua vigência corretamente. Enquanto faltar dado obrigatório, o cadastro não regulariza.'
+                : 'Expedição e plano definem a validade da carteirinha. Completar emite/regulariza a vigência.'}
           </p>
         </div>
       </div>
@@ -600,12 +638,20 @@ export function AssociacaoAtualizarForm({
                   />
                   <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
                   <DadoLeitura
-                    label="Carteirinha"
+                    label="Nº da carteirinha"
+                    value={operacao.carteirinhaNumeroLabel ?? 'Aguardando emissão'}
+                  />
+                  <DadoLeitura
+                    label="Validade"
                     value={
                       operacao.carteirinhaValidadeLabel
-                        ? `Válida até ${operacao.carteirinhaValidadeLabel}`
-                        : 'Aguardando emissão'
+                        ? `Até ${operacao.carteirinhaValidadeLabel}`
+                        : '—'
                     }
+                  />
+                  <DadoLeitura
+                    label="Emitida em"
+                    value={operacao.carteirinhaEmitidaEmLabel ?? '—'}
                   />
                 </div>
                 <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
@@ -818,6 +864,7 @@ export function AssociacaoAtualizarForm({
                       label="Comprovante de vínculo"
                       hint="Carteirinha, recibo ou documento que comprove a associação."
                       value={prova}
+                      tenantId={tenantId}
                       onChange={setProva}
                     />
                   </div>
@@ -829,6 +876,7 @@ export function AssociacaoAtualizarForm({
                           label="Foto do documento"
                           hint="Frente do RG ou documento oficial com foto."
                           value={doc}
+                          tenantId={tenantId}
                           onChange={setDoc}
                         />
                       </div>
@@ -837,6 +885,7 @@ export function AssociacaoAtualizarForm({
                           name="comprovanteResidenciaUrl"
                           label="Comprovante de residência"
                           value={residencia}
+                          tenantId={tenantId}
                           onChange={setResidencia}
                         />
                       </div>
@@ -958,11 +1007,23 @@ export function AssociacaoAtualizarForm({
                       </select>
                     </label>
                   </div>
-                  {operacao.carteirinhaValidadeLabel ? (
-                    <div className="sm:col-span-2">
+                  {temCarteirinha ? (
+                    <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+                      <DadoLeitura
+                        label="Nome na carteirinha"
+                        value={operacao.carteirinhaNome ?? '—'}
+                      />
+                      <DadoLeitura
+                        label="Nº da carteirinha digital"
+                        value={operacao.carteirinhaNumeroLabel ?? '—'}
+                      />
                       <DadoLeitura
                         label="Validade atual"
-                        value={operacao.carteirinhaValidadeLabel}
+                        value={operacao.carteirinhaValidadeLabel ?? '—'}
+                      />
+                      <DadoLeitura
+                        label="Emitida em"
+                        value={operacao.carteirinhaEmitidaEmLabel ?? '—'}
                       />
                     </div>
                   ) : null}
@@ -988,12 +1049,20 @@ export function AssociacaoAtualizarForm({
                   />
                   <DadoLeitura label="Aprovado em" value={operacao.aprovadoEmLabel ?? '—'} />
                   <DadoLeitura
-                    label="Carteirinha"
+                    label="Nº da carteirinha"
+                    value={operacao.carteirinhaNumeroLabel ?? 'Aguardando emissão'}
+                  />
+                  <DadoLeitura
+                    label="Validade"
                     value={
                       operacao.carteirinhaValidadeLabel
-                        ? `Válida até ${operacao.carteirinhaValidadeLabel}`
-                        : 'Aguardando emissão'
+                        ? `Até ${operacao.carteirinhaValidadeLabel}`
+                        : '—'
                     }
+                  />
+                  <DadoLeitura
+                    label="Emitida em"
+                    value={operacao.carteirinhaEmitidaEmLabel ?? '—'}
                   />
                 </Secao>
                 <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
@@ -1065,7 +1134,7 @@ export function AssociacaoAtualizarForm({
           ) : resumo.completo && formatosOk ? (
             <>
               <IdCard className="h-4 w-4" aria-hidden />
-              Salvar e concluir
+              {embutido ? 'Salvar alterações' : 'Salvar e concluir'}
             </>
           ) : (
             `Preencha tudo para salvar (${resumo.faltando.length} faltando)`

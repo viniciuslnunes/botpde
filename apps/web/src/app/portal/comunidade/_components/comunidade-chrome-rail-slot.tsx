@@ -4,6 +4,7 @@ import { getSugestoesCanaisParaAside, getSugestoesCanaisPublicosParaAside } from
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
+import { podeCriarGrupoInbox } from '@/lib/mensageria-api'
 import { ComunidadeChromeRail } from './comunidade-chrome-rail'
 
 /**
@@ -36,8 +37,13 @@ export async function ComunidadeChromeRailSlot() {
   let canaisTorcida: SugestaoCanalAside[] = []
   let salasNacional: SalaAtivaListItem[] = []
   let canaisNacional: SugestaoCanalAside[] = []
+  let podeCriarGrupo = false
 
-  const tarefas: Promise<void>[] = []
+  const tarefas: Promise<void>[] = [
+    podeCriarGrupoInbox(userId, session.user.email).then((v) => {
+      podeCriarGrupo = v
+    }),
+  ]
 
   if (tenantId) {
     tarefas.push(
@@ -77,6 +83,7 @@ export async function ComunidadeChromeRailSlot() {
       canaisTorcida={canaisTorcida}
       salasNacional={salasNacional}
       canaisNacional={canaisNacional}
+      podeCriarGrupo={podeCriarGrupo}
     />
   )
 }

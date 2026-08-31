@@ -18,7 +18,7 @@ import {
   saldoComanda,
 } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { notificarUsuariosComPermissao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import {
   getTurnoAbertoBar,
   JANELA_ESTORNOS_ANOMALO_DIAS,
@@ -930,6 +930,12 @@ export async function quitarComandaBar(input: unknown): Promise<QuitarComandaBar
 
     revalidateBarComanda()
     revalidateFinanceiro()
+    if (result.status === 'QUITADA') {
+      await reconciliarNotificacoesDoEvento(tenant.id, {
+        tipo: 'BAR_COMANDA_VENCIDA',
+        link: `/admin/bar/comandas?comanda=${comandaId}`,
+      })
+    }
     return { success: true, status: result.status, saldo: result.saldo }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Erro ao quitar comanda' }
@@ -997,6 +1003,10 @@ export async function cancelarComandaBar(input: unknown): Promise<BarComandaActi
     })
 
     revalidateBarComanda()
+    await reconciliarNotificacoesDoEvento(tenant.id, {
+      tipo: 'BAR_COMANDA_VENCIDA',
+      link: `/admin/bar/comandas?comanda=${comandaId}`,
+    })
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao cancelar comanda' }

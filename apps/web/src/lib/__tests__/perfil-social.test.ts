@@ -57,7 +57,7 @@ describe('resolverPerfilPrivadoEfetivo', () => {
 })
 
 describe('resolverTituloPerfilSocial', () => {
-  it('torcedor exibe apelido do clube', () => {
+  it('torcedor com ficha na TO ainda exibe o clube, nunca a organizada', () => {
     expect(
       resolverTituloPerfilSocial({
         tipoMembro: 'TORCEDOR',
@@ -66,6 +66,17 @@ describe('resolverTituloPerfilSocial', () => {
         afiliacaoNome: 'Corinthians',
       }),
     ).toBe('TIMÃO')
+  })
+
+  it('torcedor sem clube resolvido não herda o nome da TO', () => {
+    expect(
+      resolverTituloPerfilSocial({
+        tipoMembro: 'TORCEDOR',
+        tenantNome: 'GAVIÕES DA FIEL',
+        afiliacaoApelido: null,
+        afiliacaoNome: null,
+      }),
+    ).toBe('')
   })
 
   it('torcedor sem apelido cai no nome do clube', () => {

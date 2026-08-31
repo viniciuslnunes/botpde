@@ -14,7 +14,10 @@
 
 Rotas `/portal/bateria*` redirecionam para o hub / detalhe unificado.
 Admin ops: `/admin/bateria` (thin wrapper; detalhe via alias → Agenda). Entrada:
-**semana da bateria** com partidas da semana + inbox “ensaio na véspera do jogo”.
+`AdminTabs` no topo (`?tab=`): **Instrumentos** (default, cards com foto),
+Ensaios (KPIs + semana da bateria), Precisa de você, **Histórico** (baixas e
+exclusões de instrumentos). Acervo = inventário do Patrimônio, categoria
+`INSTRUMENTO`.
 Filtro legado `/admin/eventos?tipo=ENSAIO` segue válido.
 Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md).
 Cluster: [`modulo-eventos.md`](./modulo-eventos.md) § Dia operacional.

@@ -80,6 +80,7 @@ export async function marcarNotificacaoLida(notificacaoId: string): Promise<void
   emitNotificacaoPing(notificacao.tenantId, session.user.id)
 
   revalidatePath('/portal/comunidade/notificacoes')
+  revalidatePath('/super-admin')
   if (TIPOS_NOTIFICACAO_ADMIN.includes(notificacao.tipo)) {
     revalidatePath('/admin')
     revalidatePath('/admin/notificacoes')
@@ -118,6 +119,7 @@ export async function marcarNotificacoesLidasPorIds(ids: string[]): Promise<void
   }
 
   revalidatePath('/portal/comunidade/notificacoes')
+  revalidatePath('/super-admin')
   const tipos = notificacoes.map((n) => n.tipo)
   if (tipos.some((tipo) => TIPOS_NOTIFICACAO_ADMIN.includes(tipo))) {
     revalidatePath('/admin')

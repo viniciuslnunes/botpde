@@ -5,6 +5,7 @@ import {
 } from '@/lib/comunidade-escopo'
 import {
   resolverEscopoComunidade,
+  resolverTenantIdBuscaComunidade,
   type ContextoComunidadePortal,
 } from '@/lib/comunidade-contexto'
 import { decidePodeVerCanal } from '@/lib/canais-shared'
@@ -153,6 +154,19 @@ describe('resolverEscopoComunidade', () => {
   it('Sede ativa mantém o default na torcida mesmo tendo unidade', () => {
     const ctx = ctxSocioComUnidade()
     expect(resolverEscopoComunidade(ctx, undefined)).toBe('torcida')
+  })
+
+  it('typeahead: sócio/operador na PDE busca no portal ativo, não na CN', () => {
+    const ctx = { ...ctxSocioComUnidade(), tenantAtivoEhUnidade: true }
+    expect(resolverTenantIdBuscaComunidade(ctx, 'unidade')).toBe('t-1')
+    expect(resolverTenantIdBuscaComunidade(ctx, 'torcida')).toBe('t-1')
+    expect(resolverTenantIdBuscaComunidade(ctx, 'nacional')).toBe('syn-1')
+  })
+
+  it('typeahead: torcedor na CN busca no sintético; na unidade, na TO do convite', () => {
+    const ctx = ctxTorcedorComUnidade()
+    expect(resolverTenantIdBuscaComunidade(ctx, 'nacional')).toBe('syn-1')
+    expect(resolverTenantIdBuscaComunidade(ctx, 'unidade')).toBe('t-furia')
   })
 
   it('por modo: TORCEDOR sem query fica nacional; sócio sem query fica torcida', () => {

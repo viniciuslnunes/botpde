@@ -69,7 +69,7 @@ function ImagemProdutoField({
         onUrlChange?.(url)
       }}
       aspect={1}
-      purpose="comunidade"
+      purpose="loja"
       fieldErrors={fieldErrors}
       buttonLabel="Enviar imagem"
       hint="Prefira enviar a imagem — URLs externas (ex.: Discord) podem expirar."

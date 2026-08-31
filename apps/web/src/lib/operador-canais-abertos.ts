@@ -23,8 +23,10 @@ export type CanalAbertoOperador = {
   slug: string
   nome: string
   logoUrl: string | null
-  /** Tenant ativo é unidade Caso B (≠ raiz da worktree). */
+  /** Tenant é unidade Caso B (≠ raiz da worktree). */
   ehUnidade: boolean
+  /** Sede raiz da worktree — agrupa unidades da torcida ativa no 3º slot. */
+  raizId: string
 }
 
 function parseSlugs(raw: string | undefined): string[] {
@@ -83,9 +85,9 @@ export async function reordenarCanaisOperador(novaOrdem: string[]): Promise<stri
  * Metadados dos canais abertos (escudo + se é unidade) para a barra.
  * Ignora slugs inexistentes/inativos sem falhar.
  *
- * `excluirTenantIds`: tenants da worktree atual — unidades abertas pela
- * listagem Canais vivem no cookie de conversa (4+ com escudo real); não
- * repetir como slug (que caía no fallback "S" sem logo).
+ * `excluirTenantIds`: só tenants **já no prefixo** (Sede / unidade do 3º
+ * slot). Nunca a worktree inteira — PDE irmã aberta some da barra se a
+ * lineage inteira entrar aqui.
  */
 export async function carregarCanaisAbertosOperador(
   slugs: string[],
@@ -130,6 +132,7 @@ export async function carregarCanaisAbertosOperador(
       nome: formatNomeTorcida(t.nome),
       logoUrl: logo,
       ehUnidade: raizId !== t.id,
+      raizId,
     })
   }
   return out

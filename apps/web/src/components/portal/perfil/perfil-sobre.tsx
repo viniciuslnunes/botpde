@@ -24,6 +24,7 @@ interface PerfilSobreProps {
     discordTag?: string | null
     temMembro: boolean
   }
+  progressoNivel?: { label: string; faltam: number } | null
 }
 
 export function PerfilSobre({
@@ -40,6 +41,7 @@ export function PerfilSobre({
   numeroSocio,
   validadeSocio,
   membroForm,
+  progressoNivel = null,
 }: PerfilSobreProps) {
   return (
     <div className="space-y-4">
@@ -84,6 +86,20 @@ export function PerfilSobre({
           )}
         </ul>
       </section>
+
+      {isSelf && progressoNivel && progressoNivel.faltam > 0 ? (
+        <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Na torcida
+          </h3>
+          <p className="text-sm text-[rgb(var(--foreground))]">
+            Faltam {progressoNivel.faltam} para o nível {progressoNivel.label}.
+          </p>
+          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+            Presença em evento, mensalidade em dia ou aprovação da liderança.
+          </p>
+        </section>
+      ) : null}
 
       {isSelf && email && (
         <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">

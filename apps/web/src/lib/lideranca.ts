@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
-import { SYSTEM_ROLES } from '@torcida/types'
+import { casoLiderancaDaSede, SYSTEM_ROLES } from '@torcida/types'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import { vincularMembroCanaisAposAprovacao, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
@@ -94,7 +94,7 @@ async function sedeTemPortalProprio(sedeId: string): Promise<boolean> {
   return sede.sede.tenantId !== sede.tenantId
 }
 
-/** Presidente(s) atual(is) do tenant — cargo de sistema `owner`. */
+/** Presidente(s) atual(is) do tenant — cargo de sistema `owner`. No máximo um por regra. */
 export async function liderancaAtualDoTenant(tenantId: string): Promise<LiderAtual[]> {
   const rows: { userId: string; user: { nome: string | null; email: string | null } }[] =
     await db.userRole.findMany({
@@ -124,6 +124,51 @@ export async function liderancaAtualDaSede(sedeId: string): Promise<LiderAtual[]
       email: sede.responsavelUser?.email ?? null,
     },
   ]
+}
+
+/**
+ * Liderança que a UI da unidade deve mostrar: cargo `owner` no Caso B,
+ * `responsavelUserId` no Caso A. Evita a ficha da Sede raiz aparecer
+ * "sem liderança" quando o presidente só existe como UserRole.
+ */
+export async function resolverLiderancaDaSede(opts: {
+  sedeId: string
+  tipo: string
+  tenantId: string | null
+  parentTenantId: string | null
+}): Promise<LiderAtual[]> {
+  if (casoLiderancaDaSede(opts) === 'B' && opts.tenantId) {
+    return liderancaAtualDoTenant(opts.tenantId)
+  }
+  return liderancaAtualDaSede(opts.sedeId)
+}
+
+/** Unidade "cara" do tenant (Sede raiz ou a sede promovida), a que alinha `responsavelUserId`. */
+async function sedeCaraDoTenant(
+  tenantId: string,
+): Promise<{ id: string; canalConversaId: string | null } | null> {
+  const sede: { id: string; canalConversaId: string | null } | null = await db.sede.findFirst({
+    where: { tenantId },
+    select: { id: true, canalConversaId: true },
+    orderBy: { criadoEm: 'asc' },
+  })
+  return sede
+}
+
+/**
+ * Espelha o owner do tenant em `Sede.responsavelUserId` da unidade cara.
+ * Sem isso a hierarquia (cargo) e a ficha da unidade (campo) divergem.
+ */
+export async function alinhaSedeDoTenantComOwner(
+  tenantId: string,
+  lider: { userId: string; nome: string | null },
+): Promise<void> {
+  const sede = await sedeCaraDoTenant(tenantId)
+  if (!sede) return
+  await db.sede.update({
+    where: { id: sede.id },
+    data: { responsavelUserId: lider.userId, responsavel: lider.nome },
+  })
 }
 
 export type CandidatoLideranca = {
@@ -575,6 +620,20 @@ export async function removerLideranca(params: {
         },
       })
     })
+
+    for (const r of removidos) {
+      if (r.userId === atorId) continue
+      await notificarSafe({
+        userId: r.userId,
+        tenantId: alvo.tenantId,
+        tipo: 'SEDE_RESPONSAVEL_DEFINIDO',
+        titulo: `Você não é mais a liderança de ${sede.nome}`,
+        corpo: motivo ?? `A liderança de ${sede.nome} foi encerrada.`,
+        link: '/portal/sedes',
+        atorId,
+      })
+    }
+
     return { caso: 'A', removidos }
   }
 
@@ -605,6 +664,23 @@ export async function removerLideranca(params: {
   })
 
   for (const r of removidos) invalidatePermissionsCache(r.userId, alvo.tenantId)
+
+  const tenantNome: { nome: string } | null = await db.tenant.findUnique({
+    where: { id: alvo.tenantId },
+    select: { nome: true },
+  })
+  for (const r of removidos) {
+    if (r.userId === atorId) continue
+    await notificarSafe({
+      userId: r.userId,
+      tenantId: alvo.tenantId,
+      tipo: 'ACESSO_ATUALIZADO',
+      titulo: `Você não é mais presidente de ${tenantNome?.nome ?? 'esta torcida'}`,
+      corpo: motivo ?? 'A presidência foi encerrada. A unidade fica sem owner até uma nova indicação.',
+      link: '/admin',
+      atorId,
+    })
+  }
 
   return { caso: 'B', removidos }
 }

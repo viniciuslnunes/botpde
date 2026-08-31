@@ -10,6 +10,10 @@ import {
   PERMISSIONS,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
+import {
+  notificarLancamentoFinanceiroAvulso,
+  reconciliarLancamentoFinanceiroAvulso,
+} from '@/lib/financeiro-notificacoes'
 
 export type LancamentoState = {
   ok?: boolean
@@ -130,6 +134,16 @@ export async function criarLancamentoFinanceiro(
     },
   })
 
+  await notificarLancamentoFinanceiroAvulso({
+    tenantId: tenant.id,
+    lancamentoId: created.id,
+    tipo,
+    descricao,
+    valor: Number(valor),
+    departamentoId: rateio.departamentoId,
+    atorId: session.user.id,
+  })
+
   revalidateFinanceiro()
   return { ok: true }
 }
@@ -153,10 +167,11 @@ export async function editarLancamentoFinanceiro(
   const dataComp = parseDataCompetencia(data)
   if (!dataComp) return { errors: { data: ['Data inválida'] } }
 
-  const existente: { id: string } | null = await db.financeiroLancamento.findFirst({
-    where: { id, tenantId: tenant.id },
-    select: { id: true },
-  })
+  const existente: { id: string; departamentoId: string | null } | null =
+    await db.financeiroLancamento.findFirst({
+      where: { id, tenantId: tenant.id },
+      select: { id: true, departamentoId: true },
+    })
   if (!existente) return { error: 'Lançamento não encontrado' }
 
   const rateio = await resolverRateio(tenant.id, departamentoId, projetoId)
@@ -194,6 +209,11 @@ export async function editarLancamentoFinanceiro(
     },
   })
 
+  await reconciliarLancamentoFinanceiroAvulso(tenant.id, existente.id, rateio.departamentoId)
+  if (existente.departamentoId && existente.departamentoId !== rateio.departamentoId) {
+    await reconciliarLancamentoFinanceiroAvulso(tenant.id, existente.id, existente.departamentoId)
+  }
+
   revalidateFinanceiro()
   return { ok: true }
 }
@@ -211,9 +231,17 @@ export async function excluirLancamentoFinanceiro(lancamentoId: string): Promise
     categoria: string
     valor: unknown
     descricao: string
+    departamentoId: string | null
   } | null = await db.financeiroLancamento.findFirst({
     where: { id: lancamentoId, tenantId: tenant.id },
-    select: { id: true, tipo: true, categoria: true, valor: true, descricao: true },
+    select: {
+      id: true,
+      tipo: true,
+      categoria: true,
+      valor: true,
+      descricao: true,
+      departamentoId: true,
+    },
   })
   if (!existente) return { error: 'Lançamento não encontrado' }
 
@@ -234,6 +262,12 @@ export async function excluirLancamentoFinanceiro(lancamentoId: string): Promise
       },
     },
   })
+
+  await reconciliarLancamentoFinanceiroAvulso(
+    tenant.id,
+    existente.id,
+    existente.departamentoId,
+  )
 
   revalidateFinanceiro()
   return { ok: true }

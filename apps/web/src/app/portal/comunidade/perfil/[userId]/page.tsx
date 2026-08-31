@@ -1,11 +1,14 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
-import { getActiveTenant } from '@/lib/tenant'
+import { hrefAdminPessoa } from '@/lib/perfil-admin-href'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
+import { podeVerPerfilComunidade } from '@/lib/perfil-visibilidade'
 import { avaliarAcessoDm } from '@/lib/mensageria'
 import { resolveTenantContextoDm } from '@/lib/mensageria-api'
 import {
@@ -22,6 +25,7 @@ import {
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PerfilMensagemActions } from '@/components/portal/perfil-mensagem-actions'
+import { PerfilAdminLink } from '@/components/portal/perfil/perfil-admin-link'
 import { PerfilHeader } from '@/components/portal/perfil/perfil-header'
 import { PerfilStats } from '@/components/portal/perfil/perfil-stats'
 import { PerfilTabs, type PerfilAba } from '@/components/portal/perfil/perfil-tabs'
@@ -32,6 +36,14 @@ import { PerfilAtividadeList } from '@/components/portal/perfil/perfil-atividade
 import { PerfilDestaques } from '@/components/portal/perfil/perfil-destaques'
 import { postInclude, projetarPost, getDestaquesPerfil, type PostRaw, type PostSocialItem } from '@/lib/feed'
 import { db } from '@torcida/db'
+import {
+  calculateEffectivePermissions,
+  hasPermission,
+  labelNivelConfianca,
+  PERMISSIONS,
+  progressoProximoNivel,
+} from '@torcida/types'
+import { resolverNivelConfianca } from '@/lib/confianca'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Perfil da Comunidade' }
@@ -49,6 +61,7 @@ const perfilSelect = {
   exibirSede: true,
   exibirDesde: true,
   exibirNumeroSocioNoFeed: true,
+  memoriaPresencaVisivel: true,
 } as const
 
 export default async function PerfilComunidadePage({
@@ -69,9 +82,20 @@ export default async function PerfilComunidadePage({
   const tenant = await resolvePerfilTenantForUser(userId, session.user.id)
   if (!tenant) redirect('/portal')
 
+  const viewerTenant = await getActiveTenant(session.user.id, session.user.email)
+  if (
+    session.user.id !== userId &&
+    !(await podeVerPerfilComunidade(session.user.id, userId, tenant.id, viewerTenant?.id ?? null))
+  ) {
+    notFound()
+  }
+
   const aba: PerfilAba = ABAS_VALIDAS.includes(abaRaw as PerfilAba) ? (abaRaw as PerfilAba) : 'publicacoes'
 
-  const [user, membro, socio, afiliacao] = await Promise.all([
+  const mesmoTenantViewer = Boolean(viewerTenant && viewerTenant.id === tenant.id)
+  type MembroAdminLite = { id: string }
+
+  const [user, membro, socio, afiliacao, membroViewer] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
       select: { id: true, nome: true, nickname: true, avatarUrl: true, email: true, criadoEm: true },
@@ -79,6 +103,7 @@ export default async function PerfilComunidadePage({
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: tenant.id, userId } },
       select: {
+        id: true,
         nome: true,
         idade: true,
         telefone: true,
@@ -100,15 +125,51 @@ export default async function PerfilComunidadePage({
           select: { nome: true, apelido: true },
         })
       : Promise.resolve(null),
+    mesmoTenantViewer || !viewerTenant
+      ? Promise.resolve(null as MembroAdminLite | null)
+      : (db.saasMembro.findUnique({
+          where: { tenantId_userId: { tenantId: viewerTenant.id, userId } },
+          select: { id: true },
+        }) as Promise<MembroAdminLite | null>),
   ])
 
   if (!user) redirect('/portal/comunidade')
 
-  const isSelf = session.user.id === userId
-  const perfilAtual = await db.perfilMembro.findUnique({
-    where: { userId_tenantId: { userId, tenantId: tenant.id } },
-    select: perfilSelect,
+  const membroAdmin: MembroAdminLite | null = mesmoTenantViewer
+    ? membro
+      ? { id: membro.id }
+      : null
+    : membroViewer
+
+  const superAdmin = isSuperAdminEmail(session.user.email)
+  let podeVerFicha = superAdmin
+  if (!podeVerFicha && viewerTenant && session.user.id && membroAdmin) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+      session.user.id,
+      viewerTenant.id,
+    )
+    podeVerFicha = hasPermission(
+      calculateEffectivePermissions(rolePermissions, overrides),
+      PERMISSIONS.MEMBERS_VIEW,
+    )
+  }
+  const hrefAdmin = hrefAdminPessoa({
+    membroId: podeVerFicha ? (membroAdmin?.id ?? null) : null,
+    userId,
+    superAdmin,
   })
+
+  const isSelf = session.user.id === userId
+  const [perfilAtual, confianca] = await Promise.all([
+    db.perfilMembro.findUnique({
+      where: { userId_tenantId: { userId, tenantId: tenant.id } },
+      select: perfilSelect,
+    }),
+    tenant.sintetico ? Promise.resolve(null) : resolverNivelConfianca(userId, tenant.id),
+  ])
+  const nivelLabel = confianca ? labelNivelConfianca(confianca.nivel) : null
+  const progressoNivel =
+    isSelf && confianca ? progressoProximoNivel(confianca.score, confianca.nivel) : null
 
   // Torcedor global vive no tenant sintético da CN sem SaasMembro — trata como
   // TORCEDOR para título (apelido do clube) e privacidade pública obrigatória.
@@ -132,6 +193,7 @@ export default async function PerfilComunidadePage({
     exibirSede: false,
     exibirDesde: true,
     exibirNumeroSocioNoFeed: true,
+    memoriaPresencaVisivel: false,
   }
   const perfilPrivadoEfetivo = resolverPerfilPrivadoEfetivo(perfilBase.perfilPrivado, vinculo)
   const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(vinculo)
@@ -140,7 +202,6 @@ export default async function PerfilComunidadePage({
   const dmTenantContexto = await resolveTenantContextoDm(session.user.id, session.user.email)
   // Mesmo critério de `solicitarSeguir`: tenant ATIVO do viewer (não o do
   // perfil). Usar o tenant do perfil mostrava "Seguir" e a action negava → 500.
-  const viewerTenant = await getActiveTenant(session.user.id, session.user.email)
 
   const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge, acessoDm] = isSelf
     ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false, 'bloqueado' as const]
@@ -207,19 +268,29 @@ export default async function PerfilComunidadePage({
     avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
   }
 
-  const acoes = !isSelf ? (
-    <>
-      {podeSeguir && <SeguimentoButtons userId={userId} status={statusSeguimento} />}
-      {mensageriaDisponivel && (podeConversarDireto || podeSolicitarMensagem) && (
-        <PerfilMensagemActions
-          userId={userId}
-          podeConversar={podeConversarDireto}
-          podeSolicitarMensagem={podeSolicitarMensagem}
-          bloqueadoPorMim={bloqueadoPorMim}
-        />
-      )}
-    </>
-  ) : undefined
+  const temAcoesSociais =
+    !isSelf &&
+    (podeSeguir ||
+      (mensageriaDisponivel && (podeConversarDireto || podeSolicitarMensagem)))
+  const acoes =
+    hrefAdmin || temAcoesSociais ? (
+      <>
+        {hrefAdmin ? <PerfilAdminLink href={hrefAdmin} /> : null}
+        {!isSelf && podeSeguir && (
+          <SeguimentoButtons userId={userId} status={statusSeguimento} />
+        )}
+        {!isSelf &&
+          mensageriaDisponivel &&
+          (podeConversarDireto || podeSolicitarMensagem) && (
+            <PerfilMensagemActions
+              userId={userId}
+              podeConversar={podeConversarDireto}
+              podeSolicitarMensagem={podeSolicitarMensagem}
+              bloqueadoPorMim={bloqueadoPorMim}
+            />
+          )}
+      </>
+    ) : undefined
 
   return (
     <div className="space-y-4">
@@ -241,6 +312,7 @@ export default async function PerfilComunidadePage({
         segueVoce={segueVoceBadge}
         isSelf={isSelf}
         acoes={acoes}
+        nivelLabel={nivelLabel}
       />
 
       <PerfilStats
@@ -281,6 +353,8 @@ export default async function PerfilComunidadePage({
                   exibirSede={perfil.exibirSede}
                   exibirDesde={perfil.exibirDesde}
                   exibirNumeroSocioNoFeed={perfil.exibirNumeroSocioNoFeed}
+                  memoriaPresencaVisivel={perfil.memoriaPresencaVisivel}
+                  mostrarPresencaMemoria={!tenant.sintetico}
                   temNumeroSocio={socio?.numeroSocio != null}
                   bannerUrl={perfil.bannerUrl}
                   bannerPos={perfil.bannerPos}
@@ -296,7 +370,7 @@ export default async function PerfilComunidadePage({
                 exibirDesde={perfil.exibirDesde}
                 cidade={membro?.cidade ?? null}
                 sedeNome={membro?.sede?.nome ?? null}
-                membroDesde={membro?.criadoEm ?? user.criadoEm}
+                membroDesde={membro?.criadoEm ?? null}
                 email={isSelf ? user.email : null}
                 tipoMembro={vinculo?.tipo ?? null}
                 numeroSocio={isSelf ? (socio?.numeroSocio ?? null) : null}
@@ -310,6 +384,7 @@ export default async function PerfilComunidadePage({
                   discordTag: membro?.discordTag,
                   temMembro: !!membro,
                 }}
+                progressoNivel={progressoNivel}
               />
             </>
           )}

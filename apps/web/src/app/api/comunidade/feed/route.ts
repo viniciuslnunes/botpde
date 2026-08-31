@@ -10,7 +10,7 @@ import {
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
-import { getCanalDaUnidadeDoVinculo, getCanalLeituraDireta, getCanalPorId, getPostsDoCanal, resolverFeedInternoDoMural } from '@/lib/canais'
+import { getCanalDaUnidadeDoVinculo, getCanalLeituraDireta, getCanalPorId, getCanalSeMembroAtivo, getPostsDoCanal, resolverFeedInternoDoMural } from '@/lib/canais'
 import { ehOperadorPlataforma, resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 
@@ -143,6 +143,7 @@ export async function GET(request: NextRequest) {
       const canal =
         (await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)) ??
         (await getCanalDaUnidadeDoVinculo(parsed.data.conversaId, session.user.id)) ??
+        (await getCanalSeMembroAtivo(parsed.data.conversaId, session.user.id)) ??
         (leituraPlataforma
           ? await getCanalLeituraDireta(parsed.data.conversaId, session.user.id)
           : null)
@@ -174,6 +175,7 @@ export async function GET(request: NextRequest) {
     const { posts, pageInfo } = await getPostsParaFeed(tenant.id, session.user.id, {
       cursor: parsed.data.cursor,
       take,
+      escopoForum: parsed.data.escopo === 'unidade' ? 'unidade' : 'torcida',
     })
 
     return NextResponse.json({ posts, pageInfo })

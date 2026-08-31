@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { PendenciaBadge } from '@/components/pendencia-badge'
+import { useNavbarSnapshot } from '@/lib/use-navbar-context'
 
 export type SubareaNavItem = {
   id: string
@@ -8,8 +10,16 @@ export type SubareaNavItem = {
   href?: string | null
 }
 
-export function DepartamentoSubareasNav({ subareas }: { subareas: readonly SubareaNavItem[] }) {
+export function DepartamentoSubareasNav({
+  subareas,
+  slug,
+}: {
+  subareas: readonly SubareaNavItem[]
+  slug?: string
+}) {
   const [hash, setHash] = useState('')
+  const { navBadges } = useNavbarSnapshot()
+  const secoes = slug ? navBadges.porSecao[slug] : undefined
 
   useEffect(() => {
     const sync = () => setHash(window.location.hash.replace(/^#/, ''))
@@ -31,27 +41,28 @@ export function DepartamentoSubareasNav({ subareas }: { subareas: readonly Subar
             const isExternal = Boolean(s.href?.startsWith('/'))
             const href = isExternal ? (s.href as string) : `#${s.id}`
             const current = !isExternal && hash === s.id
+            const pendencias =
+              s.id === 'areas' || s.id === 'projetos' || s.id === 'equipe'
+                ? (secoes?.[s.id] ?? 0)
+                : 0
             return (
               <a
                 key={s.id}
                 href={href}
                 aria-current={current ? 'true' : undefined}
                 className={[
-                  'shrink-0 rounded-lg border px-3 py-1.5 text-xs transition-colors',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors',
                   current
                     ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))]'
                     : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] font-medium text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.35)] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
                 {s.label}
+                <PendenciaBadge count={pendencias} />
               </a>
             )
           })}
         </nav>
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[rgb(var(--background))] to-transparent sm:hidden"
-        />
       </div>
     </div>
   )

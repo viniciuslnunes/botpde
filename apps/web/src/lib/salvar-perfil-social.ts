@@ -77,6 +77,9 @@ export async function salvarPerfilSocial(
       exibirNumeroSocioNoFeed: apenasMidia
         ? true
         : (parsed.data.exibirNumeroSocioNoFeed ?? true),
+      memoriaPresencaVisivel: apenasMidia
+        ? false
+        : (parsed.data.memoriaPresencaVisivel ?? false),
       bannerUrl,
       bannerPos,
     },
@@ -92,6 +95,7 @@ export async function salvarPerfilSocial(
           exibirSede: parsed.data.exibirSede ?? false,
           exibirDesde: parsed.data.exibirDesde ?? true,
           exibirNumeroSocioNoFeed: parsed.data.exibirNumeroSocioNoFeed ?? true,
+          memoriaPresencaVisivel: parsed.data.memoriaPresencaVisivel ?? false,
           bannerUrl,
           bannerPos,
         },

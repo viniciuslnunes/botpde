@@ -1,7 +1,8 @@
 import { db } from '@torcida/db'
 import type { ConfiancaRecomendacao, StatusAlianca } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
-import { getTorcidaLineageTenantIds } from '@/lib/hierarquia'
+import { getTorcidaLineageTenantIds, carregarIdsRivaisDe } from '@/lib/hierarquia'
+import { filtrarTenantsRestritos } from '@/lib/isolamento'
 
 /** @deprecated Prefer findAliancaEntreTenants — pares de aliança não são canônicos por UUID. */
 export function normalizeTenantPair(a: string, b: string): [string, string] {
@@ -96,6 +97,10 @@ export async function findAliancaEntreTenants(
   return alianca
 }
 
+function counterpartTenantId(alianca: { tenantOrigemId: string; tenantAliadoId: string }, tenantId: string): string {
+  return alianca.tenantOrigemId === tenantId ? alianca.tenantAliadoId : alianca.tenantOrigemId
+}
+
 export async function listAliancasForTenant(tenantId: string): Promise<AliancaListItem[]> {
   const aliancas: Array<{
     id: string
@@ -129,11 +134,24 @@ export async function listAliancasForTenant(tenantId: string): Promise<AliancaLi
     },
   })
 
-  return aliancas.map((item) => ({
-    ...item,
-    tenantOrigem: toAliancaTenantLite(item.tenantOrigem),
-    tenantAliado: toAliancaTenantLite(item.tenantAliado),
-  }))
+  const rivalIds = await carregarIdsRivaisDe(
+    tenantId,
+    aliancas.map((a) => counterpartTenantId(a, tenantId)),
+  )
+
+  return aliancas
+    .filter((item) => {
+      const outro = counterpartTenantId(item, tenantId)
+      // ATIVA sobrevive (aliança vence rivalidade de clube). PENDENTE/ENCERRADA
+      // de rival não podem anunciar a existência da outra torcida.
+      if (rivalIds.has(outro) && item.status !== 'ATIVA') return false
+      return true
+    })
+    .map((item) => ({
+      ...item,
+      tenantOrigem: toAliancaTenantLite(item.tenantOrigem),
+      tenantAliado: toAliancaTenantLite(item.tenantAliado),
+    }))
 }
 
 /** ALIADA = bloco/bilateral entre times distintos; CO_IRMA = mesma afiliação. */
@@ -210,10 +228,6 @@ export function filterAndSortRecomendacoes(
     })
 }
 
-function counterpartTenantId(alianca: { tenantOrigemId: string; tenantAliadoId: string }, tenantId: string): string {
-  return alianca.tenantOrigemId === tenantId ? alianca.tenantAliadoId : alianca.tenantOrigemId
-}
-
 /**
  * Outras organizadas ativas do mesmo time (Afiliacao) — co-irmãs, não aliadas.
  */
@@ -277,13 +291,16 @@ export function unidadesEntreTenants(sedes: SedeAncoraRow[]): Set<string> {
   return unidades
 }
 
-/** Candidatos elegíveis a aliança/co-irmã: nem unidade, nem da própria worktree. */
+/** Candidatos elegíveis a aliança/co-irmã: nem unidade, nem da própria worktree, nem rival. */
 export function filtrarTorcidasElegiveis<T extends { id: string }>(
   candidatos: T[],
   unidadeIds: Set<string>,
   linhagemIds: Set<string>,
+  rivalIds: Set<string> = new Set(),
 ): T[] {
-  return candidatos.filter((c: T) => !unidadeIds.has(c.id) && !linhagemIds.has(c.id))
+  return candidatos.filter(
+    (c: T) => !unidadeIds.has(c.id) && !linhagemIds.has(c.id) && !rivalIds.has(c.id),
+  )
 }
 
 async function carregarUnidadeIds(tenantIds: string[]): Promise<Set<string>> {
@@ -298,7 +315,8 @@ async function carregarUnidadeIds(tenantIds: string[]): Promise<Set<string>> {
 
 /**
  * Remove da lista quem não pode ser parte de uma aliança vista por `tenantId`:
- * unidades promovidas (Caso B) e a própria worktree (ancestrais/descendentes).
+ * unidades promovidas (Caso B), a própria worktree, rivais e canal restrito.
+ * Rival some como se não existisse — nunca serializar nome/logo/slug ao client.
  */
 export async function filtrarTenantsDeAlianca<T extends { id: string }>(
   tenantId: string,
@@ -306,11 +324,18 @@ export async function filtrarTenantsDeAlianca<T extends { id: string }>(
 ): Promise<T[]> {
   if (candidatos.length === 0) return []
 
-  const [unidadeIds, linhagem]: [Set<string>, string[]] = await Promise.all([
-    carregarUnidadeIds(candidatos.map((c: T) => c.id)),
-    getTorcidaLineageTenantIds(tenantId),
-  ])
-  return filtrarTorcidasElegiveis(candidatos, unidadeIds, new Set(linhagem))
+  const ids = candidatos.map((c: T) => c.id)
+  const [unidadeIds, linhagem, rivalIds, visiveis]: [Set<string>, string[], Set<string>, string[]] =
+    await Promise.all([
+      carregarUnidadeIds(ids),
+      getTorcidaLineageTenantIds(tenantId),
+      carregarIdsRivaisDe(tenantId, ids),
+      filtrarTenantsRestritos(ids, tenantId),
+    ])
+  const visiveisSet = new Set(visiveis)
+  return filtrarTorcidasElegiveis(candidatos, unidadeIds, new Set(linhagem), rivalIds).filter(
+    (c: T) => visiveisSet.has(c.id),
+  )
 }
 
 export async function listRecomendacoesForTenant(
@@ -408,11 +433,12 @@ export async function listRecomendacoesForTenant(
   // `afiliacaoId` da mãe e entraria como "co-irmã", assim como as unidades da
   // própria worktree. Aliança é vínculo entre torcidas — unidade herda o da
   // sede. Uma consulta cobre co-irmãs e sugestões mapeadas.
-  const [unidadeIds, linhagem]: [Set<string>, string[]] = await Promise.all([
+  const [unidadeIds, linhagem, rivalIds]: [Set<string>, string[], Set<string>] = await Promise.all([
     carregarUnidadeIds(
       Array.from(new Set([...coirmasRaw.map((c: CoIrmaRow) => c.id), ...tenantsById.keys()])),
     ),
     getTorcidaLineageTenantIds(tenantId),
+    carregarIdsRivaisDe(tenantId, Array.from(tenantsById.keys())),
   ])
   const linhagemIds = new Set(linhagem)
 
@@ -460,9 +486,10 @@ export async function listRecomendacoesForTenant(
       if (!item.tenantSugeridoId) return true
       // Seed legado / erro: não mostrar “aliada” quem é do mesmo clube.
       if (sameClubIds.has(item.tenantSugeridoId)) return false
-      // Nem unidade de outra torcida, nem a própria worktree.
+      // Nem unidade de outra torcida, nem a própria worktree, nem rival.
       if (unidadeIds.has(item.tenantSugeridoId)) return false
       if (linhagemIds.has(item.tenantSugeridoId)) return false
+      if (rivalIds.has(item.tenantSugeridoId)) return false
       return true
     })
 

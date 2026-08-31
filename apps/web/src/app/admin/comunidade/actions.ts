@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidateComunicadosCache } from '@/lib/comunidade'
-import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
+import { notificarComunicado } from '@/lib/notificacoes-routing'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
@@ -236,16 +236,21 @@ async function publicarComunicadoENotificar(opts: {
     },
   })
 
-  if (opts.prioridade === 'URGENTE') {
-    await notificarComunicadoUrgente({
-      tenantId: opts.tenantId,
-      tipo: 'COMUNICADO_URGENTE',
-      titulo: `Urgente: ${opts.titulo}`,
-      corpo: opts.corpo.slice(0, 280),
-      link: '/portal/comunidade',
-      excetoUserId: opts.autorId,
-    })
-  }
+  const urgente = opts.prioridade === 'URGENTE'
+  const importante = opts.prioridade === 'IMPORTANTE'
+  await notificarComunicado({
+    tenantId: opts.tenantId,
+    tipo: urgente ? 'COMUNICADO_URGENTE' : 'COMUNICADO_NOVO',
+    titulo: urgente
+      ? `Urgente: ${opts.titulo}`
+      : importante
+        ? `Importante: ${opts.titulo}`
+        : opts.titulo,
+    corpo: opts.corpo.slice(0, 280),
+    link: '/portal/comunidade',
+    atorId: opts.autorId,
+    excetoUserId: opts.autorId,
+  })
 
   invalidateComunicadosCache(opts.tenantId)
   revalidatePath('/admin/comunidade')

@@ -2144,7 +2144,7 @@ export function BarPdv({
             role="dialog"
             aria-modal="true"
             aria-labelledby="pdv-abrir-comanda-titulo"
-            className="w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl @[40rem]/pdv:pb-4"
           >
             <h2
               id="pdv-abrir-comanda-titulo"
@@ -2252,7 +2252,7 @@ export function BarPdv({
             role="dialog"
             aria-modal="true"
             aria-labelledby="pdv-fechar-comanda-titulo"
-            className="max-h-[90%] w-full max-w-lg overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-2xl"
+            className="max-h-[90%] w-full max-w-lg overflow-y-auto rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl @[40rem]/pdv:pb-4"
           >
             <h2
               id="pdv-fechar-comanda-titulo"

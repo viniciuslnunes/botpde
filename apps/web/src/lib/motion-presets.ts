@@ -128,12 +128,13 @@ export const heartBurst: Variants = {
   show: { opacity: [0.55, 0], scale: [0.4, 1.8], transition: { duration: 0.5, ease: 'easeOut' } },
 }
 
-/** Bookmark "cai" e assenta ao salvar — distinto do bounce genérico de reação. */
+/** Bookmark "cai" e assenta ao salvar. Tween — o hop usa 3 keyframes
+ * (`scale: [1, 1.15, 1]`, `y: [0, -3, 0]`); spring só aceita 2
+ * (https://motion.dev/troubleshooting/spring-two-frames). */
 export const bookmarkDrop: Transition = {
-  type: 'spring',
-  stiffness: 500,
-  damping: 15,
-  mass: 0.7,
+  type: 'tween',
+  duration: 0.4,
+  ease: [0.22, 1.15, 0.36, 1],
 }
 
 /** Giro rápido do ícone de compartilhar ao confirmar o repost. */

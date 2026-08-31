@@ -102,7 +102,7 @@ async function FemininoHeaderLinks({ tenantId }: { tenantId: string }) {
   return (
     <Link
       href={`/portal/departamentos/${ops.departamentoSlug}`}
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+      className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
     >
       <Users className="h-4 w-4" aria-hidden />
       Equipe no portal
@@ -174,7 +174,7 @@ export default async function AdminFemininoPage() {
             </Suspense>
             <Link
               href="/admin/eventos?vista=semana"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
               Agenda da semana

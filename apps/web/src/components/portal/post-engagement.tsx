@@ -73,7 +73,8 @@ function EngajamentoBtn({
   className: string
   onClick?: () => void
   disabled?: boolean
-  /** Transição usada ao ativar (default: bounce genérico `reactionPop`). */
+  /** Transição usada ao ativar (default: bounce genérico `reactionPop`).
+   * Com 3+ keyframes em `activeAnimate`, precisa ser tween — spring só aceita 2. */
   activeTransition?: Transition
   /** Keyframes de ativação (default: `scale: [1, 1.08, 1]`). */
   activeAnimate?: TargetAndTransition
@@ -117,6 +118,9 @@ export function PostEngagement({
   const [comentarios, setComentarios] = useState<ComentarioPostItem[]>([])
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
   const [carregandoComentarios, setCarregandoComentarios] = useState(false)
+  // Falha da leitura fica na própria seção (com "Tentar de novo") — o toast
+  // some em segundos e o usuário ficava olhando um spinner sem explicação.
+  const [erroComentarios, setErroComentarios] = useState<string | null>(null)
   const [comentario, setComentario] = useState('')
   const [mencoesComentario, setMencoesComentario] = useState<MencaoParsed[]>([])
   const [denunciando, setDenunciando] = useState(false)
@@ -137,12 +141,15 @@ export function PostEngagement({
   const carregarComentarios = useCallback(async () => {
     if (comentariosCarregadosRef.current) return
     setCarregandoComentarios(true)
+    setErroComentarios(null)
     try {
       const lista = await listarComentariosPost(postId)
       setComentarios(lista)
       comentariosCarregadosRef.current = true
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível carregar comentários.')
+      const mensagem = err instanceof Error ? err.message : 'Não foi possível carregar comentários.'
+      setErroComentarios(mensagem)
+      toast.error(mensagem)
     } finally {
       setCarregandoComentarios(false)
     }
@@ -567,6 +574,19 @@ export function PostEngagement({
               <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Carregando comentários…
+              </div>
+            )}
+
+            {!carregandoComentarios && erroComentarios && comentarios.length === 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                <span>{erroComentarios}</span>
+                <button
+                  type="button"
+                  onClick={() => void carregarComentarios()}
+                  className="app-touch-target rounded-lg px-2 py-1 font-semibold text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  Tentar de novo
+                </button>
               </div>
             )}
 

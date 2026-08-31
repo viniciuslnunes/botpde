@@ -98,6 +98,38 @@ describe('reconciliarNotificacoesDoEvento', () => {
     expect(where).not.toHaveProperty('corpo')
   })
 
+  it('filtra por link da entidade resolvida', async () => {
+    mocks.notificacaoFindMany.mockResolvedValue([{ userId: 'gestor-1' }])
+    mocks.notificacaoUpdateMany.mockResolvedValue({ count: 1 })
+
+    await reconciliarNotificacoesDoEvento(TENANT, {
+      tipos: ['COBRANCA_PENDENTE', 'COBRANCA_VENCIDA'],
+      links: ['/portal/cobrancas/c1', '/admin/financeiro/cobrancas?cobranca=c1'],
+    })
+
+    const where = mocks.notificacaoUpdateMany.mock.calls[0][0].where
+    expect(where).not.toHaveProperty('userId')
+    expect(where.tipo).toEqual({ in: ['COBRANCA_PENDENTE', 'COBRANCA_VENCIDA'] })
+    expect(where.link).toEqual({
+      in: ['/portal/cobrancas/c1', '/admin/financeiro/cobrancas?cobranca=c1'],
+    })
+  })
+
+  it('escopa por destinatário só em notificação 1:1 (NOVA_MENSAGEM)', async () => {
+    mocks.notificacaoFindMany.mockResolvedValue([{ userId: 'eu' }])
+    mocks.notificacaoUpdateMany.mockResolvedValue({ count: 1 })
+
+    await reconciliarNotificacoesDoEvento(TENANT, {
+      tipo: 'NOVA_MENSAGEM',
+      userId: 'eu',
+      link: '/portal/mensagens?c=conv-1',
+    })
+
+    const where = mocks.notificacaoUpdateMany.mock.calls[0][0].where
+    expect(where.userId).toBe('eu')
+    expect(where.link).toBe('/portal/mensagens?c=conv-1')
+  })
+
   it('não toca no banco nem pinga quando ninguém tem a notificação pendente', async () => {
     mocks.notificacaoFindMany.mockResolvedValue([])
 

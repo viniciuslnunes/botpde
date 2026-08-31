@@ -22,7 +22,7 @@ export function abrirCanalNaOrdem(
 
 /**
  * Nova ordem manual (drag). A barra pode mandar um **subconjunto** do cookie:
- * - canais da worktree omitidos na UI (`excluirTenantIds`)
+ * - canais já no prefixo clube→torcida→unidade (`excluirTenantIds` só desses)
  * - canal atual só na barra (ainda sem cookie)
  *
  * Ids desconhecidos são ignorados; slots do cookie fora do subconjunto
@@ -93,15 +93,41 @@ export function slugsHierarquiaFixos(opts: {
 }
 
 /**
+ * Unidade no 3º slot da barra (clube → torcida → unidade).
+ *
+ * 1. Unidade do contexto (vínculo ou tenant ativo Caso B).
+ * 2. Senão, a primeira unidade Caso B **aberta** na cookie cuja raiz é a
+ *    torcida ativa — operador sem `SaasMembro` na PDE ainda vê o 3º escudo.
+ */
+export function slugUnidadePrefixoBarra(opts: {
+  slugUnidadeContexto: string | null | undefined
+  slugTorcida: string | null | undefined
+  canaisAbertos: Array<{ slug: string; ehUnidade: boolean; raizId: string }>
+  raizIdTorcida: string | null | undefined
+}): string | null {
+  const torcida = opts.slugTorcida?.trim() || ''
+  const contexto = opts.slugUnidadeContexto?.trim() || ''
+  if (contexto && contexto !== torcida) return contexto
+
+  const raiz = opts.raizIdTorcida?.trim() || ''
+  if (!raiz) return null
+  for (const canal of opts.canaisAbertos) {
+    if (!canal.ehUnidade || canal.raizId !== raiz) continue
+    const slug = canal.slug.trim()
+    if (slug && slug !== torcida) return slug
+  }
+  return null
+}
+
+/**
  * Unidade entra no prefixo fixo (sem X) da barra multi-canal?
  *
- * Sócio comum: sim, quando há escopo unidade — é a aba "Minha unidade".
+ * Hierarquia da barra é sempre clube → torcida → unidade, para sócio e
+ * super-admin. Estar logado na Sede (e não na PDE) **não** esconde o 3º
+ * slot — outras unidades abertas da mesma worktree ficam na zona móvel.
  *
- * Super-admin: só quando o tenant ativo **é** essa unidade. Caso contrário o
- * vínculo residual (`SaasMembro` com `sedeId` de SUBSEDE/PDE, ainda APROVADO
- * depois de `removerLideranca`) trava a 3ª aba em Gaviões sem poder fechar —
- * e ela "volta" ao sair do PDE, onde a mesma unidade era só extra do cookie
- * (4ª posição, fechável).
+ * `superAdmin` / `atualSlug` permanecem no contrato dos call sites; o
+ * prefixo não depende mais deles.
  */
 export function temUnidadeFixaOperador(opts: {
   superAdmin: boolean
@@ -110,20 +136,16 @@ export function temUnidadeFixaOperador(opts: {
   atualSlug: string | null | undefined
 }): boolean {
   const unidade = opts.slugUnidade?.trim() || ''
-  if (!opts.temEscopoUnidade || !unidade) return false
-  if (!opts.superAdmin) return true
-  const atual = opts.atualSlug?.trim() || ''
-  return atual === unidade
+  return Boolean(opts.temEscopoUnidade && unidade)
 }
 
 /**
  * Conversa ids que NÃO entram na barra 4+ (já cobertos pelas abas fixas).
  *
  * - Canal oficial da Sede (aba torcida): sempre fixo.
- * - Canal da unidade do vínculo: só quando a aba unidade está fixa
- *   (`temUnidadeFixaOperador`). Super-admin na Sede com vínculo residual
- *   (ex.: Rio Claro) deve poder abrir essa unidade como 4+ fechável —
- *   senão o mural abre e a aba some.
+ * - Canal da unidade do 3º slot: fora da 4+ enquanto a aba unidade está
+ *   fixa (`temUnidadeFixaOperador`). Outras unidades da worktree continuam
+ *   na zona móvel (slug ou conversa).
  */
 export function idsCanaisHierarquiaFixosNaBarra(opts: {
   canalIdTorcida: string | null | undefined

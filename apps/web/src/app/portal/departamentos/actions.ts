@@ -22,6 +22,7 @@ import {
   validarVinculoCanalArea,
   BARRACAO_CHECKLIST,
   PERMISSIONS,
+  hrefHomeDepartamento,
 } from '@torcida/types'
 import {
   adicionarMembroDepartamento,
@@ -29,6 +30,7 @@ import {
 } from '@/app/admin/(plataforma)/acessos/actions'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { isCloudinaryUrl } from '@/lib/social-embed'
+import { notificarSafe } from '@/lib/notificacoes'
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
@@ -38,6 +40,13 @@ const BuscarCandidatosSchema = z.object({
 })
 
 export type ActionState = { ok?: boolean; error?: string }
+
+function revalidateEscoposArea(slug: string) {
+  revalidatePath(`/portal/departamentos/${slug}`)
+  revalidatePath('/admin/departamentos')
+  revalidatePath('/admin/departamentos/areas')
+  revalidatePath('/admin/departamentos/equipes')
+}
 
 async function assertPodeGerirArea(departamentoId: string) {
   const session = await auth()
@@ -741,7 +750,17 @@ export async function adicionarMembroAreaDepartamento(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    await notificarSafe({
+      userId: parsed.data.targetUserId,
+      tenantId: tenant.id,
+      tipo: 'DEPARTAMENTO_ADICIONADO',
+      titulo: `Você entrou na área ${area.nome}`,
+      corpo: `Você foi incluído na frente de atuação ${area.nome}.`,
+      link: hrefHomeDepartamento(parsed.data.slug, 'areas'),
+      atorId: session.user.id,
+    })
+
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível incluir na área' }
@@ -785,7 +804,17 @@ export async function removerMembroAreaDepartamento(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    await notificarSafe({
+      userId: parsed.data.targetUserId,
+      tenantId: tenant.id,
+      tipo: 'DEPARTAMENTO_REMOVIDO',
+      titulo: `Você saiu da área ${area.nome}`,
+      corpo: `Você não faz mais parte da frente de atuação ${area.nome}.`,
+      link: hrefHomeDepartamento(parsed.data.slug, 'areas'),
+      atorId: session.user.id,
+    })
+
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível remover da área' }
@@ -835,11 +864,155 @@ export async function definirResponsavelArea(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    if (parsed.data.papel === 'RESPONSAVEL') {
+      await notificarSafe({
+        userId: parsed.data.targetUserId,
+        tenantId: tenant.id,
+        tipo: 'ACESSO_ATUALIZADO',
+        titulo: `Você é responsável pela área ${area.nome}`,
+        corpo: 'A accountability da frente de atuação ficou com você — isso não concede permissão extra.',
+        link: hrefHomeDepartamento(parsed.data.slug, 'areas'),
+        atorId: session.user.id,
+      })
+    }
+
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
   }
+}
+
+/**
+ * Atalho institucional: inclui a pessoa na área (se ainda não estiver) e a
+ * nomeia responsável. Um passo — a regra antiga exigia membro antes.
+ * `RESPONSAVEL` continua accountability, não permissão.
+ */
+export async function nomearResponsavelArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = AreaMembroSchema.safeParse({
+    areaId: formData.get('areaId'),
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    targetUserId: formData.get('targetUserId'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+    const area = await assertAreaNoDepartamento(
+      tenant.id,
+      parsed.data.departamentoId,
+      parsed.data.areaId,
+    )
+    await assertElegivelParaArea(tenant.id, parsed.data.departamentoId, parsed.data.targetUserId)
+
+    const atual: { id: string; papel: string } | null = await db.departamentoAreaMembro.findFirst({
+      where: { areaId: area.id, userId: parsed.data.targetUserId },
+      select: { id: true, papel: true },
+    })
+    if (atual?.papel === 'RESPONSAVEL') {
+      revalidateEscoposArea(parsed.data.slug)
+      return { ok: true }
+    }
+
+    await db.departamentoAreaMembro.upsert({
+      where: {
+        areaId_userId: { areaId: area.id, userId: parsed.data.targetUserId },
+      },
+      create: { areaId: area.id, userId: parsed.data.targetUserId, papel: 'RESPONSAVEL' },
+      update: { papel: 'RESPONSAVEL' },
+    })
+
+    if (!atual) await syncMembrosCanalArea(db, area.id)
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_AREA_RESPONSAVEL_DEFINIDO',
+        entidade: 'DepartamentoArea',
+        entidadeId: area.id,
+        detalhes: {
+          userId: parsed.data.targetUserId,
+          papel: 'RESPONSAVEL',
+          incluido: !atual,
+        },
+      },
+    })
+
+    await notificarSafe({
+      userId: parsed.data.targetUserId,
+      tenantId: tenant.id,
+      tipo: 'ACESSO_ATUALIZADO',
+      titulo: `Você é responsável pela área ${area.nome}`,
+      corpo: 'A accountability da frente de atuação ficou com você — isso não concede permissão extra.',
+      link: hrefHomeDepartamento(parsed.data.slug, 'areas', { area: area.id }),
+      atorId: session.user.id,
+    })
+
+    revalidateEscoposArea(parsed.data.slug)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível nomear o responsável' }
+  }
+}
+
+export type AreaMembroAdmin = {
+  userId: string
+  nome: string | null
+  nickname: string | null
+  papel: 'MEMBRO' | 'RESPONSAVEL'
+}
+
+/** Gente da área, para o modal de nomeação no admin. */
+export async function listarMembrosArea(
+  areaId: string,
+  departamentoId: string,
+): Promise<AreaMembroAdmin[]> {
+  const entrada = z
+    .object({ areaId: IdSchema, departamentoId: IdSchema })
+    .safeParse({ areaId, departamentoId })
+  if (!entrada.success) return []
+
+  let tenantId: string
+  try {
+    const { tenant } = await assertPodeGerirArea(entrada.data.departamentoId)
+    tenantId = tenant.id
+  } catch {
+    return []
+  }
+
+  const area: { id: string } | null = await db.departamentoArea.findFirst({
+    where: { id: entrada.data.areaId, departamentoId: entrada.data.departamentoId, tenantId },
+    select: { id: true },
+  })
+  if (!area) return []
+
+  const rows: Array<{
+    userId: string
+    papel: string
+    user: { nome: string | null; nickname: string | null }
+  }> = await db.departamentoAreaMembro.findMany({
+    where: { areaId: area.id },
+    orderBy: [{ criadoEm: 'asc' }],
+    select: {
+      userId: true,
+      papel: true,
+      user: { select: { nome: true, nickname: true } },
+    },
+  })
+
+  return rows
+    .map((r) => ({
+      userId: r.userId,
+      nome: r.user.nome,
+      nickname: r.user.nickname,
+      papel: r.papel === 'RESPONSAVEL' ? ('RESPONSAVEL' as const) : ('MEMBRO' as const),
+    }))
+    .sort((a, b) => Number(b.papel === 'RESPONSAVEL') - Number(a.papel === 'RESPONSAVEL'))
 }
 
 /** Candidatos do departamento (já elegíveis) ainda fora desta área específica. */

@@ -77,7 +77,7 @@ function InboxRow({
         <div className="min-w-0 flex-1">
           <Link
             href={item.href}
-            className="block text-sm font-medium text-[rgb(var(--foreground))] hover:underline"
+            className="app-touch-line block text-sm font-medium text-[rgb(var(--foreground))] hover:underline"
           >
             {item.titulo}
           </Link>

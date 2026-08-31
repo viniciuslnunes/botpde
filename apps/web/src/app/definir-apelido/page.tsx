@@ -70,7 +70,7 @@ export default async function DefinirApelidoPage({
     : await primeiraSugestaoLivre([], nome, email || null, session.user.id)
 
   return (
-    <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
+    <div className="app-shell-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-4">
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgb(var(--primary)),transparent)]" />
 
       <div className="relative z-10 w-full max-w-sm">

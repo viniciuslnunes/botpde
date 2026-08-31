@@ -1,6 +1,9 @@
 import { auth } from '@/lib/auth'
 import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
-import { subscribeNotificacaoPing } from '@/lib/notificacoes-bus'
+import {
+  subscribeNotificacaoPing,
+  subscribeNotificacaoPingUsuario,
+} from '@/lib/notificacoes-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
@@ -17,6 +20,9 @@ export const dynamic = 'force-dynamic'
  * (`resolveTenantIdPortalComunidade`). Sem isso, super-admin operando outra
  * torcida ou liderança com vínculo em mais de uma torcida assina o ping do
  * tenant errado no admin e só recebe o badge no polling de 20s.
+ *
+ * `?escopo=plataforma` assina a chave por usuário (cross-tenant) — sino do
+ * console super-admin.
  */
 export async function GET(request: Request) {
   try {
@@ -26,16 +32,23 @@ export async function GET(request: Request) {
     }
 
     const escopo = new URL(request.url).searchParams.get('escopo')
+    if (escopo === 'plataforma') {
+      if (!isSuperAdminEmail(session.user.email)) {
+        return new Response('Proibido', { status: 403 })
+      }
+      return createSsePingResponse(
+        (onPing) => subscribeNotificacaoPingUsuario(session.user.id, onPing),
+        request.signal,
+      )
+    }
     const tenantId =
       escopo === 'admin'
         ? ((await getTenantFromHost())?.id ?? null)
         : await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
     if (!tenantId) {
-      // Super-admin sem vínculo: stream ocioso (evita 404 no console; navbar faz poll).
-      if (escopo !== 'admin' && isSuperAdminEmail(session.user.email)) {
-        return createSsePingResponse(() => () => {}, request.signal)
-      }
-      return new Response('Tenant não encontrado', { status: 404 })
+      // Sem tenant: stream ocioso (polling da navbar é o fallback). 404
+      // no EventSource aparecia no console a cada reconnect.
+      return createSsePingResponse(() => () => {}, request.signal)
     }
 
     const userId = session.user.id

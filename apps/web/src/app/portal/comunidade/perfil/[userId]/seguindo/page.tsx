@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
 import { listarRedeSocial, podeVerListasRede } from '@/lib/perfil-social'
+import { saoUsuariosRivais } from '@/lib/perfil-visibilidade'
 import { ComunidadeMemberList } from '../../../_components/comunidade-member-list'
 import { getSeguimentoStatus } from '@/lib/social'
 import { db } from '@torcida/db'
@@ -17,6 +18,9 @@ export default async function PerfilSeguindoPage({
 }) {
   const [{ userId }, session] = await Promise.all([params, auth()])
   if (!session?.user?.id) redirect('/entrar')
+  if (session.user.id !== userId && (await saoUsuariosRivais(session.user.id, userId))) {
+    notFound()
+  }
   const tenant = await resolveTenantMinhaTorcida(session.user.id, session.user.email)
   if (!tenant) redirect('/portal/comunidade?escopo=nacional')
 

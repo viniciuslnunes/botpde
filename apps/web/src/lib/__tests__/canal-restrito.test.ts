@@ -78,6 +78,7 @@ describe('recursoCascateiaParaIsolado', () => {
 
   it('barra o feed da comunidade e o resto da praça social', () => {
     expect(recursoCascateiaParaIsolado('comunidade')).toBe(false)
+    expect(recursoCascateiaParaIsolado('memoria')).toBe(false)
     expect(recursoCascateiaParaIsolado('loja')).toBe(false)
     expect(recursoCascateiaParaIsolado('sedes')).toBe(false)
   })

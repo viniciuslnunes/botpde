@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import { KeyRound, Loader2 } from 'lucide-react'
 import { AccessUserPanel } from '@/components/admin/access-user-panel'
-import { carregarAcessoMembro, type MembroAcessoDados } from './acesso-actions'
+import { carregarAcessoMembro, concederFonteVerificadaAction, type MembroAcessoDados } from './acesso-actions'
+import { toast } from '@torcida/ui'
 
 /**
  * Aba "Acessos" do card de detalhes — cargo, área e permissões adicionais da
@@ -82,8 +83,54 @@ export function TabAcesso({ membroId }: { membroId: string }) {
         roles={dados.roles}
         departamentos={dados.departamentos}
         tipoSede={dados.tipoSede}
+        ownerOcupadoPor={dados.ownerOcupadoPor}
         onClose={recarregar}
+      />
+      <FonteVerificadaToggle
+        membroId={membroId}
+        concedida={Boolean(dados.fonteVerificadaEm)}
+        onDone={recarregar}
       />
     </div>
   )
 }
+
+function FonteVerificadaToggle({
+  membroId,
+  concedida,
+  onDone,
+}: {
+  membroId: string
+  concedida: boolean
+  onDone: () => void
+}) {
+  const [pending, start] = useTransition()
+
+  return (
+    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-3">
+      <p className="text-sm font-medium text-[rgb(var(--foreground))]">Fonte verificada</p>
+      <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+        Selo de perfil autêntico nesta torcida. Artigo sai como opinião verificada, não como
+        comunicado oficial. Não concede cargo.
+      </p>
+      <button
+        type="button"
+        disabled={pending}
+        className="app-action mt-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 text-xs font-medium text-[rgb(var(--foreground))] disabled:opacity-50"
+        onClick={() => {
+          start(async () => {
+            const r = await concederFonteVerificadaAction(membroId, !concedida)
+            if ('error' in r) {
+              toast.error(r.error)
+              return
+            }
+            onDone()
+          })
+        }}
+      >
+        {concedida ? 'Revogar selo' : 'Conceder selo'}
+      </button>
+    </div>
+  )
+}
+

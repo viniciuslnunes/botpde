@@ -18,30 +18,30 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 
 ### Onda A — quick wins (zero infra)
 
-| Item | Arquivo(s) | Efeito |
-|------|------------|--------|
-| Comentários lazy | `post-engagement.tsx` | Sem fetch de comentários no mount |
-| SSE feed + refresh | `feed-live-banner.tsx`, `use-feed-stream.ts`, `feed-live-refresh.ts` | Topo: auto-refetch; rolado: banner |
-| Batch visibilidade | `perfil-social.ts`, `social.ts`, `comunidade-busca.ts` | Fim de N+1 em busca/feed |
-| Batch contagens | `getContagensSeguimentoEmLote` | Aside "Para seguir" |
-| Canais sugeridos | `getSugestoesCanaisParaAside` → `listCanaisVisiveis` | Rail direito (layout; filtra membership; cache base 120s) |
-| Hashtags em alta SQL | `feed.ts` `getHashtagsEmAlta` | `groupBy` em vez de agregar em memória |
-| Stories privacidade batch | `stories.ts` | Uma leitura de perfis/seguimentos |
-| Índices compostos | `schema.prisma` (`Post`, `Seguimento`) | Leituras por autor/data e rede |
-| Nav badges Suspense | `comunidade-feed-nav.tsx` | Shell não bloqueia em badges |
+| Item                      | Arquivo(s)                                                           | Efeito                                                    |
+| ------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------- |
+| Comentários lazy          | `post-engagement.tsx`                                                | Sem fetch de comentários no mount                         |
+| SSE feed + refresh        | `feed-live-banner.tsx`, `use-feed-stream.ts`, `feed-live-refresh.ts` | Topo: auto-refetch; rolado: banner                        |
+| Batch visibilidade        | `perfil-social.ts`, `social.ts`, `comunidade-busca.ts`               | Fim de N+1 em busca/feed                                  |
+| Batch contagens           | `getContagensSeguimentoEmLote`                                       | Aside "Para seguir"                                       |
+| Canais sugeridos          | `getSugestoesCanaisParaAside` → `listCanaisVisiveis`                 | Rail direito (layout; filtra membership; cache base 120s) |
+| Hashtags em alta SQL      | `feed.ts` `getHashtagsEmAlta`                                        | `groupBy` em vez de agregar em memória                    |
+| Stories privacidade batch | `stories.ts`                                                         | Uma leitura de perfis/seguimentos                         |
+| Índices compostos         | `schema.prisma` (`Post`, `Seguimento`)                               | Leituras por autor/data e rede                            |
+| Nav badges Suspense       | `comunidade-feed-nav.tsx`                                            | Shell não bloqueia em badges                              |
 
 ### Onda B — feed escalável
 
-| Item | Arquivo(s) | Efeito |
-|------|------------|--------|
-| **B1** Paginação API | `GET /api/comunidade/feed`, `/rede` | Infinite scroll sem reload |
-| **B1** Client infinite | `comunidade-feed-infinite.tsx`, `comunidade-rede-infinite.tsx` | `IntersectionObserver` + cache módulo |
-| **B2** Deep-link cursor | `replaceState` nos clients | URL preserva posição parcial |
-| **B3** SSE invalidação | `feed-bus.ts`, `/api/comunidade/feed/stream` | Long-poll ping → refetch do trecho atual |
-| **B4** Timeline materializada | `FeedTimeline`, `feed-timeline.ts`, `actions.ts` | Fan-out on write para rede/seguindo |
-| **B5** Ranking Descobrir | `scoreDescobrirPost`, `rankDescobrirPosts` | Recência + engajamento + boost local |
-| **B6** Busca `pg_trgm` | `comunidade-busca.ts`, `enable-pg-trgm.js` | Similaridade + índices GIN; fallback ILIKE |
-| **B6.1** Busca typeahead (2026-07-17) | `modo=rapida`, `postIncludeBusca`, fix `GROUP BY` | Dropdown leve; SQL DISTINCT+ORDER BY quebrava API (`42P10`) |
+| Item                                  | Arquivo(s)                                                     | Efeito                                                      |
+| ------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| **B1** Paginação API                  | `GET /api/comunidade/feed`, `/rede`                            | Infinite scroll sem reload                                  |
+| **B1** Client infinite                | `comunidade-feed-infinite.tsx`, `comunidade-rede-infinite.tsx` | `IntersectionObserver` + cache módulo                       |
+| **B2** Deep-link cursor               | `replaceState` nos clients                                     | URL preserva posição parcial                                |
+| **B3** SSE invalidação                | `feed-bus.ts`, `/api/comunidade/feed/stream`                   | Long-poll ping → refetch do trecho atual                    |
+| **B4** Timeline materializada         | `FeedTimeline`, `feed-timeline.ts`, `actions.ts`               | Fan-out on write para rede/seguindo                         |
+| **B5** Ranking Descobrir              | `scoreDescobrirPost`, `rankDescobrirPosts`                     | Recência + engajamento + boost local                        |
+| **B6** Busca `pg_trgm`                | `comunidade-busca.ts`, `enable-pg-trgm.js`                     | Similaridade + índices GIN; fallback ILIKE                  |
+| **B6.1** Busca typeahead (2026-07-17) | `modo=rapida`, `postIncludeBusca`, fix `GROUP BY`              | Dropdown leve; SQL DISTINCT+ORDER BY quebrava API (`42P10`) |
 
 ### Ondas dual Nacional × Torcida (2026-07-22)
 
@@ -50,20 +50,20 @@ escopo Nacional; busca de sugestões em commit separado. Não substituem ondas
 A/B — estendem o mesmo padrão (cache público + overlay viewer, TanStack no
 client, ping SSE pós-fan-out).
 
-| Onda | Commit(s) | Escopo | Entregas |
-|------|-----------|--------|----------|
-| **1** | `7dbc82a`, `7823d25` | Filtros + UX publicação | `getPostsFeedNacionalSeguindo` / `Grupos` com queries duras; roteamento `filtro` na API e `comunidade-posts-section`; empty states; prepend otimista + pull-to-refresh; `FeedLiveBanner` no Nacional; timeline/fan-out em `after()`; `unstable_cache` 45s em `getPostsFeedNacional` + `tagFeedNacional`; assinatura Cloudinary cacheada 4 min |
-| **2** | `3439e56` | Hot path leitura/publicação | `assertAutorPublicacaoPost` retorna `permissoesEfetivas` (sem 2ª leitura RBAC); invalidação via `after()`; cache badges 120s (`autor-badges-feed`); `postIncludeLista` no Nacional; queries paralelas no SSR (`page.tsx`); includes enxutos Seguindo/Grupos |
-| **3** | `f5462a4` | Realtime + ranking + badges | Canal SSE `feed-nacional:{afiliacaoId}`; stream `?escopo=nacional&afiliacaoId=`; `emitFeedNacionalPing` na invalidação pós-publicação; ranking Descobrir Nacional (1ª página); Descobrir torcida com `postIncludeLista` no cache base; tag `autor-badges:{tenantId}` + `revalidateTag` em RBAC/aprovação |
-| **Busca** | `0b8f1dd` | Sugestões `/busca` | Ranking por mesma unidade + atividade recente; cards com sede/cidade/badges (`comunidade-busca.ts`, `membro-sugestao-card.tsx`) |
+| Onda      | Commit(s)            | Escopo                      | Entregas                                                                                                                                                                                                                                                                                                                                      |
+| --------- | -------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1**     | `7dbc82a`, `7823d25` | Filtros + UX publicação     | `getPostsFeedNacionalSeguindo` / `Grupos` com queries duras; roteamento `filtro` na API e `comunidade-posts-section`; empty states; prepend otimista + pull-to-refresh; `FeedLiveBanner` no Nacional; timeline/fan-out em `after()`; `unstable_cache` 45s em `getPostsFeedNacional` + `tagFeedNacional`; assinatura Cloudinary cacheada 4 min |
+| **2**     | `3439e56`            | Hot path leitura/publicação | `assertAutorPublicacaoPost` retorna `permissoesEfetivas` (sem 2ª leitura RBAC); invalidação via `after()`; cache badges 120s (`autor-badges-feed`); `postIncludeLista` no Nacional; queries paralelas no SSR (`page.tsx`); includes enxutos Seguindo/Grupos                                                                                   |
+| **3**     | `f5462a4`            | Realtime + ranking + badges | Canal SSE `feed-nacional:{afiliacaoId}`; stream `?escopo=nacional&afiliacaoId=`; `emitFeedNacionalPing` na invalidação pós-publicação; ranking Descobrir Nacional (1ª página); Descobrir torcida com `postIncludeLista` no cache base; tag `autor-badges:{tenantId}` + `revalidateTag` em RBAC/aprovação                                      |
+| **Busca** | `0b8f1dd`            | Sugestões `/busca`          | Ranking por mesma unidade + atividade recente; cards com sede/cidade/badges (`comunidade-busca.ts`, `membro-sugestao-card.tsx`)                                                                                                                                                                                                               |
 
 **Segregação Nacional (filtros duros — não relaxar sem revisão de produto):**
 
-| Aba | Regra |
-|-----|-------|
-| Descobrir | `PUBLICO`, `conversaId: null`, tenants da afiliação; OR sintético ∪ seguidos `APROVADO` ∪ `alcanceNacional` |
-| Seguindo | Só autores seguidos `APROVADO`, `PUBLICO`, mesma afiliação |
-| Meus grupos | Só tenant sintético + murais dos grupos do viewer (`escopoFeedSomenteGrupos`) |
+| Aba         | Regra                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Descobrir   | `PUBLICO`, `conversaId: null`, tenants da afiliação; OR sintético ∪ seguidos `APROVADO` ∪ `alcanceNacional` |
+| Seguindo    | Só autores seguidos `APROVADO`, `PUBLICO`, mesma afiliação                                                  |
+| Meus grupos | Só tenant sintético + murais dos grupos do viewer (`escopoFeedSomenteGrupos`)                               |
 
 **Invariantes dual (preservar em features novas):**
 
@@ -88,10 +88,10 @@ client, ping SSE pós-fan-out).
 
 Commit de referência: `e4a30ee` (fix SQL + `modo=rapida`).
 
-| Superfície | Endpoint | Trabalho |
-|------------|----------|----------|
-| Dropdown do feed (`comunidade-search-bar.tsx`) | `GET /api/comunidade/busca?q=&modo=rapida` | Membros (avatar/nome) + hashtags + posts leves; **sem** canais, badges, follow, contagens |
-| Página `/portal/comunidade/busca` | `GET /api/comunidade/busca?q=` (`completa`) | Tudo acima + canais/unidades + badges + follow |
+| Superfície                                     | Endpoint                                    | Trabalho                                                                                  |
+| ---------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Dropdown do feed (`comunidade-search-bar.tsx`) | `GET /api/comunidade/busca?q=&modo=rapida`  | Membros (avatar/nome) + hashtags + posts leves; **sem** canais, badges, follow, contagens |
+| Página `/portal/comunidade/busca`              | `GET /api/comunidade/busca?q=` (`completa`) | Tudo acima + canais/unidades + badges + follow                                            |
 
 **Armadilha SQL (regressão clássica):** com `pg_trgm` ligado,
 
@@ -105,6 +105,7 @@ candidatos de membros usam `GROUP BY m.user_id, u.nome` +
 `MAX(similarity(bio))`. Ver `docs/data/modulo-comunidade.md` § busca.
 
 **Padrões a preservar:**
+
 - Typeahead sempre `modo=rapida`; página completa = default.
 - Posts de busca: `postIncludeBusca` / `projetarPostBusca` (não `postInclude` cheio).
 - Erro de API ≠ empty state (dropdown e página).
@@ -113,27 +114,27 @@ candidatos de membros usam `GROUP BY m.user_id, u.nome` +
 
 ### Caches e hot paths (pós-B)
 
-| Bloco | Padrão | TTL / escopo |
-|-------|--------|----------------|
-| Discover base | `unstable_cache` em `feed.ts` | 60s por tenant + escopo visível |
-| Feed Nacional Descobrir | `unstable_cache` + `tagFeedNacional(afiliacaoId)` | 45s; key inclui `userId`, seguindo, tenants, cursor |
-| Badges autor (feed) | `unstable_cache` + `tagAutorBadgesTenant(tenantId)` | 120s por lote autor:tenant |
-| Sugestões aside | `unstable_cache` + filtro por usuário | 120s base pública |
-| Canais visíveis | `unstable_cache` + membership por request | 120s base + query leve |
-| Hashtags em alta | `unstable_cache` | 120s |
-| Stories rings | `unstable_cache` + privacidade por request | 60s |
-| Salas ao vivo | `React.cache` + `unstable_cache` | Por request + 15s cross-request |
-| Privacidade autores | `React.cache` em `getAutoresSemAcesso` | Por request |
-| Eventos composer + aside | `React.cache` `getEventosFuturosVisiveis` | Por request |
-| Tenant ativo | `React.cache` `getActiveTenant` | Por request (layout + page) |
-| Salas no chrome | `listSalasAtivas` no layout (`ComunidadeLayoutChrome`) + dedupe `React.cache` se a page também pedir | Por request |
+| Bloco                    | Padrão                                                                                               | TTL / escopo                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Discover base            | `unstable_cache` em `feed.ts`                                                                        | 60s por tenant + escopo visível                     |
+| Feed Nacional Descobrir  | `unstable_cache` + `tagFeedNacional(afiliacaoId)`                                                    | 45s; key inclui `userId`, seguindo, tenants, cursor |
+| Badges autor (feed)      | `unstable_cache` + `tagAutorBadgesTenant(tenantId)`                                                  | 120s por lote autor:tenant                          |
+| Sugestões aside          | `unstable_cache` + filtro por usuário                                                                | 120s base pública                                   |
+| Canais visíveis          | `unstable_cache` + membership por request                                                            | 120s base + query leve                              |
+| Hashtags em alta         | `unstable_cache`                                                                                     | 120s                                                |
+| Stories rings            | `unstable_cache` + privacidade por request                                                           | 60s                                                 |
+| Salas ao vivo            | `React.cache` + `unstable_cache`                                                                     | Por request + 15s cross-request                     |
+| Privacidade autores      | `React.cache` em `getAutoresSemAcesso`                                                               | Por request                                         |
+| Eventos composer + aside | `React.cache` `getEventosFuturosVisiveis`                                                            | Por request                                         |
+| Tenant ativo             | `React.cache` `getActiveTenant`                                                                      | Por request (layout + page)                         |
+| Salas no chrome          | `listSalasAtivas` no layout (`ComunidadeLayoutChrome`) + dedupe `React.cache` se a page também pedir | Por request                                         |
 
 ### Chat e painéis laterais
 
-| Item | Arquivo(s) | Efeito |
-|------|------------|--------|
-| Resumo leve | `GET /api/conversas/resumo` | Badge + bloqueio sem inbox completa |
-| Inbox sob demanda | `comunidade-chat-panel.tsx` | `/api/conversas` só ao expandir |
+| Item                | Arquivo(s)                               | Efeito                                      |
+| ------------------- | ---------------------------------------- | ------------------------------------------- |
+| Resumo leve         | `GET /api/conversas/resumo`              | Badge + bloqueio sem inbox completa         |
+| Inbox sob demanda   | `comunidade-chat-panel.tsx`              | `/api/conversas` só ao expandir             |
 | Sem fetch duplicado | `mensagens-shell.tsx` (`inboxPreloaded`) | Pai pré-carrega; shell não repete bootstrap |
 
 ## Modelo novo — `FeedTimeline`
@@ -153,14 +154,14 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
 
 ## APIs novas
 
-| Método | Rota | Uso |
-|--------|------|-----|
-| GET | `/api/comunidade/feed?cursor=&take=&filtro=` | Paginação feed Descobrir/Seguindo |
-| GET | `/api/comunidade/feed?escopo=nacional&afiliacaoId=&filtro=` | Paginação feed Nacional (Descobrir / Seguindo / Grupos) |
-| GET | `/api/comunidade/rede?cursor=&take=` | Paginação Minha rede |
-| GET | `/api/comunidade/feed/stream` | Long-poll ping por tenant (host) |
-| GET | `/api/comunidade/feed/stream?escopo=nacional&afiliacaoId=` | Long-poll ping feed Nacional (por afiliação) |
-| GET | `/api/conversas/resumo` | `naoLidas` + flags de bloqueio |
+| Método | Rota                                                        | Uso                                                     |
+| ------ | ----------------------------------------------------------- | ------------------------------------------------------- |
+| GET    | `/api/comunidade/feed?cursor=&take=&filtro=`                | Paginação feed Descobrir/Seguindo                       |
+| GET    | `/api/comunidade/feed?escopo=nacional&afiliacaoId=&filtro=` | Paginação feed Nacional (Descobrir / Seguindo / Grupos) |
+| GET    | `/api/comunidade/rede?cursor=&take=`                        | Paginação Minha rede                                    |
+| GET    | `/api/comunidade/feed/stream`                               | Long-poll ping por tenant (host)                        |
+| GET    | `/api/comunidade/feed/stream?escopo=nacional&afiliacaoId=`  | Long-poll ping feed Nacional (por afiliação)            |
+| GET    | `/api/conversas/resumo`                                     | `naoLidas` + flags de bloqueio                          |
 
 ## Padrões obrigatórios (features novas na Comunidade)
 
@@ -186,7 +187,7 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    são estado otimista no cliente (`PostEngagement`). Revalidar
    `/portal/comunidade` a cada clique força RSC do feed inteiro (dezenas–
    centenas de queries) e mascara erros de Server Action em produção como
-   *“An error occurred in the Server Components render”*. Notificações e
+   _“An error occurred in the Server Components render”_. Notificações e
    `AuditLog` de comentário saem via `after()` + `notificarSafe`.
 9. **Voltar ao feed sem skeleton bloqueante** — Suspense dos posts usa
    `ComunidadeFeedBootstrap` (TanStack no layout, `gcTime` 20 min). Aside
@@ -202,41 +203,42 @@ Correção de produção + otimização em `reagirPost` / `comentarPost`
 (`comunidade/actions.ts`). Escopo de produto/visibilidade:
 `docs/data/modulo-comunidade.md` § engajamento.
 
-| Técnica | Efeito |
-|---------|--------|
-| Sem `revalidatePath('/portal/comunidade')` (nem `/portal`) na reação; comentário também sem revalidate de feed | POST deixa de esperar RSC do feed |
-| Authz + `findUnique` do post em `Promise.all` | Menos waterfall |
-| `podeEngajarPostVisivel` (fast-path tenant/clube; fallback hierarquia) | Evita resolver todos os tenants visíveis no caso comum (CN / mesmo clube) |
-| `resolverContextoEngajamento`: 1× `SaasMembro`; carteirinha + permissões em paralelo | −1 query vs `assertMembroAtivo` duplicado |
-| Reação: `deleteMany` (descurtir) / `upsert` (add·troca) | 1 RTT no toggle-off |
-| Comentário: `create` sem `include` do autor (usa sessão); audit + notifs em `after()` | Menos join + resposta imediata |
-| Notificação de reação/comentário/menção em `after()` | Fora do caminho crítico |
+| Técnica                                                                                                        | Efeito                                                                    |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Sem `revalidatePath('/portal/comunidade')` (nem `/portal`) na reação; comentário também sem revalidate de feed | POST deixa de esperar RSC do feed                                         |
+| Authz + `findUnique` do post em `Promise.all`                                                                  | Menos waterfall                                                           |
+| `podeEngajarPostVisivel` (fast-path tenant/clube; fallback hierarquia)                                         | Evita resolver todos os tenants visíveis no caso comum (CN / mesmo clube) |
+| `resolverContextoEngajamento`: 1× `SaasMembro`; carteirinha + permissões em paralelo                           | −1 query vs `assertMembroAtivo` duplicado                                 |
+| Reação: `deleteMany` (descurtir) / `upsert` (add·troca)                                                        | 1 RTT no toggle-off                                                       |
+| Comentário: `create` sem `include` do autor (usa sessão); audit + notifs em `after()`                          | Menos join + resposta imediata                                            |
+| Notificação de reação/comentário/menção em `after()`                                                           | Fora do caminho crítico                                                   |
 
 **Teto deste fluxo:** auth + post em paralelo → 1–2 writes. Próximo salto
 (API dedicada, contadores denormalizados) só com p95 pedindo — não otimizar
 por hábito.
 
-| Cenário | Antes | Depois | Ganho estimado |
-|---------|-------|--------|----------------|
+| Cenário                                        | Antes                                            | Depois                     | Ganho estimado                                         |
+| ---------------------------------------------- | ------------------------------------------------ | -------------------------- | ------------------------------------------------------ |
 | Curtir / comentar no feed (mesmo tenant ou CN) | Action + `revalidatePath` do feed (RSC completo) | Mutação leve + UI otimista | **~70–95%** menos trabalho no POST (∝ tamanho do feed) |
 
 ## Publicar + feed client (2026-07-17)
 
 Incidente: publicar “lento”, tempestade de requests depois, e o post **só
 aparecia após F5**. Causa raiz: o feed vivo é **TanStack Query** — `revalidatePath`
-+ `router.refresh()` (SSE perto do topo) forçavam RSC completo **sem** atualizar
-a lista client. Sintoma no Network: `navbar-context`, `conversas`, RSC
-`comunidade`, `feed`, `salas`, Sentry em cascata.
 
-| Técnica | Efeito |
-|---------|--------|
-| Composer emite `comunidade:post-publicado` (+ `PostPublicadoPreview` opcional) | Infinite feed faz **prepend otimista** imediato |
-| Soft hydrate / `invalidateQueries` leve após create | Confirma com servidor sem limpar a lista |
-| Sem `revalidatePath('/portal/comunidade')` no path de publicar | Action não espera RSC do feed |
-| `invalidarLeituraComunidade` / `revalidateTag` mantidos | Cache cross-request fica coerente |
-| `FeedLiveBanner` **não** chama `router.refresh()` perto do topo | Ping SSE → só refetch TanStack do topo |
-| Caminho crítico da action = create + timeline do autor; hashtags/menções/audit/`Perfil` via `after()` | Menos trabalho síncrono na action |
-| Descobrir: ranking **unificado** (rede + sugestões); API/SSR usam `feed.posts` | Post do autor não some quando há `postsSugeridos` |
+- `router.refresh()` (SSE perto do topo) forçavam RSC completo **sem** atualizar
+  a lista client. Sintoma no Network: `navbar-context`, `conversas`, RSC
+  `comunidade`, `feed`, `salas`, Sentry em cascata.
+
+| Técnica                                                                                               | Efeito                                            |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Composer emite `comunidade:post-publicado` (+ `PostPublicadoPreview` opcional)                        | Infinite feed faz **prepend otimista** imediato   |
+| Soft hydrate / `invalidateQueries` leve após create                                                   | Confirma com servidor sem limpar a lista          |
+| Sem `revalidatePath('/portal/comunidade')` no path de publicar                                        | Action não espera RSC do feed                     |
+| `invalidarLeituraComunidade` / `revalidateTag` mantidos                                               | Cache cross-request fica coerente                 |
+| `FeedLiveBanner` **não** chama `router.refresh()` perto do topo                                       | Ping SSE → só refetch TanStack do topo            |
+| Caminho crítico da action = create + timeline do autor; hashtags/menções/audit/`Perfil` via `after()` | Menos trabalho síncrono na action                 |
+| Descobrir: ranking **unificado** (rede + sugestões); API/SSR usam `feed.posts`                        | Post do autor não some quando há `postsSugeridos` |
 
 **Invariante:** se a UI do feed é client (Query/Virtual), mutação bem-sucedida
 **deve** atualizar o cache client (evento / prepend / `setQueryData`). RSC
@@ -253,15 +255,15 @@ gargalo nessa medição.
 Navegar para Buscar/Classificação e voltar remountava shell + chat + salas e
 zerava a percepção do TanStack (Suspense skeleton + SSR seed).
 
-| Técnica | Arquivo(s) | Efeito |
-|---------|------------|--------|
-| Fallback Suspense = `ComunidadeFeedBootstrap` | `_components/comunidade-feed-bootstrap.tsx` | Mostra cache quente em vez de skeleton vazio |
-| `gcTime` 20 min no Query provider | `comunidade-query-provider.tsx` | Cache sobrevive à saída do feed |
-| SSR seed só se cache vazio | `use-comunidade-infinite-feed.ts` | Não sobrescreve lista quente |
-| `ComunidadeLayoutChrome` (salas + canais sugeridos + chat) no layout | `comunidade-layout-chrome.tsx`, `layout.tsx` | `display:none` fora do feed — **sem unmount** |
-| Page fina + Suspense composer/card | `composer-context.ts`, `*-section.tsx` | Layout resolve chrome; page não bloqueia no composer |
-| Prefetch on-hover abas Descobrir/Seguindo | `comunidade-feed-tabs.tsx` | Volta mais rápida |
-| `React.cache` em `listSalasAtivas` + `getActiveTenant` | `salas.ts`, `tenant.ts` | Dedupe layout ↔ page no mesmo RSC |
+| Técnica                                                              | Arquivo(s)                                   | Efeito                                               |
+| -------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
+| Fallback Suspense = `ComunidadeFeedBootstrap`                        | `_components/comunidade-feed-bootstrap.tsx`  | Mostra cache quente em vez de skeleton vazio         |
+| `gcTime` 20 min no Query provider                                    | `comunidade-query-provider.tsx`              | Cache sobrevive à saída do feed                      |
+| SSR seed só se cache vazio                                           | `use-comunidade-infinite-feed.ts`            | Não sobrescreve lista quente                         |
+| `ComunidadeLayoutChrome` (salas + canais sugeridos + chat) no layout | `comunidade-layout-chrome.tsx`, `layout.tsx` | `display:none` fora do feed — **sem unmount**        |
+| Page fina + Suspense composer/card                                   | `composer-context.ts`, `*-section.tsx`       | Layout resolve chrome; page não bloqueia no composer |
+| Prefetch on-hover abas Descobrir/Seguindo                            | `comunidade-feed-tabs.tsx`                   | Volta mais rápida                                    |
+| `React.cache` em `listSalasAtivas` + `getActiveTenant`               | `salas.ts`, `tenant.ts`                      | Dedupe layout ↔ page no mesmo RSC                    |
 
 Medir: `e2e/feed-nav-back.measure.ts` (`firstPostMs`, contagens de
 `conversas/resumo` / feed / RSC).
@@ -274,28 +276,28 @@ rail; cortar soft-refetch ~600 ms em posts só-texto.
 Cada troca ainda é navegação App Router (page RSC remonta), mas o critical
 path do mural deixou de esperar listas de gestão e o N+1 das abas abertas.
 
-| Técnica | Arquivo(s) | Efeito |
-|---------|------------|--------|
-| Listas membros/pedidos/candidatos só ao abrir modal | `canal-feed-view.tsx`, `canal-feed-composition.tsx`, `carregarPainel*Canal` | Shell + Suspense de posts sem 2–5 queries de admin |
-| Badge de pedidos via `count` barato | `countPedidosPendentesCanal` | Mantém contagem no menu sem `listPedidosCanal` no SSR |
-| Batch das abas temáticas do cookie | `carregarCanaisAbertosSocio` | 1 `findMany` + `podeVerCanal` paralelo (antes N× `getCanalPorId`) |
-| `React.cache` em `getCanalPorId` / `carregarCanalRow` | `canais.ts` | Dedupe no mesmo request |
-| Waterfall paralelo na page | `canais/[id]/page.tsx` | perms + canal + cookies juntos |
-| Prefetch on-hover cards da listagem | `canais-client.tsx` + `ComunidadePrefetchLink` | Aquece RSC antes do clique |
+| Técnica                                               | Arquivo(s)                                                                  | Efeito                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Listas membros/pedidos/candidatos só ao abrir modal   | `canal-feed-view.tsx`, `canal-feed-composition.tsx`, `carregarPainel*Canal` | Shell + Suspense de posts sem 2–5 queries de admin                |
+| Badge de pedidos via `count` barato                   | `countPedidosPendentesCanal`                                                | Mantém contagem no menu sem `listPedidosCanal` no SSR             |
+| Batch das abas temáticas do cookie                    | `carregarCanaisAbertosSocio`                                                | 1 `findMany` + `podeVerCanal` paralelo (antes N× `getCanalPorId`) |
+| `React.cache` em `getCanalPorId` / `carregarCanalRow` | `canais.ts`                                                                 | Dedupe no mesmo request                                           |
+| Waterfall paralelo na page                            | `canais/[id]/page.tsx`                                                      | perms + canal + cookies juntos                                    |
+| Prefetch on-hover cards da listagem                   | `canais-client.tsx` + `ComunidadePrefetchLink`                              | Aquece RSC antes do clique                                        |
 
 ### Soft-switch temático ↔ temático (2026-08-05)
 
 Enquanto já se está em `/portal/comunidade/canais/[id]`, clicar outra aba
 temática **não** remonta o RSC: `history.pushState` + swap de chrome/feed.
 
-| Técnica | Arquivo(s) | Efeito |
-|---------|------------|--------|
-| `CanalSoftSwitchProvider` + `CanalSoftMuralHost` | `canal-soft-switch.tsx`, `canais/[id]/page.tsx` | Shell montado; só banner/composer/posts trocam |
-| Clique interceptado nas escopo-tabs | `comunidade-escopo-tabs.tsx` | Sem `loading.tsx` / sem remount do rail |
-| `carregarCanalMuralAction` | `socio-canais-actions.ts` | Chrome (flags + cor) on-demand, authz no servidor |
-| Prefetch TanStack no hover da aba | `prefetchComunidadeFeedPage` | Cache quente antes do clique |
-| Prune do cookie em batch | `registrarCanalTematicoAbertoAction` | Sem N× `getCanalPorId` no register |
-| Loading frio só no painel central | `canais/[id]/loading.tsx` | Menos flash na 1ª entrada pela listagem |
+| Técnica                                          | Arquivo(s)                                      | Efeito                                            |
+| ------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------- |
+| `CanalSoftSwitchProvider` + `CanalSoftMuralHost` | `canal-soft-switch.tsx`, `canais/[id]/page.tsx` | Shell montado; só banner/composer/posts trocam    |
+| Clique interceptado nas escopo-tabs              | `comunidade-escopo-tabs.tsx`                    | Sem `loading.tsx` / sem remount do rail           |
+| `carregarCanalMuralAction`                       | `socio-canais-actions.ts`                       | Chrome (flags + cor) on-demand, authz no servidor |
+| Prefetch TanStack no hover da aba                | `prefetchComunidadeFeedPage`                    | Cache quente antes do clique                      |
+| Prune do cookie em batch                         | `registrarCanalTematicoAbertoAction`            | Sem N× `getCanalPorId` no register                |
+| Loading frio só no painel central                | `canais/[id]/loading.tsx`                       | Menos flash na 1ª entrada pela listagem           |
 
 Abas oficiais (`?escopo=`) e operador (`trocarTorcidaAction`) continuam
 navegação/RSC completa. Deep-link / refresh ainda passam pelo RSC.
@@ -312,10 +314,60 @@ Sem `db:push`, `FeedTimeline` e índices novos não existem — leitura de rede
 degrada ou falha. Sem `db:enable-pg-trgm`, busca usa fallback ILIKE (correto,
 porém mais lenta em bases grandes).
 
+## Achado em aberto — 221 queries por visita (medido 2026-08-30)
+
+Medição direta no Postgres local (contador `xact_commit` de `pg_stat_database`,
+com ruído de fundo verificado em **0 txn** numa janela de 3 s sem requisição):
+
+| Rota                 | Queries **durante** a resposta | Queries **depois** (3 s, `after()`) | ms  |
+| -------------------- | ------------------------------ | ----------------------------------- | --- |
+| `/portal/comunidade` | **83**                         | **138**                             | 601 |
+| `/portal/eventos`    | 25                             | 0                                   | 191 |
+| `/portal`            | 12                             | 0                                   | 183 |
+
+Ou seja ~221 transações por visita à Comunidade, contra 12 na home do portal. As
+138 do rastro vêm do trabalho pós-resposta (fan-out de timeline é o suspeito
+óbvio, mas **não foi confirmado** — falta rastrear a origem).
+
+Não foi investigado a fundo nem corrigido: o item entrou como achado durante uma
+auditoria de performance do **dev server** (`docs/ops/dev-local-performance.md`),
+que é outro assunto. Fica registrado para a próxima rodada. Em produção (RTT
+~1 ms) as 83 da resposta custam ~83 ms de banco por visita; as 138 em background
+não atrasam o usuário, mas consomem pool e CPU do Postgres — o que importa para
+`docs/ops/plano-teste-volume-dados.md`.
+
 ## Como medir
 
+> **Atenção (2026-08-30): a instrumentação descrita abaixo não existe mais.**
+> `apps/web/src/components/dev/prisma-query-logger.tsx` e o componente
+> `PrismaQueryLogger` foram removidos, e o `proxy.ts` não passa mais
+> `x-pathname`/`x-method`/`x-request-start`. O que sobrou é o `after()` em
+> `proxy.ts`, e **ele nunca imprime**: o `after` lê o AsyncLocalStorage do
+> contexto do proxy, que não é o contexto onde o render roda, então `count` é
+> sempre 0 e a função retorna antes do log. Vale para dev e para o
+> `PERF_METRICS=1` de produção.
+>
+> Para **latência** por request, o Next 16 já imprime um breakdown próprio no
+> stdout do dev, que cobre boa parte do que o log morto prometia:
+>
+> ```
+> GET /entrar 200 in 15.1s (next.js: 360ms, proxy.ts: 632ms, application-code: 14.1s)
+> ```
+>
+> `proxy.ts` isolado ali é útil: mostra o custo do middleware por request sem
+> instrumentação nenhuma. O que ele **não** dá é contagem de queries — para isso,
+> meça por fora. Foi assim que a tabela acima saiu:
+>
+> ```sql
+> SELECT xact_commit FROM pg_stat_database WHERE datname = current_database();
+> ```
+>
+> Leia antes e depois da requisição, e deixe uma janela de quiescência para
+> separar o que é da resposta do que é do `after()`. Confirme o ruído de fundo
+> medindo duas vezes sem requisição nenhuma.
+
 - **Dev:** log `[prisma] GET /portal/comunidade — N queries (Xms db)`
-  (`PrismaQueryLogger` + `query-metrics.js`).
+  (`PrismaQueryLogger` + `query-metrics.js`) — **morto, ver aviso acima**.
 - **Network:** primeira carga = HTML/RSC; scroll = `GET /api/comunidade/feed`;
   chat colapsado = só `/api/conversas/resumo`.
 - **Comparar:** 1ª vs 2ª visita em &lt;2 min (cache `unstable_cache` quente).
@@ -351,42 +403,42 @@ por rota e priorizar a próxima rodada de otimização com dado, não palpite.
 
 ### Por jornada
 
-| Cenário | Antes (ordem de grandeza) | Depois | Ganho estimado |
-|---------|---------------------------|--------|----------------|
-| 1ª carga Comunidade (RSC + asides) | Queries em série / N+1 / salas 3× | Batch + caches + salas 1× + Suspense | **~40–60%** menos trabalho no servidor |
-| 2ª visita &lt;2 min (cache quente) | Quase tudo de novo no Postgres | `unstable_cache` + tags | **~50–70%** menos hits nos blocos cacheados |
-| Scroll do feed | Reload ou DOM enorme | Infinite API + Virtual + Query | **~70–90%** menos DOM após ~50 posts; sem reload de documento |
-| Novos posts (SSE) | Ping cedo / lista estática | Ping **pós-fan-out**; auto-refetch no topo (~250ms); banner se rolado | Quase em tempo real no topo; “Seguindo” consistente |
-| Chat colapsado | Inbox completa no mount | Só `/api/conversas/resumo` | **~80–95%** menos payload/queries de DM no mount |
-| Badge / nova DM | Poll 15s | SSE (+ poll 60s fallback) | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s** |
-| Publicar post (rede grande) | Fan-out sync na action | Autor sync + fila Redis | **~60–90%** menos tempo na action (∝ seguidores) |
-| Publicar → card no feed (client) | `revalidatePath` + refresh RSC; lista TanStack não atualizava | Prepend otimista + sem refresh RSC; action leve (`after`) | Percepção ~**sub-segundo** local (~520 ms medido); sem tempestade RSC |
-| Voltar Buscar/Classificação → Feed | Remount chat/salas + skeleton Suspense | Chrome no layout + bootstrap TanStack + `gcTime` 20 min | Sem “reload” percebido se cache quente |
-| SSE entre réplicas | In-memory só na réplica local | Redis pub/sub (`REDIS_URL`) | De **0%** → **~100%** dos pings cruzam réplicas |
-| Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`); dropdown `modo=rapida` (sem canais/badges/follow; posts leves) | **~30–70%** em bases grandes; **~40–60%** menos trabalho no typeahead vs página completa |
-| Assets estáticos (CDN) | Sempre origin Railway | Cloudflare Free | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio |
-| Reação / comentário no feed | `revalidatePath` + RSC do feed | Overlay otimista + mutação leve (`after` notifs) | **~70–95%** menos trabalho no POST |
+| Cenário                            | Antes (ordem de grandeza)                                     | Depois                                                                                                       | Ganho estimado                                                                           |
+| ---------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| 1ª carga Comunidade (RSC + asides) | Queries em série / N+1 / salas 3×                             | Batch + caches + salas 1× + Suspense                                                                         | **~40–60%** menos trabalho no servidor                                                   |
+| 2ª visita &lt;2 min (cache quente) | Quase tudo de novo no Postgres                                | `unstable_cache` + tags                                                                                      | **~50–70%** menos hits nos blocos cacheados                                              |
+| Scroll do feed                     | Reload ou DOM enorme                                          | Infinite API + Virtual + Query                                                                               | **~70–90%** menos DOM após ~50 posts; sem reload de documento                            |
+| Novos posts (SSE)                  | Ping cedo / lista estática                                    | Ping **pós-fan-out**; auto-refetch no topo (~250ms); banner se rolado                                        | Quase em tempo real no topo; “Seguindo” consistente                                      |
+| Chat colapsado                     | Inbox completa no mount                                       | Só `/api/conversas/resumo`                                                                                   | **~80–95%** menos payload/queries de DM no mount                                         |
+| Badge / nova DM                    | Poll 15s                                                      | SSE (+ poll 60s fallback)                                                                                    | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s**                                   |
+| Publicar post (rede grande)        | Fan-out sync na action                                        | Autor sync + fila Redis                                                                                      | **~60–90%** menos tempo na action (∝ seguidores)                                         |
+| Publicar → card no feed (client)   | `revalidatePath` + refresh RSC; lista TanStack não atualizava | Prepend otimista + sem refresh RSC; action leve (`after`)                                                    | Percepção ~**sub-segundo** local (~520 ms medido); sem tempestade RSC                    |
+| Voltar Buscar/Classificação → Feed | Remount chat/salas + skeleton Suspense                        | Chrome no layout + bootstrap TanStack + `gcTime` 20 min                                                      | Sem “reload” percebido se cache quente                                                   |
+| SSE entre réplicas                 | In-memory só na réplica local                                 | Redis pub/sub (`REDIS_URL`)                                                                                  | De **0%** → **~100%** dos pings cruzam réplicas                                          |
+| Busca                              | ILIKE / agregação pesada                                      | `pg_trgm` + batch (após `db:enable-pg-trgm`); dropdown `modo=rapida` (sem canais/badges/follow; posts leves) | **~30–70%** em bases grandes; **~40–60%** menos trabalho no typeahead vs página completa |
+| Assets estáticos (CDN)             | Sempre origin Railway                                         | Cloudflare Free                                                                                              | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio                         |
+| Reação / comentário no feed        | `revalidatePath` + RSC do feed                                | Overlay otimista + mutação leve (`after` notifs)                                                             | **~70–95%** menos trabalho no POST                                                       |
 
 ### Por camada do plano
 
-| Camada | Cobertura zero-custo | Peso típico no caminho crítico |
-|--------|----------------------|--------------------------------|
-| A–B (batch, timeline, APIs, busca) | ~100% | ~45% da melhoria de servidor |
-| C (tags, Query, Virtual, prefetch) | ~100% | ~25% (percepção / client) |
-| D1–D3 (Redis SSE, mensagens, fan-out) | ~100% | ~25% (tempo real + publish) |
-| F4 CDN | runbook pronto | **0%** até haver domínio |
-| E / F1–F3 | sob métrica / $ | **0%** até evidência |
+| Camada                                | Cobertura zero-custo | Peso típico no caminho crítico |
+| ------------------------------------- | -------------------- | ------------------------------ |
+| A–B (batch, timeline, APIs, busca)    | ~100%                | ~45% da melhoria de servidor   |
+| C (tags, Query, Virtual, prefetch)    | ~100%                | ~25% (percepção / client)      |
+| D1–D3 (Redis SSE, mensagens, fan-out) | ~100%                | ~25% (tempo real + publish)    |
+| F4 CDN                                | runbook pronto       | **0%** até haver domínio       |
+| E / F1–F3                             | sob métrica / $      | **0%** até evidência           |
 
 **Pacote profissional sem domínio e sem infra paga:** ~**85–95%** do valor
 planejado capturado. Restante ≈ CDN + E/F sob evidência.
 
 ### Modos de uso
 
-| Modo | Situação | Ordem de melhoria vs. baseline pré-ondas |
-|------|----------|------------------------------------------|
-| Dia comum, 1 réplica, Redis on | Produção típica atual | ~**2×** mais eficiente em feed/chat |
-| Dia de jogo (scroll + DMs) | SSE + Virtual + resumo | ~**3×** melhor percepção |
-| Com domínio + Cloudflare | Futuro | +**~20–30%** só no LCP de JS/CSS |
+| Modo                           | Situação               | Ordem de melhoria vs. baseline pré-ondas |
+| ------------------------------ | ---------------------- | ---------------------------------------- |
+| Dia comum, 1 réplica, Redis on | Produção típica atual  | ~**2×** mais eficiente em feed/chat      |
+| Dia de jogo (scroll + DMs)     | SSE + Virtual + resumo | ~**3×** melhor percepção                 |
+| Com domínio + Cloudflare       | Futuro                 | +**~20–30%** só no LCP de JS/CSS         |
 
 ### O que isso não é
 
@@ -417,14 +469,14 @@ aprovação humana antes de implementação (`product-strategy` + `performance`)
 feed/rede, `revalidateTag`, prefetch hover, e2e budget, hashtags com TTL/invalidação.
 Provider: `ComunidadeQueryProvider` no layout da Comunidade.
 
-| # | Recorte | Por quê | Esforço | Status |
-|---|---------|---------|---------|--------|
-| C1 | **Virtualização** (`@tanstack/react-virtual` / `useWindowVirtualizer`) | DOM após ~50 cards | Médio | ✅ |
-| C2 | **`revalidateTag`** nos caches Comunidade | Staleness pós-escrita | Baixo | ✅ |
-| C3 | **TanStack Query** (`useInfiniteQuery`) no feed/rede | Dedupe, retry, staleTime | Médio | ✅ |
-| C4 | **E2E de latência Comunidade** | Regressão no CI | Baixo | ✅ |
-| C5 | **Prefetch on-hover** perfil/hashtag | Alinha navbar | Baixo | ✅ |
-| C6 | Hashtags trending TTL 300s + tag on-write | Escala trending | Baixo | ✅ (MV job ainda futuro) |
+| #   | Recorte                                                                | Por quê                  | Esforço | Status                   |
+| --- | ---------------------------------------------------------------------- | ------------------------ | ------- | ------------------------ |
+| C1  | **Virtualização** (`@tanstack/react-virtual` / `useWindowVirtualizer`) | DOM após ~50 cards       | Médio   | ✅                       |
+| C2  | **`revalidateTag`** nos caches Comunidade                              | Staleness pós-escrita    | Baixo   | ✅                       |
+| C3  | **TanStack Query** (`useInfiniteQuery`) no feed/rede                   | Dedupe, retry, staleTime | Médio   | ✅                       |
+| C4  | **E2E de latência Comunidade**                                         | Regressão no CI          | Baixo   | ✅                       |
+| C5  | **Prefetch on-hover** perfil/hashtag                                   | Alinha navbar            | Baixo   | ✅                       |
+| C6  | Hashtags trending TTL 300s + tag on-write                              | Escala trending          | Baixo   | ✅ (MV job ainda futuro) |
 
 **Fix 2026-07-29 — `scrollMargin` no windowing (loop de scroll).** `useFeedWindow`
 usava `useWindowVirtualizer` **sem `scrollMargin`**, ou seja assumindo que a lista
@@ -442,11 +494,11 @@ só é correto com `scrollMargin`** — nunca usar `item.start` cru.
 **Fix 2026-07-29 — a troca de modo em si.** A virtualização liga no meio do scroll
 (quando a 2ª página cruza os 24 itens), e a troca trazia mais três problemas:
 
-| Problema | Efeito | Correção |
-|---|---|---|
-| Lista já renderizada não era medida antes de virtualizar | container passava a valer `count × 420` de uma vez → altura do documento pula | `useLayoutEffect` lê as alturas reais (`[data-index]`) e semeia `initialMeasurementsCache` **no mesmo commit**, antes do paint |
-| `estimateSize` fixo em 420 px | páginas seguintes com estimativa arbitrária | estimativa = **média real medida** na troca |
-| `.feed-post-window` (`content-visibility: auto`) dentro do item medido | fora da viewport o elemento reporta o tamanho intrínseco; o `ResizeObserver` do `measureElement` grava esse valor falso e o total oscila | classe só no modo não-virtualizado (`windowing.postClassName`) — virtualizando, o windowing nativo é redundante |
+| Problema                                                               | Efeito                                                                                                                                   | Correção                                                                                                                       |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Lista já renderizada não era medida antes de virtualizar               | container passava a valer `count × 420` de uma vez → altura do documento pula                                                            | `useLayoutEffect` lê as alturas reais (`[data-index]`) e semeia `initialMeasurementsCache` **no mesmo commit**, antes do paint |
+| `estimateSize` fixo em 420 px                                          | páginas seguintes com estimativa arbitrária                                                                                              | estimativa = **média real medida** na troca                                                                                    |
+| `.feed-post-window` (`content-visibility: auto`) dentro do item medido | fora da viewport o elemento reporta o tamanho intrínseco; o `ResizeObserver` do `measureElement` grava esse valor falso e o total oscila | classe só no modo não-virtualizado (`windowing.postClassName`) — virtualizando, o windowing nativo é redundante                |
 
 Detalhes: o modo é **latch** (não desliga se um post for removido e a contagem
 cair); a marcação dos itens é a **mesma nos dois modos** (só muda o
@@ -472,12 +524,12 @@ no free tier (256 MB · 500k comandos/mês).
 4. Redeploy. Logs: ausência de `[realtime-bus] Redis … error` = ok.
 5. Sem `REDIS_URL` o app segue igual (fallback in-memory).
 
-| # | Recorte | Por quê | Esforço | Status |
-|---|---------|---------|---------|--------|
-| D1 | **Redis pub/sub** para `feed-bus` e `notificacoes-bus` | SSE in-memory não cruza réplicas | Médio | ✅ código; ativar com env |
-| D2 | **Worker assíncrono** para fan-out (`scheduleFanoutPostParaRede`) | Post com rede grande não bloqueia request HTTP | Médio | ✅ 2026-07-16 |
-| D3 | **SSE mensageria** (inbox + thread) + polling lento como fallback | Menos requests; melhor em dia de jogo | Médio | ✅ 2026-07-16 |
-| D4 | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia | Médio | parcial (C2 tags) |
+| #   | Recorte                                                                   | Por quê                                        | Esforço | Status                    |
+| --- | ------------------------------------------------------------------------- | ---------------------------------------------- | ------- | ------------------------- |
+| D1  | **Redis pub/sub** para `feed-bus` e `notificacoes-bus`                    | SSE in-memory não cruza réplicas               | Médio   | ✅ código; ativar com env |
+| D2  | **Worker assíncrono** para fan-out (`scheduleFanoutPostParaRede`)         | Post com rede grande não bloqueia request HTTP | Médio   | ✅ 2026-07-16             |
+| D3  | **SSE mensageria** (inbox + thread) + polling lento como fallback         | Menos requests; melhor em dia de jogo          | Médio   | ✅ 2026-07-16             |
+| D4  | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia          | Médio   | parcial (C2 tags)         |
 
 **D2:** ao publicar, `materializarTimelineAutor` (sync, 1 row) + fila
 `torcida:queue:fanout-timeline` (Redis LPUSH/BRPOP se `REDIS_URL`; senão
@@ -490,11 +542,13 @@ escutam long-poll SSE (`ping`|`idle`); polling 60s como rede de segurança.
 
 ### Fase E — busca e descoberta avançada
 
-| # | Recorte | Por quê | Esforço |
-|---|---------|---------|---------|
-| E1 | **Meilisearch / Typesense** (índice denormalizado de membros, posts, canais) | `pg_trgm` resolve typo; não resolve ranking complexo nem facetas | Alto |
-| E2 | **Ranking personalizado** (features: rede, tenant, recência, engajamento, afiliação) com A/B offline | Heurística atual é baseline; ML/heurística tunável vem depois | Alto |
-| E3 | **Sugestões de seguir** pré-computadas por tenant (tabela `SugestaoAutor` ou job) | Aside deixa de depender de queries ad hoc | Médio |
+Planejamento **fechado**. Implementação só com gatilho (não otimizar por hábito).
+
+| #   | Recorte                                                                                              | Por quê                                                          | Esforço | Status                                                                                                                   |
+| --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| E1  | **Meilisearch / Typesense** (índice denormalizado de membros, posts, canais)                         | `pg_trgm` resolve typo; não resolve ranking complexo nem facetas | Alto    | ⏸ gated — p95 de busca com `pg_trgm` em produção                                                                         |
+| E2  | **Ranking personalizado** (features: rede, tenant, recência, engajamento, afiliação) com A/B offline | Heurística atual é baseline; ML/heurística tunável vem depois    | Alto    | ⏸ gated — evidência de que a heurística falha                                                                            |
+| E3  | **Sugestões de seguir** pré-computadas por tenant                                                    | Aside deixa de depender de queries ad hoc                        | Médio   | ⏸ aside já tem `unstable_cache` 120s (`getSugestoesAutoresParaAside`); tabela `SugestaoAutor` só se o p95 do aside pedir |
 
 ### Investimento em infra (orçamento / ads) — ver ops
 
@@ -505,12 +559,14 @@ o plano ops é a fonte de **faixas de investimento**.
 
 ### Fase F — infra e observabilidade (quando métricas justificarem)
 
-| # | Recorte | Gatilho | Esforço |
-|---|---------|---------|---------|
-| F1 | **PgBouncer / Prisma Accelerate** | Contenção de conexões ou p95 de query &gt; SLA | Médio–Alto |
-| F2 | **Read replica** para feeds e buscas | CPU do primary &gt; 70% sustentado | Alto |
-| F3 | **Instrumentação de rota** — queries + tempo de banco + wall por rota | Debug em produção sem adivinhar | Baixo | ✅ 2026-07-18 (`PERF_METRICS=1`, logs JSON; ver "Como medir"). OpenTelemetry completo só se precisar de tracing distribuído |
-| F4 | **CDN** Cloudflare Free | LCP em 4G no dia de jogo | Baixo | ✅ runbook `docs/ops/cloudflare-cdn.md` + headers origin |
+Planejamento **fechado**. F3/F4 prontos; F1/F2 só com gatilho de infra.
+
+| #   | Recorte                                                               | Gatilho                                        | Esforço    | Status                                                                                                                      |
+| --- | --------------------------------------------------------------------- | ---------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| F1  | **PgBouncer / Prisma Accelerate**                                     | Contenção de conexões ou p95 de query &gt; SLA | Médio–Alto | ⏸ gated                                                                                                                     |
+| F2  | **Read replica** para feeds e buscas                                  | CPU do primary &gt; 70% sustentado             | Alto       | ⏸ gated                                                                                                                     |
+| F3  | **Instrumentação de rota** — queries + tempo de banco + wall por rota | Debug em produção sem adivinhar                | Baixo      | ✅ 2026-07-18 (`PERF_METRICS=1`, logs JSON; ver "Como medir"). OpenTelemetry completo só se precisar de tracing distribuído |
+| F4  | **CDN** Cloudflare Free                                               | LCP em 4G no dia de jogo                       | Baixo      | ✅ runbook `docs/ops/cloudflare-cdn.md` + headers origin                                                                    |
 
 ### Checklist pós-deploy (produção)
 
@@ -521,14 +577,14 @@ pnpm --filter @torcida/db db:push
 pnpm --filter @torcida/db db:enable-pg-trgm
 ```
 
-| Check | Como |
-|-------|------|
-| `REDIS_URL` | Upstash Free ligado; logs sem `[realtime-bus] Redis … error` |
-| Timeline / índices | `db:push` ok |
-| Busca | `db:enable-pg-trgm` ok; senão fallback ILIKE |
-| CDN | Cloudflare Free + `cf-cache-status: HIT` em `/_next/static` |
-| Mensagens SSE | Enviar DM → badge/inbox atualiza sem esperar 60s |
-| Feed | Scroll infinite sem reload; Network só `/api/comunidade/feed` |
+| Check              | Como                                                          |
+| ------------------ | ------------------------------------------------------------- |
+| `REDIS_URL`        | Upstash Free ligado; logs sem `[realtime-bus] Redis … error`  |
+| Timeline / índices | `db:push` ok                                                  |
+| Busca              | `db:enable-pg-trgm` ok; senão fallback ILIKE                  |
+| CDN                | Cloudflare Free + `cf-cache-status: HIT` em `/_next/static`   |
+| Mensagens SSE      | Enviar DM → badge/inbox atualiza sem esperar 60s              |
+| Feed               | Scroll infinite sem reload; Network só `/api/comunidade/feed` |
 
 **E1 (Meilisearch):** só se, após `pg_trgm` em produção, busca continuar lenta
 com evidência (p95 / reclamações). Não contratar engine sem medir.
@@ -544,36 +600,36 @@ com evidência (p95 / reclamações). Não contratar engine sem medir.
 
 ## Handoff para agentes
 
-| Agente | Quando acionar |
-|--------|----------------|
-| `performance` | Nova feature em feed/busca/polling; regressão de queries; typeahead vs `completa` |
-| `data-model` | Novas tabelas materializadas, índices, jobs de backfill; E1 só com p95 |
-| `implementation` | Codificar recorte aprovado; preservar `modo=rapida` / `GROUP BY` |
-| `qa-verification` | Vitest + e2e; smoke busca (erro ≠ vazio; `vi` → 200) |
-| `ux-review` | Estados loading/erro/vazio do dropdown de busca |
-| `product-strategy` | Priorizar Fase C vs D vs escopo de ranking/busca; não E1 sem métrica |
+| Agente             | Quando acionar                                                                    |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `performance`      | Nova feature em feed/busca/polling; regressão de queries; typeahead vs `completa` |
+| `data-model`       | Novas tabelas materializadas, índices, jobs de backfill; E1 só com p95            |
+| `implementation`   | Codificar recorte aprovado; preservar `modo=rapida` / `GROUP BY`                  |
+| `qa-verification`  | Vitest + e2e; smoke busca (erro ≠ vazio; `vi` → 200)                              |
+| `ux-review`        | Estados loading/erro/vazio do dropdown de busca                                   |
+| `product-strategy` | Priorizar Fase C vs D vs escopo de ranking/busca; não E1 sem métrica              |
 
 ## Referências no código
 
-| Área | Caminho |
-|------|---------|
-| Cache tags | `apps/web/src/lib/comunidade-cache.ts` |
-| Infinite hook | `apps/web/src/lib/use-comunidade-infinite-feed.ts` (TanStack Query) |
-| Windowing | `apps/web/src/lib/use-feed-window.ts` (`@tanstack/react-virtual`) |
-| Query provider | `apps/web/src/components/portal/comunidade-query-provider.tsx` (`gcTime` 20 min) |
-| Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
-| Feed + ranking | `apps/web/src/lib/feed.ts` (Descobrir unificado → `posts`) |
-| Timeline | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts` |
-| Live refresh | `apps/web/src/lib/feed-live-refresh.ts`, `feed-live-banner.tsx` (sem `router.refresh`) |
-| Publish client | `feed-composer.tsx` → evento `comunidade:post-publicado`; prepend no infinite |
-| Layout chrome | `comunidade-layout-chrome.tsx`, `comunidade-feed-bootstrap.tsx`, `composer-context.ts` |
-| Busca | `comunidade-busca.ts`, `postIncludeBusca`/`projetarPostBusca` em `feed.ts`, `comunidade-search-bar.tsx` (`modo=rapida`), `api/comunidade/busca` |
-| Stories | `apps/web/src/lib/stories.ts` |
-| Salas / tenant | `salas.ts` (`listSalasAtivas` + `React.cache`), `tenant.ts` (`getActiveTenant` + `React.cache`) |
-| SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |
-| SSE notif | `apps/web/src/lib/notificacoes-bus.ts`, `realtime-bus.ts` |
-| SSE mensagens | `apps/web/src/lib/mensageria-bus.ts`, `use-mensagem-stream.ts` |
-| Chat resumo | `apps/web/src/app/api/conversas/resumo/route.ts` |
-| Measure e2e | `e2e/publish-latency.measure.ts`, `e2e/feed-nav-back.measure.ts` (`--project=measure`) |
-| Scripts DB | `packages/db/scripts/enable-pg-trgm.js` |
-| Schema | `packages/db/prisma/schema.prisma` (`FeedTimeline`, índices `Post`) |
+| Área           | Caminho                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cache tags     | `apps/web/src/lib/comunidade-cache.ts`                                                                                                          |
+| Infinite hook  | `apps/web/src/lib/use-comunidade-infinite-feed.ts` (TanStack Query)                                                                             |
+| Windowing      | `apps/web/src/lib/use-feed-window.ts` (`@tanstack/react-virtual`)                                                                               |
+| Query provider | `apps/web/src/components/portal/comunidade-query-provider.tsx` (`gcTime` 20 min)                                                                |
+| Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx`                                                                                   |
+| Feed + ranking | `apps/web/src/lib/feed.ts` (Descobrir unificado → `posts`)                                                                                      |
+| Timeline       | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts`                                                                                   |
+| Live refresh   | `apps/web/src/lib/feed-live-refresh.ts`, `feed-live-banner.tsx` (sem `router.refresh`)                                                          |
+| Publish client | `feed-composer.tsx` → evento `comunidade:post-publicado`; prepend no infinite                                                                   |
+| Layout chrome  | `comunidade-layout-chrome.tsx`, `comunidade-feed-bootstrap.tsx`, `composer-context.ts`                                                          |
+| Busca          | `comunidade-busca.ts`, `postIncludeBusca`/`projetarPostBusca` em `feed.ts`, `comunidade-search-bar.tsx` (`modo=rapida`), `api/comunidade/busca` |
+| Stories        | `apps/web/src/lib/stories.ts`                                                                                                                   |
+| Salas / tenant | `salas.ts` (`listSalasAtivas` + `React.cache`), `tenant.ts` (`getActiveTenant` + `React.cache`)                                                 |
+| SSE feed       | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts`                                                                         |
+| SSE notif      | `apps/web/src/lib/notificacoes-bus.ts`, `realtime-bus.ts`                                                                                       |
+| SSE mensagens  | `apps/web/src/lib/mensageria-bus.ts`, `use-mensagem-stream.ts`                                                                                  |
+| Chat resumo    | `apps/web/src/app/api/conversas/resumo/route.ts`                                                                                                |
+| Measure e2e    | `e2e/publish-latency.measure.ts`, `e2e/feed-nav-back.measure.ts` (`--project=measure`)                                                          |
+| Scripts DB     | `packages/db/scripts/enable-pg-trgm.js`                                                                                                         |
+| Schema         | `packages/db/prisma/schema.prisma` (`FeedTimeline`, índices `Post`)                                                                             |

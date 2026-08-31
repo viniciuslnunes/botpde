@@ -13,6 +13,7 @@ import { assertPermission } from '@/lib/authz'
 import {
   baixarCobrancaComoPaga,
   recalcularAdimplencia,
+  reconciliarNotificacoesCobranca,
   sincronizarCobrancasVencidas,
 } from '@/lib/cobrancas'
 import { criarCobrancaPix } from '@/lib/pix-gateway'
@@ -165,6 +166,7 @@ export async function cancelarCobranca(cobrancaId: string): Promise<CobrancaActi
   })
 
   await recalcularAdimplencia(tenant.id, cob.userId)
+  await reconciliarNotificacoesCobranca(tenant.id, cob.id)
 
   await db.auditLog.create({
     data: {
@@ -284,7 +286,7 @@ export async function dispararLembretesCobrancas(): Promise<CobrancaActionState 
         tipo: 'COBRANCA_VENCIDA',
         titulo: 'Cobrança vencida',
         corpo: cob.descricao,
-        link: '/admin/financeiro/cobrancas?status=VENCIDA',
+        link: `/admin/financeiro/cobrancas?cobranca=${cob.id}`,
         atorId: session.user.id,
       })
     }

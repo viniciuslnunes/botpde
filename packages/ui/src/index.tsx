@@ -1,6 +1,7 @@
 // Serviços
 export {
   ThemeProvider,
+  useTheme,
   useTenantTheme,
   hexToRgb,
   applyTenantDesign,

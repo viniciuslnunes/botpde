@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
-import { markAdminNavbarNotificationRead } from '@/lib/use-admin-navbar-context'
+import { markAdminNavbarNotificationRead, refreshAdminNavbarContext } from '@/lib/use-admin-navbar-context'
 import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 
 /**
@@ -21,6 +21,7 @@ export function AdminNotificacoesAutoRead({ ids }: { ids: string[] }) {
     const timer = setTimeout(() => {
       void marcarNotificacoesLidasPorIds(ids).then(() => {
         for (const id of ids) markAdminNavbarNotificationRead(id)
+        void refreshAdminNavbarContext(true)
         router.refresh()
       })
     }, NOTIFICATION_AUTO_READ_DELAY_MS)

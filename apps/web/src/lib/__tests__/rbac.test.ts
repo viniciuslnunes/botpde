@@ -16,10 +16,12 @@ import {
   hrefModuloPortal,
   hrefOperacaoAdmin,
   isDepartamentoLegado,
+  MAX_PRESIDENTES,
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   podeTerVice,
   podeCriarUnidadeTerritorial,
+  casoLiderancaDaSede,
   permissionsOfRole,
   resolverMenuIdDeRota,
   rotuloCargoMaximo,
@@ -204,6 +206,10 @@ describe('perfil de sistema Vice', () => {
     expect(MAX_VICE_PRESIDENTES).toBe(2)
   })
 
+  it('uma torcida admite no máximo 1 presidente', () => {
+    expect(MAX_PRESIDENTES).toBe(1)
+  })
+
   it('vice só existe no tenant da Sede principal (tipo SEDE)', () => {
     expect(podeTerVice('SEDE')).toBe(true)
     expect(podeTerVice('SUBSEDE')).toBe(false)
@@ -242,6 +248,33 @@ describe('afiliação de unidades (AFFILIATION_MANAGE)', () => {
     expect(ownerPermissions).toContain(PERMISSIONS.AFFILIATION_MANAGE)
     expect(vicePermissions).toContain(PERMISSIONS.AFFILIATION_MANAGE)
     expect(adminPermissions).not.toContain(PERMISSIONS.AFFILIATION_MANAGE)
+  })
+})
+
+describe('casoLiderancaDaSede', () => {
+  it('Sede raiz (cara do tenant) é Caso B — cargo owner', () => {
+    expect(
+      casoLiderancaDaSede({ tipo: 'SEDE', tenantId: 't1', parentTenantId: null }),
+    ).toBe('B')
+  })
+
+  it('subsede/PDE no mesmo tenant é Caso A — responsavelUserId', () => {
+    expect(
+      casoLiderancaDaSede({ tipo: 'SUBSEDE', tenantId: 't1', parentTenantId: 't1' }),
+    ).toBe('A')
+    expect(
+      casoLiderancaDaSede({ tipo: 'PONTO_ENCONTRO', tenantId: 't1', parentTenantId: 't1' }),
+    ).toBe('A')
+  })
+
+  it('unidade promovida (pai em outro tenant) é Caso B', () => {
+    expect(
+      casoLiderancaDaSede({ tipo: 'SUBSEDE', tenantId: 't-filho', parentTenantId: 't-mae' }),
+    ).toBe('B')
+  })
+
+  it('sem tenantId não tem cargo — Caso A', () => {
+    expect(casoLiderancaDaSede({ tipo: 'SEDE', tenantId: null, parentTenantId: null })).toBe('A')
   })
 })
 
@@ -286,6 +319,19 @@ describe('DEPARTAMENTO_MODULO_ROTA (hub do portal)', () => {
 describe('departamento capabilities', () => {
   it('home e operação: módulo portal nunca é admin; operação pode ser', () => {
     expect(hrefHomeDepartamento('financeiro')).toBe('/portal/departamentos/financeiro')
+    expect(hrefHomeDepartamento('financeiro', 'painel')).toBe('/portal/departamentos/financeiro')
+    expect(hrefHomeDepartamento('financeiro', 'projetos')).toBe(
+      '/portal/departamentos/financeiro?tab=projetos',
+    )
+    expect(hrefHomeDepartamento('social-e-eventos', 'areas', { area: 'area-1' })).toBe(
+      '/portal/departamentos/social-e-eventos?tab=areas&area=area-1',
+    )
+    expect(hrefHomeDepartamento('social-e-eventos', undefined, { projeto: 'proj-1' })).toBe(
+      '/portal/departamentos/social-e-eventos?tab=projetos&projeto=proj-1',
+    )
+    expect(hrefHomeDepartamento('bateria', undefined, { pessoa: 'user-1' })).toBe(
+      '/portal/departamentos/bateria?tab=equipe&pessoa=user-1',
+    )
     expect(hrefModuloPortal('eventos')).toBe('/portal/eventos')
     expect(hrefModuloPortal('financeiro')).toBe('/portal/financeiro')
     expect(hrefModuloPortal('patrimonio')).toBe('/portal/patrimonio')

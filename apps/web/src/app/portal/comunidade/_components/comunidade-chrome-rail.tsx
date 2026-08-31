@@ -39,6 +39,7 @@ export function ComunidadeChromeRail({
   salasNacional,
   canaisNacional = [],
   tenantAtivoEhUnidade = false,
+  podeCriarGrupo = false,
 }: {
   currentUserId: string
   tenantId: string | null
@@ -52,6 +53,7 @@ export function ComunidadeChromeRail({
   canaisTorcida?: SugestaoCanalAside[]
   salasNacional: SalaAtivaListItem[]
   canaisNacional?: SugestaoCanalAside[]
+  podeCriarGrupo?: boolean
 }) {
   const searchParams = useSearchParams()
   const noFeed = useShellDeFeed()
@@ -77,7 +79,11 @@ export function ComunidadeChromeRail({
       {tenantAtualId && canaisSugeridos.length > 0 ? (
         <CanaisSugeridosAside canais={canaisSugeridos} tenantAtualId={tenantAtualId} />
       ) : null}
-      <ComunidadeChatPanel currentUserId={currentUserId} liveUpdates={noFeed} />
+      <ComunidadeChatPanel
+        currentUserId={currentUserId}
+        liveUpdates={noFeed}
+        podeCriarGrupo={podeCriarGrupo}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { formatNomeTorcida } from '@torcida/types'
 import type { InboxItemDto } from './mensageria-client'
 import { canFollowUser } from './social'
 import { getTenantsRestritos } from './isolamento'
-import { criarNotificacao } from '@/lib/notificacoes'
+import { criarNotificacao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 
@@ -325,35 +325,10 @@ async function temBloqueioMutuo(userA: string, userB: string): Promise<boolean> 
   return bloqueio !== null
 }
 
-async function vinculosSocioOuCargo(userIds: string[]): Promise<Array<{ userId: string; tenantId: string }>> {
-  const [membros, cargos] = await Promise.all([
-    db.saasMembro.findMany({
-      where: { userId: { in: userIds }, status: 'APROVADO', tipo: 'SOCIO' },
-      select: { userId: true, tenantId: true },
-    }) as Promise<Array<{ userId: string; tenantId: string }>>,
-    db.userRole.findMany({
-      where: {
-        userId: { in: userIds },
-        tenant: { ativo: true, sintetico: false },
-      },
-      select: { userId: true, tenantId: true },
-    }) as Promise<Array<{ userId: string; tenantId: string }>>,
-  ])
-  const vistos = new Set<string>()
-  const out: Array<{ userId: string; tenantId: string }> = []
-  for (const v of [...membros, ...cargos]) {
-    const key = `${v.userId}:${v.tenantId}`
-    if (vistos.has(key)) continue
-    vistos.add(key)
-    out.push(v)
-  }
-  return out
-}
-
 /**
- * R5 — canal restrito segrega a DM. Ao contrário de `vinculosSocioOuCargo`,
- * conta também o vínculo TORCEDOR: quem entrou numa unidade isolada pelo
- * convite é torcedor DELA, e o isolamento vale para ele igual.
+ * R5 — canal restrito segrega a DM. Conta também o vínculo TORCEDOR: quem
+ * entrou numa unidade isolada pelo convite é torcedor DELA, e o isolamento
+ * vale para ele igual.
  */
 async function tenantsDoUsuarioParaIsolamento(
   userIds: string[],
@@ -406,24 +381,6 @@ async function isParSeparadoPorCanalRestrito(userA: string, userB: string): Prom
   // Compartilhar a mesma unidade restrita é justamente o que continua valendo:
   // a comunidade interna segue funcionando para quem pertence a ela.
   return ![...aTenants].some((t) => bTenants.has(t))
-}
-
-async function isParRivalSocio(userA: string, userB: string): Promise<boolean> {
-  const vinculos = await vinculosSocioOuCargo([userA, userB])
-  const aV = vinculos.filter((v) => v.userId === userA)
-  const bV = vinculos.filter((v) => v.userId === userB)
-  if (aV.length === 0 || bV.length === 0) return false
-
-  const { getTenantRelation } = await import('./hierarquia')
-  const { saoRivais } = await import('@torcida/types')
-  for (const va of aV) {
-    for (const vb of bV) {
-      if (va.tenantId === vb.tenantId) continue
-      const rel = await getTenantRelation(va.tenantId, vb.tenantId)
-      if (saoRivais(rel)) return true
-    }
-  }
-  return false
 }
 
 interface DmExistenteRow {
@@ -516,7 +473,8 @@ export async function avaliarAcessoDm(
 ): Promise<AcessoDm> {
   if (remetenteId === destinatarioId) return 'bloqueado'
   if (await temBloqueioMutuo(remetenteId, destinatarioId)) return 'bloqueado'
-  if (await isParRivalSocio(remetenteId, destinatarioId)) return 'bloqueado'
+  const { saoUsuariosRivais } = await import('./perfil-visibilidade')
+  if (await saoUsuariosRivais(remetenteId, destinatarioId)) return 'bloqueado'
   if (await isParSeparadoPorCanalRestrito(remetenteId, destinatarioId)) return 'bloqueado'
 
   const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
@@ -1119,12 +1077,28 @@ export async function notificarNovaMensagem(params: {
   }
 }
 
-/** Marca a conversa como lida até agora. */
+/** Marca a conversa como lida até agora e some o sino de NOVA_MENSAGEM. */
 export async function marcarConversaLida(conversaId: string, userId: string): Promise<void> {
   await db.membroConversa.updateMany({
     where: { conversaId, userId, saiuEm: null },
     data: { ultimaLeituraEm: new Date() },
   })
+
+  const conversa: { tenantId: string } | null = await db.conversa.findFirst({
+    where: { id: conversaId },
+    select: { tenantId: true },
+  })
+  if (!conversa) return
+
+  try {
+    await reconciliarNotificacoesDoEvento(conversa.tenantId, {
+      tipo: 'NOVA_MENSAGEM',
+      userId,
+      link: `/portal/mensagens?c=${conversaId}`,
+    })
+  } catch {
+    // best-effort — a leitura da conversa já foi gravada
+  }
 }
 
 /** Total de mensagens não lidas do usuário (badge da navbar). */

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertAffiliationManage, assertTenantOwner } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { notificarSafe, notificarUsuariosComPermissao, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -107,6 +107,32 @@ async function carregarSolicitacao(id: string): Promise<SolicitacaoLite> {
   })
   if (!s) throw new ExpectedError('Solicitação não encontrada.')
   return s
+}
+
+async function notificarDecisaoUnidade(
+  solicitacao: SolicitacaoLite,
+  aprovada: boolean,
+  motivo?: string,
+): Promise<void> {
+  if (solicitacao.solicitadoPorId) {
+    await notificarSafe({
+      userId: solicitacao.solicitadoPorId,
+      tenantId: solicitacao.tenantId,
+      tipo: aprovada ? 'SOLICITACAO_UNIDADE_APROVADA' : 'SOLICITACAO_UNIDADE_RECUSADA',
+      titulo: aprovada
+        ? `Unidade "${solicitacao.nome}" aprovada`
+        : `Solicitação de "${solicitacao.nome}" recusada`,
+      corpo: aprovada
+        ? 'A unidade foi criada com portal próprio.'
+        : (motivo ?? 'A diretoria recusou o cadastro desta unidade.'),
+      link: aprovada ? '/portal/sedes' : '/portal/comunidade',
+      atorId: solicitacao.solicitadoPorId,
+    })
+  }
+  await reconciliarNotificacoesDoEvento(solicitacao.tenantId, {
+    tipo: 'SOLICITACAO_UNIDADE_CRIADA',
+    ...(solicitacao.solicitadoPorId ? { atorId: solicitacao.solicitadoPorId } : {}),
+  })
 }
 
 /** Ator não-super-admin só mexe em solicitações da própria torcida. */
@@ -220,6 +246,7 @@ export async function aprovarSolicitacao(
       invalidateHierarchyCache(promocao.novoTenantId)
     }
     revalidar()
+    await notificarDecisaoUnidade(solicitacao, true)
 
     if (!promocao.ok) {
       return {
@@ -279,6 +306,7 @@ export async function recusarSolicitacao(
     })
 
     revalidar()
+    await notificarDecisaoUnidade(solicitacao, false, parsed.data.motivo)
     return { success: true, message: `Solicitação de "${solicitacao.nome}" recusada.` }
   } catch (error) {
     return erroState(error)

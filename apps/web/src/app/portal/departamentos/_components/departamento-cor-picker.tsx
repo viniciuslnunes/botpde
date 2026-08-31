@@ -48,7 +48,7 @@ export function DepartamentoCorPicker({
         disabled={pending}
         title={`Alterar cor de ${nome}`}
         aria-label={`Alterar cor de ${nome}`}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))] disabled:opacity-70"
+        className="app-touch-target relative flex h-10 w-10 items-center justify-center rounded-xl text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))] disabled:opacity-70"
         style={{ backgroundColor: corAtual }}
       >
         {pending ? (

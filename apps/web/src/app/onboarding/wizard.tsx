@@ -1,6 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
@@ -91,10 +100,19 @@ function isPassoHistorico(value: unknown): value is Passo {
   return typeof value === 'string' && PASSOS_HISTORICO.has(value as Passo)
 }
 
+export type AssocieSeOnboarding = {
+  clube: AfiliacaoOnboarding
+  torcida: TorcidaOnboarding
+  unidadeId: string | null
+  uf: string
+  cidade: string
+}
+
 function urlDoPasso(
   passo: Passo,
   vinculoModo?: 'escolha' | 'socio',
   conviteSlug?: string | null,
+  associeSe?: AssocieSeOnboarding | null,
 ): string {
   const params = new URLSearchParams()
   params.set('passo', passo)
@@ -103,6 +121,11 @@ function urlDoPasso(
   }
   // Sem isto o replaceState no mount apaga `?convite=` e um refresh cai no Clube.
   if (conviteSlug) params.set('convite', conviteSlug)
+  if (associeSe) {
+    params.set('origem', 'associe-se')
+    params.set('torcida', associeSe.torcida.id)
+    if (associeSe.unidadeId) params.set('sede', associeSe.unidadeId)
+  }
   return `/onboarding?${params.toString()}`
 }
 
@@ -134,6 +157,12 @@ type Props = {
    * na vitrine pública do onboarding.
    */
   convite?: ConviteOnboarding | null
+  /**
+   * Deep-link do mapa Associe-se: clube/região/torcida (e unidade) já
+   * resolvidos; o wizard abre no sócio. Convite continua o único jeito de
+   * entrar como TORCEDOR.
+   */
+  associeSe?: AssocieSeOnboarding | null
 }
 
 export function OnboardingWizard({
@@ -143,24 +172,36 @@ export function OnboardingWizard({
   emailInicial,
   userId,
   convite = null,
+  associeSe = null,
 }: Props) {
   const { allowUnload } = useUnsavedChangesContext()
-  const [passo, setPasso] = useState<Passo>(convite ? convite.passoInicial : 'clube')
+  const passoInicialAssocieSe: Passo | null = associeSe
+    ? associeSe.unidadeId || associeSe.torcida.sedes.length <= 1
+      ? 'vinculo'
+      : 'unidade'
+    : null
+  const [passo, setPasso] = useState<Passo>(
+    convite ? convite.passoInicial : (passoInicialAssocieSe ?? 'clube'),
+  )
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>('escolha')
+  const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>(
+    associeSe ? 'socio' : 'escolha',
+  )
   /**
    * EXISTENTE = já tem nº/carteirinha; NOVO = primeira associação.
-   * Fica null quando o passo Unidade pula direto para `modo=socio` (sem
-   * reoferecer «torcedor») — aí o PassoVinculo exige a escolha antes do form.
+   * Fica null na escolha de vínculo — o PassoVinculo exige o card antes do form.
+   * Associe-se entra em `modo=socio` sem o card de torcedor.
    */
   const [caminhoSocio, setCaminhoSocio] = useState<'EXISTENTE' | 'NOVO' | null>(null)
 
   // Seleções acumuladas
-  const [clube, setClube] = useState<AfiliacaoOnboarding | null>(convite?.clube ?? null)
-  const [uf, setUf] = useState(convite?.uf ?? '')
-  const [cidade, setCidade] = useState(convite?.cidade ?? '')
+  const [clube, setClube] = useState<AfiliacaoOnboarding | null>(
+    convite?.clube ?? associeSe?.clube ?? null,
+  )
+  const [uf, setUf] = useState(convite?.uf ?? associeSe?.uf ?? '')
+  const [cidade, setCidade] = useState(convite?.cidade ?? associeSe?.cidade ?? '')
   const [localizacaoPrecisa, setLocalizacaoPrecisa] = useState<GoogleMapsRegion | null>(null)
   /**
    * Coordenadas vindas do GPS do dispositivo (não do centróide da cidade) —
@@ -169,9 +210,16 @@ export function OnboardingWizard({
   const [coordsDispositivo, setCoordsDispositivo] = useState<{ lat: number; lng: number } | null>(
     null,
   )
-  const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(convite?.torcida ?? null)
-  const [unidadeId, setUnidadeId] = useState<string | null>(convite?.unidadeId ?? null)
+  const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(
+    convite?.torcida ?? associeSe?.torcida ?? null,
+  )
+  const [unidadeId, setUnidadeId] = useState<string | null>(
+    convite?.unidadeId ?? associeSe?.unidadeId ?? null,
+  )
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
+  // null = ainda não buscou (refresh/voltar); [] = clube sem organizada na plataforma.
+  const [torcidas, setTorcidas] = useState<TorcidaOnboarding[] | null>(null)
+  const torcidasClubeIdRef = useRef<string | null>(null)
 
   const passoRef = useLatestRef(passo)
   const clubeRef = useLatestRef(clube)
@@ -191,6 +239,15 @@ export function OnboardingWizard({
         return alvo
       }
       return 'vinculo'
+    }
+    if (associeSe) {
+      if (alvo === 'clube' || alvo === 'regiao' || alvo === 'torcida') {
+        return passoInicialAssocieSe ?? 'vinculo'
+      }
+      if (alvo === 'unidade' && (passoInicialAssocieSe === 'vinculo' && associeSe.unidadeId)) {
+        return 'vinculo'
+      }
+      return alvo
     }
     if (!clubeRef.current && alvo !== 'clube') return 'clube'
     if (!torcidaRef.current && (alvo === 'unidade' || alvo === 'vinculo')) return 'torcida'
@@ -214,13 +271,17 @@ export function OnboardingWizard({
     window.history.pushState(
       mergeHistoryState(novo, modo),
       '',
-      urlDoPasso(novo, modo, conviteSlug),
+      urlDoPasso(novo, modo, conviteSlug, associeSe),
     )
   }
 
   /** Voltar UI = mesma ação da seta do navegador. */
   function voltarHistorico() {
     window.history.back()
+  }
+
+  function voltarDoAssocieSe() {
+    window.location.assign('/portal/associe-se')
   }
 
   /** Corrige o passo sem empilhar (ex.: falha ao concluir). */
@@ -230,22 +291,24 @@ export function OnboardingWizard({
     window.history.replaceState(
       mergeHistoryState(novo),
       '',
-      urlDoPasso(novo, undefined, conviteSlug),
+      urlDoPasso(novo, undefined, conviteSlug, associeSe),
     )
   }
 
   useEffect(() => {
-    let initialPasso: Passo = convite ? convite.passoInicial : 'clube'
-    let initialVinculoModo: 'escolha' | 'socio' = 'escolha'
+    let initialPasso: Passo = convite
+      ? convite.passoInicial
+      : (passoInicialAssocieSe ?? 'clube')
+    let initialVinculoModo: 'escolha' | 'socio' = associeSe ? 'socio' : 'escolha'
 
     // Cookie de curto prazo já cumpriu o papel (chegamos com o convite resolvido).
     if (convite) void consumirConviteCookie()
 
     try {
-      // Convite é intenção explícita e recente: descarta o rascunho de uma
-      // sessão anterior, que apontaria para outra torcida.
-      if (convite) window.sessionStorage.removeItem(wizardDraftKey)
-      const raw = convite ? null : window.sessionStorage.getItem(wizardDraftKey)
+      // Convite / Associe-se são intenção explícita: descarta o rascunho de
+      // uma sessão anterior, que apontaria para outra torcida.
+      if (convite || associeSe) window.sessionStorage.removeItem(wizardDraftKey)
+      const raw = convite || associeSe ? null : window.sessionStorage.getItem(wizardDraftKey)
       if (raw) {
         const saved = JSON.parse(raw) as Partial<{
           passo: Passo
@@ -255,6 +318,7 @@ export function OnboardingWizard({
           uf: string
           cidade: string
           torcida: TorcidaOnboarding | null
+          torcidas: TorcidaOnboarding[] | null
           unidadeId: string | null
           unidadeNaoListada: boolean
         }>
@@ -277,6 +341,9 @@ export function OnboardingWizard({
         if (saved.clube) setClube(saved.clube)
         if (typeof saved.uf === 'string') setUf(saved.uf)
         if (typeof saved.cidade === 'string') setCidade(saved.cidade)
+        if (Array.isArray(saved.torcidas)) {
+          setTorcidas(saved.torcidas)
+        }
         if (saved.torcida) setTorcida(saved.torcida)
         if (typeof saved.unidadeId === 'string' || saved.unidadeId === null) setUnidadeId(saved.unidadeId ?? null)
         if (typeof saved.unidadeNaoListada === 'boolean') setUnidadeNaoListada(saved.unidadeNaoListada)
@@ -292,7 +359,7 @@ export function OnboardingWizard({
       window.history.replaceState(
         mergeHistoryState(initialPasso, initialVinculoModo),
         '',
-        urlDoPasso(initialPasso, initialVinculoModo, convite?.conviteSlug),
+        urlDoPasso(initialPasso, initialVinculoModo, convite?.conviteSlug, associeSe),
       )
       setWizardDraftRestored(true)
     }
@@ -338,6 +405,7 @@ export function OnboardingWizard({
         uf,
         cidade,
         torcida,
+        torcidas,
         unidadeId,
         unidadeNaoListada,
       } satisfies Record<string, unknown>
@@ -352,7 +420,7 @@ export function OnboardingWizard({
       // Flush ao desmontar (voltar/refresh) para não perder seleções recentes.
       saveDraft()
     }
-  }, [wizardDraftRestored, wizardDraftKey, passo, vinculoModo, caminhoSocio, clube, uf, cidade, torcida, unidadeId, unidadeNaoListada])
+  }, [wizardDraftRestored, wizardDraftKey, passo, vinculoModo, caminhoSocio, clube, uf, cidade, torcida, torcidas, unidadeId, unidadeNaoListada])
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
 
@@ -383,12 +451,13 @@ export function OnboardingWizard({
     // Ref sincronizada já: avancarPara → passoAlcancavel lê clubeRef antes do re-render.
     clubeRef.current = afiliacao
     setClube(afiliacao)
+    setTorcidas(null)
+    torcidasClubeIdRef.current = null
     limparErro()
     avancarPara('regiao')
   }
 
   // ── Passo 2 → 3: persiste clube + região, carrega torcidas ───────────────────
-  const [torcidas, setTorcidas] = useState<TorcidaOnboarding[] | null>(null)
   function avancarDaRegiao() {
     if (!clube) return
     startTransition(async () => {
@@ -399,10 +468,36 @@ export function OnboardingWizard({
       }
       const lista = await buscarTorcidas(clube.id)
       setTorcidas(lista)
+      torcidasClubeIdRef.current = clube.id
       limparErro()
       avancarPara('torcida')
     })
   }
+
+  const clubeId = clube?.id ?? null
+  // Refresh / voltar do histórico: a lista não vive no React state inicial.
+  // Sem isto o passo Torcida cai no vazio ("nenhuma torcida na plataforma").
+  useEffect(() => {
+    if (!wizardDraftRestored) return
+    if (passo !== 'torcida' || !clubeId) return
+    if (torcidasClubeIdRef.current === clubeId) return
+
+    let cancelled = false
+    void buscarTorcidas(clubeId).then(
+      (lista) => {
+        if (cancelled) return
+        setTorcidas(lista)
+        torcidasClubeIdRef.current = clubeId
+      },
+      () => {
+        if (cancelled) return
+        setErro('Não foi possível carregar as organizadas. Volte um passo e tente de novo.')
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [wizardDraftRestored, passo, clubeId])
 
   // ── Passo 3: escolher torcida ou seguir como torcedor global ─────────────────
   function escolherTorcida(t: TorcidaOnboarding) {
@@ -419,9 +514,9 @@ export function OnboardingWizard({
     setUnidadeId(sedeId)
     setUnidadeNaoListada(naoListada)
     limparErro()
-    // Quem escolheu organizada + unidade já pediu vínculo com a torcida —
-    // vai direto à solicitação de sócio (sem reoferecer comunidade nacional).
-    avancarPara('vinculo', 'socio')
+    // Associe-se é só pedido de sócio. No restante (onboarding e convite)
+    // o passo Vínculo mostra torcedor da torcida × já sócio × primeira associação.
+    avancarPara('vinculo', associeSe ? 'socio' : 'escolha')
   }
 
   function abrirModoSocio(caminho: 'EXISTENTE' | 'NOVO') {
@@ -551,7 +646,7 @@ export function OnboardingWizard({
             >
               <PassoTorcida
                 clube={clube}
-                torcidas={torcidas ?? []}
+                torcidas={torcidas}
                 pending={pending}
                 onEscolher={escolherTorcida}
                 onTorcedorGlobal={seguirComoTorcedorGlobal}
@@ -579,7 +674,7 @@ export function OnboardingWizard({
                 localizacao={localizacaoPrecisa ?? undefined}
                 pending={pending}
                 onConfirmar={confirmarUnidade}
-                onVoltar={voltarHistorico}
+                onVoltar={associeSe ? voltarDoAssocieSe : voltarHistorico}
                 onErro={setErro}
                 onSedesAtualizadas={(sedes) => {
                   setTorcida((atual) => (atual ? { ...atual, sedes } : atual))
@@ -614,10 +709,11 @@ export function OnboardingWizard({
                 canalRestrito={convite?.canalRestrito ?? false}
                 torcidaMae={convite?.torcidaMae ?? null}
                 conviteSlug={conviteSlug}
+                origemAssocieSe={Boolean(associeSe)}
                 modo={vinculoModo}
                 caminhoSocio={caminhoSocio}
                 onAbrirSocio={abrirModoSocio}
-                onVoltar={voltarHistorico}
+                onVoltar={associeSe ? voltarDoAssocieSe : voltarHistorico}
                 onErro={setErro}
               />
             </m.div>
@@ -948,7 +1044,7 @@ function PassoTorcida({
   onVoltar,
 }: {
   clube: AfiliacaoOnboarding | null
-  torcidas: TorcidaOnboarding[]
+  torcidas: TorcidaOnboarding[] | null
   pending: boolean
   onEscolher: (t: TorcidaOnboarding) => void
   onTorcedorGlobal: () => void
@@ -962,7 +1058,8 @@ function PassoTorcida({
         Você pertence a alguma organizada?
       </h1>
       <p className="mt-1.5 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
-        Comece como torcedor do {nomeClube} ou vincule-se a uma torcida na plataforma.
+        Como torcedor você entra na comunidade nacional do {nomeClube} agora. Sócio de
+        uma organizada vê o mural interno, a carteirinha digital e os posts exclusivos.
       </p>
 
       {/* Caminho padrão: só torcedor — 1ª célula da grade (não estica full-width) */}
@@ -998,9 +1095,19 @@ function PassoTorcida({
               <p className="line-clamp-2 w-full text-xs font-semibold leading-snug text-[rgb(var(--foreground))] sm:text-sm">
                 Sou só torcedor do {nomeClube}
               </p>
-              <p className="line-clamp-3 w-full text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+              <p className="w-full text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
                 Comunidade nacional — sem vínculo com torcida organizada.
               </p>
+              <ul className="mt-2 w-full space-y-1.5 text-left text-[11px] leading-snug">
+                <li className="flex gap-1.5 text-[rgb(var(--foreground))]">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--color-primary-fg))]" aria-hidden />
+                  <span>Você vê o feed nacional do {nomeClube}</span>
+                </li>
+                <li className="flex gap-1.5 text-[rgb(var(--foreground-muted))]">
+                  <X className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden />
+                  <span>Sócio vê mural interno, carteirinha e benefícios da organizada</span>
+                </li>
+              </ul>
               {clube ? (
                 <div className="mt-auto flex w-full justify-center pt-1">
                   <LinhaPlataforma
@@ -1015,7 +1122,35 @@ function PassoTorcida({
         </li>
       </ul>
 
-      {torcidas.length === 0 ? (
+      {torcidas === null ? (
+        <div className="mt-8" aria-busy="true" aria-live="polite">
+          <div className="flex items-center gap-3" role="separator">
+            <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+            <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Ou escolha sua organizada
+            </p>
+            <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+          </div>
+          <ul
+            className="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
+            aria-label="Carregando torcidas organizadas"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <li key={i} className="min-w-0">
+                <div className="flex h-full min-h-[220px] w-full animate-pulse flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+                  <div className="flex w-full shrink-0 items-center justify-center bg-[rgb(var(--background-subtle))] px-5 py-6 sm:px-6 sm:py-7">
+                    <div className="h-28 w-28 rounded-full bg-[rgb(var(--border))] sm:h-32 sm:w-32" />
+                  </div>
+                  <div className="flex flex-1 flex-col items-center gap-2 p-3.5 sm:p-4">
+                    <div className="h-4 w-3/4 rounded bg-[rgb(var(--border))]" />
+                    <div className="h-3 w-1/2 rounded bg-[rgb(var(--border))]" />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : torcidas.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-8 text-center">
           <p className="text-sm text-[rgb(var(--foreground-muted))]">
             Nenhuma torcida de {nomeClube} está na plataforma ainda.
@@ -1747,6 +1882,197 @@ function calcularIdadeDeInput(isoDate: string): number | null {
   return idade
 }
 
+function VinculoAcessoItem({
+  ok,
+  children,
+}: {
+  ok: boolean
+  children: ReactNode
+}) {
+  return (
+    <li
+      className={`flex gap-2 ${
+        ok ? 'text-[rgb(var(--foreground))]' : 'text-[rgb(var(--foreground-muted))]'
+      }`}
+    >
+      {ok ? (
+        <Check
+          className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+          aria-hidden
+        />
+      ) : (
+        <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" aria-hidden />
+      )}
+      <span>{children}</span>
+    </li>
+  )
+}
+
+function ItensMuralSocio({
+  ok,
+  nomeOrganizada,
+  nomeUnidade,
+  vinculoEmUnidadeFilha,
+}: {
+  ok: boolean
+  nomeOrganizada: string
+  nomeUnidade: string
+  vinculoEmUnidadeFilha: boolean
+}) {
+  return (
+    <>
+      <VinculoAcessoItem ok={ok}>
+        Mural interno de sócios da <strong>{nomeOrganizada}</strong>
+        {vinculoEmUnidadeFilha ? ' — por hierarquia' : null}
+      </VinculoAcessoItem>
+      {vinculoEmUnidadeFilha ? (
+        <VinculoAcessoItem ok={ok}>
+          Mural interno de sócios da <strong>{nomeUnidade}</strong>
+        </VinculoAcessoItem>
+      ) : null}
+    </>
+  )
+}
+
+function ListaAcessoTorcedor({
+  canalRestrito,
+  nomeClube,
+  nomeUnidade,
+  nomeOrganizada,
+  torcidaNome,
+  vinculoEmUnidadeFilha,
+}: {
+  canalRestrito: boolean
+  nomeClube: string
+  nomeUnidade: string
+  nomeOrganizada: string
+  torcidaNome: string
+  vinculoEmUnidadeFilha: boolean
+}) {
+  return (
+    <div className="mt-4 space-y-3 border-t border-[rgb(var(--border))] pt-4 text-sm">
+      <div>
+        <p className="font-medium text-[rgb(var(--foreground))]">Você vê agora</p>
+        <ul className="mt-2 space-y-2">
+          {canalRestrito ? (
+            <VinculoAcessoItem ok>
+              Espaço aberto da <strong>{nomeUnidade}</strong> — eventos e novidades
+            </VinculoAcessoItem>
+          ) : (
+            <>
+              <VinculoAcessoItem ok>
+                Comunidade do <strong>{nomeClube}</strong> (feed nacional)
+              </VinculoAcessoItem>
+              <VinculoAcessoItem ok>
+                Espaço aberto da{' '}
+                <strong>{vinculoEmUnidadeFilha ? nomeUnidade : torcidaNome}</strong> —
+                eventos e novidades
+              </VinculoAcessoItem>
+            </>
+          )}
+        </ul>
+      </div>
+      <div>
+        <p className="font-medium text-[rgb(var(--foreground))]">Só o sócio vê</p>
+        <ul className="mt-2 space-y-2">
+          {canalRestrito ? (
+            <VinculoAcessoItem ok={false}>
+              Mural interno de sócios da <strong>{nomeUnidade}</strong>
+            </VinculoAcessoItem>
+          ) : (
+            <ItensMuralSocio
+              ok={false}
+              nomeOrganizada={nomeOrganizada}
+              nomeUnidade={nomeUnidade}
+              vinculoEmUnidadeFilha={vinculoEmUnidadeFilha}
+            />
+          )}
+          <VinculoAcessoItem ok={false}>Carteirinha digital com QR</VinculoAcessoItem>
+          <VinculoAcessoItem ok={false}>
+            Posts exclusivos e benefícios de associado
+          </VinculoAcessoItem>
+          {canalRestrito ? (
+            <VinculoAcessoItem ok={false}>
+              Comunidade da <strong>{nomeOrganizada}</strong> e feed nacional (canal
+              restrito)
+            </VinculoAcessoItem>
+          ) : null}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function ListaAcessoSocio({
+  canalRestrito,
+  nomeClube,
+  nomeUnidade,
+  nomeOrganizada,
+  vinculoEmUnidadeFilha,
+  caminho,
+}: {
+  canalRestrito: boolean
+  nomeClube: string
+  nomeUnidade: string
+  nomeOrganizada: string
+  vinculoEmUnidadeFilha: boolean
+  caminho: 'EXISTENTE' | 'NOVO'
+}) {
+  return (
+    <div className="mt-4 space-y-3 border-t border-[rgb(var(--border))] pt-4 text-sm">
+      <div>
+        <p className="font-medium text-[rgb(var(--foreground))]">Na ficha</p>
+        <p className="mt-1 text-[rgb(var(--foreground-muted))]">
+          {caminho === 'EXISTENTE'
+            ? 'Número de associado, data de expedição, plano e foto da carteirinha.'
+            : 'RG, CPF, endereço, documentos e termo. Sem número ainda — a diretoria emite a carteirinha depois.'}
+        </p>
+      </div>
+      <div>
+        <p className="font-medium text-[rgb(var(--foreground))]">Depois da aprovação</p>
+        <ul className="mt-2 space-y-2">
+          {canalRestrito ? (
+            <>
+              <VinculoAcessoItem ok>
+                Mural interno de sócios da <strong>{nomeUnidade}</strong>
+              </VinculoAcessoItem>
+              <VinculoAcessoItem ok>
+                Carteirinha digital, benefícios e posts exclusivos
+              </VinculoAcessoItem>
+              <VinculoAcessoItem ok={false}>
+                Sem o mural da <strong>{nomeOrganizada}</strong> nem o feed nacional
+                (canal restrito)
+              </VinculoAcessoItem>
+            </>
+          ) : (
+            <>
+              <VinculoAcessoItem ok>
+                Comunidade do <strong>{nomeClube}</strong>
+              </VinculoAcessoItem>
+              <ItensMuralSocio
+                ok
+                nomeOrganizada={nomeOrganizada}
+                nomeUnidade={nomeUnidade}
+                vinculoEmUnidadeFilha={vinculoEmUnidadeFilha}
+              />
+              <VinculoAcessoItem ok>
+                {caminho === 'EXISTENTE'
+                  ? 'Carteirinha digital já vigente, benefícios e posts exclusivos'
+                  : 'Carteirinha digital (emitida pela diretoria), benefícios e posts exclusivos'}
+              </VinculoAcessoItem>
+            </>
+          )}
+        </ul>
+      </div>
+      <p className="text-[rgb(var(--foreground-muted))]">
+        {caminho === 'EXISTENTE'
+          ? 'Até a diretoria conferir, você acompanha como torcedor — comunidade aberta, sem mural exclusivo.'
+          : 'Até a aprovação você acompanha como torcedor. A carteirinha entra na fila de emissão da diretoria.'}
+      </p>
+    </div>
+  )
+}
+
 function PassoVinculo({
   clube,
   torcida,
@@ -1761,6 +2087,7 @@ function PassoVinculo({
   canalRestrito,
   torcidaMae,
   conviteSlug,
+  origemAssocieSe = false,
   userId,
   modo,
   caminhoSocio,
@@ -1788,6 +2115,8 @@ function PassoVinculo({
    * procedência declarada pelo cliente não vale sozinha.
    */
   conviteSlug: string | null
+  /** Deep-link do mapa Associe-se. */
+  origemAssocieSe?: boolean
   /** Sede/mãe quando o convite é de unidade Caso B. */
   torcidaMae: TorcidaMaeConvite | null
   userId: string
@@ -2053,6 +2382,12 @@ function PassoVinculo({
     unidadeSelecionada?.tenantId,
     torcida.id,
   )
+  /** PDE/Subsede (não a Sede): sócio vê o mural da unidade e o da organizada. */
+  const vinculoEmUnidadeFilha =
+    unidadeNaoListada ||
+    Boolean(torcidaMae) ||
+    vinculoEmUnidadePropria ||
+    (unidadeSelecionada != null && unidadeSelecionada.tipo !== 'SEDE')
   const nomeUnidade = unidadeSelecionada?.nome ?? 'sua unidade'
   const nomeTorcidaSede = torcida.nome
   /** Organizada "mãe" na copy (Gaviões); cai na própria torcida se o link for da Sede. */
@@ -2418,6 +2753,7 @@ function PassoVinculo({
           // unidade enquanto espera aprovação (§7 22). O servidor confere o
           // slug contra a linhagem — mandar isto não basta para ganhar acesso.
           conviteSlug: conviteSlug ?? undefined,
+          origemAssocieSe: origemAssocieSe || undefined,
           nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
           idade: idadeCalculada !== null ? String(idadeCalculada) : undefined,
           telefone: telefone || undefined,
@@ -2554,12 +2890,14 @@ function PassoVinculo({
         </h1>
         <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
           {modo === 'socio'
-            ? 'Escolha se você já é sócio ou quer se associar pela primeira vez. Isso define os dados e documentos da ficha.'
+            ? vinculoEmUnidadeFilha
+              ? `Os dois caminhos levam aos mesmos acessos de sócio: o mural da ${nomeOrganizada} (por hierarquia) e o da ${nomeUnidade}. Muda o que você informa na ficha e quando a carteirinha digital fica pronta.`
+              : 'Os dois caminhos levam aos mesmos acessos de sócio. Muda o que você informa na ficha e quando a carteirinha digital fica pronta.'
             : canalRestrito
-              ? `Escolha um dos dois caminhos. Com o canal restrito, sua comunidade fica na ${torcida.nome}.`
-              : torcidaMae
-                ? `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube}, na da ${nomeOrganizada} e na da ${torcida.nome}.`
-                : `Escolha um dos dois caminhos. Cada um define o que você vê na comunidade do ${nomeClube} e na da ${torcida.nome}.`}
+              ? `Torcedor entra agora no espaço aberto da unidade. Sócio vê o mural interno, a carteirinha e os posts exclusivos — a comunidade fica na ${torcida.nome}.`
+              : vinculoEmUnidadeFilha
+                ? `Torcedor entra agora na comunidade aberta da unidade. Sócio vê o mural da ${nomeOrganizada} (por hierarquia), o mural da ${nomeUnidade}, a carteirinha e os posts exclusivos.`
+                : `Torcedor entra agora na comunidade aberta. Sócio vê o mural interno, a carteirinha digital e os posts exclusivos da ${torcida.nome}.`}
         </p>
 
         {!torcida.acessivelNoHost && (
@@ -2581,8 +2919,7 @@ function PassoVinculo({
             modo === 'socio' ? 'lg:grid-cols-2' : 'lg:grid-cols-3'
           }`}
         >
-          {/* Card 1: Torcedor da torcida — só na escolha completa (não quando
-              o passo Unidade já decidiu que o caminho é de sócio). */}
+          {/* Card 1: Torcedor da torcida — oculto no Associe-se (só pedido de sócio). */}
           {modo === 'escolha' ? (
           <button
             type="button"
@@ -2609,62 +2946,18 @@ function PassoVinculo({
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
                 {canalRestrito
-                  ? 'Entra agora na comunidade da unidade — sem aprovação nem comprovante.'
-                  : 'Entra agora nas comunidades — sem aprovação nem comprovante.'}
+                  ? 'Entra agora na comunidade da unidade — sem aprovação nem comprovante. Depois você pode se associar pelo portal.'
+                  : 'Entra agora nas comunidades abertas — sem aprovação nem comprovante. Depois você pode se associar pelo portal.'}
               </p>
 
-              <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-                {canalRestrito ? (
-                  <>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Espaço aberto da <strong>{nomeUnidade}</strong> (eventos e
-                        novidades)
-                      </span>
-                    </li>
-                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                      <span>
-                        Sem feed da <strong>{nomeOrganizada}</strong> nem da
-                        comunidade nacional
-                      </span>
-                    </li>
-                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                      <span>Sem mural exclusivo de sócios</span>
-                    </li>
-                  </>
-                ) : (
-                  <>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Comunidade do <strong>{nomeClube}</strong> (feed nacional)
-                      </span>
-                    </li>
-                    {torcidaMae ? (
-                      <li className="flex gap-2">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                        <span>
-                          Comunidade da <strong>{nomeOrganizada}</strong>
-                        </span>
-                      </li>
-                    ) : null}
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
-                        novidades)
-                      </span>
-                    </li>
-                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                      <span>Sem mural exclusivo de sócios</span>
-                    </li>
-                  </>
-                )}
-              </ul>
+              <ListaAcessoTorcedor
+                canalRestrito={canalRestrito}
+                nomeClube={nomeClube}
+                nomeUnidade={nomeUnidade}
+                nomeOrganizada={nomeOrganizada}
+                torcidaNome={torcida.nome}
+                vinculoEmUnidadeFilha={vinculoEmUnidadeFilha}
+              />
 
               <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
                 Entrar agora
@@ -2704,61 +2997,18 @@ function PassoVinculo({
                 Já sou sócio
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                Nº, expedição da carteirinha e plano — após aprovação a carteirinha digital já nasce vigente.
+                Você já tem número e carteirinha. A diretoria confere e ativa a digital na
+                hora da aprovação.
               </p>
 
-              <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-                {canalRestrito ? (
-                  <>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Mural interno de sócios da <strong>{nomeUnidade}</strong>
-                      </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>Carteirinha, benefícios e posts exclusivos</span>
-                    </li>
-                    <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                      <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                      <span>
-                        Sem interação com a comunidade da{' '}
-                        <strong>{nomeOrganizada}</strong> nem o feed nacional
-                        (canal restrito)
-                      </span>
-                    </li>
-                  </>
-                ) : (
-                  <>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Comunidade do <strong>{nomeClube}</strong>
-                      </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>
-                        Mural interno de sócios da <strong>{nomeUnidade}</strong>
-                      </span>
-                    </li>
-                    {torcidaMae ? (
-                      <li className="flex gap-2">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                        <span>
-                          Também interage com a comunidade da{' '}
-                          <strong>{nomeOrganizada}</strong>
-                        </span>
-                      </li>
-                    ) : null}
-                    <li className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
-                      <span>Carteirinha, benefícios e posts exclusivos</span>
-                    </li>
-                  </>
-                )}
-              </ul>
+              <ListaAcessoSocio
+                canalRestrito={canalRestrito}
+                nomeClube={nomeClube}
+                nomeUnidade={nomeUnidade}
+                nomeOrganizada={nomeOrganizada}
+                vinculoEmUnidadeFilha={vinculoEmUnidadeFilha}
+                caminho="EXISTENTE"
+              />
 
               <div className="mt-auto flex items-end justify-between gap-4 pt-5">
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
@@ -2810,12 +3060,37 @@ function PassoVinculo({
                 Quero me associar
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                Primeira associação — ficha completa. A carteirinha é emitida pela diretoria após a aprovação.
+                Primeira associação — mesmos acessos de sócio, ficha completa. A
+                carteirinha sai da diretoria depois da aprovação.
               </p>
-              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
-                Continuar
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </span>
+
+              <ListaAcessoSocio
+                canalRestrito={canalRestrito}
+                nomeClube={nomeClube}
+                nomeUnidade={nomeUnidade}
+                nomeOrganizada={nomeOrganizada}
+                vinculoEmUnidadeFilha={vinculoEmUnidadeFilha}
+                caminho="NOVO"
+              />
+
+              <div className="mt-auto flex items-end justify-between gap-4 pt-5">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
+                  Continuar
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+
+                {fotoUnidade ? (
+                  <span className="relative block h-20 w-20 shrink-0">
+                    <LogoImage
+                      src={fotoUnidade}
+                      alt={`Foto da unidade ${nomeUnidade}`}
+                      fill
+                      sizes="80px"
+                      className="object-contain"
+                    />
+                  </span>
+                ) : null}
+              </div>
             </div>
           </button>
         </div>
@@ -3529,6 +3804,7 @@ function PassoVinculo({
             Falta preencher: {abasPendentes.map((tab) => tab.label).join(', ')}.
           </p>
         ) : null}
+        {!origemAssocieSe ? (
         <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
           Não é sócio da organizada?{' '}
           <button
@@ -3540,8 +3816,9 @@ function PassoVinculo({
             Entrar só como torcedor da torcida
           </button>
           {' '}
-          (sem aprovação nem mural exclusivo).
+          — comunidade aberta agora, sem mural exclusivo nem carteirinha.
         </p>
+        ) : null}
       </div>
       </div>
     )

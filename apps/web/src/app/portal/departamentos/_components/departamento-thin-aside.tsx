@@ -333,7 +333,7 @@ export async function DepartamentoThinAside({
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               <Link
-                href="#projetos"
+                href="?tab=projetos"
                 className="text-[11px] font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver projetos
@@ -415,7 +415,7 @@ export async function DepartamentoThinAside({
             )}
             {projetosAtivos > 0 && (
               <Link
-                href="#projetos"
+                href="?tab=projetos"
                 className="mt-2 block text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--color-primary-fg))]"
               >
                 {projetosAtivos} projeto{projetosAtivos === 1 ? '' : 's'} em andamento →

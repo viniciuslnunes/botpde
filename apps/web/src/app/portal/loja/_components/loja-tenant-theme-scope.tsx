@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { useTheme } from 'next-themes'
 import { applyTenantDesign, tenantDesignCriticalCss, type TenantDesign } from '@torcida/ui'
+import { useTheme } from '@torcida/ui/services/theme'
 import { resolveTenantDesign } from '@torcida/types'
 import { LojaRememberStore } from './loja-fluxo'
 
@@ -30,7 +30,7 @@ export function LojaTenantThemeScope({
   )
   const { resolvedTheme } = useTheme()
   const criticalCss = useMemo(
-    () => tenantDesignCriticalCss(design, 'dark').replace(':root', `.${SCOPE_CLASS}`),
+    () => tenantDesignCriticalCss(design, 'dark', `.${SCOPE_CLASS}`),
     [design],
   )
 

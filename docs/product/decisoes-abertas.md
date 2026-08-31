@@ -15,6 +15,10 @@
 | 10 | Permissão dedicada de desligamento estatutário | **Fechado 2026-07-16** — `MEMBERS_DISMISS` + `desligadoEm`/`desligadoMotivo`/`desligadoPorId` em `SaasMembro` |
 | 14 | Provedor de gateway (Pix/boleto/cartão) | **Fechado 2026-07-16 (MVP Pix)** — mock default (`PIX_GATEWAY_MODE=mock`); Mercado Pago Pix opcional via `PIX_GATEWAY_MODE=mercadopago` + `MERCADOPAGO_ACCESS_TOKEN`. Ver `docs/data/modulo-associacao.md` |
 | 15 | E2EE em conversas/canais vs moderação de conteúdo grave | **Fechado 2026-08-07 — Fase A**: plaintext + ACL + denúncia/filas; sem E2EE prometido. Feed/canais fora de E2EE; DM candidata só em fases B (envelope+escrow) / C (E2EE com moderação sem plaintext). Ver `docs/data/plano-criptografia-e-moderacao.md` e `ARCHITECTURE.md` §5.23 |
+| 16 | Memória (linha do tempo) | **Fechado 2026-08-30.** Três recortes (unidade / torcida / clube), sem misturar no mesmo scroll. Fase 1 = unidade leitura. Clube = `Partida` + posts nacionais públicos. Fato atrasado = entidade própria (`MemoriaFato`), nunca `Post.criadoEm`. Aliados = flags **bilaterais** default off (`settings:manage`). “Quem estava” = check-in + opt-in, mesmo tenant, nunca aliado. Ver `docs/data/modulo-memoria.md` e §5.30 |
+| 17 | Confiança: local vs global no MVP | **Fechado 2026-08-30 — só local** (`ConfiancaSaldo` por tenant). Eixo global quando cross-tenant pedir. `docs/data/modulo-confianca.md` e §5.32 |
+| 18 | Confiança: ranking público vs score privado | **Fechado 2026-08-30 — score privado**; nível visível só no recorte 4. Sem ranking. |
+| 19 | Confiança: incentivar engajamento vs conter abuso | **Fechado 2026-08-30 — conter abuso.** Sinais caros (check-in, mensalidade, laudo); post/reação peso zero. |
 
 ## Ainda em aberto
 

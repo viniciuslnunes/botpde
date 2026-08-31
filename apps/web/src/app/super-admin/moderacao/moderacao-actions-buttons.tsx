@@ -1,7 +1,8 @@
 'use client'
 
 import { useTransition } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
+import { AdminRowActions } from '@/components/admin/ui'
 import { runPersistAction } from '@/lib/toast-action'
 import {
   descartarDenunciaMensagemSuperAdminAction,
@@ -40,25 +41,25 @@ export function ModeracaoActionsButtons({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={resolver}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-      >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-        Resolver e remover
-      </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={descartar}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-      >
-        <X className="h-3.5 w-3.5" />
-        Descartar
-      </button>
-    </div>
+    <AdminRowActions
+      ariaLabel={`Ações da denúncia de ${rotuloConteudo}`}
+      items={[
+        {
+          id: 'resolver',
+          label: pending ? 'Salvando…' : 'Resolver e remover',
+          icon: Check,
+          tone: 'danger',
+          disabled: pending,
+          onSelect: resolver,
+        },
+        {
+          id: 'descartar',
+          label: 'Descartar',
+          icon: X,
+          disabled: pending,
+          onSelect: descartar,
+        },
+      ]}
+    />
   )
 }

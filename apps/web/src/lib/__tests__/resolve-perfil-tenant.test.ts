@@ -58,7 +58,6 @@ describe('resolvePerfilTenantForUser', () => {
     findUniqueSaas.mockResolvedValue(null)
     findFirstSaas.mockResolvedValue(null)
     findUniquePerfil.mockResolvedValue({
-      onboardingConcluidoEm: new Date(),
       afiliacaoId: 'af-corinthians',
     })
     getOrCreateComunidadeNacionalTenant.mockResolvedValue({ id: cnTimao.id })
@@ -81,12 +80,21 @@ describe('resolvePerfilTenantForUser', () => {
     expect(findUniquePerfil).not.toHaveBeenCalled()
   })
 
+  it('torcedor APROVADO no host também fica na TO (ficha), sem virar sócio', async () => {
+    getTenantFromHost.mockResolvedValue(gavioes)
+    findUniqueSaas.mockResolvedValue({ status: 'APROVADO', tipo: 'TORCEDOR' })
+
+    const tenant = await resolvePerfilTenantForUser('user-torcedor', 'viewer')
+
+    expect(tenant?.id).toBe(gavioes.id)
+    expect(findUniquePerfil).not.toHaveBeenCalled()
+  })
+
   it('perfil visitado de torcedor global (viewer noutro user) resolve CN', async () => {
     getTenantFromHost.mockResolvedValue(gavioes)
     findUniqueSaas.mockResolvedValue(null)
     findFirstSaas.mockResolvedValue(null)
     findUniquePerfil.mockResolvedValue({
-      onboardingConcluidoEm: new Date(),
       afiliacaoId: 'af-corinthians',
     })
     getOrCreateComunidadeNacionalTenant.mockResolvedValue({ id: cnTimao.id })
@@ -95,5 +103,6 @@ describe('resolvePerfilTenantForUser', () => {
     const tenant = await resolvePerfilTenantForUser('user-torcedor', 'user-socio')
 
     expect(tenant?.id).toBe(cnTimao.id)
+    expect(tenant?.sintetico).toBe(true)
   })
 })

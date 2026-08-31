@@ -108,3 +108,30 @@ Staging + auditoria da importação da base existente (prioridade #1 de dados).
   CPF, filiação, escolaridade, profissão, foto e data de nascimento no cadastro
   de membro; `SaasMembro` hoje só tem `idade`, `telefone`, `cidade`, endereço e
   `imagemProva`. Ver decisão em aberto #9 em `docs/product/decisoes-abertas.md`.
+
+## Memória (entregue 2026-08-30 — fases 2–5)
+
+Contrato em `packages/types/src/memoria.js`. Doc: `docs/data/modulo-memoria.md`.
+Aplicado no schema: `MemoriaFato`, `Tenant.memoriaAliados`,
+`PerfilMembro.memoriaPresencaVisivel`. Índice `MemoriaDia` ainda não.
+
+### `MemoriaFato` (fase 3)
+
+Fato atrasado ligado a um dia civil. Não reescreve `Post.criadoEm`.
+- `id, tenantId, autorId, dia, conteudo, midiaUrls[], visibilidade (PUBLICO|TENANT),
+  status (PENDENTE|APROVADA|REJEITADA), postId?, eventoId?, aprovadoPorId?,
+  decididoEm?, motivoRejeicao?, criadoEm`
+- Índices: `(tenantId, status, dia)`, `(tenantId, dia)`, `(autorId, criadoEm)`
+
+### `MemoriaDia` (índice — fase 3 ou se p95 da espinha clube estourar)
+
+- `escopoTipo (tenant|afiliacao), escopoId, dia, kinds[], totais Json, atualizadoEm`
+- Unique `(escopoTipo, escopoId, dia)`
+
+### Colunas em entidades existentes
+
+| Entidade | Fase | Campo |
+|---|---|---|
+| `Tenant` | 4 | `memoriaAliados Boolean @default(false)` — só a raiz SEDE |
+| `PerfilMembro` | 5 | `memoriaPresencaVisivel Boolean @default(false)` |
+

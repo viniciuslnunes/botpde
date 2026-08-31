@@ -41,6 +41,7 @@ export function AdminMembroLgeForm({
   desligadoEm,
   espelhado,
   aprovadoNaUnidadeNome,
+  canEdit = false,
 }: {
   membroId: string
   initial: {
@@ -58,6 +59,8 @@ export function AdminMembroLgeForm({
   /** Espelho na Sede — LGE só leitura; edite na unidade de origem. */
   espelhado?: boolean
   aprovadoNaUnidadeNome?: string | null
+  /** `members:approve` — quem só vê o cadastro não altera RG/CPF. */
+  canEdit?: boolean
 }) {
   const [lgeState, lgeAction, lgePending] = useActionState(atualizarDadosLge, {} as MembroLgeState)
   const [dismissState, dismissAction, dismissPending] = useActionState(
@@ -82,7 +85,7 @@ export function AdminMembroLgeForm({
   const cpfExibicao = formatCpfAdmin(initial.cpf) ?? initial.cpf
   const rgExibicao = formatRg(initial.rg) ?? initial.rg
 
-  if (espelhado) {
+  if (espelhado || !canEdit) {
     const planoNome =
       planos.find((p) => p.id === initial.planoAssociacaoId)?.nome ?? null
     return (
@@ -91,9 +94,11 @@ export function AdminMembroLgeForm({
           Dados LGE (Lei 14.597/2023)
         </h2>
         <p className="text-xs text-[rgb(var(--foreground-muted))]">
-          {via
-            ? `Registro espelhado — aprovado via ${via}. Edite na unidade de origem.`
-            : 'Registro espelhado — edite na unidade de origem.'}
+          {espelhado
+            ? via
+              ? `Registro espelhado — aprovado via ${via}. Edite na unidade de origem.`
+              : 'Registro espelhado — edite na unidade de origem.'
+            : 'Somente quem aprova membros pode alterar RG, CPF e filiação.'}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>

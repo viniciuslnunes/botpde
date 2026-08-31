@@ -27,6 +27,9 @@ export const StatusPatrimonioEmprestimoSchema = z.enum([
 /** Itens por página (portal e admin alinhados). */
 export const PATRIMONIO_PAGE_SIZE = 40
 
+/** Grade visual do acervo — cabe mais itens porque o card é a unidade. */
+export const PATRIMONIO_ACERVO_PAGE_SIZE = 60
+
 const itemCampos = {
   nome: z.string().trim().min(2, 'Nome muito curto').max(120),
   categoria: CategoriaPatrimonioSchema,
@@ -48,6 +51,10 @@ const itemCampos = {
     .max(500)
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  fotoUrl: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.string().trim().url('URL da foto inválida').max(2000).optional(),
+  ),
   responsavelId: z
     .union([z.literal(''), z.string().uuid('Responsável inválido')])
     .optional()
@@ -58,12 +65,67 @@ const itemCampos = {
     .transform((v) => (v === '' || v === undefined ? undefined : v)),
 }
 
-export const CriarPatrimonioItemSchema = z.object(itemCampos)
+/**
+ * Bandeira/faixa/mastro não é lote: cada peça tem foto, vistoria e
+ * empréstimo próprios. Na criação, `quantidade` é quantas peças abrir
+ * (cada uma grava `quantidade: 1`). Na edição a peça já é única.
+ */
+export const CATEGORIA_BANDEIRA = 'BANDEIRA'
+export const BANDEIRA_PECAS_MAX = 50
 
-export const AtualizarPatrimonioItemSchema = z.object({
-  id: z.string().uuid('Item inválido'),
-  ...itemCampos,
-})
+export function patrimonioEhPecaUnica(categoria) {
+  return categoria === CATEGORIA_BANDEIRA
+}
+
+/**
+ * Nomes das N peças de um lote. `total === 1` devolve o nome original,
+ * sem sufixo. Sufixo já existente (` · 3`) é descartado para não virar
+ * `Bandeira · 3 · 1`.
+ *
+ * @param {string} nome
+ * @param {number} total
+ * @returns {string[]}
+ */
+export function nomesPecasPatrimonio(nome, total) {
+  const n = Math.max(1, Math.floor(Number(total) || 1))
+  const base = String(nome ?? '')
+    .replace(/\s·\s\d+$/, '')
+    .trim()
+  const rotulo = base || String(nome ?? '').trim() || 'Peça'
+  if (n === 1) return [rotulo]
+  return Array.from({ length: n }, (_, i) => `${rotulo} · ${i + 1}`)
+}
+
+function bandeiraQuantidadeNoCadastro(data, ctx) {
+  if (!patrimonioEhPecaUnica(data.categoria)) return
+  if (data.quantidade > BANDEIRA_PECAS_MAX) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['quantidade'],
+      message: `No máximo ${BANDEIRA_PECAS_MAX} peças por cadastro.`,
+    })
+  }
+}
+
+function bandeiraPecaUnicaNaEdicao(data, ctx) {
+  if (!patrimonioEhPecaUnica(data.categoria)) return
+  if (data.quantidade !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['quantidade'],
+      message: 'Bandeira é peça única — cada uma tem a própria foto.',
+    })
+  }
+}
+
+export const CriarPatrimonioItemSchema = z.object(itemCampos).superRefine(bandeiraQuantidadeNoCadastro)
+
+export const AtualizarPatrimonioItemSchema = z
+  .object({
+    id: z.string().uuid('Item inválido'),
+    ...itemCampos,
+  })
+  .superRefine(bandeiraPecaUnicaNaEdicao)
 
 export const AbrirEmprestimoPatrimonioSchema = z.object({
   itemId: z.string().uuid('Item inválido'),
@@ -152,9 +214,6 @@ export function categoriaExigeEvidencia(categoria) {
 /* ------------------------------------------------------------------ *
  * Bandeiras — recorte do acervo (departamento próprio, mesmo modelo)
  * ------------------------------------------------------------------ */
-
-/** Categoria operada pelo departamento de Bandeiras. */
-export const CATEGORIA_BANDEIRA = 'BANDEIRA'
 
 /**
  * Escopo de acesso ao inventário, resolvido de uma vez para a página/action.

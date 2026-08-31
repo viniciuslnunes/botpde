@@ -1,5 +1,6 @@
 import { db, type Prisma } from '@torcida/db'
 import { redirect } from 'next/navigation'
+import { assertPermission } from '@/lib/authz'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import {
   AccessPessoasLista,
@@ -8,7 +9,7 @@ import {
 import { AccessUserPanelRoute } from '@/components/admin/access-user-panel-route'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { assertPermission } from '@/lib/authz'
+import { liderancaAtualDoTenant } from '@/lib/lideranca'
 import {
   construirHrefListagem,
   parseListagemParams,
@@ -225,6 +226,9 @@ export default async function AcessosPage({
 
     if (!pessoa) redirect(voltarHref)
 
+    const owners = await liderancaAtualDoTenant(tenant.id)
+    const outroOwner = owners.find((o) => o.userId !== pessoa.id) ?? null
+
     return (
       <MotionReveal>
         <AccessUserPanelRoute
@@ -242,6 +246,9 @@ export default async function AcessosPage({
           departamentos={departamentos}
           tipoSede={tipoSede}
           voltarHref={voltarHref}
+          ownerOcupadoPor={
+            outroOwner ? { userId: outroOwner.userId, nome: outroOwner.nome } : null
+          }
         />
       </MotionReveal>
     )

@@ -91,8 +91,11 @@ não entra na cobrança: não vai a jogo.
   suprimido, categoria travada no formulário) — é o recorte dele, não um
   Patrimônio capado.
 - **Admin** — `/admin/bandeiras` (`flags:manage` ou `patrimony:manage`, com
-  gestoria da área no menu): KPIs, inbox de pendências, "fora agora" com foto
-  de saída e o acervo com a ficha de vistoria embutida.
+  gestoria da área no menu): KPIs e `AdminTabs` (`?tab=`): **Acervo** (default,
+  cards com foto de catálogo), Fora agora (foto de saída), Precisa de você.
+  Edição/exclusão no modal (unsaved-changes + confirmação). A ficha de vistoria
+  entra no mesmo modal. Aba **Histórico** (`?tab=historico`): baixas e
+  exclusões permanentes de bandeiras, com ator e data.
 - **Áreas canônicas** — Acervo e guarda · Escala de jogo · Confecção e reforma
   · Vistoria e liberação (`departamento-areas-canonicas.js`).
 
@@ -100,7 +103,9 @@ não entra na cobrança: não vai a jogo.
 
 Reusa `Evento` com `partidaId` na Agenda — mesmo padrão do aside `#escala` da
 Bateria. **Não** existe lista de escala paralela: quem leva o trapo confirma
-presença no evento do jogo.
+presença no evento do jogo. O cockpit (Painel) sugere a receita quando há
+`Partida` no horizonte sem esse evento; Ativar cria o `Evento` GERAL +
+checklist `escala-de-jogo` se a frente existir.
 
 ## Depois do deploy
 

@@ -9,6 +9,7 @@ import {
 } from '@torcida/types'
 import { assertPodeGerirItem } from '@/lib/patrimonio-authz'
 import { isExpectedError } from '@/lib/expected-error'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 export type VistoriaState = {
   ok?: boolean
@@ -16,11 +17,12 @@ export type VistoriaState = {
   errors?: Record<string, string[]>
 }
 
-function revalidateBandeiras() {
+function revalidateBandeiras(tenantId: string) {
   revalidatePath('/admin/bandeiras')
   revalidatePath('/admin/patrimonio')
   revalidatePath('/portal/patrimonio')
   revalidatePath('/portal/departamentos/bandeiras')
+  invalidateAdminDirecao(tenantId)
 }
 
 /**
@@ -83,6 +85,6 @@ export async function registrarVistoriaBandeira(
     },
   })
 
-  revalidateBandeiras()
+  revalidateBandeiras(ctx.tenant.id)
   return { ok: true }
 }

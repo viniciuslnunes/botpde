@@ -266,3 +266,18 @@ describe('getSedesDaTorcidaOnboarding', () => {
     expect(sedes[0]?.tenantId).toBe('t-pde')
   })
 })
+
+describe('podeListarTorcidasDaAfiliacao', () => {
+  it('no wizard ainda permite listar o clube selecionado', async () => {
+    const { podeListarTorcidasDaAfiliacao } = await import('@/lib/onboarding')
+    expect(podeListarTorcidasDaAfiliacao('af-palmeiras', 'af-corinthians', false)).toBe(true)
+    expect(podeListarTorcidasDaAfiliacao('af-corinthians', null, false)).toBe(true)
+  })
+
+  it('onboarding concluído: só o próprio clube — rival devolve vazio', async () => {
+    const { podeListarTorcidasDaAfiliacao } = await import('@/lib/onboarding')
+    expect(podeListarTorcidasDaAfiliacao('af-corinthians', 'af-corinthians', true)).toBe(true)
+    expect(podeListarTorcidasDaAfiliacao('af-palmeiras', 'af-corinthians', true)).toBe(false)
+    expect(podeListarTorcidasDaAfiliacao('af-palmeiras', null, true)).toBe(false)
+  })
+})

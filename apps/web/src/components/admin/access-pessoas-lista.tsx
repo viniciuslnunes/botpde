@@ -243,7 +243,7 @@ export function AccessPessoasLista({
                     <Link
                       href={hrefEditar(pessoa.id)}
                       title={`Editar acesso de ${nome}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                      className="app-touch-target inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
                     >
                       <Pencil className="h-3.5 w-3.5" aria-hidden />
                       <span className="sr-only">Editar acesso de {nome}</span>

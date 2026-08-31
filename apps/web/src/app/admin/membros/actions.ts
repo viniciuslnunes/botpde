@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, Prisma } from '@torcida/db'
-import { assertAnyPermission, assertPermission } from '@/lib/authz'
+import { assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { ExpectedError, isExpectedError } from '@/lib/expected-error'
 import {
@@ -23,9 +23,12 @@ import {
   emitNotificacaoPingCnDoSolicitante,
   reconciliarNotificacoesDoEvento,
 } from '@/lib/notificacoes'
+import { notificarGestoresDepartamento } from '@/lib/notificacoes-routing'
+import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import { tentarAutoEmitirCarteirinhaAposAprovacao } from '@/lib/carteirinha-emissao'
+import { registrarSinalConfiancaSafe } from '@/lib/confianca'
 import { espelharCarteirinhaDoTenant } from '@/lib/carteirinha-espelho'
 import { diffCamposMembro } from '@/lib/membro-audit-diff'
 import {
@@ -90,6 +93,36 @@ function erroDecisaoPorUnique(err: unknown): { error: string } | null {
 function mapearErroDecisaoMembro(err: unknown): { error: string } | null {
   if (isExpectedError(err)) return { error: err.message }
   return erroDecisaoPorUnique(err)
+}
+
+async function avisarGestoresAreaPendente(opts: {
+  tenantId: string
+  userId: string
+  nome: string
+  departamentoId: string | null
+  excetoUserId: string
+}): Promise<void> {
+  if (!opts.departamentoId) return
+  const efetivadas = await getAreasEfetivadasPorUser(opts.tenantId, [opts.userId])
+  if (efetivadas.get(opts.userId)?.has(opts.departamentoId)) return
+
+  const depto: { slug: string; nome: string } | null = await db.departamento.findFirst({
+    where: { id: opts.departamentoId, tenantId: opts.tenantId },
+    select: { slug: true, nome: true },
+  })
+  if (!depto) return
+
+  await notificarGestoresDepartamento({
+    tenantId: opts.tenantId,
+    departamentoId: opts.departamentoId,
+    slug: depto.slug,
+    tab: 'pedidos',
+    tipo: 'DEPARTAMENTO_ADICIONADO',
+    titulo: 'Pedido de área pendente',
+    corpo: `${opts.nome} pediu para entrar em ${depto.nome}.`,
+    atorId: opts.userId,
+    excetoUserId: opts.excetoUserId,
+  })
 }
 
 type MembroDecisaoSelect = {
@@ -379,10 +412,28 @@ export async function efetivarAreaPretendida(
         },
       })
 
-      return { userId: membro.userId }
+      return { userId: membro.userId, departamentoId: membro.departamentoId }
     })
 
     invalidatePermissionsCache(resultado.userId, tenant.id)
+
+    if (resultado.departamentoId) {
+      try {
+        const depto: { slug: string } | null = await db.departamento.findFirst({
+          where: { id: resultado.departamentoId, tenantId: tenant.id },
+          select: { slug: true },
+        })
+        if (depto) {
+          await reconciliarNotificacoesDoEvento(tenant.id, {
+            tipo: 'DEPARTAMENTO_ADICIONADO',
+            atorId: resultado.userId,
+            link: `/portal/departamentos/${depto.slug}?tab=pedidos`,
+          })
+        }
+      } catch {
+        // Fan-out é best-effort: a área já foi efetivada.
+      }
+    }
   } catch (error) {
     if (isExpectedError(error)) return { error: error.message }
     console.error('[efetivarAreaPretendida]', error)
@@ -403,7 +454,7 @@ export type AprovarMembroOpts = {
 export async function aprovarMembro(
   membroId: string,
   opts?: AprovarMembroOpts,
-): Promise<{ error: string } | void> {
+): Promise<{ error: string } | { destinoLista: 'aguardando' | 'ativos' } | void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
   const incluirDepartamento = opts?.incluirDepartamento !== false
   const aprovadoPorNome = session.user.name ?? 'Admin'
@@ -703,9 +754,40 @@ export async function aprovarMembro(
   })
   await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
+  registrarSinalConfiancaSafe({
+    userId: origem.userId,
+    tenantId: origem.tenantId,
+    sinal: 'APROVACAO',
+    origemId: origem.id,
+  })
+
   // Sócio «Já sou sócio»: auto-emite carteirinha com validade = expedição + plano.
   // Best-effort — falha deixa o sócio em Aguardando emissão.
+  let carteirinhaEmitida = false
   if (origem.tipo === 'SOCIO') {
+    await avisarGestoresAreaPendente({
+      tenantId: origem.tenantId,
+      userId: origem.userId,
+      nome: origem.nome,
+      departamentoId: origem.departamentoId,
+      excetoUserId: aprovadoPorId,
+    })
+    if (espelhoId) {
+      const espelho: { tenantId: string; departamentoId: string | null } | null =
+        await db.saasMembro.findFirst({
+          where: { id: espelhoId },
+          select: { tenantId: true, departamentoId: true },
+        })
+      if (espelho && espelho.tenantId !== origem.tenantId) {
+        await avisarGestoresAreaPendente({
+          tenantId: espelho.tenantId,
+          userId: origem.userId,
+          nome: origem.nome,
+          departamentoId: espelho.departamentoId,
+          excetoUserId: aprovadoPorId,
+        })
+      }
+    }
     const auto = await tentarAutoEmitirCarteirinhaAposAprovacao({
       tenantId: origem.tenantId,
       userId: origem.userId,
@@ -716,6 +798,7 @@ export async function aprovarMembro(
       periodicidadePretendida: origem.periodicidadePretendida,
       atorId: aprovadoPorId,
     })
+    carteirinhaEmitida = auto.emitida
     if (auto.emitida) {
       await notificarSafe({
         userId: origem.userId,
@@ -751,6 +834,12 @@ export async function aprovarMembro(
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
   revalidatePath(`/portal/comunidade/perfil/${origem.userId}`)
+
+  // «Quero me associar» não gera carteirinha na hora — some da fila e só
+  // aparece em Aguardando emissão. Devolve o destino para a UI navegar.
+  if (origem.tipo === 'SOCIO') {
+    return { destinoLista: carteirinhaEmitida ? 'ativos' : 'aguardando' }
+  }
   } catch (err) {
     const mapped = mapearErroDecisaoMembro(err)
     if (mapped) return mapped
@@ -1053,6 +1142,13 @@ export async function reprovarMembro(
   })
   await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
+  registrarSinalConfiancaSafe({
+    userId: origem.userId,
+    tenantId: origem.tenantId,
+    sinal: 'REPROVACAO',
+    origemId: origem.id,
+  })
+
   invalidarCachesComunidadeFeed(origem.tenantId)
   revalidatePath('/portal', 'layout')
   revalidatePath('/admin/torcedores')
@@ -1191,10 +1287,7 @@ export async function atualizarDadosLge(
   _prev: MembroLgeState,
   formData: FormData,
 ): Promise<MembroLgeState> {
-  const { session, tenant } = await assertAnyPermission([
-    PERMISSIONS.MEMBERS_VIEW,
-    PERMISSIONS.MEMBERS_APPROVE,
-  ])
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   const parsed = AtualizarMembroLgeSchema.safeParse(formToLgePayload(formData))
   if (!parsed.success) {

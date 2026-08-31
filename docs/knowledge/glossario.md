@@ -36,7 +36,58 @@
   gatilho clássico de conflito (contexto de moderação).
 - **Batucada / bateria** — núcleo de percussão da torcida.
 - **Grito de guerra / canto** — músicas da arquibancada.
-- **Setor** — área da torcida no estádio (ex.: setor norte).
+- **Setor** — recorte da arquibancada onde a torcida se concentra no estádio
+  do time apoiado. **Copy do produto:** sempre “Setor Norte / Sul / Leste /
+  Oeste”. Nunca “Gol Norte” / “Gol Sul” — isso é jargão de bilheteria de
+  arena (ex.: “Cadeira Gol Norte” no Allianz/Nubank Parque), não a fala da
+  organizada. A Neo Química Arena, o Maracanã e a Arena do Grêmio usam
+  “Setor Norte” / “Arquibancada Norte” nas guias oficiais de acesso.
+  Fonte: neoquimicaarena.com.br/mapas-e-rotas; estadiodomaracana.com.br;
+  arenadogremio.net (consulta 2026-08-26). Confiança **alta**.
+- **Norte · Sul · Leste · Oeste** — os quatro cardeais cobrem a geografia
+  de praticamente todo estádio brasileiro. Organizadas da casa quase sempre
+  ocupam **Norte ou Sul** (atrás do gol, festa/bateria). Leste e Oeste são
+  laterais, em geral mais “família” ou premium — mas entram no picker
+  porque o recorte histórico às vezes foi lateral (Mancha no velho Palestra)
+  e porque TOs menores também sentam na lateral. Não inventar um 5º
+  cardeal. Fonte: Lance (Neo Química); WikiRio/Maracanã; Portal do Palestra
+  (consulta 2026-08-26). Confiança **alta**.
+- **Geral** — tipo, não direção: faixa popular **em pé**, em geral colada
+  ao gol (Geral Norte do Palmeiras, 2025; Arquibancada Norte da Arena do
+  Grêmio, sem cadeiras; antiga geral do Maracanã). “Geral do Grêmio” é o
+  *nome da torcida*; o lugar dela no estádio continua sendo o Setor Norte.
+  Não vira quinto pedaço do mapa — é qualificativo do cardeal. Fonte:
+  palmeiras.com.br (Geral Norte, mar/2025); ge (Arena do Grêmio, fev/2026).
+  Confiança **alta**.
+- **Anel / inferior / superior** — segundo eixo (altura), não setor novo.
+  Quase toda arena moderna parte o mesmo cardeal em inferior e superior
+  (Neo Química Leste Inferior/Superior; Arena MRV Brahma × Inter; MorumBIS
+  térreo / intermediário / arquibancada). Opcional no cadastro; a identidade
+  da TO é o cardeal. Fonte: Meu Timão; Itatiaia/ge Arena MRV; MorumBIS
+  (consulta 2026-08-26). Confiança **alta**.
+- **Nome comercial / cor / patrocínio** — Brahma Sul, Inter Norte,
+  Arquibancada Oreo, setor Amarelo (Mineirão), Verde (Maracanã Norte).
+  Mudam com reforma e patrocinador. **Não** são valores canônicos; o
+  produto grava o cardeal + texto livre se a torcida quiser o apelido
+  local. Mineirão Amarelo ≈ Sul; Laranja ≈ Norte; Vermelho ≈ Leste;
+  Roxo ≈ Oeste (mapeamento Arena MRV × Mineirão, O Tempo 2023). Confiança
+  **média** no mapeamento de cores (uma fonte sólida + prática local).
+- **Visitante** — fatia operacional (quase sempre um canto de Norte ou
+  Sul, portão isolado). Não é o setor *da* torcida sede em casa. Não
+  oferecer no picker de identidade. Fonte: Neo Química Portão G; Arena do
+  Grêmio Portão 6 (consulta 2026-08-26). Confiança **alta**.
+- **Camarote / lounge / Gold / tribuna / PCD / família** — classe de
+  ingresso, não lugar de organizada. Fora do cadastro de setor da TO.
+- **Curva** — na Europa/Argentina, o nome da cabeceira hardcore (Curva Nord
+  / Sud): é o **Setor Norte ou Sul**, não um quinto cardeal. No produto BR
+  não usar “Curva” na copy. Distinto do **canto/diagonal** de engenharia
+  (NE, NO, SE, SO; “Oeste Inferior Corner” na bilheteria) — junção do bowl,
+  visível no desenho, não clicável à parte. Confiança **alta** na distinção
+  de vocabulário; o tratado interno de geometria (2026-08-26) não traz fonte
+  para os números de C-value / vazão.
+- **Portão** — entrada física do setor (Portão O no Setor Norte da Neo
+  Química; Q/S/U/W na Arquibancada Norte da Arena do Grêmio). Acompanha o
+  cardeal; não substitui. Texto livre no cadastro da sede. Confiança **alta**.
 - **Caravana** — excursão organizada para jogo fora de casa.
 - **Excursão / busão** — ônibus da caravana.
 - **Festa / recepção** — mosaicos, sinalizadores e festa na chegada do time.
@@ -58,9 +109,14 @@
   torcidas de clubes diferentes.
 - **Bloco / união** — rede nacional de alianças (Punho Cruzado, Dedo pro
   Alto, Punho Colado, Lado A, Lado B).
-- **Torcida coirmã** — torcida aliada.
-- **Rival** — par histórico de conflito. No produto: dado de moderação,
-  nunca conteúdo.
+- **Torcida coirmã** — outra organizada do **mesmo** time (`Afiliacao`);
+  não é aliança (aliança é entre times diferentes).
+- **Rival** — par histórico de conflito. No produto: (1) nunca sugerir
+  como aliado; (2) moderação; (3) **isolamento de interação** — `rival`
+  não vê nem o PÚBLICO, igual `unrelated`. Não é rótulo só de moderação
+  (atualização 2026-07-16; política de inexistência 2026-08-26 em
+  [`aliancas.md`](aliancas.md)). Nunca virar ranking ou conteúdo de
+  confronto.
 - **Torcida única** — medida que proíbe torcida visitante (clássicos de SP
   desde 2016).
 

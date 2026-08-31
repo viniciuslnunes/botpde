@@ -23,6 +23,7 @@ vi.mock('@/lib/hierarquia', () => ({
   getAncestorTenantIds,
   getDescendantTenantIds,
   getVisibleTenantIds,
+  podeVerPreviewPublicoTorcida: vi.fn(async () => true),
 }))
 vi.mock('@/lib/isolamento', () => ({
   ISOLAMENTO_CACHE_TAG: 'isolamento',

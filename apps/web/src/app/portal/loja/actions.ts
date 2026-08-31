@@ -3,8 +3,10 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
-import { tenantsPermitidosLoja } from '@/lib/loja-lojas'
+import { z } from 'zod'
+import { podeGerirLoja, tenantsPermitidosLoja } from '@/lib/loja-lojas'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
+import { invalidateTenantCache } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { randomUUID } from 'node:crypto'
@@ -17,6 +19,7 @@ import {
   rotuloTamanho,
   formatarMoedaBRL,
   PERMISSIONS,
+  resolveTenantDesign,
 } from '@torcida/types'
 import { abrirTicketPedido } from '@/lib/loja-ticket'
 
@@ -35,17 +38,17 @@ export type ActionState = {
 async function assertAuth() {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Você precisa estar logado.')
-  return { session, userId: session.user.id }
+  return { session, userId: session.user.id, email: session.user.email }
 }
 
-async function assertProdutoVisivel(produtoId: string, userId: string) {
+async function assertProdutoVisivel(produtoId: string, userId: string, email?: string | null) {
   const produto = await db.saasProduto.findFirst({
     where: { id: produtoId, ativo: true },
     select: { tenantId: true },
   })
   if (!produto) throw new Error('Produto não encontrado ou inativo.')
 
-  const permitidos = await tenantsPermitidosLoja(userId)
+  const permitidos = await tenantsPermitidosLoja(userId, email)
   if (!permitidos.has(produto.tenantId)) {
     throw new Error('Produto não encontrado ou inativo.')
   }
@@ -57,14 +60,14 @@ export async function adicionarAoCarrinho(
   formData: FormData,
 ): Promise<ActionState> {
   try {
-    const { userId } = await assertAuth()
+    const { userId, email } = await assertAuth()
     const parsed = CarrinhoItemSchema.safeParse(Object.fromEntries(formData))
     if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
     const { produtoId, quantidade } = parsed.data
     const tamanhoChave = chaveTamanho(parsed.data.tamanho)
 
-    const produtoTenantId = await assertProdutoVisivel(produtoId, userId)
+    const produtoTenantId = await assertProdutoVisivel(produtoId, userId, email)
 
     const produto = await db.saasProduto.findFirst({
       where: { id: produtoId, ativo: true },
@@ -182,7 +185,7 @@ export async function finalizarPedido(
   let redirectTo: string | null = null
 
   try {
-    const { userId } = await assertAuth()
+    const { userId, email } = await assertAuth()
 
     const raw: Record<string, FormDataEntryValue> = Object.fromEntries(formData)
     if (typeof raw.enderecoEntrega === 'string') {
@@ -196,7 +199,21 @@ export async function finalizarPedido(
     const parsed = CheckoutSchema.safeParse(raw)
     if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
-    const itensCarrinho = await db.saasCarrinhoItem.findMany({
+    const itensCarrinhoBruto: Array<{
+      id: string
+      produtoId: string
+      quantidade: number
+      tamanho: string
+      produto: {
+        id: string
+        nome: string
+        preco: unknown
+        estoque: unknown
+        tamanhos: string[]
+        tenantId: string
+        ativo: boolean
+      }
+    }> = await db.saasCarrinhoItem.findMany({
       where: { userId },
       include: {
         produto: {
@@ -213,16 +230,14 @@ export async function finalizarPedido(
       },
     })
 
-    if (itensCarrinho.length === 0) return { error: 'Sua sacola está vazia.' }
+    const permitidos = await tenantsPermitidosLoja(userId, email)
+    const itensCarrinho = itensCarrinhoBruto.filter((item) => permitidos.has(item.produto.tenantId))
 
-    const permitidos = await tenantsPermitidosLoja(userId)
+    if (itensCarrinho.length === 0) return { error: 'Sua sacola está vazia.' }
 
     for (const item of itensCarrinho) {
       if (!item.produto.ativo)
         return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
-      if (!permitidos.has(item.produto.tenantId)) {
-        return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
-      }
     }
 
     const porTenant = new Map<string, typeof itensCarrinho>()
@@ -234,6 +249,19 @@ export async function finalizarPedido(
 
     const grupoCheckoutId = randomUUID()
     const pedidoIds: string[] = []
+
+    const codigoCupom = parsed.data.cupomCodigo?.trim()
+      ? parsed.data.cupomCodigo.toUpperCase().trim()
+      : null
+    if (codigoCupom) {
+      for (const tenantDonoId of porTenant.keys()) {
+        const cupom: { id: string } | null = await db.saasCupom.findFirst({
+          where: { tenantId: tenantDonoId, codigo: codigoCupom, ativo: true },
+          select: { id: true },
+        })
+        if (!cupom) return { error: 'Cupom inválido.' }
+      }
+    }
 
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
       for (const [tenantDonoId, itens] of porTenant) {
@@ -331,7 +359,9 @@ export async function finalizarPedido(
         pedidoIds.push(pedido.id)
       }
 
-      await tx.saasCarrinhoItem.deleteMany({ where: { userId } })
+      await tx.saasCarrinhoItem.deleteMany({
+        where: { userId, id: { in: itensCarrinho.map((i) => i.id) } },
+      })
     })
 
     const session = await auth()
@@ -403,6 +433,81 @@ export async function finalizarPedido(
   }
 
   redirect(redirectTo ?? '/portal/loja/pedidos')
+}
+
+const CapaLojaSchema = z.object({
+  tenantId: z.string().uuid(),
+  bannerUrl: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null))
+    .pipe(z.union([z.string().url('URL da capa inválida'), z.null()])),
+})
+
+/** Capa da vitrine no portal — `store:manage` no tenant da loja, e a loja tem
+ *  que estar na vitrine do portal ativo (não edita catálogo de rival). */
+export async function atualizarCapaLoja(
+  tenantId: string,
+  bannerUrl: string | null,
+): Promise<ActionState> {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) return { error: 'Não autorizado' }
+
+    const parsed = CapaLojaSchema.safeParse({ tenantId, bannerUrl: bannerUrl ?? '' })
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+    }
+
+    const pode = await podeGerirLoja(session.user.id, parsed.data.tenantId, session.user.email)
+    if (!pode) return { error: 'Sem permissão' }
+
+    const tenant: {
+      id: string
+      slug: string
+      design: unknown
+      corPrimaria: string
+    } | null = await db.tenant.findFirst({
+      where: { id: parsed.data.tenantId, ativo: true },
+      select: { id: true, slug: true, design: true, corPrimaria: true },
+    })
+    if (!tenant) return { error: 'Loja não encontrada' }
+
+    const design = resolveTenantDesign(tenant.design, tenant.corPrimaria)
+    const nextDesign = {
+      ...design,
+      loja: {
+        ...design.loja,
+        bannerUrl: parsed.data.bannerUrl,
+      },
+    }
+
+    await db.tenant.update({
+      where: { id: tenant.id },
+      data: { design: nextDesign as unknown as Prisma.InputJsonValue },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'LOJA_VITRINE_ATUALIZADA',
+        entidade: 'Tenant',
+        entidadeId: tenant.id,
+        detalhes: { bannerUrl: parsed.data.bannerUrl, origem: 'portal' },
+      },
+    })
+
+    invalidateTenantCache(tenant.slug)
+    revalidatePath('/admin/loja/vitrine')
+    revalidatePath(`/portal/loja/${tenant.id}`)
+    revalidatePath('/portal/loja')
+
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao salvar capa' }
+  }
 }
 
 /** @deprecated Use adicionarAoCarrinho + finalizarPedido */

@@ -13,6 +13,7 @@ import type {
   TorcidaOnboarding,
 } from '@/lib/onboarding'
 import { isTenantRestrito } from '@/lib/isolamento'
+import { resolverSetorArquibancada } from '@/lib/setor-arquibancada'
 
 /**
  * Afiliação efetiva do tenant: a própria, ou a do ancestral mais próximo
@@ -262,7 +263,7 @@ export const resolverConvite = cache(
         }
       : null
 
-    const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito] = await Promise.all([
+    const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito, setor] = await Promise.all([
       db.afiliacao.findUnique({
         where: { id: afiliacaoId },
         select: {
@@ -288,6 +289,7 @@ export const resolverConvite = cache(
         { canonicalId: afiliacaoId, afiliacaoIds: [afiliacaoId] },
       ]),
       isTenantRestrito(tenant.id),
+      resolverSetorArquibancada(tenant.id),
     ])
     if (!afiliacao) return null
 
@@ -335,6 +337,14 @@ export const resolverConvite = cache(
       acessivelNoHost: torcidaAcessivelNoHost(tenant.slug),
       exigirDocumentosCadastro: tenant.exigirDocumentosCadastro,
       periodicidadesOnboarding: tenant.periodicidadesOnboarding ?? [],
+      setor: setor
+        ? {
+            cardeal: setor.cardeal,
+            geral: setor.geral,
+            nomeLocal: setor.nomeLocal,
+            portao: setor.portao,
+          }
+        : null,
     }
 
     const { unidadeId, passoInicial } = decidirPassoInicialConvite({

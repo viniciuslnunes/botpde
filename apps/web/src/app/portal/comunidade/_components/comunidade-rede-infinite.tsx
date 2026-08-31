@@ -14,6 +14,7 @@ import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
 import { deveExibirBadgeTorcidaNoFeed } from '@/lib/feed-live-refresh'
 import { useLatestRef } from '@/lib/use-latest-ref'
+import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
@@ -32,21 +33,31 @@ interface PageInfo {
   nextCursor: string | null
 }
 
-export function ComunidadeRedeInfinite({
-  tenantId,
-  currentUser,
-  initialPosts,
-  initialPageInfo,
-  initialCursor,
-  salvoIds,
-}: {
+type ComunidadeRedeInfiniteProps = {
   tenantId: string
   currentUser: CurrentUser
   initialPosts: PostSocialItem[]
   initialPageInfo: PageInfo
   initialCursor: string | null
   salvoIds: string[]
-}) {
+}
+
+export function ComunidadeRedeInfinite(props: ComunidadeRedeInfiniteProps) {
+  return (
+    <ComunidadeQueryProvider>
+      <ComunidadeRedeInfiniteView {...props} />
+    </ComunidadeQueryProvider>
+  )
+}
+
+function ComunidadeRedeInfiniteView({
+  tenantId,
+  currentUser,
+  initialPosts,
+  initialPageInfo,
+  initialCursor,
+  salvoIds,
+}: ComunidadeRedeInfiniteProps) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
 
   const {

@@ -127,7 +127,7 @@ export default async function AdminBarPage() {
             {podeGerir && (
               <Link
                 href="/admin/bar/estoque"
-                className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ir para o estoque
               </Link>

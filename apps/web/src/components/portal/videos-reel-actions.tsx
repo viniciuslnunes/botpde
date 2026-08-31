@@ -289,7 +289,7 @@ export function VideosReelActions({
               initial="hidden"
               animate="show"
               exit="exit"
-              className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[70vh] flex-col rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl"
+              className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[70dvh] flex-col rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-[rgb(var(--border))] px-4 py-3">
                 <p className="text-sm font-semibold text-[rgb(var(--foreground))]">

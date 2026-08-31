@@ -183,7 +183,7 @@ export default async function AdminCaravanasPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/admin/eventos?vista=semana&tipo=CARAVANA"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
               Agenda da semana

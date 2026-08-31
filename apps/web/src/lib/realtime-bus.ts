@@ -154,6 +154,11 @@ export function notificacaoBusKey(tenantId: string, userId: string): string {
   return `notif:${tenantId}:${userId}`
 }
 
+/** Ping cross-tenant — sino do super-admin assina isto, não um tenant do host. */
+export function notificacaoUserBusKey(userId: string): string {
+  return `notif-user:${userId}`
+}
+
 export function isRealtimeRedisActive(): boolean {
   return isRedisConfigured() && !redisFailed
 }

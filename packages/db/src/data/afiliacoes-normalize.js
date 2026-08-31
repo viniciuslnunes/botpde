@@ -34,6 +34,9 @@ export const ALIASES = {
   'sport club internacional': 'internacional',
   'botafogo de futebol e regatas': 'botafogo',
   'red bull bragantino': 'bragantino',
+  // Nome gravado no catálogo. Fecha o triângulo com o par de mão dupla acima —
+  // `chaveCanonicaClube` resolve o ciclo escolhendo um representante estável.
+  'clube atletico bragantino': 'bragantino',
   'sao paulo futebol clube': 'sao paulo',
   'clube de regatas do flamengo': 'flamengo',
   'clube de regatas flamengo': 'flamengo',
@@ -119,6 +122,43 @@ export function normalizeNomeSemUf(nome) {
     return tokens.slice(0, -1).join(' ')
   }
   return nm
+}
+
+/**
+ * Chave canônica de clube para CRUZAMENTO com fontes externas (CBF, Wikidata,
+ * Ogol, listas de clássicos). Não substitui `casarClube` — resolve o problema
+ * que ele não tem: `ALIASES` mistura dois sentidos ("diretório → API" e
+ * "nome longo do catálogo → nome curto"), e por isso contém pares de mão dupla
+ * (`bragantino ↔ red bull bragantino`). Sem tratamento, o resultado dependia do
+ * lado por onde se entrava, e o Bragantino (Série A) aparecia como ausente do
+ * catálogo — achado da auditoria de 2026-08-27.
+ *
+ * Aqui o alias é seguido até o ponto fixo; se fecha um ciclo, o representante é
+ * o MENOR nome do ciclo em ordem lexical — determinístico dos dois lados.
+ *
+ * @param {string} nome
+ * @param {string | null | undefined} uf
+ * @returns {string}
+ */
+export function chaveCanonicaClube(nome, uf) {
+  const base = normalizeNome(nome ?? '')
+  if (!base) return ''
+  const comUf = `${base} ${String(uf ?? '').toLowerCase()}`.trim()
+
+  let atual = ALIASES[comUf] ?? ALIASES[base] ?? base
+  const vistos = new Set([base, atual])
+  for (let i = 0; i < 8; i += 1) {
+    const proximo = ALIASES[atual]
+    if (!proximo) break
+    if (vistos.has(proximo)) {
+      // Ciclo: escolhe um representante estável entre os nomes envolvidos.
+      atual = [...vistos].sort()[0]
+      break
+    }
+    vistos.add(proximo)
+    atual = proximo
+  }
+  return chaveMatch(atual)
 }
 
 /**

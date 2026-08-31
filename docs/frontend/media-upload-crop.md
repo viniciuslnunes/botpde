@@ -29,6 +29,7 @@ Re-exports de compatibilidade: `components/admin/image-crop-dialog.tsx`,
 | Admin sedes | 16:9 (foto identidade) + Street View (localização, ângulos persistidos) | Completo — fluxos separados |
 | Admin eventos | 16:9 + Street View → capa | Completo |
 | Admin loja (produto) | 1:1 | — |
+| Admin loja (vitrine) / portal capa | 16:9 (igual aos cards) | — |
 | Admin bar (produto) | 1:1 | — |
 | Admin mural (post) | 16:9 | — |
 | Admin config — canal oficial | 1:1 | — |

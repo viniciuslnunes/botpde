@@ -67,7 +67,7 @@ Arquivo: `apps/web/src/lib/motion-presets.ts` — **fonte única** de timings e 
 | `lightboxContent` | Variants | Zoom suave do conteúdo do lightbox |
 | `cartItemExit` | Variants | Saída de linha ao remover item da sacola |
 | `heartBurst` | Variants | Burst de anel atrás do ícone ao curtir (expande e desaparece) |
-| `bookmarkDrop` | Transition | "Drop" ao salvar (bookmark) — assinatura própria, distinta do bounce genérico |
+| `bookmarkDrop` | Transition | "Drop" ao salvar (bookmark) — tween (o hop tem 3 keyframes; spring só aceita 2) |
 | `shareSpin` | Transition | Giro de 360° do ícone ao confirmar compartilhar/repost |
 
 ### Componentes reutilizáveis (genéricos)

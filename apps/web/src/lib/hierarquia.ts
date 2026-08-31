@@ -4,8 +4,10 @@ import { db } from '@torcida/db'
 import {
   aplicarIsolamento,
   canViewRecurso,
+  ESCOPOS_RIVALIDADE_ISOLANTE,
   formatNomeTorcida,
   ordenarPar,
+  podeDescobrirTorcida,
   recursoCascateiaParaIsolado,
   relationFromLineage,
   type RECURSO_SENSIBILIDADE,
@@ -322,10 +324,84 @@ export async function tenantsAreRivais(tenantAId: string, tenantBId: string): Pr
   if (!afiliacaoA || !afiliacaoB || afiliacaoA === afiliacaoB) return false
 
   const [clubeA, clubeB] = ordenarPar(afiliacaoA, afiliacaoB)
+  // `escopo` filtra clássico interestadual: ele fica gravado como contexto, mas
+  // não isola (ver ESCOPOS_RIVALIDADE_ISOLANTE em @torcida/types).
   const rivalClube: number = await db.rivalidadeClube.count({
-    where: { afiliacaoAId: clubeA, afiliacaoBId: clubeB },
+    where: {
+      afiliacaoAId: clubeA,
+      afiliacaoBId: clubeB,
+      escopo: { in: [...ESCOPOS_RIVALIDADE_ISOLANTE] },
+    },
   })
   return rivalClube > 0
+}
+
+/**
+ * Quais desses `candidatoIds` são rivais de `tenantId` (torcida×torcida ou
+ * clube×clube). Não considera aliança — quem já é aliado continua no set;
+ * o caller decide se ATIVA sobrevive (listagem) ou some (proposta nova).
+ *
+ * Uma query por tipo, não N× `tenantsAreRivais`.
+ */
+export async function carregarIdsRivaisDe(
+  tenantId: string,
+  candidatoIds: string[],
+): Promise<Set<string>> {
+  const ids = candidatoIds.filter((id) => id !== tenantId)
+  if (ids.length === 0) return new Set()
+
+  const rivais = new Set<string>()
+
+  const paresTorcida: { tenantAId: string; tenantBId: string }[] = await db.rivalidadeTorcida.findMany({
+    where: {
+      OR: [
+        { tenantAId: tenantId, tenantBId: { in: ids } },
+        { tenantBId: tenantId, tenantAId: { in: ids } },
+      ],
+    },
+    select: { tenantAId: true, tenantBId: true },
+  })
+  for (const par of paresTorcida) {
+    rivais.add(par.tenantAId === tenantId ? par.tenantBId : par.tenantAId)
+  }
+
+  const tenants: { id: string; afiliacaoId: string | null }[] = await db.tenant.findMany({
+    where: { id: { in: [tenantId, ...ids] } },
+    select: { id: true, afiliacaoId: true },
+  })
+  const afiliacaoViewer = tenants.find((t) => t.id === tenantId)?.afiliacaoId ?? null
+  if (!afiliacaoViewer) return rivais
+
+  const candidatos = tenants.filter((t) => t.id !== tenantId)
+  const outrosClubes = [
+    ...new Set(
+      candidatos
+        .map((t) => t.afiliacaoId)
+        .filter((id): id is string => Boolean(id) && id !== afiliacaoViewer),
+    ),
+  ]
+  if (outrosClubes.length === 0) return rivais
+
+  const paresClube: { afiliacaoAId: string; afiliacaoBId: string }[] = await db.rivalidadeClube.findMany({
+    where: {
+      escopo: { in: [...ESCOPOS_RIVALIDADE_ISOLANTE] },
+      OR: [
+        { afiliacaoAId: afiliacaoViewer, afiliacaoBId: { in: outrosClubes } },
+        { afiliacaoBId: afiliacaoViewer, afiliacaoAId: { in: outrosClubes } },
+      ],
+    },
+    select: { afiliacaoAId: true, afiliacaoBId: true },
+  })
+  const clubesRivais = new Set<string>()
+  for (const par of paresClube) {
+    clubesRivais.add(par.afiliacaoAId === afiliacaoViewer ? par.afiliacaoBId : par.afiliacaoAId)
+  }
+  for (const candidato of candidatos) {
+    if (candidato.afiliacaoId && clubesRivais.has(candidato.afiliacaoId)) {
+      rivais.add(candidato.id)
+    }
+  }
+  return rivais
 }
 
 /**
@@ -407,6 +483,36 @@ export const getTenantRelation = cache(
     )()
   },
 )
+
+/**
+ * Preview / descoberta: rival e canal restrito do alvo são inexistentes (404).
+ * Unrelated não-rival pode ver posts públicos — é o caminho para avaliar aliança.
+ * Checa a raiz da worktree para PDE/subsede sem `afiliacaoId` próprio.
+ */
+export async function podeVerPreviewPublicoTorcida(
+  viewerTenantId: string,
+  targetTenantId: string,
+): Promise<boolean> {
+  const relation = await getTenantRelation(viewerTenantId, targetTenantId)
+  if (relation === 'self' || relation === 'ancestor' || relation === 'descendant' || relation === 'allied') {
+    return true
+  }
+  if (!podeDescobrirTorcida(relation)) return false
+
+  if (await isTenantRestrito(targetTenantId)) return false
+
+  const [viewerAncestrais, targetAncestrais]: [string[], string[]] = await Promise.all([
+    getAncestorTenantIds(viewerTenantId),
+    getAncestorTenantIds(targetTenantId),
+  ])
+  const viewerRoot = viewerAncestrais[viewerAncestrais.length - 1] ?? viewerTenantId
+  const targetRoot = targetAncestrais[targetAncestrais.length - 1] ?? targetTenantId
+  if (await tenantsAreRivais(viewerRoot, targetRoot)) return false
+  if (viewerRoot !== viewerTenantId || targetRoot !== targetTenantId) {
+    if (await tenantsAreRivais(viewerTenantId, targetTenantId)) return false
+  }
+  return true
+}
 
 /**
  * IDs de tenant cujo conteúdo do recurso indicado é visível para o tenant

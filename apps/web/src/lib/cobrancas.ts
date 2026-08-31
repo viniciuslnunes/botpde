@@ -20,18 +20,60 @@ export type CobrancaLite = {
   user: { id: string; nome: string | null; email: string | null }
 }
 
-/** Marca cobranças PENDENTE com vencimento passado como VENCIDA. */
+/** Marca cobranças PENDENTE com vencimento passado como VENCIDA e avisa. */
 export async function sincronizarCobrancasVencidas(tenantId: string): Promise<number> {
   const agora = new Date()
-  const result = await db.cobrancaAssociacao.updateMany({
-    where: {
-      tenantId,
-      status: 'PENDENTE',
-      vencimento: { lt: agora },
-    },
+  const vencendo: Array<{ id: string; userId: string; descricao: string }> =
+    await db.cobrancaAssociacao.findMany({
+      where: {
+        tenantId,
+        status: 'PENDENTE',
+        vencimento: { lt: agora },
+      },
+      select: { id: true, userId: true, descricao: true },
+    })
+  if (vencendo.length === 0) return 0
+
+  await db.cobrancaAssociacao.updateMany({
+    where: { id: { in: vencendo.map((c) => c.id) } },
     data: { status: 'VENCIDA' },
   })
-  return result.count
+
+  try {
+    const { criarNotificacoesEmLote, listarDestinatariosAdmin } = await import(
+      '@/lib/notificacoes'
+    )
+    const { PERMISSIONS } = await import('@torcida/types')
+
+    await criarNotificacoesEmLote(
+      vencendo.map((c) => ({
+        userId: c.userId,
+        tenantId,
+        tipo: 'COBRANCA_VENCIDA' as const,
+        titulo: 'Cobrança vencida',
+        corpo: c.descricao,
+        link: `/portal/cobrancas/${c.id}`,
+      })),
+    )
+
+    const destinosAdmin = await listarDestinatariosAdmin(tenantId, PERMISSIONS.FINANCE_MANAGE)
+    await criarNotificacoesEmLote(
+      destinosAdmin.flatMap((userId) =>
+        vencendo.map((c) => ({
+          userId,
+          tenantId,
+          tipo: 'COBRANCA_VENCIDA' as const,
+          titulo: 'Cobrança vencida',
+          corpo: c.descricao,
+          link: `/admin/financeiro/cobrancas?status=VENCIDA&cobranca=${c.id}`,
+        })),
+      ),
+    )
+  } catch {
+    // Fan-out é best-effort: o status já virou VENCIDA.
+  }
+
+  return vencendo.length
 }
 
 /**
@@ -113,6 +155,7 @@ export async function baixarCobrancaComoPaga(input: {
     descricao: string
     financeiroLancamentoId: string | null
     eventoId: string | null
+    tipo: string
   }
   const cob: Row | null = await db.cobrancaAssociacao.findFirst({
     where: { id: input.cobrancaId, tenantId: input.tenantId },
@@ -125,11 +168,23 @@ export async function baixarCobrancaComoPaga(input: {
       descricao: true,
       financeiroLancamentoId: true,
       eventoId: true,
+      tipo: true,
     },
   })
   if (!cob) return { ok: false, error: 'Cobrança não encontrada' }
-  if (cob.status === 'PAGA') return { ok: true }
   if (cob.status === 'CANCELADA') return { ok: false, error: 'Cobrança cancelada' }
+  if (cob.status === 'PAGA') {
+    if (cob.tipo === 'MENSALIDADE') {
+      const { registrarSinalConfiancaSafe } = await import('@/lib/confianca')
+      registrarSinalConfiancaSafe({
+        userId: cob.userId,
+        tenantId: input.tenantId,
+        sinal: 'MENSALIDADE',
+        origemId: cob.id,
+      })
+    }
+    return { ok: true }
+  }
 
   // Vaga de caravana: lotação segura = PAGOs. Se o ônibus já está cheio,
   // não deixa baixar outra vaga (a pessoa fica CONFIRMADA com cobrança pendente).
@@ -209,5 +264,35 @@ export async function baixarCobrancaComoPaga(input: {
   })
 
   await recalcularAdimplencia(input.tenantId, cob.userId)
+  await reconciliarNotificacoesCobranca(input.tenantId, cob.id)
+  if (cob.tipo === 'MENSALIDADE') {
+    const { registrarSinalConfiancaSafe } = await import('@/lib/confianca')
+    registrarSinalConfiancaSafe({
+      userId: cob.userId,
+      tenantId: input.tenantId,
+      sinal: 'MENSALIDADE',
+      origemId: cob.id,
+    })
+  }
   return { ok: true }
+}
+
+/** Marca lidas as notificações desta cobrança (devedor + gestores). */
+export async function reconciliarNotificacoesCobranca(
+  tenantId: string,
+  cobrancaId: string,
+): Promise<void> {
+  try {
+    const { reconciliarNotificacoesDoEvento } = await import('@/lib/notificacoes')
+    await reconciliarNotificacoesDoEvento(tenantId, {
+      tipos: ['COBRANCA_PENDENTE', 'COBRANCA_VENCIDA'],
+      links: [
+        `/portal/cobrancas/${cobrancaId}`,
+        `/admin/financeiro/cobrancas?cobranca=${cobrancaId}`,
+        `/admin/financeiro/cobrancas?status=VENCIDA&cobranca=${cobrancaId}`,
+      ],
+    })
+  } catch {
+    // best-effort
+  }
 }

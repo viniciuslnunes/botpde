@@ -15,10 +15,9 @@ import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
   DEFAULT_ACTIONS,
   DEFAULT_ACTIONS_FG,
-  DEFAULT_SURFACE_DARK,
-  DEFAULT_SURFACE_LIGHT,
   contrasteTextoSobre,
   resolveActionTextColors,
+  resolverSuperficies,
 } from '@torcida/types'
 
 export type PreviewScene = 'portal' | 'admin' | 'entrar'
@@ -56,9 +55,7 @@ export type DesignStudioPreviewProps = {
 }
 
 function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
-  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
-  const overrides = mode === 'dark' ? design.dark : design.light
-  return { ...defaults, ...overrides }
+  return resolverSuperficies(design, mode)
 }
 
 function Hotspot({
@@ -110,13 +107,14 @@ function PortalScene({
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const surfaces = resolveSurfaces(design, mode)
-  const primaryOnBtn =
-    contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
-  const primaryFg = resolveActionTextColors(
+  const primaryText = resolveActionTextColors(
     design.brand.primary,
     design.brandFg?.primary,
     surfaces.surface,
-  ).fg
+  )
+  const primaryFg = primaryText.fg
+  const primaryOnBtn = primaryText.on
+  const primaryFill = primaryText.fill
   const secondaryHex =
     design.brand.secondary ??
     (contrasteTextoSobre(design.brand.primary) === 'light' ? '#f4f4f5' : '#27272a')
@@ -127,6 +125,7 @@ function PortalScene({
   )
   const secondaryFg = secondaryText.fg
   const secondaryOn = secondaryText.on
+  const secondaryFill = secondaryText.fill
   const raisedOn =
     contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
   const raisedMuted =
@@ -143,7 +142,7 @@ function PortalScene({
     { icon: Home, label: 'Início' },
     { icon: Users, label: 'Comunidade', active: true },
     { icon: Calendar, label: 'Agenda' },
-    { icon: ShoppingBag, label: 'Loja' },
+    { icon: ShoppingBag, label: 'Lojas' },
   ]
 
   return (
@@ -152,8 +151,8 @@ function PortalScene({
         <header className="flex items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 backdrop-blur-sm">
           <Hotspot token="brand.primary" focus={focus} label="Cor primária">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
-              style={{ backgroundColor: design.brand.primary }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold"
+              style={{ backgroundColor: primaryFill, color: primaryOnBtn }}
             >
               {tenantNome.slice(0, 1)}
             </div>
@@ -188,8 +187,8 @@ function PortalScene({
             <span className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
               <MessageCircle className="h-3.5 w-3.5" />
               <span
-                className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold text-white"
-                style={{ backgroundColor: design.brand.primary }}
+                className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold"
+                style={{ backgroundColor: primaryFill, color: primaryOnBtn }}
               >
                 2
               </span>
@@ -221,8 +220,8 @@ function PortalScene({
             <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-sm">
               <div className="flex items-start gap-3">
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ backgroundColor: design.brand.primary }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                  style={{ backgroundColor: primaryFill, color: primaryOnBtn }}
                 >
                   V
                 </div>
@@ -235,7 +234,7 @@ function PortalScene({
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                         style={{
-                          backgroundColor: `${design.brand.primary}24`,
+                          backgroundColor: `${primaryFill}24`,
                           color: primaryFg,
                         }}
                       >
@@ -246,7 +245,7 @@ function PortalScene({
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                         style={{
-                          backgroundColor: `${secondaryHex}24`,
+                          backgroundColor: `${secondaryFill}24`,
                           color: secondaryFg,
                         }}
                       >
@@ -275,7 +274,7 @@ function PortalScene({
                         type="button"
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold"
                         style={{
-                          backgroundColor: design.brand.primary,
+                          backgroundColor: primaryFill,
                           color: primaryOnBtn,
                         }}
                       >
@@ -287,7 +286,7 @@ function PortalScene({
                         type="button"
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold"
                         style={{
-                          backgroundColor: secondaryHex,
+                          backgroundColor: secondaryFill,
                           color: secondaryOn,
                         }}
                       >
@@ -440,6 +439,11 @@ function AdminScene({
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const surfaces = resolveSurfaces(design, mode)
+  const primaryText = resolveActionTextColors(
+    design.brand.primary,
+    design.brandFg?.primary,
+    surfaces.surface,
+  )
   const raisedOn =
     contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
   const raisedMuted =
@@ -457,8 +461,8 @@ function AdminScene({
     <div className="flex flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5">
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
-          style={{ backgroundColor: design.brand.primary }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold"
+          style={{ backgroundColor: primaryText.fill, color: primaryText.on }}
         >
           {tenantNome.slice(0, 1)}
         </div>
@@ -606,6 +610,12 @@ function EntrarScene({
   tenantNome: string
   focus: TokenFocus
 }) {
+  const surfaces = resolveSurfaces(design, mode)
+  const primaryText = resolveActionTextColors(
+    design.brand.primary,
+    design.brandFg?.primary,
+    surfaces.surface,
+  )
   return (
     <Hotspot token="grid" focus={focus} label="Fundo e grade">
       <div
@@ -617,8 +627,8 @@ function EntrarScene({
             <div className="mb-5 text-center">
               <Hotspot token="brand.primary" focus={focus} label="Cor primária" className="inline-flex">
                 <div
-                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-md"
-                  style={{ backgroundColor: design.brand.primary }}
+                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold shadow-md"
+                  style={{ backgroundColor: primaryText.fill, color: primaryText.on }}
                 >
                   {tenantNome.slice(0, 1)}
                 </div>
@@ -645,8 +655,8 @@ function EntrarScene({
             <Hotspot token="brand.primary" focus={focus} label="Botão entrar" className="mt-4">
               <button
                 type="button"
-                className="w-full rounded-lg py-2.5 text-sm font-semibold text-white"
-                style={{ backgroundColor: design.brand.primary }}
+                className="w-full rounded-lg py-2.5 text-sm font-semibold"
+                style={{ backgroundColor: primaryText.fill, color: primaryText.on }}
               >
                 Entrar
               </button>

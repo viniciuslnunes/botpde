@@ -8,6 +8,7 @@ import {
   getAncestorTenantIds,
   getDescendantTenantIds,
   getVisibleTenantIds,
+  podeVerPreviewPublicoTorcida,
 } from './hierarquia'
 import {
   ISOLAMENTO_CACHE_TAG,
@@ -27,9 +28,12 @@ import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
 import { isSuperAdminEmail } from './tenant-context'
+import { expandirCoirmasNoFeed } from './feed-coirmas'
 import { formatNomeTorcida } from '@torcida/types'
 import { durableImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { compactOr } from '@/lib/prisma-filters'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import type { TopicoParaFeed } from './praca'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 import {
@@ -49,6 +53,8 @@ export interface FeedOpts {
   cursor?: string
   take?: number
   afiliacaoId?: string | null
+  /** Canal da praça — só Descobrir mistura tópico. Unidade vs torcida muda o `?escopo=` do permalink. */
+  escopoForum?: 'torcida' | 'unidade'
 }
 
 type SeguimentoLite = { seguidoId: string }
@@ -146,6 +152,16 @@ export interface PostSocialItem {
   enquete: EnquetePostItem | null
   /** Origem do mural de grupo da comunidade, se houver. */
   grupo: { id: string; nome: string | null } | null
+  /**
+   * Tópico do fórum projetado no Descobrir. O id do item é o `ForumTopico.id`
+   * — reagir/comentar usam as tabelas da praça, não Post.
+   */
+  forum?: {
+    escopo: 'nacional' | 'torcida' | 'unidade'
+    gostei: number
+    naoGostei: number
+    meuVoto: 1 | -1 | null
+  }
 }
 
 /** Shape cru do Prisma antes de projetar em PostSocialItem. */
@@ -645,7 +661,7 @@ function sortPostsDesc(a: { criadoEm: Date | string }, b: { criadoEm: Date | str
   return asDate(b.criadoEm).getTime() - asDate(a.criadoEm).getTime()
 }
 
-function scoreDescobrirPost(post: PostSocialItem, tenantId: string): number {
+export function scoreDescobrirPost(post: PostSocialItem, tenantId: string): number {
   const now = Date.now()
   const ageHours = Math.max(0, (now - asDate(post.criadoEm).getTime()) / 3_600_000)
   const freshness = Math.max(0, 72 - ageHours) * 1.5
@@ -653,16 +669,122 @@ function scoreDescobrirPost(post: PostSocialItem, tenantId: string): number {
   const localBoost = post.tenantId === tenantId ? 6 : 0
   const mediaBoost = post.midiaUrls.length > 0 || post.imagemUrl ? 1.5 : 0
   const pollBoost = post.enquete ? 2 : 0
+  const forumPinBoost = post.forum && post.fixado ? 8 : 0
   const oficialBoost =
     post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId ? 100_000 + (post.fixado ? 50 : 0) : 0
-  return freshness + engagement + localBoost + mediaBoost + pollBoost + oficialBoost
+  return freshness + engagement + localBoost + mediaBoost + pollBoost + forumPinBoost + oficialBoost
 }
 
-function rankDescobrirPosts(posts: PostSocialItem[], tenantId: string): PostSocialItem[] {
+export function rankDescobrirPosts(posts: PostSocialItem[], tenantId: string): PostSocialItem[] {
   return [...posts].sort((a, b) => {
     const diff = scoreDescobrirPost(b, tenantId) - scoreDescobrirPost(a, tenantId)
     if (diff !== 0) return diff
     return sortPostsDesc(a, b)
+  })
+}
+
+/** Teto de tópicos na janela ranqueada — o resto do feed continua sendo Post. */
+export const MAX_FORUM_CANDIDATOS_FEED = 8
+
+export function ehItemForumFeed(post: Pick<PostSocialItem, 'forum'>): boolean {
+  return Boolean(post.forum)
+}
+
+export function projetarTopicoParaFeed(
+  t: TopicoParaFeed,
+  opts: {
+    escopo: EscopoComunidade
+    tenantId: string
+    tenant: PostTenantLite
+  },
+): PostSocialItem {
+  return {
+    id: t.id,
+    tenantId: opts.tenantId,
+    titulo: t.titulo,
+    conteudo: t.corpo,
+    imagemUrl: t.midiaUrls[0] ? durableImageUrl(t.midiaUrls[0]) : null,
+    midiaUrls: filterDurableImageUrls(t.midiaUrls),
+    tipo: 'MEMBRO',
+    visibilidade: 'PUBLICO',
+    fixado: t.fixado,
+    criadoEm: t.criadoEm,
+    autorId: t.autor.id,
+    postOrigemId: null,
+    comunicadoOrigemId: null,
+    eventoId: null,
+    tenant: opts.tenant,
+    autor: {
+      id: t.autor.id,
+      nome: t.autor.nome,
+      nickname: t.autor.nickname,
+      avatarUrl: durableImageUrl(t.autor.avatarUrl),
+      sedeNome: null,
+      cargoNome: null,
+      departamentoNome: null,
+    },
+    totalReacoes: t.gostei,
+    totalComentarios: t.respostasCount,
+    minhaReacao: t.meuVoto === 1 ? 'CURTIR' : null,
+    postOrigem: null,
+    comunicadoOrigem: null,
+    evento: null,
+    enquete: null,
+    grupo: null,
+    forum: {
+      escopo: opts.escopo,
+      gostei: t.gostei,
+      naoGostei: t.naoGostei,
+      meuVoto: t.meuVoto,
+    },
+  }
+}
+
+async function carregarForumDescobrir(opts: {
+  escopo: EscopoComunidade
+  ancora: { tenantId: string | null; afiliacaoId: string | null }
+  tenantId: string
+  tenant: PostTenantLite
+  cursor: FeedCursor | null
+  userId?: string
+}): Promise<PostSocialItem[]> {
+  const { listarTopicosParaFeed } = await import('./praca')
+  const rows = await listarTopicosParaFeed(opts.escopo, opts.ancora, {
+    take: MAX_FORUM_CANDIDATOS_FEED,
+    cursor: opts.cursor,
+    userId: opts.userId,
+  })
+  return rows.map((t) => projetarTopicoParaFeed(t, opts))
+}
+
+async function carregarForumDoTenant(
+  tenantId: string,
+  opts: {
+    escopoForum?: 'torcida' | 'unidade'
+    cursor: FeedCursor | null
+    userId?: string
+  },
+): Promise<PostSocialItem[]> {
+  const tenantRow: (TenantPostRaw & {
+    afiliacaoId: string | null
+  }) | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      nome: true,
+      logoUrl: true,
+      torcidaConhecida: { select: { logoUrl: true } },
+      afiliacaoId: true,
+    },
+  })
+  if (!tenantRow) return []
+  const escopo: EscopoComunidade = opts.escopoForum ?? 'torcida'
+  return carregarForumDescobrir({
+    escopo,
+    ancora: { tenantId, afiliacaoId: tenantRow.afiliacaoId },
+    tenantId,
+    tenant: projetarTenantPost(tenantRow),
+    cursor: opts.cursor,
+    userId: opts.userId,
   })
 }
 
@@ -788,14 +910,15 @@ async function hidratarPostsDoUsuario(
 ): Promise<PostSocialItem[]> {
   if (posts.length === 0) return posts
 
-  const ids = posts.map((p) => p.id)
+  const ids = posts.filter((p) => !p.forum).map((p) => p.id)
+  if (ids.length === 0) return posts
   const postsRaw = (await db.post.findMany({
     where: { id: { in: ids } },
     include: postInclude(userId),
   })) as PostRaw[]
 
   const porId = new Map(postsRaw.map((p) => [p.id, projetarPost(p)]))
-  return posts.map((p) => porId.get(p.id) ?? p)
+  return posts.map((p) => (p.forum ? p : porId.get(p.id) ?? p))
 }
 
 export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
@@ -848,10 +971,11 @@ export async function resolveVisibleTenantIdsForFeed(
   // ancestral entra por fora, via `resolveTenantIdsSomenteComunicado`.
   if (await isTenantRestrito(tenantId)) return base
 
-  const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
-    where: { id: tenantId },
-    select: { afiliacaoId: true },
-  })
+  const tenant: { afiliacaoId: string | null; sintetico: boolean } | null =
+    await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { afiliacaoId: true, sintetico: true },
+    })
 
   // Posts de torcedor global (tenant sintético do clube) entram como sugestão
   // no feed de qualquer sócio da torcida — mesmo sem vínculo pendente.
@@ -866,11 +990,28 @@ export async function resolveVisibleTenantIdsForFeed(
 
   if (!userId) return comSintetico
 
-  const membro: { status: string } | null = await db.saasMembro.findUnique({
-    where: { tenantId_userId: { tenantId, userId } },
-    select: { status: true },
-  })
-  if (membro?.status === 'APROVADO') return comSintetico
+  const [membro, user] = await Promise.all([
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { status: true },
+    }) as Promise<{ status: string } | null>,
+    db.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    }) as Promise<{ email: string | null } | null>,
+  ])
+
+  // Sócio e operador: malha desta TO (`getVisibleTenantIds` = hierarquia +
+  // aliados; rivais nunca entram). Torcedor / CN: coirmãs da mesma afiliação.
+  if (
+    !expandirCoirmasNoFeed({
+      membroAprovado: membro?.status === 'APROVADO',
+      tenantSintetico: Boolean(tenant?.sintetico),
+      superAdmin: isSuperAdminEmail(user?.email),
+    })
+  ) {
+    return comSintetico
+  }
 
   if (!tenant?.afiliacaoId) return comSintetico
 
@@ -925,15 +1066,21 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
 
-  const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
-    resolveTenantIdsMinhaTorcida(tenantId),
-    userId
-      ? db.seguimento.findMany({
-          where: { seguidorId: userId, status: 'APROVADO' },
-          select: { seguidoId: true },
-        })
-      : Promise.resolve([] as SeguimentoLite[]),
-  ])
+  const [visibleTenantIds, seguindo, forum]: [string[], SeguimentoLite[], PostSocialItem[]] =
+    await Promise.all([
+      resolveTenantIdsMinhaTorcida(tenantId),
+      userId
+        ? db.seguimento.findMany({
+            where: { seguidorId: userId, status: 'APROVADO' },
+            select: { seguidoId: true },
+          })
+        : Promise.resolve([] as SeguimentoLite[]),
+      carregarForumDoTenant(tenantId, {
+        escopoForum: opts.escopoForum,
+        cursor: decodedCursor,
+        userId,
+      }),
+    ])
 
   const fetchLimit = (take + 1) * 3
 
@@ -952,7 +1099,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     const visiveis = publicos.filter(
       (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
     )
-    const ranqueados = rankDescobrirPosts(visiveis, tenantId)
+    const ranqueados = rankDescobrirPosts([...visiveis, ...forum], tenantId)
     const slice = await finalizarPosts(ranqueados.slice(0, take))
     const hasMore = ranqueados.length > take
     return {
@@ -1009,8 +1156,8 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
   )
 
-  // Ranking único: rede (inclui o autor) + externos — post fresco do viewer sobe no Descobrir.
-  const candidatos = rankDescobrirPosts([...discoverVisiveis, ...seguindoOrdenados], tenantId)
+  // Ranking único: rede (inclui o autor) + externos + fórum da praça.
+  const candidatos = rankDescobrirPosts([...discoverVisiveis, ...seguindoOrdenados, ...forum], tenantId)
   const hasMore = candidatos.length > take
   const paginaBruta = candidatos.slice(0, take)
   const pagina = await finalizarPosts(await hidratarPostsDoUsuario(paginaBruta, userId))
@@ -1606,7 +1753,12 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
       : Promise.resolve([] as string[]),
     db.tenant.findFirst({
       where: { afiliacaoId, sintetico: true },
-      select: { id: true },
+      select: {
+        id: true,
+        nome: true,
+        logoUrl: true,
+        torcidaConhecida: { select: { logoUrl: true } },
+      },
     }),
   ])
 
@@ -1621,7 +1773,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   // Dois baldes, uma consulta cada. Uma consulta só, ordenada por recência,
   // devolvia a página inteira do balde mais prolífico (organizadas com
   // `alcanceNacional`) e o torcedor sumia da CN.
-  const [postsTorcedorRaw, postsTorcidaRaw] = await Promise.all([
+  const [postsTorcedorRaw, postsTorcidaRaw, forum] = await Promise.all([
     sintetico
       ? (unstable_cache(
           async () =>
@@ -1678,6 +1830,16 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
           { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
         )() as Promise<PostRaw[]>)
       : Promise.resolve([] as PostRaw[]),
+    carregarForumDescobrir({
+      escopo: 'nacional',
+      ancora: { tenantId: null, afiliacaoId },
+      tenantId: sintetico?.id ?? tenantIds[0] ?? afiliacaoId,
+      tenant: sintetico
+        ? projetarTenantPost(sintetico)
+        : { nome: '', logoUrl: null },
+      cursor: cursores.torcedor ?? cursores.torcida,
+      userId,
+    }),
   ])
 
   const torcedorRecencia = postsTorcedorRaw.map(projetarPost)
@@ -1700,10 +1862,16 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   const consumidoTorcida = torcidaRecencia.slice(0, nTorcida)
 
   const escopoRanking = sintetico?.id ?? tenantIds[0] ?? afiliacaoId
-  const paginaBruta = intercalarProporcional(
-    rankDescobrirPosts(consumidoTorcedor, escopoRanking),
-    rankDescobrirPosts(consumidoTorcida, escopoRanking),
-  )
+  const paginaBruta = rankDescobrirPosts(
+    [
+      ...intercalarProporcional(
+        rankDescobrirPosts(consumidoTorcedor, escopoRanking),
+        rankDescobrirPosts(consumidoTorcida, escopoRanking),
+      ),
+      ...forum,
+    ],
+    escopoRanking,
+  ).slice(0, take)
 
   const hasMore =
     torcedorRecencia.length > nTorcedor || torcidaRecencia.length > nTorcida
@@ -1780,7 +1948,8 @@ export interface TorcidaComunidadePublica {
 
 /**
  * Preview autenticado: posts Públicos de um tenant (não “Só torcida” / PRIVADO).
- * Sem gate de hierarquia/aliança — usado para avaliar recomendação de aliança.
+ * Rival e canal restrito = inexistente (null → 404). Unrelated não-rival
+ * permanece para avaliar recomendação de aliança.
  */
 export const getPostsPublicosDoTenant = cache(async function getPostsPublicosDoTenant(
   targetTenantId: string,
@@ -1806,6 +1975,7 @@ export const getPostsPublicosDoTenant = cache(async function getPostsPublicosDoT
     },
   })
   if (!tenant) return null
+  if (!(await podeVerPreviewPublicoTorcida(viewerTenantId, targetTenantId))) return null
 
   const postsRaw = (await db.post.findMany({
     where: {

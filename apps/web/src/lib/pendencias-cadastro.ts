@@ -8,7 +8,8 @@
  * Fonte de verdade dos campos: `completude-cadastro-socio.ts`. Dispensar
  * («não mostrar de novo») esconde o modal mas mantém a pendência →
  * inadimplência até completar. O tenant pode desligar o serviço em
- * Configurações (`solicitarPendenciasCadastro`).
+ * Configurações (`solicitarPendenciasCadastro`). A ficha em si fica
+ * permanente em `/portal/carteirinha` (ver/editar a qualquer momento).
  */
 
 import {
@@ -50,7 +51,7 @@ export type MembroParaPendenciaCadastro = MembroParaCompletude & {
   pendenciasCadastroDispensadas?: readonly string[] | null
 }
 
-const HREF_ATUALIZAR = '/portal/cadastro/associacao'
+const HREF_ATUALIZAR = '/portal/carteirinha?secao=cadastro'
 
 const LABELS: Record<CompletudeItemId, string> = {
   numeroAssociado: 'Nº de associado',

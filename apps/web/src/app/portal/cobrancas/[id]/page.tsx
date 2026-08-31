@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getActiveTenant } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import {
   formatarMoedaBRL,
   formatDataCompetenciaInput,
@@ -19,8 +20,9 @@ export default async function PortalCobrancaDetalhePage({ params }: Props) {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) redirect('/portal/comunidade')
+  const ativo = await getActiveTenant(session.user.id, session.user.email)
+  if (!ativo) redirect('/portal/comunidade')
+  const tenant = await carregarTenantCarteirinha(ativo, session.user.id)
 
   const { id } = await params
 

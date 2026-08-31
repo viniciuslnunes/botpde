@@ -23,16 +23,25 @@ export const TEXTO_ESTIMATIVA_INDISPONIVEL = 'base digital não estimada'
 export const TOOLTIP_ESTIMATIVA_INDISPONIVEL =
   'Fora do Top 50 IBOPE Repucom; não há dado publicado de inscritos digitais para este clube'
 
-/** Estimativa pública por tier (IBOPE digital, plataforma ou indisponível). */
+export const TOOLTIP_ESTIMATIVA_PESQUISA =
+  'Percentual da pesquisa Datafolha aplicado à população brasileira de 16 anos ou mais (Censo 2022, IBGE). ' +
+  'Estimativa de torcedores — não confundir com seguidores de rede social.'
+
+/** Estimativa pública por tier (pesquisa, IBOPE digital, plataforma ou indisponível). */
 export function formatTorcedoresEstimados(
   n: number,
-  tipo?: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA' | null,
+  tipo?: 'PESQUISA' | 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA' | null,
 ): string {
   if (tipo === 'PLATAFORMA') {
     return `${formatContagem(n)} torcedores na plataforma`
   }
   if (tipo === 'LIMITE_ATE') {
     return TEXTO_ESTIMATIVA_INDISPONIVEL
+  }
+  // "cerca de" e não número cheio: a pesquisa tem margem de ±2 pontos, e o
+  // absoluto é uma projeção sobre a população, não uma contagem.
+  if (tipo === 'PESQUISA') {
+    return `cerca de ${formatContagem(n)} torcedores`
   }
   if (tipo === 'IBOPE_DIGITAL') {
     return `${formatContagem(n)} inscritos digitais`

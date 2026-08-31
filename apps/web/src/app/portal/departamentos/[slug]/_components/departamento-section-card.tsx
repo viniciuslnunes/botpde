@@ -6,7 +6,7 @@ export interface DepartamentoSectionCardProps {
   icon: ReactNode
   title: string
   description: string
-  /** Âncora estável para deep links (ex.: `#areas`). */
+  /** Cabeçalho da aba — o `?tab=` da barra já é o deep link. */
   id?: string
   /** Bloco em modo só-leitura para quem não pode gerir esta seção. */
   blocked?: boolean

@@ -13,6 +13,10 @@ import {
 } from '@/lib/carteirinha-espelho'
 import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
+import {
+  lockNumeroAssociadoDaTorcida,
+  validarNumeroAssociadoUnicoNaTorcida,
+} from '@/lib/membros-sede'
 
 // Carteirinha/sócio reaproveita MEMBERS_APPROVE — não existe permissão
 // dedicada para "gerenciar sócios" ainda; emitir/renovar/revogar carteirinha
@@ -25,6 +29,13 @@ const EmitirCarteirinhaSchema = z.object({
     .string()
     .min(1, 'Validade obrigatória')
     .refine((v) => !Number.isNaN(new Date(v).getTime()), 'Data de validade inválida'),
+  numeroAssociado: z
+    .string()
+    .trim()
+    .max(7)
+    .regex(/^\d*$/, 'Use só números')
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
 })
 
 const RenovarCarteirinhaSchema = z.object({
@@ -50,6 +61,7 @@ export async function emitirCarteirinha(formData: FormData) {
     userId: String(formData.get('userId') ?? ''),
     nome: String(formData.get('nome') ?? ''),
     validade: String(formData.get('validade') ?? ''),
+    numeroAssociado: String(formData.get('numeroAssociado') ?? ''),
   })
   if (!parsed.success) {
     throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
@@ -58,16 +70,70 @@ export async function emitirCarteirinha(formData: FormData) {
   const { userId, nome } = parsed.data
   const validade = new Date(parsed.data.validade)
 
-  const membro = await db.saasMembro.findUnique({
+  type MembroEmit = {
+    id: string
+    status: string
+    tipo: string
+    numeroAssociado: string | null
+    espelhado: boolean
+    membroOrigemId: string | null
+  }
+  const membro: MembroEmit | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
-    select: { id: true, status: true, tipo: true, numeroAssociado: true },
+    select: {
+      id: true,
+      status: true,
+      tipo: true,
+      numeroAssociado: true,
+      espelhado: true,
+      membroOrigemId: true,
+    },
   })
   if (!membro) throw new Error('Membro não encontrado')
   if (membro.status !== 'APROVADO') throw new Error('Membro não está aprovado')
   if (membro.tipo !== 'SOCIO')
     throw new Error('Apenas membros do tipo Sócio podem receber carteirinha')
 
-  const numeroRaw = membro.numeroAssociado?.trim() ?? ''
+  let numeroRaw = membro.numeroAssociado?.trim() ?? ''
+  if (!numeroRaw) {
+    numeroRaw = parsed.data.numeroAssociado?.trim() ?? ''
+    if (!/^\d+$/.test(numeroRaw)) {
+      throw new ExpectedError(
+        'Informe o número de associado para emitir a carteirinha.',
+      )
+    }
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      await lockNumeroAssociadoDaTorcida(tx, tenant.id)
+      await validarNumeroAssociadoUnicoNaTorcida(
+        tx,
+        tenant.id,
+        userId,
+        numeroRaw,
+        membro.id,
+      )
+      await tx.saasMembro.update({
+        where: { id: membro.id },
+        data: { numeroAssociado: numeroRaw },
+      })
+      if (membro.espelhado && membro.membroOrigemId) {
+        await tx.saasMembro.update({
+          where: { id: membro.membroOrigemId },
+          data: { numeroAssociado: numeroRaw },
+        })
+      } else {
+        const espelho: { id: string } | null = await tx.saasMembro.findUnique({
+          where: { membroOrigemId: membro.id },
+          select: { id: true },
+        })
+        if (espelho) {
+          await tx.saasMembro.update({
+            where: { id: espelho.id },
+            data: { numeroAssociado: numeroRaw },
+          })
+        }
+      }
+    })
+  }
   const resultado = await emitirCarteirinhaInterna({
     tenantId: tenant.id,
     userId,

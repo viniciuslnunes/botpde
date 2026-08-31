@@ -461,6 +461,13 @@ export const PAPEL_DEPARTAMENTO = /** @type {const} */ ({
 })
 
 /**
+ * Regra de governança: uma torcida admite no máximo 1 presidente (cargo `owner`).
+ * Unidade sem portal (Caso A) também admite no máximo 1 liderança — o campo
+ * `Sede.responsavelUserId` já é singular; o limite aqui trava o cargo.
+ */
+export const MAX_PRESIDENTES = 1
+
+/**
  * Regra de governança: uma torcida admite no máximo 2 vice-presidentes.
  */
 export const MAX_VICE_PRESIDENTES = 2
@@ -687,6 +694,28 @@ export function canManageDepartamento(effectivePermissions, gestorDepartamentoId
  */
 export function podeTerVice(tipoSede) {
   return tipoSede === 'SEDE'
+}
+
+/**
+ * Como a liderança desta unidade é gravada.
+ *
+ * - **Caso B**: a unidade É o tenant (Sede raiz, ou filha promovida a portal).
+ *   Liderança = cargo de sistema `owner`. Troca em Estrutura › Presidência.
+ * - **Caso A**: subsede/PDE sem portal, no mesmo tenant da mãe.
+ *   Liderança = `Sede.responsavelUserId` (no máximo uma).
+ *
+ * @param {{
+ *   tipo: string,
+ *   tenantId?: string | null,
+ *   parentTenantId?: string | null,
+ * }} sede
+ * @returns {'A' | 'B'}
+ */
+export function casoLiderancaDaSede(sede) {
+  if (!sede.tenantId) return 'A'
+  if (sede.tipo === 'SEDE') return 'B'
+  if (sede.parentTenantId && sede.parentTenantId !== sede.tenantId) return 'B'
+  return 'A'
 }
 
 /**

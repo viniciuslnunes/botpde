@@ -1,0 +1,1423 @@
+{
+ "fonte": "CBF — Ranking Nacional de Clubes (RNC) 2026",
+ "url": "https://www.cbf.com.br/a-cbf/noticias/informes-cbf/a/cbf-divulga-ranking-nacional-de-clubes-e-de-federacoes-do-futebol-masculino-para-2026",
+ "arquivo": "https://stcbfsiteprdimgbrs.blob.core.windows.net/img-site/cdn/RNC_Ranking_Nacional_dos_Clubes_2026_27e24418e7.pdf",
+ "revisadoEm": "2025-12-23",
+ "divulgadoEm": "2025-12-24",
+ "criterio": "Participação nas Séries A, B, C e D do Brasileiro e na Copa do Brasil nos últimos 5 anos (Convenção de Pontos do RNC).",
+ "extraidoEm": "2026-08-27",
+ "total": 235,
+ "edicao": "2026",
+ "clubes": [
+  {
+   "pos": 1,
+   "clube": "Flamengo",
+   "uf": "RJ",
+   "pontos": 16314
+  },
+  {
+   "pos": 2,
+   "clube": "Corinthians",
+   "uf": "SP",
+   "pontos": 14930
+  },
+  {
+   "pos": 3,
+   "clube": "Palmeiras",
+   "uf": "SP",
+   "pontos": 13860
+  },
+  {
+   "pos": 4,
+   "clube": "Atlético",
+   "uf": "MG",
+   "pontos": 13696
+  },
+  {
+   "pos": 5,
+   "clube": "São Paulo",
+   "uf": "SP",
+   "pontos": 13556
+  },
+  {
+   "pos": 6,
+   "clube": "Fluminense",
+   "uf": "RJ",
+   "pontos": 13006
+  },
+  {
+   "pos": 7,
+   "clube": "Botafogo",
+   "uf": "RJ",
+   "pontos": 12834
+  },
+  {
+   "pos": 8,
+   "clube": "Athletico",
+   "uf": "PR",
+   "pontos": 12656
+  },
+  {
+   "pos": 9,
+   "clube": "Bahia",
+   "uf": "BA",
+   "pontos": 12632
+  },
+  {
+   "pos": 10,
+   "clube": "Vasco da Gama",
+   "uf": "RJ",
+   "pontos": 11330
+  },
+  {
+   "pos": 11,
+   "clube": "Cruzeiro",
+   "uf": "MG",
+   "pontos": 11010
+  },
+  {
+   "pos": 12,
+   "clube": "Grêmio",
+   "uf": "RS",
+   "pontos": 10636
+  },
+  {
+   "pos": 13,
+   "clube": "Fortaleza",
+   "uf": "CE",
+   "pontos": 10382
+  },
+  {
+   "pos": 14,
+   "clube": "Internacional",
+   "uf": "RS",
+   "pontos": 10014
+  },
+  {
+   "pos": 15,
+   "clube": "Red Bull Bragantino",
+   "uf": "SP",
+   "pontos": 9802
+  },
+  {
+   "pos": 16,
+   "clube": "Santos",
+   "uf": "SP",
+   "pontos": 8852
+  },
+  {
+   "pos": 17,
+   "clube": "Juventude",
+   "uf": "RS",
+   "pontos": 8426
+  },
+  {
+   "pos": 18,
+   "clube": "Atlético",
+   "uf": "GO",
+   "pontos": 7476
+  },
+  {
+   "pos": 19,
+   "clube": "América",
+   "uf": "MG",
+   "pontos": 7429
+  },
+  {
+   "pos": 20,
+   "clube": "Vitória",
+   "uf": "BA",
+   "pontos": 7205
+  },
+  {
+   "pos": 21,
+   "clube": "Ceará",
+   "uf": "CE",
+   "pontos": 7122
+  },
+  {
+   "pos": 22,
+   "clube": "Cuiabá",
+   "uf": "MT",
+   "pontos": 6746
+  },
+  {
+   "pos": 23,
+   "clube": "Goiás",
+   "uf": "GO",
+   "pontos": 6463
+  },
+  {
+   "pos": 24,
+   "clube": "Coritiba",
+   "uf": "PR",
+   "pontos": 6381
+  },
+  {
+   "pos": 25,
+   "clube": "Sport",
+   "uf": "PE",
+   "pontos": 6340
+  },
+  {
+   "pos": 26,
+   "clube": "CRB",
+   "uf": "AL",
+   "pontos": 6150
+  },
+  {
+   "pos": 27,
+   "clube": "Criciúma",
+   "uf": "SC",
+   "pontos": 6090
+  },
+  {
+   "pos": 28,
+   "clube": "Mirassol",
+   "uf": "SP",
+   "pontos": 5537
+  },
+  {
+   "pos": 29,
+   "clube": "Vila Nova",
+   "uf": "GO",
+   "pontos": 4750
+  },
+  {
+   "pos": 30,
+   "clube": "Operário",
+   "uf": "PR",
+   "pontos": 4525
+  },
+  {
+   "pos": 31,
+   "clube": "Avaí",
+   "uf": "SC",
+   "pontos": 4491
+  },
+  {
+   "pos": 32,
+   "clube": "Novorizontino",
+   "uf": "SP",
+   "pontos": 4436
+  },
+  {
+   "pos": 33,
+   "clube": "Chapecoense",
+   "uf": "SC",
+   "pontos": 4277
+  },
+  {
+   "pos": 34,
+   "clube": "Botafogo",
+   "uf": "SP",
+   "pontos": 4036
+  },
+  {
+   "pos": 35,
+   "clube": "Paysandu",
+   "uf": "PA",
+   "pontos": 4030
+  },
+  {
+   "pos": 36,
+   "clube": "Brusque",
+   "uf": "SC",
+   "pontos": 3807
+  },
+  {
+   "pos": 37,
+   "clube": "Remo",
+   "uf": "PA",
+   "pontos": 3764
+  },
+  {
+   "pos": 38,
+   "clube": "Ponte Preta",
+   "uf": "SP",
+   "pontos": 3743
+  },
+  {
+   "pos": 39,
+   "clube": "CSA",
+   "uf": "AL",
+   "pontos": 3736
+  },
+  {
+   "pos": 40,
+   "clube": "Amazonas",
+   "uf": "AM",
+   "pontos": 3403
+  },
+  {
+   "pos": 41,
+   "clube": "Ituano",
+   "uf": "SP",
+   "pontos": 3380
+  },
+  {
+   "pos": 42,
+   "clube": "Tombense",
+   "uf": "MG",
+   "pontos": 3240
+  },
+  {
+   "pos": 43,
+   "clube": "Volta Redonda",
+   "uf": "RJ",
+   "pontos": 3210
+  },
+  {
+   "pos": 44,
+   "clube": "Náutico",
+   "uf": "PE",
+   "pontos": 3200
+  },
+  {
+   "pos": 45,
+   "clube": "Guarani",
+   "uf": "SP",
+   "pontos": 3186
+  },
+  {
+   "pos": 46,
+   "clube": "ABC",
+   "uf": "RN",
+   "pontos": 3008
+  },
+  {
+   "pos": 47,
+   "clube": "Sampaio Corrêa",
+   "uf": "MA",
+   "pontos": 2908
+  },
+  {
+   "pos": 48,
+   "clube": "Londrina",
+   "uf": "PR",
+   "pontos": 2865
+  },
+  {
+   "pos": 49,
+   "clube": "Retrô",
+   "uf": "PE",
+   "pontos": 2707
+  },
+  {
+   "pos": 50,
+   "clube": "Ypiranga",
+   "uf": "RS",
+   "pontos": 2686
+  },
+  {
+   "pos": 51,
+   "clube": "Athletic",
+   "uf": "MG",
+   "pontos": 2570
+  },
+  {
+   "pos": 52,
+   "clube": "Botafogo",
+   "uf": "PB",
+   "pontos": 2529
+  },
+  {
+   "pos": 53,
+   "clube": "Confiança",
+   "uf": "SE",
+   "pontos": 2363
+  },
+  {
+   "pos": 54,
+   "clube": "Ferroviária",
+   "uf": "SP",
+   "pontos": 2201
+  },
+  {
+   "pos": 55,
+   "clube": "Aparecidense",
+   "uf": "GO",
+   "pontos": 2091
+  },
+  {
+   "pos": 56,
+   "clube": "Maringá",
+   "uf": "PR",
+   "pontos": 2086
+  },
+  {
+   "pos": 57,
+   "clube": "São Bernardo FC",
+   "uf": "SP",
+   "pontos": 2061
+  },
+  {
+   "pos": 58,
+   "clube": "Caxias",
+   "uf": "RS",
+   "pontos": 2051
+  },
+  {
+   "pos": 59,
+   "clube": "Figueirense",
+   "uf": "SC",
+   "pontos": 1983
+  },
+  {
+   "pos": 60,
+   "clube": "Ferroviário",
+   "uf": "CE",
+   "pontos": 1916
+  },
+  {
+   "pos": 61,
+   "clube": "Floresta",
+   "uf": "CE",
+   "pontos": 1838
+  },
+  {
+   "pos": 62,
+   "clube": "América",
+   "uf": "RN",
+   "pontos": 1818
+  },
+  {
+   "pos": 63,
+   "clube": "São José",
+   "uf": "RS",
+   "pontos": 1741
+  },
+  {
+   "pos": 64,
+   "clube": "Manaus",
+   "uf": "AM",
+   "pontos": 1697
+  },
+  {
+   "pos": 65,
+   "clube": "Altos",
+   "uf": "PI",
+   "pontos": 1575
+  },
+  {
+   "pos": 66,
+   "clube": "Nova Iguaçu",
+   "uf": "RJ",
+   "pontos": 1566
+  },
+  {
+   "pos": 67,
+   "clube": "Águia de Marabá",
+   "uf": "PA",
+   "pontos": 1437
+  },
+  {
+   "pos": 68,
+   "clube": "Brasil",
+   "uf": "RS",
+   "pontos": 1434
+  },
+  {
+   "pos": 69,
+   "clube": "Anápolis",
+   "uf": "GO",
+   "pontos": 1404
+  },
+  {
+   "pos": 70,
+   "clube": "Sousa",
+   "uf": "PB",
+   "pontos": 1394
+  },
+  {
+   "pos": 71,
+   "clube": "Tocantinópolis",
+   "uf": "TO",
+   "pontos": 1297
+  },
+  {
+   "pos": 72,
+   "clube": "FC Cascavel",
+   "uf": "PR",
+   "pontos": 1271
+  },
+  {
+   "pos": 73,
+   "clube": "Brasiliense",
+   "uf": "DF",
+   "pontos": 1242
+  },
+  {
+   "pos": 74,
+   "clube": "ASA",
+   "uf": "AL",
+   "pontos": 1239
+  },
+  {
+   "pos": 75,
+   "clube": "Porto Velho",
+   "uf": "RO",
+   "pontos": 1185
+  },
+  {
+   "pos": 76,
+   "clube": "Pouso Alegre",
+   "uf": "MG",
+   "pontos": 1168
+  },
+  {
+   "pos": 77,
+   "clube": "Ceilândia",
+   "uf": "DF",
+   "pontos": 1131
+  },
+  {
+   "pos": 78,
+   "clube": "Portuguesa",
+   "uf": "RJ",
+   "pontos": 1101
+  },
+  {
+   "pos": 79,
+   "clube": "Inter de Limeira",
+   "uf": "SP",
+   "pontos": 1070
+  },
+  {
+   "pos": 80,
+   "clube": "Humaitá",
+   "uf": "AC",
+   "pontos": 1064
+  },
+  {
+   "pos": 80,
+   "clube": "Trem",
+   "uf": "AP",
+   "pontos": 1064
+  },
+  {
+   "pos": 82,
+   "clube": "Sergipe",
+   "uf": "SE",
+   "pontos": 1045
+  },
+  {
+   "pos": 83,
+   "clube": "Juazeirense",
+   "uf": "BA",
+   "pontos": 1016
+  },
+  {
+   "pos": 84,
+   "clube": "Itabaiana",
+   "uf": "SE",
+   "pontos": 1011
+  },
+  {
+   "pos": 85,
+   "clube": "Maranhão",
+   "uf": "MA",
+   "pontos": 1001
+  },
+  {
+   "pos": 86,
+   "clube": "Santa Cruz",
+   "uf": "PE",
+   "pontos": 979
+  },
+  {
+   "pos": 87,
+   "clube": "Tuna Luso",
+   "uf": "PA",
+   "pontos": 978
+  },
+  {
+   "pos": 88,
+   "clube": "São Raimundo",
+   "uf": "RR",
+   "pontos": 965
+  },
+  {
+   "pos": 89,
+   "clube": "Maracanã",
+   "uf": "CE",
+   "pontos": 959
+  },
+  {
+   "pos": 90,
+   "clube": "Cianorte",
+   "uf": "PR",
+   "pontos": 940
+  },
+  {
+   "pos": 91,
+   "clube": "Iguatu",
+   "uf": "CE",
+   "pontos": 926
+  },
+  {
+   "pos": 92,
+   "clube": "União",
+   "uf": "MT",
+   "pontos": 793
+  },
+  {
+   "pos": 93,
+   "clube": "Operário",
+   "uf": "MS",
+   "pontos": 783
+  },
+  {
+   "pos": 94,
+   "clube": "Jacuipense",
+   "uf": "BA",
+   "pontos": 756
+  },
+  {
+   "pos": 95,
+   "clube": "Capital",
+   "uf": "DF",
+   "pontos": 755
+  },
+  {
+   "pos": 96,
+   "clube": "Real Noroeste",
+   "uf": "ES",
+   "pontos": 754
+  },
+  {
+   "pos": 97,
+   "clube": "Fluminense",
+   "uf": "PI",
+   "pontos": 734
+  },
+  {
+   "pos": 98,
+   "clube": "São Luiz",
+   "uf": "RS",
+   "pontos": 707
+  },
+  {
+   "pos": 99,
+   "clube": "Barra",
+   "uf": "SC",
+   "pontos": 704
+  },
+  {
+   "pos": 100,
+   "clube": "Treze",
+   "uf": "PB",
+   "pontos": 703
+  },
+  {
+   "pos": 101,
+   "clube": "Atlético",
+   "uf": "CE",
+   "pontos": 679
+  },
+  {
+   "pos": 102,
+   "clube": "Operário",
+   "uf": "MT",
+   "pontos": 667
+  },
+  {
+   "pos": 103,
+   "clube": "Manauara",
+   "uf": "AM",
+   "pontos": 665
+  },
+  {
+   "pos": 104,
+   "clube": "Água Santa",
+   "uf": "SP",
+   "pontos": 659
+  },
+  {
+   "pos": 105,
+   "clube": "Marcílio Dias",
+   "uf": "SC",
+   "pontos": 658
+  },
+  {
+   "pos": 106,
+   "clube": "Moto Club",
+   "uf": "MA",
+   "pontos": 615
+  },
+  {
+   "pos": 107,
+   "clube": "Parnahyba",
+   "uf": "PI",
+   "pontos": 608
+  },
+  {
+   "pos": 108,
+   "clube": "Concórdia",
+   "uf": "SC",
+   "pontos": 607
+  },
+  {
+   "pos": 109,
+   "clube": "Campinense",
+   "uf": "PB",
+   "pontos": 599
+  },
+  {
+   "pos": 110,
+   "clube": "Santa Cruz",
+   "uf": "RN",
+   "pontos": 584
+  },
+  {
+   "pos": 111,
+   "clube": "Azuriz",
+   "uf": "PR",
+   "pontos": 559
+  },
+  {
+   "pos": 112,
+   "clube": "Rio Branco",
+   "uf": "ES",
+   "pontos": 536
+  },
+  {
+   "pos": 113,
+   "clube": "Boavista",
+   "uf": "RJ",
+   "pontos": 531
+  },
+  {
+   "pos": 113,
+   "clube": "GAS",
+   "uf": "RR",
+   "pontos": 531
+  },
+  {
+   "pos": 115,
+   "clube": "Santo André",
+   "uf": "SP",
+   "pontos": 510
+  },
+  {
+   "pos": 116,
+   "clube": "Guarany de Bagé",
+   "uf": "RS",
+   "pontos": 505
+  },
+  {
+   "pos": 116,
+   "clube": "União",
+   "uf": "TO",
+   "pontos": 505
+  },
+  {
+   "pos": 118,
+   "clube": "Bahia de Feira",
+   "uf": "BA",
+   "pontos": 501
+  },
+  {
+   "pos": 119,
+   "clube": "Mixto",
+   "uf": "MT",
+   "pontos": 494
+  },
+  {
+   "pos": 120,
+   "clube": "Rio Branco",
+   "uf": "AC",
+   "pontos": 482
+  },
+  {
+   "pos": 121,
+   "clube": "Portuguesa",
+   "uf": "SP",
+   "pontos": 461
+  },
+  {
+   "pos": 122,
+   "clube": "Iporá",
+   "uf": "GO",
+   "pontos": 459
+  },
+  {
+   "pos": 123,
+   "clube": "Atlético",
+   "uf": "BA",
+   "pontos": 456
+  },
+  {
+   "pos": 123,
+   "clube": "Costa Rica",
+   "uf": "MS",
+   "pontos": 456
+  },
+  {
+   "pos": 125,
+   "clube": "Princesa do Solimões",
+   "uf": "AM",
+   "pontos": 448
+  },
+  {
+   "pos": 126,
+   "clube": "Patrocinense",
+   "uf": "MG",
+   "pontos": 438
+  },
+  {
+   "pos": 127,
+   "clube": "Lagarto",
+   "uf": "SE",
+   "pontos": 435
+  },
+  {
+   "pos": 128,
+   "clube": "CSE",
+   "uf": "AL",
+   "pontos": 431
+  },
+  {
+   "pos": 129,
+   "clube": "Real Brasília",
+   "uf": "DF",
+   "pontos": 429
+  },
+  {
+   "pos": 130,
+   "clube": "Capital",
+   "uf": "TO",
+   "pontos": 404
+  },
+  {
+   "pos": 130,
+   "clube": "Petrolina",
+   "uf": "PE",
+   "pontos": 404
+  },
+  {
+   "pos": 132,
+   "clube": "Barcelona",
+   "uf": "BA",
+   "pontos": 380
+  },
+  {
+   "pos": 132,
+   "clube": "Independência",
+   "uf": "AC",
+   "pontos": 380
+  },
+  {
+   "pos": 132,
+   "clube": "Jequié",
+   "uf": "BA",
+   "pontos": 380
+  },
+  {
+   "pos": 135,
+   "clube": "Hercílio Luz",
+   "uf": "SC",
+   "pontos": 372
+  },
+  {
+   "pos": 136,
+   "clube": "Joinville",
+   "uf": "SC",
+   "pontos": 370
+  },
+  {
+   "pos": 137,
+   "clube": "Potiguar",
+   "uf": "RN",
+   "pontos": 366
+  },
+  {
+   "pos": 138,
+   "clube": "CRAC",
+   "uf": "GO",
+   "pontos": 361
+  },
+  {
+   "pos": 139,
+   "clube": "Novo Hamburgo",
+   "uf": "RS",
+   "pontos": 357
+  },
+  {
+   "pos": 140,
+   "clube": "Globo",
+   "uf": "RN",
+   "pontos": 355
+  },
+  {
+   "pos": 141,
+   "clube": "Central",
+   "uf": "PE",
+   "pontos": 351
+  },
+  {
+   "pos": 142,
+   "clube": "Olaria",
+   "uf": "RJ",
+   "pontos": 350
+  },
+  {
+   "pos": 143,
+   "clube": "Uberlândia",
+   "uf": "MG",
+   "pontos": 347
+  },
+  {
+   "pos": 144,
+   "clube": "Imperatriz",
+   "uf": "MA",
+   "pontos": 346
+  },
+  {
+   "pos": 145,
+   "clube": "Goianésia",
+   "uf": "GO",
+   "pontos": 331
+  },
+  {
+   "pos": 146,
+   "clube": "Goiatuba",
+   "uf": "GO",
+   "pontos": 330
+  },
+  {
+   "pos": 147,
+   "clube": "Rio Branco VN",
+   "uf": "ES",
+   "pontos": 326
+  },
+  {
+   "pos": 148,
+   "clube": "Camboriú",
+   "uf": "SC",
+   "pontos": 324
+  },
+  {
+   "pos": 149,
+   "clube": "Nova Venécia",
+   "uf": "ES",
+   "pontos": 320
+  },
+  {
+   "pos": 150,
+   "clube": "Itabuna",
+   "uf": "BA",
+   "pontos": 316
+  },
+  {
+   "pos": 151,
+   "clube": "Luverdense",
+   "uf": "MT",
+   "pontos": 315
+  },
+  {
+   "pos": 152,
+   "clube": "Aimoré",
+   "uf": "RS",
+   "pontos": 314
+  },
+  {
+   "pos": 153,
+   "clube": "Maricá",
+   "uf": "RJ",
+   "pontos": 305
+  },
+  {
+   "pos": 153,
+   "clube": "Paraná",
+   "uf": "PR",
+   "pontos": 305
+  },
+  {
+   "pos": 155,
+   "clube": "Audax Rio",
+   "uf": "RJ",
+   "pontos": 304
+  },
+  {
+   "pos": 155,
+   "clube": "River",
+   "uf": "PI",
+   "pontos": 304
+  },
+  {
+   "pos": 157,
+   "clube": "Caucaia",
+   "uf": "CE",
+   "pontos": 279
+  },
+  {
+   "pos": 158,
+   "clube": "Murici",
+   "uf": "AL",
+   "pontos": 276
+  },
+  {
+   "pos": 159,
+   "clube": "Quatro de Julho",
+   "uf": "PI",
+   "pontos": 264
+  },
+  {
+   "pos": 160,
+   "clube": "Oeste",
+   "uf": "SP",
+   "pontos": 260
+  },
+  {
+   "pos": 161,
+   "clube": "Goiânia",
+   "uf": "GO",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Horizonte",
+   "uf": "CE",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Itabirito",
+   "uf": "MG",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Monte Azul",
+   "uf": "SP",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Pacajus",
+   "uf": "CE",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Penedense",
+   "uf": "AL",
+   "pontos": 255
+  },
+  {
+   "pos": 161,
+   "clube": "Porto Vitória",
+   "uf": "ES",
+   "pontos": 255
+  },
+  {
+   "pos": 168,
+   "clube": "Caldense",
+   "uf": "MG",
+   "pontos": 253
+  },
+  {
+   "pos": 169,
+   "clube": "Real Ariquemes",
+   "uf": "RO",
+   "pontos": 238
+  },
+  {
+   "pos": 170,
+   "clube": "Castanhal",
+   "uf": "PA",
+   "pontos": 234
+  },
+  {
+   "pos": 170,
+   "clube": "Democrata GV",
+   "uf": "MG",
+   "pontos": 234
+  },
+  {
+   "pos": 172,
+   "clube": "Nova Mutum",
+   "uf": "MT",
+   "pontos": 229
+  },
+  {
+   "pos": 173,
+   "clube": "Cordino",
+   "uf": "MA",
+   "pontos": 228
+  },
+  {
+   "pos": 173,
+   "clube": "Falcon",
+   "uf": "SE",
+   "pontos": 228
+  },
+  {
+   "pos": 173,
+   "clube": "Resende",
+   "uf": "RJ",
+   "pontos": 228
+  },
+  {
+   "pos": 173,
+   "clube": "São Francisco",
+   "uf": "AC",
+   "pontos": 228
+  },
+  {
+   "pos": 173,
+   "clube": "Vitória",
+   "uf": "ES",
+   "pontos": 228
+  },
+  {
+   "pos": 178,
+   "clube": "Avenida",
+   "uf": "RS",
+   "pontos": 204
+  },
+  {
+   "pos": 178,
+   "clube": "Cametá",
+   "uf": "PA",
+   "pontos": 204
+  },
+  {
+   "pos": 178,
+   "clube": "Democrata SL",
+   "uf": "MG",
+   "pontos": 204
+  },
+  {
+   "pos": 178,
+   "clube": "ipatinga",
+   "uf": "MG",
+   "pontos": 204
+  },
+  {
+   "pos": 178,
+   "clube": "São José",
+   "uf": "SP",
+   "pontos": 204
+  },
+  {
+   "pos": 178,
+   "clube": "Serra",
+   "uf": "ES",
+   "pontos": 204
+  },
+  {
+   "pos": 184,
+   "clube": "Villa Nova",
+   "uf": "MG",
+   "pontos": 200
+  },
+  {
+   "pos": 185,
+   "clube": "Nacional",
+   "uf": "AM",
+   "pontos": 195
+  },
+  {
+   "pos": 186,
+   "clube": "Nacional",
+   "uf": "PB",
+   "pontos": 180
+  },
+  {
+   "pos": 187,
+   "clube": "Juventude",
+   "uf": "MA",
+   "pontos": 178
+  },
+  {
+   "pos": 188,
+   "clube": "Tuntum",
+   "uf": "MA",
+   "pontos": 175
+  },
+  {
+   "pos": 189,
+   "clube": "Cruzeiro",
+   "uf": "AL",
+   "pontos": 153
+  },
+  {
+   "pos": 189,
+   "clube": "Interporto",
+   "uf": "TO",
+   "pontos": 153
+  },
+  {
+   "pos": 189,
+   "clube": "Juventus",
+   "uf": "SC",
+   "pontos": 153
+  },
+  {
+   "pos": 189,
+   "clube": "Sãojoseense",
+   "uf": "PR",
+   "pontos": 153
+  },
+  {
+   "pos": 189,
+   "clube": "XV de Piracicaba",
+   "uf": "SP",
+   "pontos": 153
+  },
+  {
+   "pos": 194,
+   "clube": "Grêmio Anápolis",
+   "uf": "GO",
+   "pontos": 152
+  },
+  {
+   "pos": 194,
+   "clube": "Icasa",
+   "uf": "CE",
+   "pontos": 152
+  },
+  {
+   "pos": 194,
+   "clube": "São Raimundo",
+   "uf": "AM",
+   "pontos": 152
+  },
+  {
+   "pos": 194,
+   "clube": "URT",
+   "uf": "MG",
+   "pontos": 152
+  },
+  {
+   "pos": 198,
+   "clube": "Barcelona",
+   "uf": "RO",
+   "pontos": 125
+  },
+  {
+   "pos": 198,
+   "clube": "Dourados",
+   "uf": "MS",
+   "pontos": 125
+  },
+  {
+   "pos": 198,
+   "clube": "Oratório",
+   "uf": "AP",
+   "pontos": 125
+  },
+  {
+   "pos": 198,
+   "clube": "Votuporanguense",
+   "uf": "SP",
+   "pontos": 125
+  },
+  {
+   "pos": 202,
+   "clube": "Ação",
+   "uf": "MT",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "Afogados",
+   "uf": "PE",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "Crato",
+   "uf": "CE",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "Náutico",
+   "uf": "RR",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "Pérolas Negras",
+   "uf": "RJ",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "Próspera",
+   "uf": "SC",
+   "pontos": 102
+  },
+  {
+   "pos": 202,
+   "clube": "São Paulo Crystal",
+   "uf": "PB",
+   "pontos": 102
+  },
+  {
+   "pos": 209,
+   "clube": "Glória",
+   "uf": "RS",
+   "pontos": 100
+  },
+  {
+   "pos": 209,
+   "clube": "Independente",
+   "uf": "AP",
+   "pontos": 100
+  },
+  {
+   "pos": 209,
+   "clube": "Ji-Paraná",
+   "uf": "RO",
+   "pontos": 100
+  },
+  {
+   "pos": 209,
+   "clube": "Marília",
+   "uf": "SP",
+   "pontos": 100
+  },
+  {
+   "pos": 209,
+   "clube": "Portuguesa Santista",
+   "uf": "SP",
+   "pontos": 100
+  },
+  {
+   "pos": 214,
+   "clube": "Guarany de Sobral",
+   "uf": "CE",
+   "pontos": 89
+  },
+  {
+   "pos": 215,
+   "clube": "Esportivo",
+   "uf": "RS",
+   "pontos": 83
+  },
+  {
+   "pos": 216,
+   "clube": "Penarol",
+   "uf": "AM",
+   "pontos": 77
+  },
+  {
+   "pos": 217,
+   "clube": "Águia Negra",
+   "uf": "MS",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Atlético",
+   "uf": "AC",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Galvez",
+   "uf": "AC",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Gama",
+   "uf": "DF",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Jaraguá",
+   "uf": "GO",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Madureira",
+   "uf": "RJ",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Palmas",
+   "uf": "TO",
+   "pontos": 76
+  },
+  {
+   "pos": 217,
+   "clube": "Ypiranga",
+   "uf": "AP",
+   "pontos": 76
+  },
+  {
+   "pos": 225,
+   "clube": "Salgueiro",
+   "uf": "PE",
+   "pontos": 75
+  },
+  {
+   "pos": 226,
+   "clube": "Paragominas",
+   "uf": "PA",
+   "pontos": 63
+  },
+  {
+   "pos": 227,
+   "clube": "Picos",
+   "uf": "PI",
+   "pontos": 60
+  },
+  {
+   "pos": 228,
+   "clube": "Bangu",
+   "uf": "RJ",
+   "pontos": 51
+  },
+  {
+   "pos": 228,
+   "clube": "Boa Esporte",
+   "uf": "MG",
+   "pontos": 51
+  },
+  {
+   "pos": 228,
+   "clube": "Fast Clube",
+   "uf": "AM",
+   "pontos": 51
+  },
+  {
+   "pos": 228,
+   "clube": "Rio Branco",
+   "uf": "PR",
+   "pontos": 51
+  },
+  {
+   "pos": 228,
+   "clube": "São Bento",
+   "uf": "SP",
+   "pontos": 51
+  },
+  {
+   "pos": 233,
+   "clube": "Santa Cruz",
+   "uf": "RS",
+   "pontos": 25
+  },
+  {
+   "pos": 234,
+   "clube": "Aquidauanense",
+   "uf": "MS",
+   "pontos": 10
+  },
+  {
+   "pos": 234,
+   "clube": "Santana",
+   "uf": "AP",
+   "pontos": 10
+  }
+ ]
+}

@@ -3,9 +3,11 @@ import {
   CATEGORIA_BANDEIRA,
   gravarVistoriaBandeira,
   lerVistoriaBandeira,
+  nomesPecasPatrimonio,
   PERMISSIONS,
   podeGerirCategoriaPatrimonio,
   podeVerCategoriaPatrimonio,
+  patrimonioEhPecaUnica,
   resolverEscopoPatrimonio,
   vistoriaVencendo,
   VistoriaBandeiraSchema,
@@ -105,5 +107,35 @@ describe('ficha de vistoria (meta.vistoria)', () => {
     expect(vistoriaVencendo({ validade: '2026-08-01' }, { ref })).toBe(true)
     expect(vistoriaVencendo({ validade: '2026-08-20' }, { ref })).toBe(false)
     expect(vistoriaVencendo({ validade: '2026-08-20' }, { ref, diasAviso: 30 })).toBe(true)
+  })
+})
+
+describe('bandeira é peça, não lote', () => {
+  it('cada bandeira é peça única; mesa continua lote', () => {
+    expect(patrimonioEhPecaUnica(CATEGORIA_BANDEIRA)).toBe(true)
+    expect(patrimonioEhPecaUnica('MOBILIARIO')).toBe(false)
+  })
+
+  it('lote de 11 vira 11 nomes numerados; um só não ganha sufixo', () => {
+    expect(nomesPecasPatrimonio('Bandeira de mastro 2x1,5m', 1)).toEqual([
+      'Bandeira de mastro 2x1,5m',
+    ])
+    expect(nomesPecasPatrimonio('Bandeira de mastro 2x1,5m', 11)).toEqual([
+      'Bandeira de mastro 2x1,5m · 1',
+      'Bandeira de mastro 2x1,5m · 2',
+      'Bandeira de mastro 2x1,5m · 3',
+      'Bandeira de mastro 2x1,5m · 4',
+      'Bandeira de mastro 2x1,5m · 5',
+      'Bandeira de mastro 2x1,5m · 6',
+      'Bandeira de mastro 2x1,5m · 7',
+      'Bandeira de mastro 2x1,5m · 8',
+      'Bandeira de mastro 2x1,5m · 9',
+      'Bandeira de mastro 2x1,5m · 10',
+      'Bandeira de mastro 2x1,5m · 11',
+    ])
+  })
+
+  it('não empilha sufixo se o nome já veio numerado', () => {
+    expect(nomesPecasPatrimonio('Bandeira · 3', 2)).toEqual(['Bandeira · 1', 'Bandeira · 2'])
   })
 })

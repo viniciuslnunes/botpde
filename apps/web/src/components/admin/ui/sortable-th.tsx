@@ -44,7 +44,7 @@ export function SortableTh({
       <Link
         href={href}
         className={[
-          'inline-flex items-center gap-1 transition-colors',
+          'app-touch-line inline-flex items-center gap-1 transition-colors',
           active
             ? 'text-[rgb(var(--foreground))]'
             : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',

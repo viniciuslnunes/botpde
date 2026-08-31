@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ADMIN_MODULOS,
+  MAX_PRESIDENTES,
   PERMISSIONS,
   SYSTEM_ROLE_PERMISSIONS,
   SYSTEM_ROLES,
@@ -49,6 +50,12 @@ describe('leadership:transfer é exclusiva do presidente', () => {
     const label = labelPermission(PERMISSIONS.LEADERSHIP_TRANSFER)
     expect(label).not.toBe(PERMISSIONS.LEADERSHIP_TRANSFER)
     expect(label.length).toBeGreaterThan(0)
+  })
+})
+
+describe('uma torcida tem um único presidente', () => {
+  it('MAX_PRESIDENTES é 1 — segundo owner só pela transferência, que demove o anterior', () => {
+    expect(MAX_PRESIDENTES).toBe(1)
   })
 })
 

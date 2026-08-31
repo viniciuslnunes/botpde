@@ -46,17 +46,32 @@ packages/
 pnpm install
 pnpm dev                              # turbo dev (todos os apps)
 pnpm --filter @torcida/web dev        # só web
+pnpm dev:cache                        # tamanho de .next e do cache Turbopack (exit 1 acima de 8 GB)
+pnpm dev:clean                        # apaga .next quando o cache passar do teto — ver docs/ops/dev-local-performance.md
 pnpm --filter @torcida/web lint
 pnpm --filter @torcida/web test       # Vitest (RBAC, rate-limit, visibilidade)
-pnpm --filter @torcida/db db:generate # prisma generate
+pnpm --filter @torcida/db db:generate # prisma generate + gera src/prisma-exports.{js,d.ts} (commitar o diff)
+pnpm --filter @torcida/db prisma-exports:check # exit 1 se o reexport do Prisma defasou do schema
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
 pnpm --filter @torcida/db schema:check # exit 1 se schema mudou (pós-deploy: HML/prod ainda precisam de push)
 pnpm --filter @torcida/db schema:deploy # db:push no alvo (HML/prod; prod exige --i-know-prod) — ver docs/ops/schema-deploy.md
 pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comunidade
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
+pnpm --filter @torcida/db seed:brecho-gavioes # anúncios P2P de teste no brechó (sócios nomeados; senha m1k43l3n)
+pnpm --filter @torcida/db seed:gavioes-logins # logins nomeados por cargo/área (só Postgres local; senha m1k43l3n)
+pnpm --filter @torcida/db seed:memoria-demo   # eventos, posts e fatos na linha do tempo (Gaviões + Camisa 12; só local)
+pnpm --filter @torcida/db seed:forum-praca    # fórum da praça: CN Corinthians + Gaviões (`[TESTE-FORUM]`; só local)
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
-pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
+pnpm --filter @torcida/db seed:torcedores-estimados  # tier PESQUISA (Datafolha×IBGE) > IBOPE > limite
+pnpm --filter @torcida/db seed:clubes-rnc            # Ranking Nacional de Clubes da CBF: cria os ausentes + grava posição
+pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-cidades  # fundação, estádio, cores, site, ids externos
+pnpm --filter @torcida/db repair:clubes-curados      # correções e fusões curadas (nome quebrado, UF errada, duplicata)
+pnpm --filter @torcida/db seed:rivalidades-clubes    # rivalidade que ISOLA (municipal/estadual; interestadual é só contexto)
+pnpm --filter @torcida/db seed:torcidas-registro -- --importar-ausentes  # registro na federação (FPF) + ano de fundação
+pnpm --filter @torcida/db coleta:cores-escudos       # cor do clube a partir do escudo (Cloudinary Admin API)
+pnpm --filter @torcida/db audit:catalogo-clubes      # placar do catálogo x CBF/Wikidata/IBGE/FPF (gate: exit 1)
+pnpm --filter @torcida/db test:catalogo-clubes       # invariantes puros do catálogo e da rivalidade
 pnpm --filter @torcida/db coleta:api-football-times  # snapshot times BR (1 requisição da cota)
 pnpm --filter @torcida/db seed:api-football-ids      # Afiliacao.apiExternalId (offline; --apply grava)
 pnpm --filter @torcida/db test:api-football-match    # invariantes do casamento clube ↔ API
@@ -85,6 +100,8 @@ pnpm --filter @torcida/db reset:jornadas -- --dry-run  # limpa só o lote de jor
 pnpm --filter @torcida/web audit:areas-projetos # áreas de atuação e projetos NÃO concedem permissão
 pnpm --filter @torcida/web audit:achados        # status medido dos achados de ARCHITECTURE §7
 pnpm --filter @torcida/web municipios:atualizar # regenera a malha municipal do IBGE (--check só compara)
+pnpm --filter @torcida/web lint:mobile          # safe-area + dvh + recorte lateral (CI; sem app nem banco)
+pnpm --filter @torcida/web rotas:dinamicas      # resolve ids reais p/ a auditoria de responsividade
 pnpm version:print                              # 1.<commits_main>.<commits_totais> (docs/ops/release.md)
 pnpm release:sync                               # sincroniza package.json + tag a partir do Git
 ```
@@ -106,6 +123,20 @@ lenta em dev, suba o banco local: agente `/setup` (ou
 "post/dado não apareceu" em dev, confirme que as duas telas comparadas estão no
 **mesmo banco** — um relato de feed que "não propagou" era só o snapshot local
 parado 5 dias atrás. Ver `docs/ops/postgres-local-dev.md` § o snapshot congela.
+**E se o que arrasta é a COMPILAÇÃO, não a query (2026-08-30):** problema
+distinto, disco e não rede. O cache persistente do Turbopack
+(`apps/web/.next/dev/cache/turbopack`) cresce sem teto — chegou a **70 GB** aqui,
+com o SSD 94% cheio, e sozinho levava a primeira compilação de `/entrar` a
+**36s** (a subida era 3,2s: o custo está na rota, não no start). Diagnostique com
+`pnpm dev:cache` e corte com `pnpm dev:clean` **antes** de otimizar código; passe
+as exclusões do Defender uma vez (`scripts/dev-defender-exclusoes.ps1`, como
+admin). **O tamanho do cache manda no ciclo de edição** (medido na mesma sessão:
+10,8 GB → 4,0s; após `dev:clean` → **1,3s**), e ele volta a inflar em ~13h de
+uso — `dev:clean` é rotina, não conserto de emergência. Nada que entre em `env` do `next.config.ts` pode ser volátil: vira define
+de compilação e portanto chave de cache — um `new Date()` ali reescrevia a
+árvore inteira a cada start. `turbopackFileSystemCacheForDev` e
+`turbopackServerFastRefresh` **já são default `true`** no 16.2.9, não adianta
+declarar. Ver `docs/ops/dev-local-performance.md`.
 **Custo Railway** (fatura por projeto, ordem de corte, por que o HML fica, e o
 backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
 
@@ -150,6 +181,34 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   componente de rota o barrel está ok — estreitar lá piora o chunk. Config
   herdada da era webpack (`build:analyze`, `treeshake` do Sentry) é no-op sob
   Turbopack: meça antes de creditar ganho. Ver §5.6.2.
+- **Mobile-first (2026-08-27):** o produto vira app iOS/Android, então telefone
+  é o alvo, não uma adaptação. Quatro regras não negociáveis, todas já
+  centralizadas — não reimplemente à mão: (1) **altura de viewport é `dvh`**,
+  nunca `vh`/`h-screen` (só atrás de `lg:`/`xl:`, onde são iguais); (2) **barra
+  fixa de rodapé reserva `env(safe-area-inset-bottom)`** — no `AppModal` isso já
+  vem do painel, não ponha no rodapé; (3) **campo de texto nunca abaixo de 16px
+  no toque** — o piso é global em `globals.css` (junto com `min-height` de
+  44px em input/select e 24px em checkbox/radio), não use `text-sm` achando que
+  precisa compensar; (4) **alvo de toque 44×44 nos dois eixos** — `.app-action`
+  em botão/ícone comum, `.app-touch-target` em UI densa (cresce só no toque,
+  preserva a densidade do desktop) e `.app-touch-line` em link de texto solto
+  (amplia a área por pseudo-elemento, sem mexer no layout; só onde o link está
+  sozinho na linha, senão rouba o toque do vizinho). O `min-width` das duas
+  primeiras é `:not(.min-w-0)`: botão que declara `min-w-0 flex-1` precisa
+  encolher, e forçar largura nele **corta** o card. CI trava (1) e (2) via `pnpm --filter
+@torcida/web lint:mobile`. Auditoria de tela: `e2e/responsivo.measure.ts`
+  (30 rotas × 320/390/430/768-tablet/844-paisagem, mais um teste de
+  **estado aberto** que abre modal e mede dentro; precisa de dev server +
+  `--project=setup`) e
+  `e2e/mobile-audit.measure.ts` (estouro em 25 rotas). **Guia de uso (as quatro
+  classes, as regras globais, o que NÃO se corrige e as 6 armadilhas de
+  método): `docs/frontend/mobile-first.md`** — leia antes de escrever `min-h-11`
+  na mão; quase tudo já é global. Decisão e histórico: `ARCHITECTURE.md` §5.20
+  e §5.20.1.
+  Existe ainda um **piso global de altura de toque** em todo `a[href]`/`button`/
+  `[role=button]`/`[role=tab]`/`summary` (seguro porque `min-height` não se
+  aplica a elemento inline); escape explícito: `.app-sem-piso-toque`.
+  `.app-inset-x` cobre o recorte lateral do notch em barra que atravessa a tela.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
@@ -161,43 +220,56 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   `useLatestRef` / `useHidratado` / `useMediaQuery` / `useOnline` (`lib/`).
   Trocar `setState` em effect por escrita em ref no render **não** resolve — só
   troca o aviso de nome. As regras do compilador são **aviso de propósito** em
-  `eslint.config.mjs` (limpeza gradual, sem bloquear o build); passivo hoje:
-  19. Receitas, armadilhas e o que sobrou: `docs/frontend/react-compiler.md` +
+  `eslint.config.mjs` (limpeza gradual, sem bloquear o build); passivo hoje: 19. Receitas, armadilhas e o que sobrou: `docs/frontend/react-compiler.md` +
   `ARCHITECTURE.md` §5.27.
 - **Área admin (2026-07-22):** páginas admin novas usam o kit de
- `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
- `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts
- SVG de `components/admin/charts/` — nunca reimplementar header/stat/badge/
- paginação inline. Insights/relatórios: `lib/admin-insights.ts` (bucketing JS
- fuso SP) + `/admin/relatorios` (gate `reports:view`). Guia:
- `docs/frontend/admin-ui-kit.md`; decisões: `ARCHITECTURE.md` §5.12.
- **Tabs (2026-07-30):** módulo com sub-rotas declara suas etapas em
- `ADMIN_MODULOS` (`packages/types/src/menu.js`) — fonte única — e o
- `layout.tsx` do segmento monta o shell com `montarTabsModulo` +
- `AdminModuleTabs` (tab = rota; ícone/contagem só no layout; imersivo como o
- PDV fica fora via route group). O menu lateral guarda **uma** entrada por
- módulo. Etapa com permissão própria é filtrada por `tabsPermitidasDoModulo`, e
- quem não pode ver a raiz entra por `primeiraTabPermitida` (nunca expulsar para
- `/admin`). Badge de notificação aponta para a **rota** (`ROTA_POR_TIPO` +
- `rota` em `POLITICA_POR_TIPO`), nunca para id de menu — assim ele sobe para o
- módulo em vez de sumir em silêncio. Etapas com prefixo comum viram sub-rota;
- etapas irmãs (Estrutura, Plataforma) viram **route group**
- (`admin/(estrutura)/`), que dá o layout comum sem mudar URL. Mover rota de
- módulo exige `permanentRedirect` na antiga: `Notificacao.link` já gravado
- aponta para ela.
- Seções de uma única rota usam `AdminTabs` por query param; form de criar não
- fica empilhado (disclosure ou `AdminCreateDisclosure`).
- **Listagens (2026-07-30):** listagem admin com volume declara um
- `ListagemSpec` em `apps/web/src/lib/listagem/specs.ts` (colunas, filtro por
- coluna, busca, sort padrão, `camposProibidos`) e a página usa
- `parseListagemParams` + `montarWhereListagem`/`montarOrderByListagem`/
- `montarPaginacao` + `ListagemToolbar`/`ListagemTh`/`ListagemPaginacao` — nunca
- `buildHref`/`parseSortParam` à mão, nunca `findMany` sem `take`. `sort` só
- aceita coluna declarada e campo sensível é barrado por invariante
- (`lib/__tests__/listagem.test.ts`). GET **não** escreve no banco: correção de
- dado legado é Server Action com `assertPermission` + `AuditLog` (caso
- `sincronizarNumerosSocio`). Guia: `docs/frontend/admin-ui-kit.md` § kit de
- listagem.
+  `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
+  `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts
+  SVG de `components/admin/charts/` — nunca reimplementar header/stat/badge/
+  paginação inline. Insights/relatórios: `lib/admin-insights.ts` (bucketing JS
+  fuso SP) + `/admin/relatorios` (gate `reports:view`). Guia:
+  `docs/frontend/admin-ui-kit.md`; decisões: `ARCHITECTURE.md` §5.12.
+  **Tabs (2026-07-30):** módulo com sub-rotas declara suas etapas em
+  `ADMIN_MODULOS` (`packages/types/src/menu.js`) — fonte única — e o
+  `layout.tsx` do segmento monta o shell com `montarTabsModulo` +
+  `AdminModuleTabs` (tab = rota; ícone/contagem só no layout; imersivo como o
+  PDV fica fora via route group). O menu lateral guarda **uma** entrada por
+  módulo. Etapa com permissão própria é filtrada por `tabsPermitidasDoModulo`, e
+  quem não pode ver a raiz entra por `primeiraTabPermitida` (nunca expulsar para
+  `/admin`). Badge de notificação aponta para a **rota** (`ROTA_POR_TIPO` +
+  `rota` em `POLITICA_POR_TIPO`), nunca para id de menu — assim ele sobe para o
+  módulo em vez de sumir em silêncio. Etapas com prefixo comum viram sub-rota;
+  etapas irmãs (Estrutura, Plataforma) viram **route group**
+  (`admin/(estrutura)/`), que dá o layout comum sem mudar URL. Mover rota de
+  módulo exige `permanentRedirect` na antiga: `Notificacao.link` já gravado
+  aponta para ela.
+  Seções de uma única rota usam `AdminTabs` por query param; form de criar não
+  fica empilhado (disclosure ou `AdminCreateDisclosure`).
+  **Listagens (2026-07-30):** listagem admin com volume declara um
+  `ListagemSpec` em `apps/web/src/lib/listagem/specs.ts` (colunas, filtro por
+  coluna, busca, sort padrão, `camposProibidos`) e a página usa
+  `parseListagemParams` + `montarWhereListagem`/`montarOrderByListagem`/
+  `montarPaginacao` + `ListagemToolbar`/`ListagemTh`/`ListagemPaginacao` — nunca
+  `buildHref`/`parseSortParam` à mão, nunca `findMany` sem `take`. `sort` só
+  aceita coluna declarada e campo sensível é barrado por invariante
+  (`lib/__tests__/listagem.test.ts`). GET **não** escreve no banco: correção de
+  dado legado é Server Action com `assertPermission` + `AuditLog` (caso
+  `sincronizarNumerosSocio`). Guia: `docs/frontend/admin-ui-kit.md` § kit de
+  listagem.
+- **Fronteira client/server (2026-08-27):** helper **puro** consumido pelos dois
+  lados NÃO mora em módulo `'use client'`. Importar uma função de um módulo
+  client num Server Component devolve uma **referência de client**, não a
+  função; chamá-la derruba a rota inteira com "Attempted to call X() from the
+  server". A página responde **200** e renderiza só
+  `"Application error: a client-side exception has occurred"` — não aparece em
+  log de servidor nem em teste de status. Caso real: `parseAliancaTabId` em
+  `/admin/aliancas`; a correção foi extrair para `lib/alianca-tabs.ts` e
+  reexportar do módulo client para não quebrar quem já importava.
+- **Comentário `///` no `schema.prisma`:** nunca escrever a sequência que fecha
+  um bloco JSDoc. O Prisma copia esses comentários para dentro de `/** */` no
+  `index.d.ts` gerado; a sequência encerra o comentário no meio, o resto do
+  arquivo vira código e o `tsc` quebra com erro absurdo a dezenas de milhares
+  de linhas da causa. `lint:mobile` trava isso (regra 4).
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.
@@ -221,6 +293,13 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
 - **Loja** — catálogo, sacola, checkout, cupons: `apps/web/src/app/portal/loja/`,
   `apps/web/src/app/admin/loja/`; regras em `packages/types/src/loja.js`;
   ver `docs/data/modulo-loja.md`.
+- **Brechó** — P2P entre sócios (praça nacional da torcida, não catálogo
+  oficial): `apps/web/src/app/portal/loja/brecho/`, `apps/web/src/lib/brecho.ts`;
+  regras em `packages/types/src/brecho.js`; `docs/data/modulo-brecho.md`.
+- **Confiança na torcida (2026-08-30)** — ledger `ConfiancaEvento` + saldo
+  materializado; **não concede permissão**. Recortes 1–4: sinais + AND em
+  grupo/canal/sala (tenant) + badge de nível no perfil. Ver
+  `docs/data/modulo-confianca.md` e `ARCHITECTURE.md` §5.32.
 - **Departamentos / governo** — RBAC por depto + worktree da Visão da torcida:
   `docs/data/modulo-departamentos.md`; seed `packages/db/scripts/seed-departamentos.js`.
   **Preferência ≠ membership (2026-07-17):** onboarding grava
@@ -256,22 +335,22 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   Contrato puro em `packages/types/src/projeto.js`. Ver `ARCHITECTURE.md`
   §5.16.
 - **Membros / admissão** — fila `/admin/membros`, reprovação com laudo obrigatório
- (categoria + justificativa + etapas erradas, `CATEGORIAS_REPROVACAO`/
- `PONTOS_REPROVACAO` em `packages/types/src/schemas/membro.js`) e aba de
- histórico com diff campo a campo (`historico-actions.ts`,
- `lib/membro-audit-diff.ts`); ver `docs/data/modulo-associacao.md`
- §reprovação com laudo e §histórico do cadastro.
- **Acesso no card (2026-07-31):** cargo/área/permissão adicional são editados
- na aba **Acessos** do card do membro (`membro-acesso-tab.tsx` +
- `acesso-actions.ts`), que reusa `AccessUserPanel` com `variant="embutido"` —
- a pessoa vem do `membroId` aberto, e o gate é `roles:manage`. Sócios abrem o
- mesmo modal. O log grava diff legível (`lib/acesso-audit-diff.ts`) e a aba
- Histórico lê também `entidade: 'User'`.
+  (categoria + justificativa + etapas erradas, `CATEGORIAS_REPROVACAO`/
+  `PONTOS_REPROVACAO` em `packages/types/src/schemas/membro.js`) e aba de
+  histórico com diff campo a campo (`historico-actions.ts`,
+  `lib/membro-audit-diff.ts`); ver `docs/data/modulo-associacao.md`
+  §reprovação com laudo e §histórico do cadastro.
+  **Acesso no card (2026-07-31):** cargo/área/permissão adicional são editados
+  na aba **Acessos** do card do membro (`membro-acesso-tab.tsx` +
+  `acesso-actions.ts`), que reusa `AccessUserPanel` com `variant="embutido"` —
+  a pessoa vem do `membroId` aberto, e o gate é `roles:manage`. Sócios abrem o
+  mesmo modal. O log grava diff legível (`lib/acesso-audit-diff.ts`) e a aba
+  Histórico lê também `entidade: 'User'`.
 - **Liderança / troca de gestão (2026-08-06)** — presidência não é vitalícia.
   Regra única em `apps/web/src/lib/lideranca.ts` (Caso B = cargo `owner` do
   tenant; Caso A = `Sede.responsavelUserId`), com `AuditLog` + notificação dos
   dois lados. Permissão `leadership:transfer` é **só do owner** e diz apenas
-  *se* pode — o alvo sai do **tenant ativo**, resolvido no servidor: presidente
+  _se_ pode — o alvo sai do **tenant ativo**, resolvido no servidor: presidente
   da Sede não escolhe presidente de subsede promovida. UI: aba Estrutura ›
   Presidência (`/admin/presidencia`) e `/super-admin/liderancas`
   (`lib/liderancas-console.ts`). Promoção a portal **não** herda mais o owner da
@@ -311,11 +390,40 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   pegadinhas, widgets, football-data.org): `docs/knowledge/api-football-referencia.md`;
   decisão + implementação + **runbook de teste local**:
   `docs/data/integracao-api-football.md` e §5.26.
+- **Memória (linha do tempo, 2026-08-30)** — `/portal/memoria`. Fases 1–5:
+  unidade / torcida / clube; fato atrasado (`MemoriaFato`); aliados bilaterais
+  (`Tenant.memoriaAliados`); presença com check-in + opt-in. Entra na top bar
+  como **item de menu** (ao lado de Loja), não como ícone do cluster de
+  chat/notificações; na CN abre `?escopo=clube` e isola a linha do clube (sem
+  caravana de unidade). Na unidade: chip Unidade | Torcida. Espinha pagina o
+  mês (todos os dias + busca de data). Admin: `/admin/comunidade/memoria`.
+  Contrato `packages/types/src/memoria.js`. Doc `docs/data/modulo-memoria.md`, §5.30.
 - **Sofascore Widgets** — embeds oficiais na comunidade (display only; não sync
   de `Partida`): por clube (`SOFASCORE_WIDGETS`) e classificação nacional por
   divisão A/B/C/D (`SOFASCORE_COMPETICOES` + `Afiliacao.serie`). Repair de série:
   `pnpm --filter @torcida/db db:repair-series-afiliacoes`. Ver
   `docs/data/modulo-sofascore-widgets.md`.
+- **Catálogo de clubes — fonte por campo (2026-08-27):** cada campo de
+  `Afiliacao` tem UMA fonte certa, e usar a errada é o erro clássico do
+  domínio — CBF/RNC diz se o clube existe profissionalmente (e dá relevância),
+  Wikidata dá fundação/estádio/capacidade/coordenada/site, Ogol dá fundação e
+  id externo, a **malha do IBGE valida cidade** (a cidade do clube vinha do
+  endereço da torcida: "Estádio Moça Bonita", "571 Curitiba"), Datafolha×Censo
+  dá **torcedores** (tier `PESQUISA`) e IBOPE dá **seguidor**, nunca torcedor.
+  Cor: paleta curada primeiro, escudo (Cloudinary) como proposta revisável.
+  **Nome+UF não é chave** (Bahia × Bahia de Feira) — desempatar por cidade e
+  id externo; `chaveCanonicaClube` resolve alias em ciclo. Avaliação das
+  fontes: `docs/knowledge/fontes-dados-clubes.md`; medição e antes/depois:
+  `docs/data/auditoria-catalogo-clubes.md`; decisões: `ARCHITECTURE.md` §5.29.
+- **Rivalidade tem escopo (2026-08-27):** `EscopoRivalidade` =
+  `MUNICIPAL | ESTADUAL | INTERESTADUAL`, e **só os dois primeiros isolam**
+  (`ESCOPOS_RIVALIDADE_ISOLANTE` em `@torcida/types`, aplicado em
+  `hierarquia.ts` e `perfil-visibilidade.ts`). Clássico interestadual
+  (Flamengo × São Paulo) fica gravado como contexto — isolar por ele apagaria a
+  malha nacional sem ganho. E nem todo clássico intraestadual isola: o dataset
+  `rivalidades-clubes.js` marca `isola` (mesma cidade **ou** clássico nomeado),
+  porque "clássico regional" tipo Guarani × São Paulo é jogo tradicional, não
+  conflito de torcida. Semear com `seed:rivalidades-clubes`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`; engajamento (reação/comentário CN):
   `comunidade/actions.ts` (`resolverContextoEngajamento`, `podeEngajarPostVisivel`);

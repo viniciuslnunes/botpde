@@ -1,3 +1,5 @@
+import type { OrigemCanal } from '@/lib/membro-origem'
+
 export interface MembroReprovacaoDetalhe {
   motivo: string
   categoriaId: string | null
@@ -101,4 +103,11 @@ export interface AdminMembroItem {
   espelhado?: boolean
   /** Nome da Subsede/PDE de origem do vínculo (quando espelhado). */
   aprovadoNaUnidadeNome?: string | null
+  /**
+   * Canal de entrada gravado no CADASTRO_SOLICITADO (`convite`, `onboarding`…).
+   * Ausente em cadastros antigos — a célula infere importação pelo `importacaoId`.
+   */
+  origemCanal?: OrigemCanal | null
+  /** Rastro da importação que criou o cadastro (null = orgânico). */
+  importacaoId?: string | null
 }

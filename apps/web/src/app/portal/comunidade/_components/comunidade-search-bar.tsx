@@ -274,7 +274,7 @@ export function ComunidadeSearchBar({
                   initial="hidden"
                   animate="show"
                   variants={{ show: { transition: { staggerChildren: 0.04 } } }}
-                  className="max-h-[min(60vh,22rem)] overflow-y-auto py-1"
+                  className="max-h-[min(60dvh,22rem)] overflow-y-auto py-1"
                 >
                   {resultado.membros.length > 0 && (
                     <section className="px-2 py-1">

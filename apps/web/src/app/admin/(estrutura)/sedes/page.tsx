@@ -2,7 +2,7 @@ import { db } from '@torcida/db'
 import { assertAnyPermission, assertPresidenteGlobal, assertTenantOwner } from '@/lib/authz'
 import { getEstadoCanalRestritoEmLote } from '@/lib/canal-restrito'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida, hasPermission } from '@torcida/types'
+import { PERMISSIONS, SYSTEM_ROLES, podeCriarUnidadeTerritorial, formatNomeTorcida, hasPermission } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
 import { atorPodeGerirPortalProprio } from '@/lib/sede-acesso-mae'
 import { redirect } from 'next/navigation'
@@ -239,6 +239,26 @@ export default async function AdminSedesPage() {
     ...new Set(rowsCasoB.map((s) => s.tenantId).filter((id): id is string => Boolean(id))),
   ]
   const estadoCanalPorTenant = await getEstadoCanalRestritoEmLote(tenantIdsCasoB)
+  const tenantIdsLideranca = [tenant.id, ...tenantIdsCasoB]
+  const ownersRaw: {
+    tenantId: string
+    userId: string
+    user: { nome: string | null; email: string | null }
+  }[] = await db.userRole.findMany({
+    where: {
+      tenantId: { in: tenantIdsLideranca },
+      role: { isSystem: true, nome: SYSTEM_ROLES.OWNER },
+    },
+    select: { tenantId: true, userId: true, user: { select: { nome: true, email: true } } },
+  })
+  const ownerPorTenant = new Map<string, { userId: string; nome: string | null }>()
+  for (const o of ownersRaw) {
+    if (ownerPorTenant.has(o.tenantId)) continue
+    ownerPorTenant.set(o.tenantId, {
+      userId: o.userId,
+      nome: o.user.nome ?? o.user.email,
+    })
+  }
   const podeSolicitarReativacao = presidenteSession != null
   const podeImporReativacao =
     presidenteSession != null &&
@@ -249,7 +269,11 @@ export default async function AdminSedesPage() {
 
   const sedes: AdminSedeListItem[] = rows.map((s) => {
     const portalProprio = Boolean(s.tenantId && s.tenantId !== tenant.id)
-    const temLiderancaVinculada = Boolean(s.responsavelUserId)
+    const tenantLideranca = portalProprio ? s.tenantId : s.tipo === 'SEDE' ? tenant.id : null
+    const owner = tenantLideranca ? ownerPorTenant.get(tenantLideranca) : null
+    const responsavelUserId = owner?.userId ?? s.responsavelUserId
+    const responsavel = owner?.nome ?? s.responsavel
+    const temLiderancaVinculada = Boolean(responsavelUserId)
     const estadoCanal = portalProprio && s.tenantId ? estadoCanalPorTenant.get(s.tenantId) : null
     const pendenteCanal = estadoCanal?.solicitacaoPendente ?? null
     return {
@@ -270,8 +294,8 @@ export default async function AdminSedesPage() {
       telefone: s.telefone,
       horarios: s.horarios,
       capacidade: s.capacidade,
-      responsavel: s.responsavel,
-      responsavelUserId: s.responsavelUserId,
+      responsavel,
+      responsavelUserId,
       fotoUrl: s.fotoUrl,
       ativa: s.ativa,
       lat: s.lat,

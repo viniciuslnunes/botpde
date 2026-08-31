@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   userDepartamentoFindMany: vi.fn(),
   departamentoGestorFindMany: vi.fn(),
   notificacaoCreateMany: vi.fn(),
+  notificacaoFindMany: vi.fn(),
   saasMembroFindMany: vi.fn(),
 }))
 
@@ -25,12 +26,16 @@ vi.mock('@torcida/db', () => ({
     userPermission: { findMany: mocks.userPermissionFindMany },
     userDepartamento: { findMany: mocks.userDepartamentoFindMany },
     departamentoGestor: { findMany: mocks.departamentoGestorFindMany },
-    notificacao: { createMany: mocks.notificacaoCreateMany },
+    notificacao: {
+      createMany: mocks.notificacaoCreateMany,
+      findMany: mocks.notificacaoFindMany,
+    },
     saasMembro: { findMany: mocks.saasMembroFindMany },
   },
 }))
 
 import {
+  criarNotificacoesEmLoteSePendentes,
   listarDestinatariosAdmin,
   listarUserIdsComQualquerPermissao,
   listarUserIdsSuperAdmin,
@@ -151,7 +156,7 @@ describe('notificarUsuariosComPermissao', () => {
       tipo: 'ALIANCA_PROPOSTA',
       titulo: 'Proposta de aliança de Gaviões da Fiel',
       corpo: 'Gaviões da Fiel propôs aliança com Remista.',
-      link: '/admin/aliancas',
+      link: '/admin/aliancas?tab=recebidas',
     })
 
     expect(count).toBe(1)
@@ -163,10 +168,67 @@ describe('notificarUsuariosComPermissao', () => {
           tipo: 'ALIANCA_PROPOSTA',
           titulo: 'Proposta de aliança de Gaviões da Fiel',
           corpo: 'Gaviões da Fiel propôs aliança com Remista.',
-          link: '/admin/aliancas',
+          link: '/admin/aliancas?tab=recebidas',
           atorId: null,
         },
       ],
     })
+  })
+})
+
+describe('criarNotificacoesEmLoteSePendentes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.notificacaoCreateMany.mockResolvedValue({ count: 1 })
+  })
+
+  it('não recria quando já existe não-lida com o mesmo user+tipo+link+ator', async () => {
+    mocks.notificacaoFindMany.mockResolvedValue([
+      {
+        userId: 'gestor-1',
+        tipo: 'DEPARTAMENTO_ADICIONADO',
+        link: '/portal/departamentos/financeiro?tab=pedidos',
+        atorId: 'socio-1',
+      },
+    ])
+
+    const count = await criarNotificacoesEmLoteSePendentes([
+      {
+        userId: 'gestor-1',
+        tenantId: 't1',
+        tipo: 'DEPARTAMENTO_ADICIONADO',
+        titulo: 'Pedido de área pendente',
+        link: '/portal/departamentos/financeiro?tab=pedidos',
+        atorId: 'socio-1',
+      },
+    ])
+
+    expect(count).toBe(0)
+    expect(mocks.notificacaoCreateMany).not.toHaveBeenCalled()
+  })
+
+  it('cria quando o ator é outro sócio na mesma fila', async () => {
+    mocks.notificacaoFindMany.mockResolvedValue([
+      {
+        userId: 'gestor-1',
+        tipo: 'DEPARTAMENTO_ADICIONADO',
+        link: '/portal/departamentos/financeiro?tab=pedidos',
+        atorId: 'socio-1',
+      },
+    ])
+
+    const count = await criarNotificacoesEmLoteSePendentes([
+      {
+        userId: 'gestor-1',
+        tenantId: 't1',
+        tipo: 'DEPARTAMENTO_ADICIONADO',
+        titulo: 'Pedido de área pendente',
+        link: '/portal/departamentos/financeiro?tab=pedidos',
+        atorId: 'socio-2',
+      },
+    ])
+
+    expect(count).toBe(1)
+    expect(mocks.notificacaoCreateMany).toHaveBeenCalled()
   })
 })

@@ -12,7 +12,7 @@ import {
   type StatsTorcidaOnboarding,
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
-import { formatNomeAfiliacao, formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida, isDepartamentoLegado, SETORES_ARQUIBANCADA } from '@torcida/types'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 import { getTenantsRestritos } from '@/lib/isolamento'
 
@@ -44,6 +44,9 @@ function aplicarEstimativaRealNoCard(
   torcedoresEstimadosFonte: string | null
   torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
 } {
+  // PESQUISA (Datafolha x IBGE) e IBOPE são estimativas públicas do clube:
+  // ganham da contagem da plataforma, que ainda é pequena nesses clubes.
+  if (row.torcedoresEstimadosTipo === 'PESQUISA') return row
   if (row.torcedoresEstimadosTipo === 'IBOPE_DIGITAL') return row
 
   const realPlataforma =
@@ -76,7 +79,7 @@ function aplicarEstimativaRealNoCard(
 // ─── Tipos de retorno explícitos (a inferência do Prisma quebra silenciosamente
 // neste schema — ver ARCHITECTURE.md §5.2). ─────────────────────────────────────
 
-export type TorcedoresEstimadosTipo = 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA'
+export type TorcedoresEstimadosTipo = 'PESQUISA' | 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA'
 
 export type AfiliacaoOnboarding = {
   id: string
@@ -247,6 +250,13 @@ export const getSedesDaTorcidaOnboarding = cache(
   },
 )
 
+export type SetorArquibancadaOnboarding = {
+  cardeal: (typeof SETORES_ARQUIBANCADA)[number]
+  geral: boolean
+  nomeLocal: string | null
+  portao: string | null
+}
+
 export type TorcidaOnboarding = {
   id: string
   nome: string
@@ -265,6 +275,8 @@ export type TorcidaOnboarding = {
   exigirDocumentosCadastro: boolean
   /** Periodicidades oferecidas em «Já sou sócio» (vazio = fallback Gaviões). */
   periodicidadesOnboarding: string[]
+  /** Setor da Sede no estádio do time apoiado. Null se ainda não cadastrado. */
+  setor: SetorArquibancadaOnboarding | null
 }
 
 export type DepartamentoOnboarding = {
@@ -351,7 +363,7 @@ async function carregarAfiliacoesParaOnboarding(
     serie: SerieCampeonato | null
     torcedoresEstimados: number | null
     torcedoresEstimadosFonte: string | null
-    torcedoresEstimadosTipo: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
+    torcedoresEstimadosTipo: 'PESQUISA' | 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
     _count: { tenants: number }
   }
   type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
@@ -475,6 +487,20 @@ async function carregarAfiliacoesParaOnboarding(
 }
 
 /**
+ * Depois do onboarding, listar TOs só do próprio clube — nunca as de um rival.
+ * No wizard (ainda escolhendo o time) a lista do clube selecionado é permitida.
+ */
+export function podeListarTorcidasDaAfiliacao(
+  afiliacaoSolicitada: string,
+  perfilAfiliacaoId: string | null,
+  onboardingConcluido: boolean,
+): boolean {
+  if (!onboardingConcluido) return true
+  if (!perfilAfiliacaoId) return false
+  return perfilAfiliacaoId === afiliacaoSolicitada
+}
+
+/**
  * Torcidas (Tenants ativos) vinculadas a um clube, com contagem de membros aprovados.
  * Unidades = worktree (Caso A + Caso B). Tenants-filho promovidos não aparecem
  * como torcida separada no passo Torcida.
@@ -510,6 +536,10 @@ export const getTorcidasPorAfiliacao = cache(
       corPrimaria: string
       exigirDocumentosCadastro: boolean
       periodicidadesOnboarding: string[]
+      setorArquibancada: (typeof SETORES_ARQUIBANCADA)[number] | null
+      setorArquibancadaGeral: boolean
+      setorArquibancadaNome: string | null
+      setorArquibancadaPortao: string | null
       torcidaConhecidaId: string | null
       torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
@@ -524,6 +554,10 @@ export const getTorcidasPorAfiliacao = cache(
         corPrimaria: true,
         exigirDocumentosCadastro: true,
         periodicidadesOnboarding: true,
+        setorArquibancada: true,
+        setorArquibancadaGeral: true,
+        setorArquibancadaNome: true,
+        setorArquibancadaPortao: true,
         torcidaConhecidaId: true,
         torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
@@ -578,6 +612,14 @@ export const getTorcidasPorAfiliacao = cache(
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
         exigirDocumentosCadastro: t.exigirDocumentosCadastro,
         periodicidadesOnboarding: t.periodicidadesOnboarding ?? [],
+        setor: t.setorArquibancada
+          ? {
+              cardeal: t.setorArquibancada,
+              geral: t.setorArquibancadaGeral && (t.setorArquibancada === 'NORTE' || t.setorArquibancada === 'SUL'),
+              nomeLocal: t.setorArquibancadaNome,
+              portao: t.setorArquibancadaPortao,
+            }
+          : null,
       }))
       .sort(compararTorcidasOnboarding)
   },

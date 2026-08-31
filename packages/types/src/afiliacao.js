@@ -42,9 +42,10 @@ export function rotuloSerieClube(serie) {
 }
 
 /** Espelha `enum TorcedoresEstimadosTipo`. */
-export const TORCEDORES_ESTIMADOS_TIPOS = ['IBOPE_DIGITAL', 'LIMITE_ATE']
+export const TORCEDORES_ESTIMADOS_TIPOS = ['PESQUISA', 'IBOPE_DIGITAL', 'LIMITE_ATE']
 
 export const TORCEDORES_ESTIMADOS_TIPO_LABEL = {
+  PESQUISA: 'Pesquisa Datafolha × Censo IBGE',
   IBOPE_DIGITAL: 'IBOPE — Ranking Digital',
   LIMITE_ATE: 'Teto conservador (fora do Top 50)',
 }
@@ -169,6 +170,12 @@ const escudoUrlSchema = z
   .max(500)
   .refine((v) => v.startsWith('https://'), 'O escudo precisa ser servido por HTTPS.')
 
+/** Cor do clube em hex — o Estúdio Design consome como token, sem parser tolerante. */
+const corHexSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Use hex de 6 dígitos, ex.: #0E5B5E.')
+
 const opcional = (schema) =>
   z.preprocess((v) => {
     if (typeof v !== 'string') return v ?? undefined
@@ -195,6 +202,25 @@ export const ClubeSchema = z
     cidade: opcional(z.string().max(100)),
     escudoUrl: opcional(escudoUrlSchema),
     apiExternalId: opcional(z.string().max(60)),
+    // ── Ficha do clube (seed offline; docs/knowledge/fontes-dados-clubes.md) ──
+    // Só o ANO de fundação: as fontes marcam precisão de ano com 1º de janeiro.
+    fundacaoAno: z
+      .union([z.coerce.number().int().min(1850).max(new Date().getFullYear()), z.null()])
+      .optional(),
+    estadio: opcional(z.string().max(140)),
+    estadioCapacidade: z.union([z.coerce.number().int().min(0).max(300_000), z.null()]).optional(),
+    estadioLat: z.union([z.coerce.number().min(-90).max(90), z.null()]).optional(),
+    estadioLng: z.union([z.coerce.number().min(-180).max(180), z.null()]).optional(),
+    siteOficial: opcional(z.string().url('Informe uma URL válida.').max(300)),
+    corPrimaria: opcional(corHexSchema),
+    corSecundaria: opcional(corHexSchema),
+    corAcento: opcional(corHexSchema),
+    coresFonte: opcional(z.string().max(60)),
+    wikidataQid: opcional(z.string().regex(/^Q\d+$/, 'QID do Wikidata é "Q" seguido de números.').max(20)),
+    ogolId: opcional(z.string().max(20)),
+    rncPosicao: z.union([z.coerce.number().int().min(1).max(1000), z.null()]).optional(),
+    rncPontos: z.union([z.coerce.number().int().min(0).max(1_000_000), z.null()]).optional(),
+    rncEdicao: opcional(z.string().max(9)),
     torcedoresEstimados: z
       .union([z.number().int().min(0).max(100_000_000), z.null()])
       .optional(),

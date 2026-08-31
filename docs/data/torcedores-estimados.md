@@ -2,6 +2,19 @@
 
 > Dados **offline** (seed). Nunca consultar IBOPE ou redes em runtime.
 > Inteligência de domínio: `docs/knowledge/futebol-dados-publicos.md`.
+>
+> **Revisão 2026-08-27 — leia antes de usar as tabelas abaixo.**
+> 1. A copy `até X torcedores ou menos` descrita neste doc **não existe mais no
+>    código**: `formatTorcedoresEstimados` (`apps/web/src/lib/format-contagem.ts`)
+>    devolve `base digital não estimada` para `LIMITE_ATE`.
+> 2. No banco, os **274 clubes** com `LIMITE_ATE` estão todos com o mesmo valor
+>    (471.612, o piso do Top 50 IBOPE) — número sem significado, ainda que
+>    invisível na UI.
+> 3. Fonte nova para tamanho de torcida de verdade: **Datafolha 07/2026 × base
+>    IBGE 16+** em `packages/db/src/data/torcedores-pesquisa-datafolha.js`
+>    (tier `PESQUISA` proposto). Avaliação das fontes:
+>    `docs/knowledge/fontes-dados-clubes.md`; medições:
+>    `docs/data/auditoria-catalogo-clubes.md` §3.
 
 ## Objetivo
 

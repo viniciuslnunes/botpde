@@ -45,7 +45,7 @@ export function UnsavedChangesDialog({ entries, onConfirm, onCancel, onClose }: 
         aria-modal="true"
         aria-labelledby="unsaved-changes-title"
         aria-describedby="unsaved-changes-desc"
-        className="torcida-dialog-panel flex w-full max-w-md flex-col rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_24px_48px_-20px_rgb(0_0_0_/_0.35)] sm:rounded-2xl sm:p-6"
+        className="torcida-dialog-panel flex w-full max-w-md flex-col rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_24px_48px_-20px_rgb(0_0_0_/_0.35)] sm:rounded-2xl sm:p-6 sm:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex gap-3.5">

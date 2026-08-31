@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, m } from 'motion/react'
+import { useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import {
   CATEGORIAS_REPROVACAO,
@@ -10,7 +9,7 @@ import {
   PONTOS_REPROVACAO,
   categoriaExigePontos,
 } from '@torcida/types'
-import { lightboxBackdrop, lightboxContent, springGentle } from '@/lib/motion-presets'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { runPersistAction } from '@/lib/toast-action'
 import type { ReprovarMembroInput } from '@/app/admin/membros/actions'
 
@@ -60,19 +59,6 @@ export function ReprovarMembroDialog({
   const [bloquear, setBloquear] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [tentouEnviar, setTentouEnviar] = useState(false)
-
-  // Captura antes do listener de Escape do modal de detalhes — fechar o
-  // diálogo não pode derrubar o card por baixo (e perder o rascunho).
-  useEffect(() => {
-    if (!aberto) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return
-      e.stopPropagation()
-      onFechar()
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [aberto, onFechar])
 
   const grupos = useMemo(() => {
     const disponiveis = (PONTOS_REPROVACAO as PontoCatalogo[]).filter(
@@ -130,30 +116,14 @@ export function ReprovarMembroDialog({
   }
 
   return (
-    <AnimatePresence>
-      {aberto && (
-        <m.div
-          variants={lightboxBackdrop}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 text-left sm:items-center sm:p-4"
-          role="presentation"
-          onClick={onFechar}
-        >
-          <m.div
-            variants={lightboxContent}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            transition={springGentle}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reprovar-membro-titulo"
-            className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <AppModal
+      open={aberto}
+      onClose={onFechar}
+      size="lg"
+      layer="nested"
+      labelledBy="reprovar-membro-titulo"
+      busy={enviando}
+    >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-4 sm:px-5">
               <div className="flex min-w-0 items-start gap-3">
                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
@@ -182,7 +152,7 @@ export function ReprovarMembroDialog({
               </button>
             </div>
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+            <AppModalBody className="space-y-5 px-4 py-4 sm:px-5">
               {avisoEspelho && (
                 <p className="rounded-lg bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">
                   {avisoEspelho}
@@ -235,7 +205,7 @@ export function ReprovarMembroDialog({
                       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                         {grupo}
                       </p>
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-1.5 @md/modal:grid-cols-2">
                         {itens.map((ponto) => {
                           const marcado = pontos.includes(ponto.id)
                           return (
@@ -337,7 +307,7 @@ export function ReprovarMembroDialog({
                   </span>
                 </label>
               )}
-            </div>
+            </AppModalBody>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
               <button
@@ -359,9 +329,6 @@ export function ReprovarMembroDialog({
                 Reprovar cadastro
               </button>
             </div>
-          </m.div>
-        </m.div>
-      )}
-    </AnimatePresence>
+    </AppModal>
   )
 }

@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from 'react'
 import { salvarVitrineLoja, type VitrineState } from '../actions'
 import { ImageUploadField } from '@/components/media/image-upload-field'
+import { LOJA_CAPA_ASPECT } from '@/lib/image-crop'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { useActionStateToast } from '@/lib/toast-action'
@@ -56,11 +57,11 @@ export function LojaVitrineForm({
             formRef.current?.dispatchEvent(new Event('input', { bubbles: true }))
           })
         }}
-        aspect={21 / 9}
-        purpose="perfil-banner"
+        aspect={LOJA_CAPA_ASPECT}
+        purpose="loja"
         tenantId={tenantId}
         fieldErrors={state.fieldErrors?.bannerUrl}
-        hint="Imagem larga (recomendado 21:9). Sem capa, o portal usa o produto em destaque — se a opção abaixo estiver ligada."
+        hint="Mesma proporção dos cards da vitrine (16:9). Sem capa, o portal usa o produto em destaque — se a opção abaixo estiver ligada."
         cropTitle="Ajustar capa da vitrine"
         preview={
           url ? (
@@ -68,10 +69,10 @@ export function LojaVitrineForm({
             <img
               src={url}
               alt="Prévia da capa"
-              className="aspect-[21/9] w-full rounded-xl object-cover"
+              className="aspect-[16/9] w-full rounded-xl object-cover"
             />
           ) : (
-            <div className="flex aspect-[21/9] w-full items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="flex aspect-[16/9] w-full items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-sm text-[rgb(var(--foreground-muted))]">
               Sem capa
             </div>
           )
@@ -82,7 +83,7 @@ export function LojaVitrineForm({
       {url ? (
         <button
           type="button"
-          className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           onClick={() => {
             setUrl('')
             queueMicrotask(() => {

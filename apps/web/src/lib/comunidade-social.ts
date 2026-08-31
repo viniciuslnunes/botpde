@@ -122,3 +122,11 @@ export function isVideoUrl(url: string): boolean {
 export function linkPostComunidade(postId: string): string {
   return `/portal/comunidade/post/${postId}`
 }
+
+/** Permalink do tópico do fórum no canal ativo. */
+export function linkTopicoForum(
+  id: string,
+  escopo: 'nacional' | 'torcida' | 'unidade',
+): string {
+  return `/portal/comunidade/forum/${id}?escopo=${escopo}`
+}

@@ -80,7 +80,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
 
   const dock = (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
+      className="app-inset-x pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
       style={{ left: 0, right: 0 }}
     >
       <m.div

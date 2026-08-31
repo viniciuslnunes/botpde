@@ -1,6 +1,6 @@
 import { db, type Prisma } from '@torcida/db'
 import Link from 'next/link'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, hrefHomeDepartamento } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import {
   ListagemPaginacao,
@@ -18,8 +18,9 @@ import {
   montarWhereListagem,
   resumirPaginacao,
 } from '@/lib/listagem/query'
-import { Layers } from 'lucide-react'
+import { ArrowUpRight, Layers } from 'lucide-react'
 import type { Metadata } from 'next'
+import { AreaGestaoCelulas } from '../_components/area-gestao-celulas'
 
 export const metadata: Metadata = { title: 'Áreas — Departamentos' }
 
@@ -45,8 +46,9 @@ export default async function DepartamentoAreasPage({
     descricao: string | null
     ativa: boolean
     sazonal: boolean
-    departamento: { nome: string; slug: string; cor: string }
+    departamento: { id: string; nome: string; slug: string; cor: string }
     _count: { membros: number }
+    membros: Array<{ user: { nome: string | null; nickname: string | null } }>
   }
 
   const [areas, total]: [AreaRow[], number] = await Promise.all([
@@ -60,8 +62,13 @@ export default async function DepartamentoAreasPage({
         descricao: true,
         ativa: true,
         sazonal: true,
-        departamento: { select: { nome: true, slug: true, cor: true } },
+        departamento: { select: { id: true, nome: true, slug: true, cor: true } },
         _count: { select: { membros: true } },
+        membros: {
+          where: { papel: 'RESPONSAVEL' },
+          take: 3,
+          select: { user: { select: { nome: true, nickname: true } } },
+        },
       },
     }),
     db.departamentoArea.count({ where }),
@@ -96,6 +103,10 @@ export default async function DepartamentoAreasPage({
         escopoChave={tenant.id}
       />
 
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Clique na área para abrir no departamento, ou nomeie o responsável daqui — sem sair da lista.
+      </p>
+
       {areas.length === 0 ? (
         <ListagemVazia
           spec={SPEC}
@@ -109,7 +120,7 @@ export default async function DepartamentoAreasPage({
             ),
             title: 'Nenhuma área cadastrada',
             description:
-              'Rode `pnpm --filter @torcida/db seed:departamento-areas` para semear as áreas canônicas, ou crie as frentes de trabalho no portal do departamento.',
+              'Rode `pnpm --filter @torcida/db seed:departamento-areas` para semear as áreas canônicas, ou abra um departamento na Visão e crie as frentes lá.',
           }}
         />
       ) : (
@@ -129,25 +140,43 @@ export default async function DepartamentoAreasPage({
                   className={coluna.id === 'sazonal' ? 'hidden sm:table-cell' : undefined}
                 />
               ))}
+              <th className="px-4 py-3 text-left text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Responsável
+              </th>
+              <th className="w-10 px-4 py-3">
+                <span className="sr-only">Ações</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {areas.map((a) => (
               <tr key={a.id} className="border-t border-[rgb(var(--border))]">
                 <td className="px-4 py-3">
-                  <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
-                    {a.nome}
-                  </span>
-                  {a.descricao && (
-                    <span className="mt-0.5 block max-w-md text-xs text-[rgb(var(--foreground-muted))]">
-                      {a.descricao}
+                  <Link
+                    href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
+                    className="group inline-flex max-w-md items-start gap-1.5"
+                    aria-label={`Abrir ${a.nome} em ${a.departamento.nome}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-[rgb(var(--foreground))] group-hover:underline">
+                        {a.nome}
+                      </span>
+                      {a.descricao && (
+                        <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                          {a.descricao}
+                        </span>
+                      )}
                     </span>
-                  )}
+                    <ArrowUpRight
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                      aria-hidden
+                    />
+                  </Link>
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/portal/departamentos/${a.departamento.slug}#areas`}
-                    className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
+                    href={hrefHomeDepartamento(a.departamento.slug, 'areas')}
+                    className="app-touch-line inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
                   >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -164,8 +193,25 @@ export default async function DepartamentoAreasPage({
                   {a.sazonal ? 'Sim' : '—'}
                 </td>
                 <td className="px-4 py-3 text-right text-sm text-[rgb(var(--foreground))]">
-                  {a._count.membros}
+                  <Link
+                    href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
+                    className="app-touch-line hover:underline"
+                    aria-label={`${a._count.membros} ${a._count.membros === 1 ? 'pessoa' : 'pessoas'} em ${a.nome}`}
+                  >
+                    {a._count.membros}
+                  </Link>
                 </td>
+                <AreaGestaoCelulas
+                  areaId={a.id}
+                  areaNome={a.nome}
+                  departamentoId={a.departamento.id}
+                  slug={a.departamento.slug}
+                  href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
+                  semResponsavel={a.membros.length === 0}
+                  responsaveis={a.membros.map(
+                    (m) => m.user.nome?.trim() || (m.user.nickname ? `@${m.user.nickname}` : 'Pessoa'),
+                  )}
+                />
               </tr>
             ))}
           </tbody>

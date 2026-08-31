@@ -201,12 +201,12 @@ export function ProdutoGaleria({ imagensUrl, nome }: ProdutoGaleriaProps) {
             </>
           )}
 
-          <div className="flex max-h-[90vh] max-w-[90vw] flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex max-h-[90dvh] max-w-[90vw] flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={atual}
               alt={nome}
-              className="max-h-[80vh] max-w-full object-contain"
+              className="max-h-[80dvh] max-w-full object-contain"
               referrerPolicy="no-referrer"
             />
             {total > 1 && (

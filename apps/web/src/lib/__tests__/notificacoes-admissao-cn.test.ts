@@ -24,6 +24,26 @@ vi.mock('@/lib/comunidade-contexto', () => ({
 
 vi.mock('@/lib/notificacoes-menu-badges', () => ({
   agregarBadgesPorMenu: () => ({}),
+  agregarBadgesDeInbox: () => ({
+    menuBadges: {},
+    tabBadges: {},
+    portalNavBadges: { departamentos: 0, eventos: 0, loja: 0, carteirinha: 0, sedes: 0, comunidade: 0, porSlug: {}, porSecao: {} },
+  }),
+  emptyInboxBadges: () => ({
+    menuBadges: {},
+    tabBadges: {},
+    portalNavBadges: { departamentos: 0, eventos: 0, loja: 0, carteirinha: 0, sedes: 0, comunidade: 0, porSlug: {}, porSecao: {} },
+  }),
+  emptyPortalNavBadges: () => ({
+    departamentos: 0,
+    eventos: 0,
+    loja: 0,
+    carteirinha: 0,
+    sedes: 0,
+    comunidade: 0,
+    porSlug: {},
+    porSecao: {},
+  }),
 }))
 
 vi.mock('@/lib/env', () => ({

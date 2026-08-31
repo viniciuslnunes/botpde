@@ -11,6 +11,7 @@ import {
   linkCanalComunidade,
   linkTorcidaComunidadePublica,
   orPostsDoMuralCanal,
+  decidirFeedInternoDoMural,
 } from '../canais-shared'
 
 describe('canais', () => {
@@ -142,6 +143,73 @@ describe('orPostsDoMuralCanal', () => {
     expect(where.AND).toHaveLength(2)
     expect(where.AND[0]).toEqual({ OR: orPostsDoMuralCanal(CANAL, TENANT) })
     expect(where.AND[1]).toBe(cursorWhere)
+  })
+})
+
+describe('decidirFeedInternoDoMural', () => {
+  const SEDE = 'canal-sede'
+  const PDE = 'canal-pde'
+  const MAE = 'tenant-gavioes'
+  const UNIDADE = 'tenant-baixada'
+
+  it('temático nunca mistura Só torcida', () => {
+    expect(
+      decidirFeedInternoDoMural({
+        canalOficial: false,
+        canalId: PDE,
+        oficialSedeId: SEDE,
+        vinculoTenantId: MAE,
+        viewerTenantId: MAE,
+      }),
+    ).toEqual({ incluir: false, feedInternoTenantId: null })
+  })
+
+  it('mural da Sede mistura Só torcida do tenant do viewer', () => {
+    expect(
+      decidirFeedInternoDoMural({
+        canalOficial: true,
+        canalId: SEDE,
+        oficialSedeId: SEDE,
+        vinculoTenantId: MAE,
+        viewerTenantId: MAE,
+      }),
+    ).toEqual({ incluir: true, feedInternoTenantId: MAE })
+  })
+
+  it('Caso B: viewer na Sede, vínculo na PDE — mistura o tenant da unidade', () => {
+    expect(
+      decidirFeedInternoDoMural({
+        canalOficial: true,
+        canalId: PDE,
+        oficialSedeId: SEDE,
+        vinculoTenantId: UNIDADE,
+        viewerTenantId: MAE,
+      }),
+    ).toEqual({ incluir: true, feedInternoTenantId: UNIDADE })
+  })
+
+  it('Caso B no portal da unidade (sem canal SEDE neste tenant): mistura o da unidade', () => {
+    expect(
+      decidirFeedInternoDoMural({
+        canalOficial: true,
+        canalId: PDE,
+        oficialSedeId: null,
+        vinculoTenantId: UNIDADE,
+        viewerTenantId: UNIDADE,
+      }),
+    ).toEqual({ incluir: true, feedInternoTenantId: UNIDADE })
+  })
+
+  it('Caso A: PDE no tenant da mãe NÃO mistura o feed da organizada', () => {
+    expect(
+      decidirFeedInternoDoMural({
+        canalOficial: true,
+        canalId: PDE,
+        oficialSedeId: SEDE,
+        vinculoTenantId: MAE,
+        viewerTenantId: MAE,
+      }),
+    ).toEqual({ incluir: false, feedInternoTenantId: null })
   })
 })
 

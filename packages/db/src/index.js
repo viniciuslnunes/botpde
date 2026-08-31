@@ -112,9 +112,7 @@ function createPrismaClient() {
   })
 }
 
-export const db =
-  globalForPrisma.prisma ??
-  createPrismaClient()
+export const db = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
@@ -171,7 +169,12 @@ export async function disconnectAll() {
   tenantClients.clear()
 }
 
-export * from '@prisma/client'
+// Reexport NOMEADO do @prisma/client, gerado por scripts/gerar-prisma-exports.js.
+// `export * from '@prisma/client'` direto obrigava o Turbopack a resolver os
+// nomes em runtime (o client é CJS): 127 avisos por recompilação e código extra
+// em cada módulo da cadeia. Aqui o `export *` é de um módulo ESM local com
+// nomes estáticos, que o bundler resolve em tempo de compilação.
+export * from './prisma-exports.js'
 export {
   normalizeNome,
   chaveMatch,

@@ -4,15 +4,13 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
-import { NotificationAvatar } from '@/components/portal/notification-item-visual'
+import {
+  NotificationAvatar,
+  formatarTituloNotificacao,
+  formatarQuandoNotificacao,
+  type NotificacaoAtorInfo,
+} from '@/components/portal/notification-item-visual'
 import { markAdminNavbarNotificationRead } from '@/lib/use-admin-navbar-context'
-
-function formatarData(data: Date | string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(data))
-}
 
 export function AdminNotificacaoLink({
   id,
@@ -22,6 +20,7 @@ export function AdminNotificacaoLink({
   link,
   lida: lidaInicial,
   criadoEm,
+  ator,
 }: {
   id: string
   tipo: TipoNotificacao
@@ -30,6 +29,7 @@ export function AdminNotificacaoLink({
   link: string | null
   lida: boolean
   criadoEm: Date | string
+  ator: NotificacaoAtorInfo | null
 }) {
   const [lida, setLida] = useState(lidaInicial)
   const [, startTransition] = useTransition()
@@ -65,16 +65,16 @@ export function AdminNotificacaoLink({
       ].join(' ')}
     >
       <span className="flex items-start gap-2.5">
-        <NotificationAvatar ator={null} tipo={tipo} size="sm" />
+        <NotificationAvatar ator={ator} tipo={tipo} size="sm" />
         <span className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[rgb(var(--foreground))]">{titulo}</p>
-          {corpo && (
-            <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-              {corpo}
-            </p>
-          )}
+          <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+            {formatarTituloNotificacao({ tipo, titulo, ator })}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+            {corpo?.trim() || titulo}
+          </p>
           <p className="mt-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-            {formatarData(criadoEm)}
+            {formatarQuandoNotificacao(criadoEm)}
           </p>
         </span>
       </span>

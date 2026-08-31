@@ -113,11 +113,27 @@ export type ContextoComunidadePortal =
 
 export function resolverEscopoComunidade(
   ctx: ContextoComunidadePortal,
-  escopoParam: string | undefined,
+  escopoParam: string | undefined | null,
 ): EscopoComunidade {
   return resolverEscopoComunidadePorModo(ctx.modo, ctx.escopos, escopoParam, {
     tenantAtivoEhUnidade: ctx.modo === 'torcida' && ctx.tenantAtivoEhUnidade,
   })
+}
+
+/**
+ * Tenant em que a busca / typeahead de menções roda, dado o escopo já
+ * resolvido. Não autoriza — só aponta o container. Rivais ficam de fora na
+ * query (`resolveVisibleTenantIdsForFeed` / `getVisibleTenantIds`).
+ */
+export function resolverTenantIdBuscaComunidade(
+  ctx: ContextoComunidadePortal,
+  escopo: EscopoComunidade,
+): string | null {
+  if (escopo === 'nacional' && ctx.tenantSintetico) return ctx.tenantSintetico.id
+  if (ctx.modo === 'torcida') return ctx.tenant.id
+  if (ctx.torcidaReal) return ctx.torcidaReal.id
+  if (ctx.tenantSintetico) return ctx.tenantSintetico.id
+  return null
 }
 
 /**

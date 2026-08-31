@@ -15,9 +15,13 @@ import {
   Lock,
   UserCircle2,
   LogOut,
+  Shield,
   Menu,
   X,
   ChevronDown,
+  UserPlus,
+  Globe2,
+  History,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { markNavbarNotificationRead, refreshNavbarContext } from '@/lib/use-navbar-context'
@@ -30,6 +34,18 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { LogoMiniatura } from '@/components/media/logo-miniatura'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { PendenciaBadge } from '@/components/pendencia-badge'
+import type { PortalNavBadges } from '@/lib/notificacoes-menu-badges'
+
+function badgeDaNav(href: string, badges: PortalNavBadges): number {
+  if (href === '/portal/comunidade') return badges.comunidade
+  if (href === '/portal/departamentos') return badges.departamentos
+  if (href === '/portal/eventos') return badges.eventos
+  if (href === '/portal/loja') return badges.loja
+  if (href === '/portal/carteirinha') return badges.carteirinha
+  if (href === '/portal/sedes') return badges.sedes
+  return 0
+}
 
 /** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
  * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`.
@@ -39,7 +55,10 @@ const navLinks = [
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
   { href: '/portal/eventos', label: 'Agenda', icon: Calendar, prefetch: 'hover' as const },
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: 'hover' as const },
-  { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
+  { href: '/portal/loja', label: 'Lojas', icon: ShoppingBag, prefetch: 'hover' as const },
+  // Memórias é menu como os demais (não ícone no cluster de chat/notificações);
+  // continua visível na CN, onde o href leva `?escopo=clube`.
+  { href: '/portal/memoria', label: 'Memórias', icon: History, prefetch: 'hover' as const },
 ] as const
 
 /** Torcedor global (CN sem vínculo) — seções por tenant ficariam vazias. */
@@ -98,6 +117,15 @@ interface PortalNavbarProps {
   escopoCanal?: EscopoComunidade | null
   /** Marca do `escopoCanal` — slot esquerdo fora da Comunidade. */
   brandCanal?: NavbarBrand | null
+  /**
+   * CTA Associe-se, injetado **após Comunidade** (não no cluster da direita).
+   * Null = oculto (já é sócio, sem clube no perfil, ou operador).
+   * “Ver no Brasil” só entra no escopo da comunidade do clube (CN), nunca
+   * no portal de uma torcida/unidade.
+   */
+  associeSe?: { href: string; label: string; pendente: boolean } | null
+  /** Allowlist de e-mail — atalho para `/super-admin`. Sem isso o item some. */
+  isSuperAdmin?: boolean
 }
 
 export function PortalNavbar({
@@ -110,10 +138,12 @@ export function PortalNavbar({
   tenantSlugAtual = null,
   escopoCanal = null,
   brandCanal = null,
+  associeSe = null,
+  isSuperAdmin = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
+  const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications, navBadges } =
     useNavbarContext()
   const {
     override: brandOverride,
@@ -127,6 +157,28 @@ export function PortalNavbar({
   const brandTenant = brandOverride ?? brandCanal ?? tenant
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
+
+  const userDropRef = useRef<HTMLDivElement>(null)
+
+  // pointerdown (não backdrop): o header tem `backdrop-blur`, que vira bloco
+  // contentor de `position: fixed` — um `fixed inset-0` aqui cobriria só a
+  // faixa do header e o clique no corpo da página não fechava o menu.
+  useEffect(() => {
+    if (!userDropOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (userDropRef.current?.contains(e.target as Node)) return
+      setUserDropOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setUserDropOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [userDropOpen])
 
   // O layout do portal não remonta ao trocar de torcida (redirect client-side
   // dentro da mesma rota) — o cache de 20s de useNavbarContext (hasAdminAreaAccess
@@ -183,9 +235,48 @@ export function PortalNavbar({
     ? linksComDepto.filter((link) => !LINKS_REATIVOS_CANAL.has(link.href))
     : linksComDepto
 
-  // Abaixo de xl a faixa de ações fica só com Mensagens, notificações e o
-  // cadeado do admin: os módulos (Agenda/Sedes/Loja/…) já aparecem inteiros no
-  // menu hambúrguer, e repetir cada um como ícone poluía a topbar no celular.
+  type NavItem = {
+    href: string
+    label: string
+    icon: typeof Users
+    prefetch: 'hover'
+  }
+
+  const ctasAposComunidade: NavItem[] = []
+  if (associeSe) {
+    ctasAposComunidade.push({
+      href: associeSe.href,
+      label: associeSe.label,
+      icon: UserPlus,
+      prefetch: 'hover',
+    })
+  }
+  if (emEscopoNacional) {
+    ctasAposComunidade.push({
+      href: '/portal/mapa-brasil',
+      label: 'Ver no Brasil',
+      icon: Globe2,
+      prefetch: 'hover',
+    })
+  }
+
+  const linksNav: NavItem[] = (() => {
+    const extra = ctasAposComunidade
+    const idx = links.findIndex((l) => l.href === '/portal/comunidade')
+    const comoItens: NavItem[] = links.map((l) => ({
+      href: l.href,
+      label: l.label,
+      icon: l.icon,
+      prefetch: l.prefetch,
+    }))
+    if (idx === -1) return [...extra, ...comoItens]
+    return [...comoItens.slice(0, idx + 1), ...extra, ...comoItens.slice(idx + 1)]
+  })()
+
+  // Abaixo de xl a faixa de ações fica só com Mensagens e notificações: os
+  // módulos (Agenda/Sedes/Loja/…) já aparecem inteiros no menu hambúrguer, e
+  // repetir cada um como ícone poluía a topbar no celular. Admin e tema
+  // entram no dropdown do usuário (desktop) ou no hambúrguer (abaixo de xl).
 
   // Volta para a Comunidade na aba que a pessoa estava lendo. Sem o param, o
   // resolver cai no default do modo (CN para torcedor) e a ida a Agenda/Loja
@@ -195,7 +286,14 @@ export function PortalNavbar({
     : '/portal/comunidade'
 
   function hrefDoLink(href: string) {
-    return href === '/portal/comunidade' ? hrefComunidade : href
+    if (href === '/portal/comunidade') return hrefComunidade
+    // Memória segue o canal da top bar (cookie), não o tenant da sessão.
+    if (href === '/portal/memoria') {
+      if (emEscopoNacional) return '/portal/memoria?escopo=clube'
+      if (escopoEfetivo === 'torcida') return '/portal/memoria?escopo=torcida'
+      if (escopoEfetivo === 'unidade') return '/portal/memoria?escopo=unidade'
+    }
+    return href
   }
 
   function isActive(href: string) {
@@ -220,19 +318,15 @@ export function PortalNavbar({
     ].join(' ')
   }
 
-  const adminIconClass = [
-    'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
-    pathname.startsWith('/admin')
-      ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-  ].join(' ')
+  const dropItemClass =
+    'app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
 
   return (
     <NavPendingProvider>
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
         <div className="app-container flex h-14 items-center gap-2 sm:gap-4">
 
-          <PortalNavLink href={hrefComunidade} className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
+          <PortalNavLink href={hrefComunidade} className="app-touch-line flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
               <LogoMiniatura
                 src={brandTenant.logoUrl}
@@ -253,8 +347,34 @@ export function PortalNavbar({
             </span>
           </PortalNavLink>
 
+          <nav className="app-scrollbar-none flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden">
+            {linksNav
+              .filter(
+                (link) =>
+                  link.href === '/portal/comunidade' ||
+                  link.href === '/portal/mapa-brasil' ||
+                  link.href === '/portal/associe-se' ||
+                  link.href.startsWith('/onboarding/solicitado'),
+              )
+              .map((link) => {
+                const Icon = link.icon
+                const active = isActive(link.href)
+                return (
+                  <PortalNavLink
+                    key={`sm-${link.href}`}
+                    href={hrefDoLink(link.href)}
+                    prefetch={link.prefetch}
+                    className={`${linkClass(active)} shrink-0`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {link.label}
+                  </PortalNavLink>
+                )
+              })}
+          </nav>
+
           <nav className="app-scrollbar-none hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] xl:flex [&::-webkit-scrollbar]:hidden">
-            {links.map((link) => {
+            {linksNav.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
               return (
@@ -262,10 +382,11 @@ export function PortalNavbar({
                   key={link.href}
                   href={hrefDoLink(link.href)}
                   prefetch={link.prefetch}
-                  className={linkClass(active)}
+                  className={`${linkClass(active)} shrink-0`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {link.label}
+                  <PendenciaBadge count={badgeDaNav(link.href, navBadges)} />
                 </PortalNavLink>
               )
             })}
@@ -281,7 +402,7 @@ export function PortalNavbar({
                   : 'Mensagens'
               }
               className={[
-                'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
+                'app-action relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
                 pathname.startsWith('/portal/mensagens')
                   ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                   : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
@@ -300,25 +421,11 @@ export function PortalNavbar({
               unreadCount={unreadNotifications}
               onMarkRead={markNavbarNotificationRead}
             />
-            {mostrarCadeadoAdmin && (
-              <Link
-                href="/admin"
-                prefetch={false}
-                aria-label="Área administrativa"
-                title="Área administrativa"
-                className={adminIconClass}
-              >
-                <Lock className="h-4 w-4" />
-              </Link>
-            )}
-            <div className="hidden sm:block">
-              <ThemeToggle />
-            </div>
 
-            <div className="relative hidden xl:block">
+            <div ref={userDropRef} className="relative hidden xl:block">
               <button
                 onClick={() => setUserDropOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+                className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
               >
                 {userAvatar ? (
                   canOptimizeImageUrl(userAvatar) ? (
@@ -348,30 +455,47 @@ export function PortalNavbar({
               </button>
 
               {userDropOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                  <Link
+                    href="/portal/perfil"
                     onClick={() => setUserDropOpen(false)}
-                  />
-                  <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                    className={dropItemClass}
+                  >
+                    <UserCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                    Meu Perfil
+                  </Link>
+                  {mostrarCadeadoAdmin && (
                     <Link
-                      href="/portal/perfil"
+                      href="/admin"
+                      prefetch={false}
                       onClick={() => setUserDropOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                      className={dropItemClass}
                     >
-                      <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                      Meu Perfil
+                      <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                      Área administrativa
                     </Link>
-                    <div className="my-1 border-t border-[rgb(var(--border))]" />
-                    <button
-                      onClick={() => signOut({ callbackUrl: '/entrar' })}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                  )}
+                  {isSuperAdmin && (
+                    <Link
+                      href="/super-admin"
+                      prefetch={false}
+                      onClick={() => setUserDropOpen(false)}
+                      className={dropItemClass}
                     >
-                      <LogOut className="h-4 w-4" />
-                      Sair
-                    </button>
-                  </div>
-                </>
+                      <Shield className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                      Área Super Admin
+                    </Link>
+                  )}
+                  <ThemeToggle variant="dropdown" />
+                  <div className="my-1 border-t border-[rgb(var(--border))]" />
+                  <button
+                    onClick={() => signOut({ callbackUrl: '/entrar' })}
+                    className="app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" />
+                    Sair
+                  </button>
+                </div>
               )}
             </div>
 
@@ -426,7 +550,7 @@ export function PortalNavbar({
                   </span>
                 )}
               </PortalNavLink>
-              {links.map((link) => {
+              {linksNav.map((link) => {
                 const Icon = link.icon
                 const active = isActive(link.href)
                 return (
@@ -439,9 +563,35 @@ export function PortalNavbar({
                   >
                     <Icon className="h-4 w-4" />
                     {link.label}
+                    <PendenciaBadge
+                      count={badgeDaNav(link.href, navBadges)}
+                      className="ml-auto min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white"
+                    />
                   </PortalNavLink>
                 )
               })}
+              {mostrarCadeadoAdmin && (
+                <Link
+                  href="/admin"
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className={mobileLinkClass(pathname.startsWith('/admin'))}
+                >
+                  <Lock className="h-4 w-4" />
+                  Área administrativa
+                </Link>
+              )}
+              {isSuperAdmin && (
+                <Link
+                  href="/super-admin"
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className={mobileLinkClass(pathname.startsWith('/super-admin'))}
+                >
+                  <Shield className="h-4 w-4" />
+                  Área Super Admin
+                </Link>
+              )}
               <ThemeToggle variant="row" />
               <button
                 onClick={() => signOut({ callbackUrl: '/entrar' })}

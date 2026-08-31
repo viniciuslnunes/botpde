@@ -11,6 +11,7 @@ import {
 import { auth } from '@/lib/auth'
 import { superAdminEmails } from '@/lib/env'
 import { invalidateTorcidasSelecaoCache } from '@/lib/tenant-context'
+import { invalidateRivalidadeCache } from '@/lib/hierarquia'
 import {
   carregarUnidadesDaTorcida,
   invalidarMetricasClubes,
@@ -402,6 +403,7 @@ export async function alternarRivalidadeAction(
     clubeId,
     { rivalId },
   )
+  invalidateRivalidadeCache()
   propagarCatalogo(clubeId)
   return { ok: true, clubeId }
 }

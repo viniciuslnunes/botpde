@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { validarCupom, calcularDesconto, chaveTamanho, percentualDesconto, ordenarTamanhos } from '@torcida/types'
+import { validarCupom, calcularDesconto, chaveTamanho, percentualDesconto, ordenarTamanhos, resolverCapaLoja } from '@torcida/types'
+import { validarEnderecoEnvio } from '@/lib/loja-checkout-endereco'
 
 describe('loja — cupom', () => {
   const cupom10 = { tipo: 'PERCENTUAL' as const, valor: 10, ativo: true, primeiraCompra: true, validoAte: null }
@@ -44,5 +45,52 @@ describe('loja — tamanhos e promo', () => {
 
   it('ordena tamanhos e ignora UN', () => {
     expect(ordenarTamanhos(['GG', 'UN', 'P', 'M', 'G1'])).toEqual(['P', 'M', 'GG', 'G1'])
+  })
+})
+
+describe('loja — capa da vitrine', () => {
+  it('prefere o banner gravado', () => {
+    const r = resolverCapaLoja(
+      { bannerUrl: 'https://cdn.example/capa.jpg', usarDestaqueComoCapa: true },
+      'https://cdn.example/destaque.jpg',
+    )
+    expect(r).toEqual({ capaUrl: 'https://cdn.example/capa.jpg', capaCustom: true })
+  })
+
+  it('cai no destaque quando a opção está ligada', () => {
+    const r = resolverCapaLoja(
+      { bannerUrl: null, usarDestaqueComoCapa: true },
+      'https://cdn.example/destaque.jpg',
+    )
+    expect(r).toEqual({ capaUrl: 'https://cdn.example/destaque.jpg', capaCustom: false })
+  })
+
+  it('fica sem capa se o fallback está desligado', () => {
+    const r = resolverCapaLoja(
+      { bannerUrl: null, usarDestaqueComoCapa: false },
+      'https://cdn.example/destaque.jpg',
+    )
+    expect(r).toEqual({ capaUrl: null, capaCustom: false })
+  })
+})
+
+describe('loja — endereço de envio no checkout', () => {
+  it('pede CEP, rua e número quando estão vazios', () => {
+    const r = validarEnderecoEnvio({ cep: '', rua: '', numero: '' })
+    expect(r.cep).toBeTruthy()
+    expect(r.rua).toBeTruthy()
+    expect(r.numero).toBeTruthy()
+  })
+
+  it('aceita CEP com hífen', () => {
+    const r = validarEnderecoEnvio({ cep: '01310-100', rua: 'Av. Paulista', numero: '1000' })
+    expect(r).toEqual({})
+  })
+
+  it('rejeita CEP incompleto', () => {
+    const r = validarEnderecoEnvio({ cep: '01310', rua: 'Av. Paulista', numero: '1000' })
+    expect(r.cep).toBeTruthy()
+    expect(r.rua).toBeUndefined()
+    expect(r.numero).toBeUndefined()
   })
 })

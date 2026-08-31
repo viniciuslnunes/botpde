@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { Lock, Globe } from 'lucide-react'
+import { Lock, Globe, Shield } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
@@ -14,6 +14,7 @@ interface PerfilHeaderProps {
   segueVoce: boolean
   isSelf: boolean
   acoes?: React.ReactNode
+  nivelLabel?: string | null
 }
 
 export function PerfilHeader({
@@ -27,6 +28,7 @@ export function PerfilHeader({
   segueVoce,
   isSelf,
   acoes,
+  nivelLabel = null,
 }: PerfilHeaderProps) {
   const objectPosition = `center ${Math.min(100, Math.max(0, bannerPos ?? 50))}%`
   return (
@@ -86,6 +88,12 @@ export function PerfilHeader({
             {perfilPrivado ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
             {perfilPrivado ? 'Perfil privado' : 'Perfil público'}
           </span>
+          {nivelLabel ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--color-primary-fg))]">
+              <Shield className="h-3 w-3" />
+              {nivelLabel}
+            </span>
+          ) : null}
           {segueVoce && !isSelf && (
             <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
               Segue você

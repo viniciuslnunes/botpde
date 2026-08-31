@@ -12,6 +12,8 @@ import {
   Radio,
   ListOrdered,
   Scale,
+  Newspaper,
+  MessagesSquare,
   type LucideIcon,
 } from 'lucide-react'
 import { CanalFocoNavLink } from '../canais/canais-list-link'
@@ -39,27 +41,28 @@ export function ComunidadeFeedNavClient({
   escopo?: EscopoComunidade
 }) {
   const pathname = usePathname()
-  const modoNacional = escopo === 'nacional'
-  const sufixo = modoNacional ? '?escopo=nacional' : ''
+  const sufixo = `?escopo=${escopo}`
 
   const navItems: NavItem[] = [
     { href: `/portal/comunidade${sufixo}`, label: 'Feed', icon: Rss },
-    ...(modoNacional
+    { href: `/portal/comunidade/noticias${sufixo}`, label: 'Notícias', icon: Newspaper },
+    { href: `/portal/comunidade/forum${sufixo}`, label: 'Fórum', icon: MessagesSquare },
+    ...(escopo === 'nacional'
       ? []
-      : [{ href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark }]),
+      : [{ href: `/portal/comunidade/salvos${sufixo}`, label: 'Salvos', icon: Bookmark }]),
     { href: `/portal/comunidade/busca${sufixo}`, label: 'Buscar', icon: Search },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video },
     { href: `/portal/comunidade/grupos${sufixo}`, label: 'Grupos', icon: Users },
     { href: `/portal/comunidade/canais${sufixo}`, label: 'Canais', icon: Radio },
     { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
-    ...(mostrarBalanco && !modoNacional
+    ...(mostrarBalanco && escopo !== 'nacional'
       ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
       : []),
-    ...(modoNacional
+    ...(escopo === 'nacional'
       ? []
       : [
           {
-            href: '/portal/comunidade/seguindo',
+            href: `/portal/comunidade/seguindo${sufixo}`,
             label: 'Solicitações',
             icon: UserPlus,
             badge: solicitacoesPendentes,

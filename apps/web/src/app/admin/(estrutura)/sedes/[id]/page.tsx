@@ -7,6 +7,8 @@ import {
   hasPermission,
   PERMISSIONS,
   formatNomeTorcida,
+  casoLiderancaDaSede,
+  rotuloCargoMaximo,
 } from '@torcida/types'
 import { assertPodeMutarSedeNaArvore } from '@/lib/sede-acesso-mae'
 import { redirect, notFound } from 'next/navigation'
@@ -16,6 +18,7 @@ import { PromoverSedeButton } from '@/components/admin/promover-sede-button'
 import { AdminDetailHeader, KpiGrid, StatCard } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { labelTipoUnidade } from '@/lib/canais-shared'
+import { resolverLiderancaDaSede } from '@/lib/lideranca'
 import { Badge } from '@torcida/ui'
 import { Calendar, MapPin, Users } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -148,6 +151,7 @@ export default async function EditarSedePage({
     tenantNome: string
   }
   let paiHerdado: PaiHerdadoLite | null = null
+  let parentTenantId: string | null = null
   if (sede.sedeId) {
     const pai: {
       id: string
@@ -165,6 +169,7 @@ export default async function EditarSedePage({
         tenant: { select: { nome: true } },
       },
     })
+    parentTenantId = pai?.tenantId ?? null
     if (pai?.tenantId && pai.tenantId !== tenantDaUnidade && pai.tenant) {
       paiHerdado = {
         id: pai.id,
@@ -174,6 +179,19 @@ export default async function EditarSedePage({
       }
     }
   }
+
+  const casoLideranca = casoLiderancaDaSede({
+    tipo: sede.tipo,
+    tenantId: sede.tenantId,
+    parentTenantId,
+  })
+  const lideresUnidade = await resolverLiderancaDaSede({
+    sedeId: sede.id,
+    tipo: sede.tipo,
+    tenantId: sede.tenantId,
+    parentTenantId,
+  })
+  const liderPrincipal = lideresUnidade[0] ?? null
 
   const candidatos = candidatosRaw.map((m) => ({
     id: m.userId,
@@ -354,8 +372,8 @@ export default async function EditarSedePage({
               estado: sede.estado,
               cep: sede.cep,
               capacidade: sede.capacidade,
-              responsavel: sede.responsavel,
-              responsavelUserId: sede.responsavelUserId,
+              responsavel: liderPrincipal?.nome ?? sede.responsavel,
+              responsavelUserId: liderPrincipal?.userId ?? sede.responsavelUserId,
               telefone: sede.telefone,
               horarios: sede.horarios,
               descricao: sede.descricao,
@@ -370,6 +388,10 @@ export default async function EditarSedePage({
             sedes={todasSedes}
             candidatos={candidatos}
             paiHerdado={paiHerdado}
+            liderancaCasoB={casoLideranca === 'B'}
+            rotuloLideranca={rotuloCargoMaximo(sede.tipo)}
+            presidenciaHref={portalProprio ? `/admin/torcida/unidade/${sede.tenantId}` : '/admin/presidencia'}
+            lideres={lideresUnidade}
           />
         </MotionReveal>
         ) : (

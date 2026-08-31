@@ -10,6 +10,11 @@ import {
 } from '@/lib/tenant-context'
 import { listarUnidadesParaSelecao } from '@/lib/admin-context-unidades'
 import { contarPendentesSuperAdmin } from '@/lib/super-admin/pendentes-badges'
+import { getInboxNavbar } from '@/lib/notificacoes'
+import {
+  remapLinkInboxPlataforma,
+  TIPOS_NOTIFICACAO_PLATAFORMA,
+} from '@/lib/notificacoes-plataforma'
 import type { UnidadeOpcao } from '@/lib/torcida-labels'
 
 /**
@@ -32,11 +37,14 @@ export default async function SuperAdminLayout({
     redirect('/')
   }
 
-  const [torcidas, clubes, tenant, badges] = await Promise.all([
+  const [torcidas, clubes, tenant, badges, inbox] = await Promise.all([
     listarTorcidasParaSelecao(),
     listarClubesParaSelecao(),
     getTenantFromHost(),
     contarPendentesSuperAdmin(),
+    getInboxNavbar(null, session.user.id, TIPOS_NOTIFICACAO_PLATAFORMA, 8, {
+      crossTenant: true,
+    }),
   ])
 
   const unidades: UnidadeOpcao[] = tenant
@@ -53,6 +61,10 @@ export default async function SuperAdminLayout({
       clubes={clubes}
       unidades={unidades}
       badges={badges}
+      notifications={inbox.notifications.map((n) => ({
+        ...n,
+        link: remapLinkInboxPlataforma(n.link),
+      }))}
     >
       <SuperAdminMotionShell>{children}</SuperAdminMotionShell>
     </SuperAdminShell>

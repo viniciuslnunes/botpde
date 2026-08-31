@@ -12,7 +12,7 @@ export default async function ValidarCarteirinhaPage({ searchParams }: Props) {
 
   if (!payload) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[60dvh] max-w-md flex-col items-center justify-center px-4 text-center">
         <XCircle className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
         <h1 className="text-lg font-semibold">QR inválido</h1>
         <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
@@ -25,7 +25,7 @@ export default async function ValidarCarteirinhaPage({ searchParams }: Props) {
   const result = await validarCarteirinhaPorPayload(payload)
 
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-12">
+    <div className="mx-auto flex min-h-[60dvh] max-w-md flex-col justify-center px-4 py-12">
       <div
         className={[
           'rounded-2xl border p-6 text-center',

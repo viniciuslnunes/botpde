@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
-import { saudeOrcamento, STATUS_PROJETO_ABERTOS } from '@torcida/types'
+import { hrefHomeDepartamento, saudeOrcamento, STATUS_PROJETO_ABERTOS } from '@torcida/types'
 import { diasParaEvento } from '@/lib/eventos'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import {
@@ -197,7 +197,7 @@ async function fetchDirecaoSocial(
           id: `orc-${p.id}`,
           titulo: `Orçamento estourado · ${p.titulo}`,
           detalhe: `${saude.percentual}% do previsto consumido.`,
-          href: `/portal/departamentos/${depto.slug}#projetos`,
+          href: hrefHomeDepartamento(depto.slug, 'projetos'),
           tom: 'danger',
         })
       }
@@ -209,7 +209,7 @@ async function fetchDirecaoSocial(
       id: 'sem-campanhas',
       titulo: 'Nenhuma campanha aberta',
       detalhe: 'Abra uma campanha/projeto no cockpit do departamento.',
-      href: `/portal/departamentos/${depto.slug}#projetos`,
+      href: hrefHomeDepartamento(depto.slug, 'projetos'),
       tom: 'warning',
     })
   }

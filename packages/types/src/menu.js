@@ -361,6 +361,12 @@ export const ADMIN_MODULOS = ([
         href: '/admin/loja/tickets',
         permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
       },
+      {
+        id: 'brecho',
+        label: 'Brechó',
+        href: '/admin/loja/brecho',
+        permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
+      },
       { id: 'cupons', label: 'Cupons', href: '/admin/loja/cupons', permissao: PERMISSIONS.STORE_MANAGE },
       {
         id: 'desempenho',
@@ -454,6 +460,12 @@ export const ADMIN_MODULOS = ([
         label: 'Notícias',
         href: '/admin/comunidade/noticias',
         permissao: [PERMISSIONS.COMMUNITY_VIEW, PERMISSIONS.NEWS_CURATE],
+      },
+      {
+        id: 'memoria',
+        label: 'Memórias',
+        href: '/admin/comunidade/memoria',
+        permissao: PERMISSIONS.COMMUNITY_MODERATE,
       },
     ],
   },
@@ -698,6 +710,39 @@ export function resolverMenuIdDeRota(rota) {
   }
 
   return menuId
+}
+
+/**
+ * Href canônico da **tab** dona de uma rota — o casamento mais específico entre
+ * `href` e `matchPaths`. Assim `/admin/bar/estornos` resolve para
+ * `/admin/bar/vendas` (a etapa visível), e o badge cai na tab certa.
+ *
+ * Rotas que só existem no menu (PDV) ainda casam o prefixo da raiz do módulo
+ * (`/admin/bar`); quem agrega badges deve cruzar com `resolverMenuIdDeRota`
+ * e ignorar a tab quando o menu mais específico não é o do módulo.
+ *
+ * @param {string} rota
+ * @returns {string | null}
+ */
+export function resolverTabHrefDeRota(rota) {
+  const base = rota.split('?')[0] ?? rota
+  /** @type {string | null} */
+  let href = null
+  let maisEspecifico = -1
+
+  for (const modulo of ADMIN_MODULOS) {
+    for (const tab of modulo.tabs) {
+      for (const alvo of [tab.href, ...(tab.matchPaths ?? [])]) {
+        const casa = base === alvo || base.startsWith(`${alvo}/`)
+        if (casa && alvo.length > maisEspecifico) {
+          maisEspecifico = alvo.length
+          href = tab.href
+        }
+      }
+    }
+  }
+
+  return href
 }
 
 /**

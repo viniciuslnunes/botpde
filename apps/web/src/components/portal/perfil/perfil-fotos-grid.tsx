@@ -127,14 +127,14 @@ export function PerfilFotosGrid({ fotos }: PerfilFotosGridProps) {
               dragElastic={0.15}
               onDragEnd={onDragEnd}
               onClick={(e) => e.stopPropagation()}
-              className="relative max-h-[90vh] max-w-full cursor-grab active:cursor-grabbing"
+              className="relative max-h-[90dvh] max-w-full cursor-grab active:cursor-grabbing"
             >
               <m.div variants={lightboxContent} initial="hidden" animate="show" exit="exit" transition={springSnappy}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={fotoAtual.url}
                   alt=""
-                  className="max-h-[90vh] max-w-full rounded-lg object-contain"
+                  className="max-h-[90dvh] max-w-full rounded-lg object-contain"
                   draggable={false}
                 />
               </m.div>

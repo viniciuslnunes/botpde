@@ -5,6 +5,8 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:cache": "pnpm --filter @torcida/web dev:cache",
+    "dev:clean": "pnpm --filter @torcida/web dev:clean",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:generate": "turbo db:generate",

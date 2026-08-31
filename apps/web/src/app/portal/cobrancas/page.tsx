@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { getActiveTenant } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import {
   formatarMoedaBRL,
   formatDataCompetenciaInput,
@@ -17,8 +18,9 @@ export default async function PortalCobrancasPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) redirect('/portal/comunidade')
+  const ativo = await getActiveTenant(session.user.id, session.user.email)
+  if (!ativo) redirect('/portal/comunidade')
+  const tenant = await carregarTenantCarteirinha(ativo, session.user.id)
 
   const cobrancas = await listarCobrancasTenant(tenant.id, {
     userId: session.user.id,
@@ -37,7 +39,7 @@ export default async function PortalCobrancasPage() {
           </div>
           <Link
             href="/portal/carteirinha"
-            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Carteirinha
           </Link>

@@ -29,6 +29,8 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `AdminModuleTabs` | Tabs em que cada tab é uma **rota** do módulo (`tabs` com `href` e `matchPaths?`, `children` = painel) | Client; tab ativa vem do `usePathname()` por casamento mais específico, então deep links seguem válidos; já embrulha o `role="tabpanel"` |
 | `AdminCreateDisclosure` | Ação de criar recolhida em botão (`label`, `title?`, `children` = form) | Client; para hubs cujo form de criação é componente compartilhado com a edição (cobranças, financeiro) e por isso não pode virar disclosure internamente |
 | `AdminDetailHeader` | Header de página de **detalhe** (`title`, `backHref`, `backLabel?`, `eyebrow?`, `icon?`, `badges?`, `actions?`) | Server-safe; versão leve, **sem** faixa de superfície — detalhe sob shell de módulo (`/admin/sedes/[id]` em Estrutura) ganharia dois headers full-bleed empilhados se usasse `AdminPageHeader` |
+| `AppModal` / `AppModalBody` | Overlay de diálogo (`components/ui/app-modal.tsx`) — porta no `document.body` acima da sidebar (`--z-modal` 80). Tamanhos: `sm` confirmação · `md` form curto · `lg` cadastro · `xl` ficha (sócio/torcedor). `height="frame"` trava a altura (abas de recrutamento). Nunca `fixed` solto dentro do `main` | Client |
+| `AdminRowActions` | Menu da coluna **Ações** (`items` com `label`/`icon`/`tone`/`onSelect`) | Client; gatilho só de ícone `h-8 w-8` (`.app-touch-target`); painel no `body` (`AnchoredPopover`) para não ser recortado pelo overflow da tabela |
 
 **Quando usar `AdminTabs` vs. filtro simples**: tabs são para **seções de
 conteúdo mutuamente exclusivas** (um form ou bloco por vez — ex.: settings,
@@ -307,6 +309,14 @@ página), `ListagemVazia`, `ListagemPersistencia`.
 - **Tabela de membros manteve a própria estrutura animada** (a decisão de
   2026-07-22 segue): ela recebe os `<th>` prontos via prop `cabecalho` em vez de
   virar `TableShell`.
+- **Coluna Origem** (sócios e torcedores): unidade de solicitação + canal de
+  entrada (link de convite, onboarding, Associe-se, importação). Display-only —
+  o canal é lido do `AuditLog.detalhes.origem` do `CADASTRO_SOLICITADO` mais
+  antigo. Cadastros legados sem origem mostram a unidade (quando espelho) e não
+  inventam "onboarding".
+- **Ações em menu**: `AdminRowActions` substitui fileiras de botões na coluna
+  Ações — gatilho só de ícone (`MoreVertical`, 32×32, o mesmo alvo da paginação).
+  O painel porta no `body` para não ser recortado pelo overflow da tabela.
 
 ### Ganho medido no piloto
 

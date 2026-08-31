@@ -125,11 +125,12 @@ const DRAG_THRESHOLD_PX = 6
  * sócio) e Minha unidade (canal da subsede/PDE). As abas são **escudos**,
  * não títulos: nomes longos de PDE/torcida estouravam a barra.
  *
- * Super-admin: Nacional + torcida ficam **fixos**; a unidade só entra no
- * prefixo fixo quando o tenant ativo **é** ela. Canais abertos pela lista
- * Canais entram na 4ª+ (conversa id, com escudo) — fecháveis e reordenáveis.
- * Slugs extras do cookie de tenant (troca de comunidade) também aparecem
- * depois dos fixos. Selecionar **não** muda a ordem.
+ * Super-admin: Nacional + torcida + unidade (quando houver) ficam **fixos**
+ * nesta ordem. Canais abertos pela lista Canais entram na 4ª+ (conversa id,
+ * com escudo) — fecháveis e reordenáveis. Outras unidades da mesma worktree
+ * abertas no cookie também aparecem na zona móvel. Slugs extras do cookie
+ * de tenant (troca de comunidade) também aparecem depois dos fixos.
+ * Selecionar **não** muda a ordem.
  *
  * Sócio: após os escopos fixos, **temáticos** visitados (cookie separado)
  * com o mesmo fechamento/drag; clique navega sem trocar tenant.
@@ -269,7 +270,7 @@ export function ComunidadeEscopoTabs({
         temTorcida: Boolean(escopos.torcida && slugTorcida),
         temUnidade: temUnidadeFixaOperador({
           superAdmin,
-          temEscopoUnidade: Boolean(escopos.unidade),
+          temEscopoUnidade: Boolean(escopos.unidade || slugUnidade),
           slugUnidade,
           atualSlug,
         }),
@@ -704,7 +705,7 @@ export function ComunidadeEscopoTabs({
           ) : null
 
         const className = [
-          'relative -mb-px flex h-11 touch-none items-center justify-center pb-2 pt-0.5',
+          'app-touch-target relative -mb-px flex h-11 touch-none items-center justify-center pb-2 pt-0.5',
           // Com novidade: menos fade — o escudo “acende” junto com o ponto.
           ativoVisual ? 'opacity-100' : temNovidade ? 'opacity-95 hover:opacity-100' : 'opacity-55 hover:opacity-90',
           busy && !carregandoEsta ? 'pointer-events-none opacity-40' : '',

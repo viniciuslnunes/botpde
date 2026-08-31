@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { FileSearch, ImageOff, X } from 'lucide-react'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 
 /**
  * Visualização do comprovante de vínculo do sócio (dado RESTRITO — renderizado
@@ -34,19 +35,13 @@ export function ComprovanteLightbox({
         Ver comprovante
       </button>
 
-      {aberto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Comprovante de vínculo de ${nome}`}
-          onClick={() => setAberto(false)}
-        >
-          <div
-            className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
+      <AppModal
+        open={aberto}
+        onClose={() => setAberto(false)}
+        size="lg"
+        layer="nested"
+      >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
                   Comprovante de vínculo — {nome}
@@ -66,7 +61,7 @@ export function ComprovanteLightbox({
               </button>
             </div>
 
-            <div className="flex min-h-48 flex-1 items-center justify-center overflow-auto bg-[rgb(var(--background-subtle))] p-4">
+            <AppModalBody className="relative flex min-h-48 items-center justify-center bg-[rgb(var(--background-subtle))] p-4">
               {erro ? (
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
                   <ImageOff className="h-8 w-8 text-[rgb(var(--foreground-muted))]" />
@@ -94,16 +89,14 @@ export function ComprovanteLightbox({
                   <img
                     src={imagemUrl}
                     alt={`Comprovante de vínculo de ${nome}`}
-                    className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                    className="max-h-[70dvh] w-auto max-w-full rounded-lg object-contain"
                     onLoad={() => setCarregou(true)}
                     onError={() => setErro(true)}
                   />
                 </>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </AppModalBody>
+      </AppModal>
     </>
   )
 }

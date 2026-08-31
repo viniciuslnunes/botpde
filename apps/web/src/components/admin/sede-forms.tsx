@@ -30,7 +30,7 @@ import {
   Link2,
   Loader2,
   MapPin,
-  MoreHorizontal,
+  MoreVertical,
   Power,
   PowerOff,
   Search,
@@ -41,6 +41,7 @@ import {
 import { m } from 'motion/react'
 import { FieldError, Input, Select, Textarea, toast } from '@torcida/ui'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -1410,40 +1411,90 @@ function SedeOperacaoFields({
   state,
   candidatos,
   defaults,
+  liderancaCasoB = false,
+  rotuloLideranca = 'Liderança',
+  presidenciaHref = '/admin/presidencia',
+  lideres = [],
 }: {
   state: SedeState
   candidatos: ResponsavelCandidato[]
   defaults?: Partial<SedeFormData>
+  /** Unidade cara do tenant: presidência é o cargo owner, não este dropdown. */
+  liderancaCasoB?: boolean
+  rotuloLideranca?: string
+  presidenciaHref?: string
+  lideres?: Array<{ userId: string; nome: string | null; email: string | null }>
 }) {
+  const liderPrincipal = lideres[0] ?? null
+  const nomesLideres = lideres
+    .map((l) => l.nome ?? l.email ?? l.userId)
+    .filter(Boolean)
+    .join(', ')
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/35 px-4 py-3">
         <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Dados operacionais</p>
         <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
-          Contato, capacidade e informações úteis no portal. A liderança vinculada vira owner se a
-          unidade ganhar portal próprio.
+          {liderancaCasoB
+            ? `Contato, capacidade e informações úteis no portal. A ${rotuloLideranca.toLowerCase()} desta unidade é o cargo de sistema — troca em Estrutura › Presidência.`
+            : 'Contato, capacidade e informações úteis no portal. A liderança vinculada vira owner se a unidade ganhar portal próprio.'}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <FieldLabel>Liderança (membro)</FieldLabel>
-          <Select name="responsavelUserId" defaultValue={defaults?.responsavelUserId ?? ''}>
-            <option value="">Sem liderança vinculada</option>
-            {candidatos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome ?? c.email ?? c.id}
-              </option>
-            ))}
-          </Select>
-          <FieldError errors={state.errors?.responsavelUserId} />
+          <FieldLabel>{rotuloLideranca} (membro)</FieldLabel>
+          {liderancaCasoB ? (
+            <>
+              <input type="hidden" name="responsavelUserId" value={liderPrincipal?.userId ?? ''} />
+              <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5 text-sm text-[rgb(var(--foreground))]">
+                {nomesLideres || 'Sem liderança vinculada'}
+              </p>
+              {lideres.length > 1 ? (
+                <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-200">
+                  A torcida admite apenas um {rotuloLideranca.toLowerCase()}. Consolide em{' '}
+                  <Link
+                    href={presidenciaHref}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Estrutura › Presidência
+                  </Link>
+                  .
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+                  Altere em{' '}
+                  <Link
+                    href={presidenciaHref}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Estrutura › Presidência
+                  </Link>
+                  .
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <Select name="responsavelUserId" defaultValue={defaults?.responsavelUserId ?? ''}>
+                <option value="">Sem liderança vinculada</option>
+                {candidatos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome ?? c.email ?? c.id}
+                  </option>
+                ))}
+              </Select>
+              <FieldError errors={state.errors?.responsavelUserId} />
+            </>
+          )}
         </div>
         <div>
           <FieldLabel>Nome de contato (texto)</FieldLabel>
           <Input
             name="responsavel"
             type="text"
-            defaultValue={defaults?.responsavel ?? ''}
+            defaultValue={defaults?.responsavel ?? liderPrincipal?.nome ?? ''}
             placeholder="Preenchido automaticamente se escolher liderança"
           />
         </div>
@@ -1503,6 +1554,10 @@ function SedeFormFields({
   defaults,
   paiHerdado,
   initialStep,
+  liderancaCasoB,
+  rotuloLideranca,
+  presidenciaHref,
+  lideres,
 }: {
   formId: string
   state: SedeState
@@ -1511,6 +1566,10 @@ function SedeFormFields({
   defaults?: Partial<SedeFormData>
   paiHerdado?: PaiHerdado | null
   initialStep?: SedeStepId
+  liderancaCasoB?: boolean
+  rotuloLideranca?: string
+  presidenciaHref?: string
+  lideres?: Array<{ userId: string; nome: string | null; email: string | null }>
 }) {
   const [step, setStep] = useState<SedeStepId>(initialStep ?? 'identidade')
   const [hasCoords, setHasCoords] = useState(
@@ -1612,7 +1671,15 @@ function SedeFormFields({
           hidden={step !== 'operacao'}
           className={step === 'operacao' ? 'block' : 'hidden'}
         >
-          <SedeOperacaoFields state={state} candidatos={candidatos} defaults={defaults} />
+          <SedeOperacaoFields
+            state={state}
+            candidatos={candidatos}
+            defaults={defaults}
+            liderancaCasoB={liderancaCasoB}
+            rotuloLideranca={rotuloLideranca}
+            presidenciaHref={presidenciaHref}
+            lideres={lideres}
+          />
         </div>
 
         <div className="mt-6">
@@ -1691,11 +1758,19 @@ export function EditarSedeForm({
   sedes,
   candidatos,
   paiHerdado = null,
+  liderancaCasoB = false,
+  rotuloLideranca,
+  presidenciaHref,
+  lideres,
 }: {
   sede: SedeFormData
   sedes: SedeOption[]
   candidatos: ResponsavelCandidato[]
   paiHerdado?: PaiHerdado | null
+  liderancaCasoB?: boolean
+  rotuloLideranca?: string
+  presidenciaHref?: string
+  lideres?: Array<{ userId: string; nome: string | null; email: string | null }>
 }) {
   const formId = useId()
   const [state, setState] = useState<SedeState>({})
@@ -1729,6 +1804,10 @@ export function EditarSedeForm({
         defaults={sede}
         paiHerdado={paiHerdado}
         initialStep={semCoords ? 'localizacao' : 'identidade'}
+        liderancaCasoB={liderancaCasoB}
+        rotuloLideranca={rotuloLideranca}
+        presidenciaHref={presidenciaHref}
+        lideres={lideres}
       />
       <StickyPersistBar
         locked={pending || isDirty}
@@ -1842,9 +1921,9 @@ export function SedeAcoesMenu({
         aria-expanded={menuOpen}
         aria-haspopup="menu"
         onClick={() => setMenuOpen((v) => !v)}
-        className="inline-flex items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1.5 text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+        className="app-touch-target inline-flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
       >
-        <MoreHorizontal className="h-4 w-4" aria-hidden />
+        <MoreVertical className="h-4 w-4" aria-hidden />
       </button>
 
       {menuOpen && (
@@ -1859,7 +1938,7 @@ export function SedeAcoesMenu({
               role="menuitem"
               onClick={handleToggleStatus}
               className={[
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-[rgb(var(--background-subtle))]',
+                'app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium hover:bg-[rgb(var(--background-subtle))]',
                 ativa
                   ? 'text-[rgb(var(--foreground))]'
                   : 'text-emerald-700 dark:text-emerald-400',
@@ -1878,7 +1957,7 @@ export function SedeAcoesMenu({
                 type="button"
                 role="menuitem"
                 onClick={abrirExcluir}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-[rgb(var(--background-subtle))] dark:text-red-400"
+                className="app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-red-600 hover:bg-[rgb(var(--background-subtle))] dark:text-red-400"
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Excluir
@@ -1894,24 +1973,19 @@ export function SedeAcoesMenu({
         </>
       )}
 
-      {excluirAberto && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
-          role="presentation"
-          onClick={() => {
-            if (!pending) setExcluirAberto(false)
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`excluir-sede-${sedeId}-titulo`}
-            className="flex w-full max-w-md flex-col rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_24px_48px_-20px_rgb(0_0_0_/_0.35)] sm:rounded-2xl sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <AppModal
+        open={excluirAberto}
+        onClose={() => {
+          if (!pending) setExcluirAberto(false)
+        }}
+        size="sm"
+        labelledBy={`excluir-sede-${sedeId}-titulo`}
+        busy={pending}
+      >
+        <AppModalBody className="p-5 sm:p-6">
             <div className="flex gap-3.5">
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-danger)_/_0.12)] text-[rgb(var(--color-danger))]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-danger)_/_0.12)] text-danger"
                 aria-hidden
               >
                 <Trash2 className="h-5 w-5" strokeWidth={2} />
@@ -1974,9 +2048,8 @@ export function SedeAcoesMenu({
                 {pending ? 'Aguarde…' : 'Excluir definitivamente'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </AppModalBody>
+      </AppModal>
     </div>
   )
 }

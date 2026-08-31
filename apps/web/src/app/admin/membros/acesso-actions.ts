@@ -1,24 +1,30 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import {
   PERMISSIONS,
   PAPEL_DEPARTAMENTO,
   isDepartamentoLegado,
   permissionsOfRole,
+  concederFonteVerificadaSchema,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import type {
   AccessDepartamentoOpt,
   AccessRoleOpt,
   AccessUsuario,
+  OwnerOcupadoPor,
 } from '@/components/admin/access-user-panel'
+import { liderancaAtualDoTenant } from '@/lib/lideranca'
 
 export interface MembroAcessoDados {
   usuario: AccessUsuario
   roles: AccessRoleOpt[]
   departamentos: AccessDepartamentoOpt[]
   tipoSede: string
+  fonteVerificadaEm: Date | null
+  ownerOcupadoPor: OwnerOcupadoPor | null
 }
 
 export type MembroAcessoResultado =
@@ -65,10 +71,11 @@ export async function carregarAcessoMembro(
     return { ok: false, error: 'Você não tem permissão para gerenciar acessos.' }
   }
 
-  const membro: { userId: string } | null = await db.saasMembro.findFirst({
-    where: { id: membroId, tenantId },
-    select: { userId: true },
-  })
+  const membro: { userId: string; fonteVerificadaEm: Date | null } | null =
+    await db.saasMembro.findFirst({
+      where: { id: membroId, tenantId },
+      select: { userId: true, fonteVerificadaEm: true },
+    })
   if (!membro) return { ok: false, error: 'Cadastro não encontrado nesta torcida.' }
 
   const [usuario, rolesRaw, departamentosRaw, sedeDoTenant]: [
@@ -133,6 +140,9 @@ export async function carregarAcessoMembro(
 
   if (!usuario) return { ok: false, error: 'Usuário do cadastro não encontrado.' }
 
+  const owners = await liderancaAtualDoTenant(tenantId)
+  const outroOwner = owners.find((o) => o.userId !== usuario.id) ?? null
+
   // Mapa completo (inclui slugs legados) resolve a herança dos perfis
   // "Membro · Torcedor"; a lista de áreas oferecida na UI esconde os legados.
   const deptoById = new Map(departamentosRaw.map((d) => [d.id, d]))
@@ -180,6 +190,50 @@ export async function carregarAcessoMembro(
           permissionsGestor: d.permissionsGestor,
         })),
       tipoSede: sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO',
+      fonteVerificadaEm: membro.fonteVerificadaEm,
+      ownerOcupadoPor: outroOwner
+        ? { userId: outroOwner.userId, nome: outroOwner.nome }
+        : null,
     },
   }
 }
+
+export async function concederFonteVerificadaAction(
+  membroId: string,
+  conceder: boolean,
+): Promise<{ ok: true } | { error: string }> {
+  const parsed = concederFonteVerificadaSchema.safeParse({ membroId, conceder })
+  if (!parsed.success) return { error: 'Pedido inválido.' }
+
+  try {
+    const { tenant, session } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+    const membro: { id: string; userId: string; fonteVerificadaEm: Date | null } | null =
+      await db.saasMembro.findFirst({
+        where: { id: parsed.data.membroId, tenantId: tenant.id },
+        select: { id: true, userId: true, fonteVerificadaEm: true },
+      })
+    if (!membro) return { error: 'Cadastro não encontrado nesta torcida.' }
+
+    await db.saasMembro.update({
+      where: { id: membro.id },
+      data: parsed.data.conceder
+        ? { fonteVerificadaEm: new Date(), fonteVerificadaPorId: session.user.id }
+        : { fonteVerificadaEm: null, fonteVerificadaPorId: null },
+    })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: parsed.data.conceder ? 'FONTE_VERIFICADA_CONCEDIDA' : 'FONTE_VERIFICADA_REVOGADA',
+        entidade: 'SaasMembro',
+        entidadeId: membro.id,
+        detalhes: { userId: membro.userId },
+      },
+    })
+    revalidatePath('/admin/membros')
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível alterar o selo.' }
+  }
+}
+

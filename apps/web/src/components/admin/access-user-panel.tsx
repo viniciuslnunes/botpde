@@ -17,7 +17,9 @@ import {
   rotuloCargoSistema,
   PAPEL_DEPARTAMENTO,
   permissionsOfRole,
+  SYSTEM_ROLES,
 } from '@torcida/types'
+import { toast } from '@torcida/ui'
 import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/(plataforma)/acessos/actions'
 import { atualizarRole, excluirRole } from '@/app/admin/(plataforma)/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
@@ -26,6 +28,7 @@ import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmDialog } from '@/lib/confirm-action'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { AvatarFoto } from '@/components/media/avatar-foto'
 
 export interface AccessRoleOpt {
@@ -105,6 +108,11 @@ function efetivasDe(
   return next
 }
 
+export type OwnerOcupadoPor = {
+  userId: string
+  nome: string | null
+}
+
 export function AccessUserPanel({
   usuario,
   roles: rolesProp,
@@ -112,12 +120,14 @@ export function AccessUserPanel({
   tipoSede,
   onClose,
   variant = 'pagina',
+  ownerOcupadoPor = null,
 }: {
   usuario: AccessUsuario
   roles: AccessRoleOpt[]
   departamentos: AccessDepartamentoOpt[]
   tipoSede: string
   onClose: () => void
+  ownerOcupadoPor?: OwnerOcupadoPor | null
   /**
    * `pagina` — painel autônomo de `/admin/acessos`: card com identidade da
    * pessoa, back-link e `StickyPersistBar`.
@@ -302,6 +312,20 @@ export function AccessUserPanel({
   }
 
   function togglePerfil(roleId: string) {
+    const role = roles.find((r) => r.id === roleId)
+    const jaTem = perfilIds.has(roleId)
+    if (
+      role?.isSystem &&
+      role.nome === SYSTEM_ROLES.OWNER &&
+      !jaTem &&
+      ownerOcupadoPor &&
+      ownerOcupadoPor.userId !== usuario.id
+    ) {
+      toast.error(
+        `Esta torcida já tem ${rotuloCargoSistema(SYSTEM_ROLES.OWNER, tipoSede).toLowerCase()} (${ownerOcupadoPor.nome ?? 'outra pessoa'}). Transfira em Estrutura › Presidência.`,
+      )
+      return
+    }
     const next = new Set(perfilIds)
     if (next.has(roleId)) next.delete(roleId)
     else next.add(roleId)
@@ -642,7 +666,7 @@ export function AccessUserPanel({
         })}
       </div>
 
-      <div className="max-h-[min(70vh,40rem)] overflow-y-auto px-4 py-5 sm:px-6">
+      <div className="max-h-[min(70dvh,40rem)] overflow-y-auto px-4 py-5 sm:px-6">
         {aba === 'perfis' && (
           <div className="space-y-5">
             {roleGerenciando ? (
@@ -679,6 +703,12 @@ export function AccessUserPanel({
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {grupo.items.map((role) => {
                         const checked = perfilIds.has(role.id)
+                        const ownerBloqueado =
+                          role.isSystem &&
+                          role.nome === SYSTEM_ROLES.OWNER &&
+                          !checked &&
+                          ownerOcupadoPor != null &&
+                          ownerOcupadoPor.userId !== usuario.id
                         return (
                           <div
                             key={role.id}
@@ -687,6 +717,7 @@ export function AccessUserPanel({
                               checked
                                 ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
                                 : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
+                              ownerBloqueado ? 'opacity-60' : '',
                             ].join(' ')}
                           >
                             <button
@@ -703,13 +734,15 @@ export function AccessUserPanel({
                                   {roleLabel(role, tipoSede)}
                                 </span>
                                 <span className="text-[10px] uppercase tracking-wide opacity-70">
-                                  {role.isSystem
-                                    ? 'Sistema'
-                                    : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
-                                      ? 'Gestor · editar'
-                                      : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.MEMBRO
-                                        ? 'Membro · editar'
-                                        : 'Editar'}
+                                  {ownerBloqueado
+                                    ? `Já atribuído a ${ownerOcupadoPor?.nome ?? 'outra pessoa'}`
+                                    : role.isSystem
+                                      ? 'Sistema'
+                                      : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+                                        ? 'Gestor · editar'
+                                        : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.MEMBRO
+                                          ? 'Membro · editar'
+                                          : 'Editar'}
                                 </span>
                               </span>
                               {!role.isSystem && (
@@ -719,12 +752,14 @@ export function AccessUserPanel({
                             <button
                               type="button"
                               aria-label={checked ? 'Remover perfil' : 'Atribuir perfil'}
+                              disabled={ownerBloqueado}
                               onClick={() => togglePerfil(role.id)}
                               className={[
                                 'flex h-5 w-5 shrink-0 items-center justify-center rounded border',
                                 checked
                                   ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
                                   : 'border-[rgb(var(--border-strong))]',
+                                ownerBloqueado ? 'cursor-not-allowed opacity-50' : '',
                               ].join(' ')}
                             >
                               {checked && <Check className="h-2.5 w-2.5 text-white" />}
@@ -838,21 +873,17 @@ export function AccessUserPanel({
         )
       })()}
 
-      {modalNovoPerfil && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          role="presentation"
-          onClick={() => {
-            if (!salvandoPerfil) setModalNovoPerfil(false)
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-novo-perfil-titulo"
-            className="w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <AppModal
+        open={modalNovoPerfil}
+        onClose={() => {
+          if (!salvandoPerfil) setModalNovoPerfil(false)
+        }}
+        size="sm"
+        layer="nested"
+        labelledBy="modal-novo-perfil-titulo"
+        busy={salvandoPerfil}
+      >
+        <AppModalBody className="p-5">
             <h2
               id="modal-novo-perfil-titulo"
               className="text-base font-semibold text-[rgb(var(--foreground))]"
@@ -912,9 +943,8 @@ export function AccessUserPanel({
                 Criar perfil e salvar
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </AppModalBody>
+      </AppModal>
     </form>
   )
 }

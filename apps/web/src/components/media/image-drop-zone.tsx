@@ -287,7 +287,7 @@ export function ImageDropZone({
             <button
               type="button"
               onClick={onClear}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
+              className="app-touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
               aria-label="Remover imagem"
             >
               <X className="h-3.5 w-3.5" />

@@ -18,6 +18,7 @@ export interface PerfilSocialLite {
   exibirSede: boolean
   exibirDesde: boolean
   exibirNumeroSocioNoFeed: boolean
+  memoriaPresencaVisivel: boolean
   criadoEm: Date
 }
 
@@ -48,6 +49,7 @@ const perfilSelect = {
   exibirSede: true,
   exibirDesde: true,
   exibirNumeroSocioNoFeed: true,
+  memoriaPresencaVisivel: true,
   criadoEm: true,
 } as const
 
@@ -130,7 +132,9 @@ export function torcedorAprovadoPublicoObrigatorio(
 
 /**
  * Subtítulo do cabeçalho do perfil social: sócio exibe a torcida organizada;
- * torcedor exibe o apelido (ou nome) do clube apoiado — não o nome da TO.
+ * torcedor exibe o apelido (ou nome) do clube apoiado — nunca o nome da TO.
+ * Sem clube resolvido o subtítulo fica vazio; cair no tenant pintava o
+ * convite/host (Gaviões) como se fosse associação.
  */
 export function resolverTituloPerfilSocial(args: {
   tipoMembro: 'SOCIO' | 'TORCEDOR' | null
@@ -139,12 +143,10 @@ export function resolverTituloPerfilSocial(args: {
   afiliacaoNome: string | null
 }): string {
   if (args.tipoMembro === 'TORCEDOR') {
-    return (
-      nomeExibicaoAfiliacao({
-        apelido: args.afiliacaoApelido,
-        nome: args.afiliacaoNome,
-      }) || formatNomeTorcida(args.tenantNome)
-    )
+    return nomeExibicaoAfiliacao({
+      apelido: args.afiliacaoApelido,
+      nome: args.afiliacaoNome,
+    })
   }
   return formatNomeTorcida(args.tenantNome)
 }

@@ -33,21 +33,20 @@ export async function resolvePerfilTenantForUser(
   })
   if (socio?.tenant.ativo) return socio.tenant
 
-  // Torcedor global: CN do clube do onboarding (não herdar Gaviões do deploy).
-  const perfil: {
-    onboardingConcluidoEm: Date | null
-    afiliacaoId: string | null
-  } | null = await db.perfilTorcedor.findUnique({
+  // Torcedor global: CN do clube (não herdar Gaviões do host/cookie).
+  // `afiliacaoId` basta — exigir onboarding concluído fazia o visitante cair
+  // no tenant de quem está logado e o perfil saía rotulado como a TO alheia.
+  const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
     where: { userId: profileUserId },
-    select: { onboardingConcluidoEm: true, afiliacaoId: true },
+    select: { afiliacaoId: true },
   })
-  if (perfil?.onboardingConcluidoEm && perfil.afiliacaoId) {
+  if (perfil?.afiliacaoId) {
     const { id } = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
     const sintetico: Tenant | null = await db.tenant.findUnique({ where: { id } })
     if (sintetico?.ativo) return sintetico
   }
 
-  // Visitante sem onboarding do perfil: mantém host se houver; senão null.
+  // Sem clube e sem ficha: visitante herda o host; o próprio perfil, o cookie.
   if (profileUserId !== viewerId && fromHost) return fromHost
 
   return fromHost

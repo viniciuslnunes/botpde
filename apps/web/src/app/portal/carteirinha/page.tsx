@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
+import { carregarTenantCarteirinha } from '@/lib/associacao-escopo-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CreditCard, ArrowRight, CheckCircle2, Clock, QrCode } from 'lucide-react'
@@ -7,11 +9,20 @@ import { CarteirinhaValidadeAlerts } from '@/components/portal/carteirinha-valid
 import { CarteirinhaReveal } from '@/components/portal/carteirinha-motion'
 import { CarteirinhaQrPanel } from '@/components/portal/carteirinha-qr-panel'
 import { CarteirinhaAssociacaoStatus } from '@/components/portal/carteirinha-associacao-status'
+import {
+  CarteirinhaCadastroChip,
+  CarteirinhaCadastroPanel,
+} from '@/components/portal/carteirinha-cadastro-panel'
+import { CarteirinhaCadastroAnchor } from '@/components/portal/carteirinha-cadastro-anchor'
 import { garantirQrTokenSocio, montarPayloadQr } from '@/lib/carteirinha-qr'
 import { carregarHomeAssociado } from '@/lib/associacao-home'
+import { carregarFichaAssociacaoPortal } from '@/lib/ficha-associacao-portal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha Carteirinha' }
+
+/** Mesma coluna da ficha de sócio — card digital fica mais estreito no miolo. */
+const PAGE = 'mx-auto max-w-3xl space-y-6 px-1 pb-8 sm:px-0'
 
 function hexToRgb(hex: string) {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -29,25 +40,33 @@ function luminance(r: number, g: number, b: number) {
 }
 
 export default async function CarteirinhaPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const [session, host] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) redirect('/entrar')
 
   const userId = session.user.id
+  const tenant = host ? await carregarTenantCarteirinha(host, userId) : null
   const cor = tenant?.corPrimaria ?? '#7c3aed'
   const { r, g, b } = hexToRgb(cor)
-  // Cor mais escura para gradiente
   const darken = (v: number) => Math.max(0, Math.floor(v * 0.65))
   const corEscura = `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`
   const textoBranco = luminance(r, g, b) < 180
 
-  const home = tenant ? await carregarHomeAssociado(tenant.id, userId) : null
+  const [home, ficha] = tenant
+    ? await Promise.all([
+        carregarHomeAssociado(tenant.id, userId),
+        carregarFichaAssociacaoPortal(tenant.id, userId, {
+          exigirDocumentosCadastro: tenant.exigirDocumentosCadastro,
+          periodicidadesOnboarding: tenant.periodicidadesOnboarding,
+        }),
+      ])
+    : [null, null]
   const membro = home?.membro ?? null
   const socio = home?.socio ?? null
+  const ehSocio = membro?.tipo === 'SOCIO'
 
   const nome = session.user.name ?? home?.membro?.nome ?? 'Associado'
   const avatarUrl = session.user.image
 
-  // Sem vínculo com a torcida
   if (!membro) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center justify-center py-20 text-center">
@@ -68,7 +87,6 @@ export default async function CarteirinhaPage() {
     )
   }
 
-  // Membro pendente
   if (membro.status === 'PENDENTE') {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center justify-center py-20 text-center">
@@ -82,64 +100,66 @@ export default async function CarteirinhaPage() {
     )
   }
 
-  // Torcedor aprovado mas sem número de sócio
-  if (membro.status === 'APROVADO' && !socio) {
+  // Torcedor aprovado — sem ficha de sócio.
+  if (membro.status === 'APROVADO' && !ehSocio) {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className={PAGE}>
         <CarteirinhaReveal index={0}>
           <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
         </CarteirinhaReveal>
 
         <CarteirinhaReveal index={1}>
-          <div
-            className="relative overflow-hidden rounded-2xl p-6 shadow-lg"
-            style={{
-              background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
-            }}
-          >
+          <div className="mx-auto max-w-lg">
             <div
-              className="absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-10"
-              style={{ background: 'white' }}
-            />
-            <div
-              className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full opacity-10"
-              style={{ background: 'white' }}
-            />
+              className="relative overflow-hidden rounded-2xl p-6 shadow-lg"
+              style={{
+                background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
+              }}
+            >
+              <div
+                className="absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-10"
+                style={{ background: 'white' }}
+              />
+              <div
+                className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full opacity-10"
+                style={{ background: 'white' }}
+              />
 
-            <div className="relative z-10">
-              <div className="mb-4 flex items-center justify-between">
-                <span
-                  className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/70' : 'text-black/60'}`}
-                >
-                  {tenant?.nome ?? 'TORCIDA'}
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
-                >
-                  TORCEDOR
-                </span>
-              </div>
+              <div className="relative z-10">
+                <div className="mb-4 flex items-center justify-between">
+                  <span
+                    className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/70' : 'text-black/60'}`}
+                  >
+                    {tenant?.nome ?? 'TORCIDA'}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
+                  >
+                    TORCEDOR
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-4">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt={nome}
-                    className="h-16 w-16 rounded-full border-2 border-white/30 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-2xl font-bold text-white">
-                    {nome.charAt(0).toUpperCase()}
+                <div className="flex items-center gap-4">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt={nome}
+                      className="h-16 w-16 rounded-full border-2 border-white/30 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-2xl font-bold text-white">
+                      {nome.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <p className={`text-lg font-bold ${textoBranco ? 'text-white' : 'text-black'}`}>
+                      {nome}
+                    </p>
+                    <p className={`text-sm ${textoBranco ? 'text-white/70' : 'text-black/60'}`}>
+                      Torcedor
+                    </p>
                   </div>
-                )}
-                <div>
-                  <p className={`text-lg font-bold ${textoBranco ? 'text-white' : 'text-black'}`}>
-                    {nome}
-                  </p>
-                  <p className={`text-sm ${textoBranco ? 'text-white/70' : 'text-black/60'}`}>
-                    Torcedor
-                  </p>
                 </div>
               </div>
             </div>
@@ -160,146 +180,168 @@ export default async function CarteirinhaPage() {
     )
   }
 
-  if (!socio || !home) return null
+  if (!home) return null
 
-  const vencida = isVencida(socio.validade)
-  const qrToken = await garantirQrTokenSocio(socio.id, tenant!.id)
-  const qrPayload = montarPayloadQr(qrToken)
-  const validarUrl = `/carteirinha/validar?t=${encodeURIComponent(qrPayload)}`
+  const vencida = socio ? isVencida(socio.validade) : false
+  const qrToken = socio ? await garantirQrTokenSocio(socio.id, tenant!.id) : null
+  const qrPayload = qrToken ? montarPayloadQr(qrToken) : null
+  const validarUrl = qrPayload
+    ? `/carteirinha/validar?t=${encodeURIComponent(qrPayload)}`
+    : null
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className={PAGE}>
+      <Suspense fallback={null}>
+        <CarteirinhaCadastroAnchor />
+      </Suspense>
+
       <CarteirinhaReveal index={0}>
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
-          {!vencida && (
+          {socio && !vencida ? (
             <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
               <CheckCircle2 className="h-4 w-4" /> Ativa
             </span>
-          )}
+          ) : null}
         </div>
       </CarteirinhaReveal>
 
-      <CarteirinhaReveal index={1}>
-        <div
-          className={[
-            'relative overflow-hidden rounded-2xl shadow-xl transition-all',
-            vencida ? 'opacity-60 grayscale' : '',
-          ].join(' ')}
-          style={{
-            background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
-            aspectRatio: '1.586', // proporção padrão de cartão
-          }}
-        >
-          <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-white/10" />
-          <div className="absolute bottom-8 right-12 h-20 w-20 rounded-full bg-white/5" />
+      {ficha ? (
+        <CarteirinhaReveal index={1}>
+          <CarteirinhaCadastroChip
+            completo={ficha.resumo.completo}
+            ok={ficha.resumo.okCount}
+            total={ficha.resumo.total}
+            faltando={ficha.resumo.faltando.length}
+          />
+        </CarteirinhaReveal>
+      ) : null}
 
-          <div className="absolute inset-0 flex flex-col justify-between p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p
-                  className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/60' : 'text-black/50'}`}
-                >
-                  {tenant?.nome ?? 'TORCIDA'}
-                </p>
-                <p
-                  className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/40' : 'text-black/40'}`}
-                >
-                  Carteirinha Digital
-                </p>
-              </div>
-              <div
-                className={`rounded-lg px-2.5 py-1 text-xs font-black uppercase tracking-wider ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
-              >
-                SÓCIO
-              </div>
-            </div>
+      {socio ? (
+        <CarteirinhaReveal index={2}>
+          <div className="mx-auto max-w-lg">
+            <div
+              className={[
+                'relative overflow-hidden rounded-2xl shadow-xl transition-all',
+                vencida ? 'opacity-60 grayscale' : '',
+              ].join(' ')}
+              style={{
+                background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
+                aspectRatio: '1.586',
+              }}
+            >
+              <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
+              <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-white/10" />
+              <div className="absolute bottom-8 right-12 h-20 w-20 rounded-full bg-white/5" />
 
-            <div className="flex items-center gap-4">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt={socio.nome}
-                  className="h-14 w-14 rounded-full border-2 border-white/40 object-cover shadow-md"
-                />
-              ) : (
-                <div
-                  className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-xl font-bold shadow-md"
-                  style={{ color: textoBranco ? 'white' : 'black' }}
-                >
-                  {socio.nome.charAt(0).toUpperCase()}
+              <div className="absolute inset-0 flex flex-col justify-between p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p
+                      className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/60' : 'text-black/50'}`}
+                    >
+                      {tenant?.nome ?? 'TORCIDA'}
+                    </p>
+                    <p
+                      className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/40' : 'text-black/40'}`}
+                    >
+                      Carteirinha Digital
+                    </p>
+                  </div>
+                  <div
+                    className={`rounded-lg px-2.5 py-1 text-xs font-black uppercase tracking-wider ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
+                  >
+                    SÓCIO
+                  </div>
                 </div>
-              )}
-              <div>
-                <p
-                  className={`text-base font-bold leading-tight ${textoBranco ? 'text-white' : 'text-black'}`}
-                >
-                  {socio.nome}
-                </p>
-                <p
-                  className={`mt-0.5 font-mono text-xl font-black tracking-wider ${textoBranco ? 'text-white/90' : 'text-black/80'}`}
-                >
-                  Nº {String(socio.numeroSocio).padStart(5, '0')}
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-end justify-between">
-              <div>
-                <p
-                  className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/50' : 'text-black/40'}`}
-                >
-                  Válido até
-                </p>
-                <p
-                  className={`font-mono text-sm font-bold ${textoBranco ? 'text-white' : 'text-black'}`}
-                >
-                  {socio.validade.toLocaleDateString('pt-BR', {
-                    month: '2-digit',
-                    year: 'numeric',
-                  })}
-                </p>
-              </div>
-              <div className={`rounded-lg p-2 ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
-                <QrCode className={`h-8 w-8 ${textoBranco ? 'text-white' : 'text-black'}`} />
+                <div className="flex items-center gap-4">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt={socio.nome}
+                      className="h-14 w-14 rounded-full border-2 border-white/40 object-cover shadow-md"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-xl font-bold shadow-md"
+                      style={{ color: textoBranco ? 'white' : 'black' }}
+                    >
+                      {socio.nome.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <p
+                      className={`text-base font-bold leading-tight ${textoBranco ? 'text-white' : 'text-black'}`}
+                    >
+                      {socio.nome}
+                    </p>
+                    <p
+                      className={`mt-0.5 font-mono text-xl font-black tracking-wider ${textoBranco ? 'text-white/90' : 'text-black/80'}`}
+                    >
+                      Nº {String(socio.numeroSocio).padStart(5, '0')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p
+                      className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/50' : 'text-black/40'}`}
+                    >
+                      Válido até
+                    </p>
+                    <p
+                      className={`font-mono text-sm font-bold ${textoBranco ? 'text-white' : 'text-black'}`}
+                    >
+                      {socio.validade.toLocaleDateString('pt-BR', {
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg p-2 ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
+                    <QrCode className={`h-8 w-8 ${textoBranco ? 'text-white' : 'text-black'}`} />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </CarteirinhaReveal>
+        </CarteirinhaReveal>
+      ) : (
+        <CarteirinhaReveal index={2}>
+          <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Carteirinha aguardando emissão
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Complete o cadastro de sócio abaixo. Com os dados em dia, a carteirinha digital é
+              emitida automaticamente.
+            </p>
+          </div>
+        </CarteirinhaReveal>
+      )}
 
-      <CarteirinhaReveal index={2}>
-        <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
-      </CarteirinhaReveal>
+      {socio ? (
+        <CarteirinhaReveal index={3}>
+          <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
+        </CarteirinhaReveal>
+      ) : null}
 
-      <CarteirinhaAssociacaoStatus home={home} revealFrom={3} />
+      <CarteirinhaAssociacaoStatus home={home} revealFrom={4} />
 
-      <CarteirinhaReveal index={7}>
-        <CarteirinhaQrPanel validarUrl={validarUrl} qrPayload={qrPayload} />
-      </CarteirinhaReveal>
+      {validarUrl && qrPayload ? (
+        <CarteirinhaReveal index={8}>
+          <CarteirinhaQrPanel validarUrl={validarUrl} qrPayload={qrPayload} />
+        </CarteirinhaReveal>
+      ) : null}
 
-      <CarteirinhaReveal index={8}>
-        <div className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-          {[
-            { label: 'Nome', value: socio.nome },
-            {
-              label: 'Número de sócio',
-              value: String(socio.numeroSocio).padStart(5, '0'),
-            },
-            { label: 'Válido até', value: socio.validade.toLocaleDateString('pt-BR') },
-            { label: 'Emitida em', value: socio.criadoEm.toLocaleDateString('pt-BR') },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm text-[rgb(var(--foreground-muted))]">{item.label}</span>
-              <span className="font-mono text-sm font-medium text-[rgb(var(--foreground))]">
-                {item.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </CarteirinhaReveal>
+      {ficha ? (
+        <CarteirinhaReveal index={9}>
+          <CarteirinhaCadastroPanel ficha={ficha} />
+        </CarteirinhaReveal>
+      ) : null}
     </div>
   )
 }

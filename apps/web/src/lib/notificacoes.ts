@@ -10,7 +10,12 @@ import {
 import { cache } from 'react'
 import { superAdminEmails } from '@/lib/env'
 import { emitNotificacaoPing } from './notificacoes-bus'
-import { agregarBadgesPorMenu } from '@/lib/notificacoes-menu-badges'
+import {
+  agregarBadgesDeInbox,
+  emptyInboxBadges,
+  emptyPortalNavBadges,
+  type PortalNavBadges,
+} from '@/lib/notificacoes-menu-badges'
 
 export type CriarNotificacaoInput = {
   userId: string
@@ -44,16 +49,45 @@ export async function criarNotificacao(input: CriarNotificacaoInput): Promise<No
 }
 
 /**
- * Critério do EVENTO que já foi resolvido — nunca inclui `userId`.
- * A `Notificacao` não guarda a FK da entidade (o `link` é genérico), então a
- * amarração é `tipo` + `atorId` + `corpo` (o mesmo trio usado no fan-out).
+ * Critério do EVENTO que já foi resolvido.
+ *
+ * A `Notificacao` não guarda a FK da entidade, então a amarração é `tipo` +
+ * `atorId` / `corpo` / `link`. Fan-out operacional (denúncia, sócio, estoque)
+ * **não** passa `userId` — senão N-1 badges ficam presos. Exceção 1:1:
+ * `NOVA_MENSAGEM` (cada destinatário lê a própria conversa).
  */
 export type CriterioReconciliacao = {
-  tipo: TipoNotificacao
+  tipo?: TipoNotificacao
+  /** Vários tipos do mesmo evento (ex.: cobrança PENDENTE + VENCIDA). */
+  tipos?: TipoNotificacao[]
   /** Quem gerou o evento (denunciante, solicitante…). */
   atorId?: string
   /** Corpo exato gravado no fan-out — desambigua eventos do mesmo ator. */
   corpo?: string
+  /** Link exato gravado no fan-out (cobrança, fiado, conversa…). */
+  link?: string
+  /** Vários links do mesmo evento (portal + admin). */
+  links?: string[]
+  linkStartsWith?: string
+  /** Só notificações 1:1. Fan-out de fila NÃO passa isto. */
+  userId?: string
+}
+
+function tiposDoCriterio(criterio: CriterioReconciliacao): TipoNotificacao[] {
+  const lista = [
+    ...(criterio.tipo ? [criterio.tipo] : []),
+    ...(criterio.tipos ?? []),
+  ]
+  return [...new Set(lista)]
+}
+
+function chavePendenciaNotificacao(row: {
+  userId: string
+  tipo: string
+  link?: string | null
+  atorId?: string | null
+}): string {
+  return `${row.userId}\0${row.tipo}\0${row.link ?? ''}\0${row.atorId ?? ''}`
 }
 
 /**
@@ -73,12 +107,35 @@ export async function reconciliarNotificacoesDoEvento(
   tenantId: string,
   criterio: CriterioReconciliacao,
 ): Promise<number> {
+  const tipos = tiposDoCriterio(criterio)
+  if (tipos.length === 0) return 0
+
+  const links = [
+    ...(criterio.link ? [criterio.link] : []),
+    ...(criterio.links ?? []),
+  ]
+  const linkFiltro =
+    links.length === 0 && !criterio.linkStartsWith
+      ? {}
+      : criterio.linkStartsWith && links.length === 0
+        ? { link: { startsWith: criterio.linkStartsWith } }
+        : criterio.linkStartsWith
+          ? {
+              OR: [
+                { link: { in: links } },
+                { link: { startsWith: criterio.linkStartsWith } },
+              ],
+            }
+          : { link: links.length === 1 ? links[0] : { in: links } }
+
   const where = {
     tenantId,
-    tipo: criterio.tipo,
     lida: false,
+    tipo: tipos.length === 1 ? tipos[0] : { in: tipos },
     ...(criterio.atorId ? { atorId: criterio.atorId } : {}),
     ...(criterio.corpo !== undefined ? { corpo: criterio.corpo } : {}),
+    ...(criterio.userId ? { userId: criterio.userId } : {}),
+    ...linkFiltro,
   }
 
   // Os destinatários precisam ser lidos ANTES do update — depois dele as
@@ -114,6 +171,40 @@ export async function criarNotificacoesEmLote(inputs: CriarNotificacaoInput[]): 
     emitNotificacaoPing(input.tenantId, input.userId)
   }
   return result.count
+}
+
+/**
+ * Cria só o que ainda não está pendente para o mesmo `(userId, tipo, link, atorId)`.
+ * Filas com link compartilhado distinguem pelo `atorId` (duas solicitações
+ * diferentes). Estoque/mensagem/cobrança distinguem pelo `link` da entidade.
+ */
+export async function criarNotificacoesEmLoteSePendentes(
+  inputs: CriarNotificacaoInput[],
+): Promise<number> {
+  if (inputs.length === 0) return 0
+
+  const tenantIds = [...new Set(inputs.map((i) => i.tenantId))]
+  const userIds = [...new Set(inputs.map((i) => i.userId))]
+  const tipos = [...new Set(inputs.map((i) => i.tipo))]
+
+  const existentes: Array<{
+    userId: string
+    tipo: TipoNotificacao
+    link: string | null
+    atorId: string | null
+  }> = await db.notificacao.findMany({
+    where: {
+      tenantId: { in: tenantIds },
+      userId: { in: userIds },
+      tipo: { in: tipos },
+      lida: false,
+    },
+    select: { userId: true, tipo: true, link: true, atorId: true },
+    take: 2000,
+  })
+  const ja = new Set(existentes.map((row) => chavePendenciaNotificacao(row)))
+  const novos = inputs.filter((input) => !ja.has(chavePendenciaNotificacao(input)))
+  return criarNotificacoesEmLote(novos)
 }
 
 type RolePermShape = {
@@ -332,6 +423,27 @@ export async function listarDestinatariosAdmin(
 }
 
 /**
+ * Quem gerencia um departamento: gestores da área + `roles:manage`.
+ * Espelha `canManageDepartamento` — fila de pedidos de área no cockpit.
+ */
+export async function listarUserIdsGestoresDepartamento(
+  tenantId: string,
+  departamentoId: string,
+  excetoUserId?: string,
+): Promise<string[]> {
+  const [gestores, admins]: [Array<{ userId: string }>, string[]] = await Promise.all([
+    db.departamentoGestor.findMany({
+      where: { departamentoId, departamento: { tenantId } },
+      select: { userId: true },
+    }),
+    listarDestinatariosAdminPorPermissoes(tenantId, [PERMISSIONS.ROLES_MANAGE], excetoUserId),
+  ])
+  const ids = new Set<string>([...gestores.map((g) => g.userId), ...admins])
+  if (excetoUserId) ids.delete(excetoUserId)
+  return Array.from(ids)
+}
+
+/**
  * Destinatários do comunicado da torcida: membros aprovados e **ativos**.
  *
  * `desligarMembro` grava `desligadoEm` e mantém `status: APROVADO` — filtrar
@@ -533,50 +645,67 @@ export async function emitNotificacaoPingCnDoSolicitante(
   }
 }
 
-/**
- * Lista recentes + contagem de não lidas (+ badges por menu, quando solicitado)
- * num único round-trip ao banco. Usado pelas APIs de navbar (portal e admin).
- */
-export async function getInboxNavbar(
-  tenantId: string,
-  userId: string,
-  tipos: TipoNotificacao[],
-  limite = 8,
-  opts?: { withMenuBadges?: boolean; portalComCn?: boolean },
-): Promise<{
+const LIMITE_AGREGACAO_BADGES = 400
+const LIMITE_DEPT_INBOX = 12
+
+const TIPOS_DEPARTAMENTO_PORTAL: readonly TipoNotificacao[] = [
+  'DEPARTAMENTO_ADICIONADO',
+  'DEPARTAMENTO_REMOVIDO',
+]
+
+export type InboxNavbar = {
   notifications: NotificacaoInboxItem[]
   unreadCount: number
   menuBadges: Record<string, number>
-}> {
-  if (tipos.length === 0) {
-    return { notifications: [], unreadCount: 0, menuBadges: {} }
-  }
+  tabBadges: Record<string, number>
+  portalNavBadges: PortalNavBadges
+  departamentoNotificacoes: NotificacaoInboxItem[]
+}
 
-  const baseWhere = opts?.portalComCn
-    ? await whereInboxPortal(tenantId, userId, tipos)
-    : { tenantId, userId, tipo: { in: tipos } }
+function inboxNavbarVazio(): InboxNavbar {
+  const vazio = emptyInboxBadges()
+  return {
+    notifications: [],
+    unreadCount: 0,
+    menuBadges: vazio.menuBadges,
+    tabBadges: vazio.tabBadges,
+    portalNavBadges: vazio.portalNavBadges,
+    departamentoNotificacoes: [],
+  }
+}
+
+/**
+ * Lista recentes + contagem de não lidas (+ badges de menu/tab/portal)
+ * no menor número de round-trips. Usado pelas APIs de navbar.
+ * Sempre `orderBy: criadoEm desc` — a mais recente primeiro.
+ */
+export async function getInboxNavbar(
+  tenantId: string | null,
+  userId: string,
+  tipos: TipoNotificacao[],
+  limite = 8,
+  opts?: {
+    withMenuBadges?: boolean
+    withPortalNavBadges?: boolean
+    portalComCn?: boolean
+    /** Inbox sem filtro de tenant — sino da plataforma (super-admin). */
+    crossTenant?: boolean
+  },
+): Promise<InboxNavbar> {
+  const vazio = inboxNavbarVazio()
+  if (tipos.length === 0) return vazio
+
+  const baseWhere =
+    opts?.crossTenant || !tenantId
+      ? { userId, tipo: { in: tipos } }
+      : opts?.portalComCn
+        ? await whereInboxPortal(tenantId, userId, tipos)
+        : { tenantId, userId, tipo: { in: tipos } }
   const withMenuBadges = opts?.withMenuBadges === true
+  const withPortalNavBadges = opts?.withPortalNavBadges === true
+  const withBadges = withMenuBadges || withPortalNavBadges
 
-  if (!withMenuBadges) {
-    const [notifications, unreadCount]: [NotificacaoInboxItem[], number] = await db.$transaction([
-      db.notificacao.findMany({
-        where: baseWhere,
-        orderBy: { criadoEm: 'desc' },
-        take: limite,
-        select: NOTIFICACAO_INBOX_SELECT,
-      }),
-      db.notificacao.count({
-        where: { ...baseWhere, lida: false },
-      }),
-    ])
-    return { notifications, unreadCount, menuBadges: {} }
-  }
-
-  const [notifications, unreadCount, grouped]: [
-    NotificacaoInboxItem[],
-    number,
-    Array<{ tipo: TipoNotificacao; _count: { tipo: number } }>,
-  ] = await db.$transaction([
+  const [notifications, unreadCount]: [NotificacaoInboxItem[], number] = await db.$transaction([
     db.notificacao.findMany({
       where: baseWhere,
       orderBy: { criadoEm: 'desc' },
@@ -586,17 +715,48 @@ export async function getInboxNavbar(
     db.notificacao.count({
       where: { ...baseWhere, lida: false },
     }),
-    db.notificacao.groupBy({
-      by: ['tipo'],
-      where: { ...baseWhere, lida: false },
-      _count: { tipo: true },
-    }),
   ])
+
+  if (!withBadges) {
+    return { ...vazio, notifications, unreadCount }
+  }
+
+  const unreadRows: Array<{ tipo: TipoNotificacao; link: string | null }> = await db.notificacao.findMany({
+    where: { ...baseWhere, lida: false },
+    orderBy: { criadoEm: 'desc' },
+    take: LIMITE_AGREGACAO_BADGES,
+    select: { tipo: true, link: true },
+  })
+  const agregados = agregarBadgesDeInbox(unreadRows)
+
+  let departamentoNotificacoes: NotificacaoInboxItem[] = []
+  if (withPortalNavBadges) {
+    departamentoNotificacoes = await db.notificacao.findMany({
+      where: {
+        AND: [
+          baseWhere,
+          { lida: false },
+          {
+            OR: [
+              { tipo: { in: [...TIPOS_DEPARTAMENTO_PORTAL] } },
+              { link: { startsWith: '/portal/departamentos' } },
+            ],
+          },
+        ],
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: LIMITE_DEPT_INBOX,
+      select: NOTIFICACAO_INBOX_SELECT,
+    })
+  }
 
   return {
     notifications,
     unreadCount,
-    menuBadges: agregarBadgesPorMenu(grouped),
+    menuBadges: withMenuBadges ? agregados.menuBadges : {},
+    tabBadges: withMenuBadges ? agregados.tabBadges : {},
+    portalNavBadges: withPortalNavBadges ? agregados.portalNavBadges : emptyPortalNavBadges(),
+    departamentoNotificacoes,
   }
 }
 
@@ -690,7 +850,7 @@ export const reconciliarPropostasAliancaPendentes = cache(async function reconci
           tipo: 'ALIANCA_PROPOSTA' as const,
           titulo,
           corpo: `${origemNome} propôs aliança com ${aliadoNome}.`,
-          link: '/admin/aliancas',
+          link: '/admin/aliancas?tab=recebidas',
         })),
       )
     }

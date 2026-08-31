@@ -67,6 +67,10 @@ export const LISTAGEM_TORCEDORES: ListagemSpec = {
       },
     },
     {
+      id: 'origem',
+      label: 'Origem',
+    },
+    {
       id: 'cidade',
       label: 'Cidade',
       ordenarPor: 'cidade',
@@ -357,6 +361,7 @@ export const LISTAGEM_SOCIOS_EMITIDAS: ListagemSpec = {
   dirPadrao: 'asc',
   porPaginaPadrao: 25,
   buscaPlaceholder: 'Buscar carteirinha por nome ou número…',
+  camposProibidos: CAMPOS_SENSIVEIS_MEMBRO,
   // `numeroSocio` é Int: a página acrescenta o match numérico quando `q` é
   // só dígitos. O nº do recrutamento mora em `SaasMembro`, então a busca livre
   // cobre só o nome da carteirinha aqui.
@@ -367,6 +372,7 @@ export const LISTAGEM_SOCIOS_EMITIDAS: ListagemSpec = {
     // A área mora em `SaasMembro`, não na carteirinha: exibida a partir do
     // cadastro já carregado para o card, e por isso sem ordenação.
     { id: 'departamento', label: 'Área' },
+    { id: 'origem', label: 'Origem' },
     {
       id: 'email',
       label: 'E-mail',
@@ -388,6 +394,7 @@ export const LISTAGEM_SOCIOS_EMITIDAS: ListagemSpec = {
       tipo: 'enum',
       campo: 'user.membros.some.sedeId',
       multiplo: true,
+      escopoSome: { tenantId: ESCOPO_TENANT, tipo: 'SOCIO' },
       clausulas: {
         nenhuma: {
           user: {
@@ -441,6 +448,10 @@ export const LISTAGEM_SOCIOS_SOLICITACOES: ListagemSpec = {
         multiplo: true,
         valorNulo: 'nenhuma',
       },
+    },
+    {
+      id: 'origem',
+      label: 'Origem',
     },
     {
       id: 'cidade',
@@ -500,6 +511,10 @@ export const LISTAGEM_SOCIOS_AGUARDANDO: ListagemSpec = {
         multiplo: true,
         valorNulo: 'nenhuma',
       },
+    },
+    {
+      id: 'origem',
+      label: 'Origem',
     },
     {
       id: 'cidade',

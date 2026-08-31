@@ -12,6 +12,7 @@ import {
   CreditCard,
   Handshake,
   ShoppingBag,
+  Shield,
   Settings,
   Calendar,
   MessagesSquare,
@@ -238,6 +239,17 @@ function SidebarBody({
 
       <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
         <ThemeToggle variant="row" />
+        {isSuperAdmin && (
+          <Link
+            href="/super-admin"
+            prefetch={false}
+            onClick={onNavigate}
+            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          >
+            <Shield className="h-4 w-4" />
+            Área Super Admin
+          </Link>
+        )}
         <Link
           href="/portal/comunidade"
           onClick={onNavigate}
@@ -247,7 +259,17 @@ function SidebarBody({
         </Link>
       </div>
 
-      <div className="hidden border-t border-[rgb(var(--border))] px-3 py-3 lg:block">
+      <div className="hidden space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:block">
+        {isSuperAdmin && (
+          <Link
+            href="/super-admin"
+            prefetch={false}
+            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          >
+            <Shield className="h-4 w-4" />
+            Área Super Admin
+          </Link>
+        )}
         <Link
           href="/portal/comunidade"
           className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"

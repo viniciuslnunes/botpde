@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { MOTIVO_BLOQUEIO_MIN, MOTIVO_BLOQUEIO_MAX } from '@torcida/types'
+import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { runPersistAction } from '@/lib/toast-action'
 
 interface BloquearMembroDialogProps {
@@ -26,21 +27,6 @@ export function BloquearMembroDialog({
   const [enviando, setEnviando] = useState(false)
   const [tentouEnviar, setTentouEnviar] = useState(false)
 
-  // Captura antes do listener do modal de detalhes por baixo (mesmo motivo do
-  // diálogo de reprovação): fechar este não pode derrubar o card.
-  useEffect(() => {
-    if (!aberto) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return
-      e.stopPropagation()
-      onFechar()
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [aberto, onFechar])
-
-  if (!aberto) return null
-
   const motivoCurto = motivo.trim().length < MOTIVO_BLOQUEIO_MIN
 
   async function handleConfirmar() {
@@ -61,23 +47,24 @@ export function BloquearMembroDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60"
-        onClick={enviando ? undefined : onFechar}
-      />
-      <div className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl">
-        <div className="border-b border-[rgb(var(--border))] px-4 py-3 sm:px-5">
-          <h2 className="text-base font-semibold text-[rgb(var(--foreground))]">
-            Bloquear {nomeMembro?.trim() || 'usuário'}
-          </h2>
-          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-            A pessoa deixa de conseguir enviar solicitações para esta unidade e para as
-            unidades abaixo dela. Não desliga quem já é associado.
-          </p>
-        </div>
+    <AppModal
+      open={aberto}
+      onClose={onFechar}
+      size="sm"
+      layer="nested"
+      busy={enviando}
+    >
+      <div className="border-b border-[rgb(var(--border))] px-4 py-3 sm:px-5">
+        <h2 className="text-base font-semibold text-[rgb(var(--foreground))]">
+          Bloquear {nomeMembro?.trim() || 'usuário'}
+        </h2>
+        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+          A pessoa deixa de conseguir enviar solicitações para esta unidade e para as
+          unidades abaixo dela. Não desliga quem já é associado.
+        </p>
+      </div>
 
-        <div className="px-4 py-3 sm:px-5">
+      <AppModalBody className="px-4 py-3 sm:px-5">
           <label
             htmlFor="motivo-bloqueio"
             className="block text-sm font-medium text-[rgb(var(--foreground))]"
@@ -98,7 +85,7 @@ export function BloquearMembroDialog({
               className={[
                 'text-xs',
                 tentouEnviar && motivoCurto
-                  ? 'text-[rgb(var(--color-danger))]'
+                  ? 'text-danger'
                   : 'text-[rgb(var(--foreground-muted))]',
               ].join(' ')}
             >
@@ -108,7 +95,7 @@ export function BloquearMembroDialog({
               {motivo.trim().length}/{MOTIVO_BLOQUEIO_MAX}
             </span>
           </div>
-        </div>
+      </AppModalBody>
 
         <div className="flex items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
           <button
@@ -128,7 +115,6 @@ export function BloquearMembroDialog({
             {enviando ? 'Bloqueando…' : 'Bloquear'}
           </button>
         </div>
-      </div>
-    </div>
+    </AppModal>
   )
 }

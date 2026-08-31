@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@torcida/ui/services/theme'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {

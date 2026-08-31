@@ -51,7 +51,7 @@ function PainelMetricas({ metricas }: { metricas: MetricasClube }) {
     metricas.estimativa != null
       ? formatTorcedoresEstimados(
           metricas.estimativa.total,
-          metricas.estimativa.tipo as 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA' | null,
+          metricas.estimativa.tipo as 'PESQUISA' | 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA' | null,
         )
       : null
 

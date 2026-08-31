@@ -152,5 +152,9 @@ export const proxy = auth((req) => {
 })
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // `_next` inteiro, não só static/image: o wrapper `auth()` roda ANTES do
+  // early-return de PUBLIC_PATHS, então cada poll de HMR e cada chunk pedido em
+  // dev pagava uma decodificação de JWT à toa. O early-return continua no corpo
+  // como rede de segurança.
+  matcher: ['/((?!_next/|favicon.ico).*)'],
 }

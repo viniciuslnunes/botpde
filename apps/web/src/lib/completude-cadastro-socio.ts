@@ -60,6 +60,18 @@ export function preenchidoCompletude(v: unknown): boolean {
   return true
 }
 
+/**
+ * «Quero me associar» (caminho NOVO): sem comprovante de carteirinha física e
+ * sem expedição. Nº e prova nascem na emissão pela diretoria — não são
+ * pendência de cadastro. «Já sou sócio» sempre manda prova + expedição.
+ */
+export function socioEhPrimeiraAssociacao(m: MembroParaCompletude): boolean {
+  return (
+    !preenchidoCompletude(m.imagemProva) &&
+    !preenchidoCompletude(m.dataExpedicaoCarteirinha)
+  )
+}
+
 function ehMenor(m: MembroParaCompletude): boolean {
   return (
     (typeof m.idade === 'number' && m.idade < 18) ||
@@ -75,12 +87,13 @@ function ehMenor(m: MembroParaCompletude): boolean {
 export function checklistCompletudeCadastro(m: MembroParaCompletude): CompletudeItem[] {
   if (!m.isSocio) return []
   const menor = ehMenor(m)
+  const primeira = socioEhPrimeiraAssociacao(m)
   return [
     {
       id: 'numeroAssociado',
       label: 'Nº de associado',
       ok: preenchidoCompletude(m.numeroAssociado),
-      obrigatorio: true,
+      obrigatorio: !primeira,
     },
     { id: 'cpf', label: 'CPF', ok: preenchidoCompletude(m.cpf), obrigatorio: true },
     { id: 'rg', label: 'RG', ok: preenchidoCompletude(m.rg), obrigatorio: true },
@@ -109,7 +122,7 @@ export function checklistCompletudeCadastro(m: MembroParaCompletude): Completude
       id: 'prova',
       label: 'Comprovante de vínculo',
       ok: preenchidoCompletude(m.imagemProva),
-      obrigatorio: true,
+      obrigatorio: !primeira,
     },
     ...(menor
       ? ([
@@ -136,12 +149,13 @@ export function checklistCompletudeDocumentos(
   exigirDocumentos: boolean,
 ): CompletudeItem[] {
   if (!m.isSocio || !exigirDocumentos) return []
+  const primeira = socioEhPrimeiraAssociacao(m)
   return [
     {
       id: 'prova',
       label: 'Comprovante de vínculo',
       ok: preenchidoCompletude(m.imagemProva),
-      obrigatorio: true,
+      obrigatorio: !primeira,
     },
     {
       id: 'documento',
@@ -167,6 +181,9 @@ export function checklistCompletudeCarteirinha(
   temCarteirinha: boolean,
 ): CompletudeItem[] {
   if (!m.isSocio || temCarteirinha) return []
+  // Primeira associação: a diretoria emite com validade escolhida — não há
+  // carteirinha física cuja expedição precise ser declarada pelo sócio.
+  if (socioEhPrimeiraAssociacao(m)) return []
   return [
     {
       id: 'dataExpedicaoCarteirinha',

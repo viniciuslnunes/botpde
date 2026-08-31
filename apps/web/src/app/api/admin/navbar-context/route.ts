@@ -29,6 +29,7 @@ export async function GET() {
   return NextResponse.json({
     unreadNotifications: inbox.unreadCount,
     menuBadges: inbox.menuBadges,
+    tabBadges: inbox.tabBadges,
     notifications: inbox.notifications.map((n) => ({
       ...n,
       criadoEm: n.criadoEm.toISOString(),

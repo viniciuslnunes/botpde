@@ -64,7 +64,7 @@ export function StickerPicker({ onSelect, onClose, anchorRef }: StickerPickerPro
           className="card-soft w-64 overflow-x-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-xl"
         >
           <m.div
-            className="grid max-h-[min(50vh,16rem)] grid-cols-3 gap-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+            className="grid max-h-[min(50dvh,16rem)] grid-cols-3 gap-1 overflow-x-hidden overflow-y-auto overscroll-contain"
             variants={{ show: { transition: { staggerChildren: 0.03 } } }}
             initial="hidden"
             animate="show"

@@ -200,6 +200,7 @@ export async function solicitarCadastro(
         acao: 'CADASTRO_SOLICITADO',
         entidade: 'SaasMembro',
         entidadeId: novo.id,
+        detalhes: { origem: 'portal' },
       },
     })
   }

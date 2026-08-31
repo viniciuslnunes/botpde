@@ -1,0 +1,97 @@
+{
+ "descricao": "Correções de clube que as fontes automáticas não resolvem — nome corrompido, UF errada, cidade ausente e linha duplicada. Cada entrada tem fonte e é aplicada por `repair:clubes-curados`.",
+ "geradoEm": "2026-08-27",
+ "comoUsar": "TORCIDA_ENV=local pnpm --filter @torcida/db repair:clubes-curados -- --dry-run",
+ "correcoes": [
+  {
+   "alvo": { "nome": "Trem", "uf": "AP" },
+   "cidade": "Macapá",
+   "fundacaoAno": 1947,
+   "fonte": "Wikidata Q2588630 (Trem Desportivo Clube)",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "São Francisco", "uf": "AC" },
+   "cidade": "Rio Branco",
+   "fundacaoAno": 1967,
+   "fonte": "Wikidata Q3509820 (São Francisco Futebol Clube — Acre)",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "Afogados", "uf": "PE" },
+   "cidade": "Afogados da Ingazeira",
+   "fonte": "Wikidata Q18473852 (Afogados da Ingazeira Futebol Clube)",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "Nova Mutum", "uf": "MT" },
+   "cidade": "Nova Mutum",
+   "fonte": "Wikidata Q65160517 (Nova Mutum Esporte Clube)",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "Sãojoseense", "uf": "PR" },
+   "cidade": "São José dos Pinhais",
+   "fundacaoAno": 2015,
+   "fonte": "Wikipédia (Independente Futebol São Joseense) + Federação Paranaense de Futebol",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "União", "uf": "TO" },
+   "cidade": "Palmas",
+   "fundacaoAno": 1993,
+   "fonte": "Wikipédia (Associação Recreativa União Esporte Clube)",
+   "confianca": "media"
+  },
+  {
+   "alvo": { "nome": "Pérolas Negras", "uf": "RJ" },
+   "cidade": "Resende",
+   "fonte": "FERJ + Ogol (manda no Estádio do Trabalhador, Resende); sede administrativa fica na capital",
+   "confianca": "media"
+  },
+  {
+   "alvo": { "nome": "Clube Esportivo Sete de Setembro", "uf": "MS" },
+   "cidade": "Dourados",
+   "fonte": "Wikipédia (Clube Desportivo Sete de Setembro / Sete de Dourados) + imprensa local",
+   "confianca": "alta",
+   "motivo": "A cidade gravada era \"Portão B13\" — pedaço de endereço da torcida."
+  },
+  {
+   "alvo": { "nome": "America Futebol Clube de Teófilo Ottoni", "uf": "MG" },
+   "cidade": "Teófilo Otoni",
+   "fonte": "Malha municipal do IBGE (grafia oficial tem um único 't')",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "Blumenal Esporte Clube", "uf": "SC" },
+   "nome": "Blumenau Esporte Clube",
+   "cidade": "Blumenau",
+   "fonte": "Torcida vinculada é a \"BEC Manguaça\" (BEC = Blumenau Esporte Clube); \"Blumenal\" é erro do scrape",
+   "confianca": "alta"
+  },
+  {
+   "alvo": { "nome": "Associação Atletica Luziânia", "uf": "DF" },
+   "uf": "GO",
+   "cidade": "Luziânia",
+   "fonte": "Luziânia é município de Goiás; o DF só tem Brasília",
+   "confianca": "alta",
+   "motivo": "A cidade gravada era literalmente \"GO\"."
+  }
+ ],
+ "merges": [
+  {
+   "origem": { "nome": "Gama", "uf": "DF" },
+   "destino": { "nome": "Sociedade Esportiva Gama", "uf": "DF" },
+   "fonte": "Só existe um clube profissional chamado Gama no DF: a Sociedade Esportiva do Gama (RNC 2026, Série D)",
+   "confianca": "alta",
+   "motivo": "Duas linhas para o mesmo clube — o nome curto bloqueava o casamento com o RNC por homônimo."
+  },
+  {
+   "origem": { "nome": "Cia Norte", "uf": "PR" },
+   "destino": { "nome": "Cianorte", "uf": "PR" },
+   "fonte": "organizadasbrasil.com/torcida/TORCIDA-ORGANIZADA-IRA-DO-LEAO-434.html — a torcida é do CIANORTE FUTEBOL CLUBE; \"Cia Norte\" é o nome quebrado no scrape",
+   "confianca": "alta",
+   "motivo": "Duas linhas para o mesmo clube: a antiga carrega tenant e torcida, a nova carrega a ficha do RNC."
+  }
+ ]
+}

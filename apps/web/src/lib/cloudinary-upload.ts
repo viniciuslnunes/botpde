@@ -9,7 +9,7 @@ const AVATAR_MAX_WIDTH = 1024
 const JPEG_QUALITY = 0.85
 const AVATAR_JPEG_QUALITY = 0.92
 
-type UploadPurpose =
+export type UploadPurpose =
   | 'comunidade'
   | 'perfil-banner'
   | 'perfil-avatar'
@@ -17,8 +17,11 @@ type UploadPurpose =
   | 'sede'
   | 'mensagem'
   | 'patrimonio'
+  | 'brecho'
   /** Escudo do catálogo global de clubes (`/super-admin/clubes`) — sem tenant. */
   | 'clube-escudo'
+  /** Capa/produto da vitrine — `store:manage`, não associado. */
+  | 'loja'
 
 interface SignResponse {
   cloudName: string
@@ -106,7 +109,7 @@ async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
   const maxWidth =
     purpose === 'perfil-avatar'
       ? AVATAR_MAX_WIDTH
-      : purpose === 'perfil-banner'
+      : purpose === 'perfil-banner' || purpose === 'loja'
         ? BANNER_MAX_WIDTH
         : MAX_WIDTH
   const quality = purpose === 'perfil-avatar' ? AVATAR_JPEG_QUALITY : JPEG_QUALITY
@@ -145,7 +148,9 @@ export async function uploadMediaToCloudinary(
     throw new Error(
       purpose === 'sede'
         ? 'Apenas imagens são permitidas para a foto da unidade.'
-        : 'Apenas imagens são permitidas para o perfil.',
+        : purpose === 'loja'
+          ? 'Apenas imagens são permitidas para a loja.'
+          : 'Apenas imagens são permitidas para o perfil.',
     )
   }
   if (purpose === 'cadastro' && !tenantId) {

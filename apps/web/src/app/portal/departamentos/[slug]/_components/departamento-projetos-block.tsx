@@ -25,6 +25,7 @@ import { useActionStateToast, isRedirectError } from '@/lib/toast-action'
 import { DatePicker } from '@/components/ui/date-picker'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { toast } from '@torcida/ui/services/toast'
+import { classeFocoCard, useFocoCard } from '../../_components/departamento-foco'
 
 /** Tudo já serializado no server — nunca `Decimal`/`Date` cruzando a fronteira. */
 export type ProjetoResumo = {
@@ -100,6 +101,7 @@ export function DepartamentoProjetosBlock({
   areas,
   podeGerir,
   areasSazonaisSemCampanha = [],
+  focoProjetoId,
 }: {
   departamentoId: string
   slug: string
@@ -108,6 +110,8 @@ export function DepartamentoProjetosBlock({
   podeGerir: boolean
   /** Áreas sazonais ativas sem campanha do ano — CTA rápido. */
   areasSazonaisSemCampanha?: Array<{ id: string; nome: string }>
+  /** Deep-link `?projeto=` — destaca o card. */
+  focoProjetoId?: string
 }) {
   const [criando, setCriando] = useState(false)
   const [areaFiltro, setAreaFiltro] = useState<string | null>(null)
@@ -239,6 +243,7 @@ export function DepartamentoProjetosBlock({
             projeto={p}
             areas={areas}
             podeGerir={podeGerir}
+            foco={p.id === focoProjetoId}
           />
         ))}
       </div>
@@ -302,16 +307,19 @@ function ProjetoCard({
   projeto,
   areas,
   podeGerir,
+  foco,
 }: {
   departamentoId: string
   slug: string
   projeto: ProjetoResumo
   areas: AreaOpcao[]
   podeGerir: boolean
+  foco: boolean
 }) {
   const [editando, setEditando] = useState(false)
   const [registrando, setRegistrando] = useState(false)
   const [pending, startTransition] = useTransition()
+  const focoRef = useFocoCard(foco)
 
   const meta = progressoMeta(projeto.realizadoQuantidade, projeto.metaQuantidade)
   const orcamento = saudeOrcamento(projeto.gastoRealizado, projeto.orcamentoPrevisto)
@@ -338,7 +346,15 @@ function ProjetoCard({
   }
 
   return (
-    <div className="flex flex-col rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-4">
+    <div
+      ref={focoRef}
+      id={`projeto-${projeto.id}`}
+      aria-current={foco ? 'true' : undefined}
+      className={[
+        'flex flex-col rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-4',
+        classeFocoCard(foco),
+      ].join(' ')}
+    >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">

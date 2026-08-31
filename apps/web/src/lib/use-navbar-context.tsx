@@ -8,6 +8,13 @@ import { criarVigiaDeNotificacoes } from '@/lib/notification-toast'
 import { useNotificationStream } from '@/lib/use-notification-stream'
 import { useInboxStream } from '@/lib/use-mensagem-stream'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { createFetchGeneration } from '@/lib/fetch-generation'
+import {
+  agregarBadgesDeInbox,
+  emptyPortalNavBadges,
+  subtrairPortalNavBadges,
+  type PortalNavBadges,
+} from '@/lib/notificacoes-menu-badges'
 
 interface NavbarContext {
   unreadMessages: number
@@ -16,12 +23,15 @@ interface NavbarContext {
   /** @deprecated Use hasAdminAreaAccess */
   isAdmin: boolean
   notifications: NotificationItem[]
+  navBadges: PortalNavBadges
+  departamentoNotificacoes: NotificationItem[]
 }
 
 const CACHE_MS = 20_000
 let cached: NavbarContext | null = null
 let cachedAt = 0
 let inflight: Promise<NavbarContext> | null = null
+const fetchGeneration = createFetchGeneration()
 
 /** Assinantes do patch otimista (sino, nav lateral, rollback). */
 const listeners = new Set<(data: NavbarContext) => void>()
@@ -41,12 +51,14 @@ function emptyContext(): NavbarContext {
     hasAdminAreaAccess: false,
     isAdmin: false,
     notifications: [],
+    navBadges: emptyPortalNavBadges(),
+    departamentoNotificacoes: [],
   }
 }
 
-function publish(next: NavbarContext): void {
+function publish(next: NavbarContext, opts?: { touchTtl?: boolean }): void {
   cached = next
-  cachedAt = Date.now()
+  if (opts?.touchTtl !== false) cachedAt = Date.now()
   for (const listener of listeners) listener(next)
 }
 
@@ -56,11 +68,16 @@ function publish(next: NavbarContext): void {
  */
 export function markNavbarNotificationsRead(): void {
   const base = cached ?? emptyContext()
-  publish({
-    ...base,
-    unreadNotifications: 0,
-    notifications: base.notifications.map((n) => ({ ...n, lida: true })),
-  })
+  publish(
+    {
+      ...base,
+      unreadNotifications: 0,
+      notifications: base.notifications.map((n) => ({ ...n, lida: true })),
+      navBadges: emptyPortalNavBadges(),
+      departamentoNotificacoes: base.departamentoNotificacoes.map((n) => ({ ...n, lida: true })),
+    },
+    { touchTtl: false },
+  )
 }
 
 /**
@@ -69,26 +86,39 @@ export function markNavbarNotificationsRead(): void {
  */
 export function markNavbarNotificationRead(id: string): void {
   const base = cached ?? emptyContext()
-  const inList = base.notifications.find((n) => n.id === id)
-  if (inList?.lida) return
+  const inList =
+    base.notifications.find((n) => n.id === id) ??
+    base.departamentoNotificacoes.find((n) => n.id === id)
+  if (!inList || inList.lida) return
 
-  publish({
-    ...base,
-    unreadNotifications: Math.max(0, base.unreadNotifications - 1),
-    notifications: base.notifications.map((n) =>
-      n.id === id ? { ...n, lida: true } : n,
-    ),
-  })
+  const delta = agregarBadgesDeInbox([{ tipo: inList.tipo, link: inList.link }])
+  publish(
+    {
+      ...base,
+      unreadNotifications: Math.max(0, base.unreadNotifications - 1),
+      notifications: base.notifications.map((n) =>
+        n.id === id ? { ...n, lida: true } : n,
+      ),
+      departamentoNotificacoes: base.departamentoNotificacoes.map((n) =>
+        n.id === id ? { ...n, lida: true } : n,
+      ),
+      navBadges: subtrairPortalNavBadges(base.navBadges, delta.portalNavBadges),
+    },
+    { touchTtl: false },
+  )
 }
 
 /** Decrementa o badge sem id (ex.: aprovar/rejeitar seguimento que limpa notif no servidor). */
 export function decrementNavbarUnread(by = 1): void {
   if (by <= 0) return
   const base = cached ?? emptyContext()
-  publish({
-    ...base,
-    unreadNotifications: Math.max(0, base.unreadNotifications - by),
-  })
+  publish(
+    {
+      ...base,
+      unreadNotifications: Math.max(0, base.unreadNotifications - by),
+    },
+    { touchTtl: false },
+  )
 }
 
 /** Assina mudanças do contador de não lidas (nav lateral da Comunidade). */
@@ -138,6 +168,8 @@ async function fetchNavbarContext(): Promise<NavbarContext> {
     hasAdminAreaAccess: data.hasAdminAreaAccess ?? data.isAdmin ?? false,
     isAdmin: data.hasAdminAreaAccess ?? data.isAdmin ?? false,
     notifications: data.notifications ?? [],
+    navBadges: data.navBadges ?? emptyPortalNavBadges(),
+    departamentoNotificacoes: data.departamentoNotificacoes ?? [],
   }
 }
 
@@ -148,18 +180,21 @@ function loadNavbarContext(force = false): Promise<NavbarContext> {
   }
   if (!force && inflight) return inflight
 
-  inflight = fetchNavbarContext()
+  const gen = fetchGeneration.next()
+  const request = fetchNavbarContext()
     .then((data) => {
+      if (!fetchGeneration.isCurrent(gen)) return cached ?? data
       cached = data
       cachedAt = Date.now()
       for (const listener of listeners) listener(data)
       return data
     })
     .finally(() => {
-      inflight = null
+      if (fetchGeneration.isCurrent(gen)) inflight = null
     })
 
-  return inflight
+  inflight = request
+  return request
 }
 
 /** Recarrega o contexto da navbar (rollback após falha otimista). */
@@ -178,6 +213,8 @@ export function useNavbarContext() {
     hasAdminAreaAccess: cached?.hasAdminAreaAccess ?? false,
     isAdmin: cached?.isAdmin ?? false,
     notifications: cached?.notifications ?? [],
+    navBadges: cached?.navBadges ?? emptyPortalNavBadges(),
+    departamentoNotificacoes: cached?.departamentoNotificacoes ?? [],
   })
 
   const refresh = useCallback(
@@ -213,4 +250,20 @@ export function useNavbarContext() {
   useInboxStream(() => refresh(true))
 
   return { ...ctx, refresh }
+}
+
+/**
+ * Snapshot só de leitura — hub/seções de departamento escutam o mesmo cache
+ * da navbar, sem um segundo SSE/poll.
+ */
+export function useNavbarSnapshot(): NavbarContext {
+  const [ctx, setCtx] = useState<NavbarContext>(() => cached ?? emptyContext())
+  useEffect(() => {
+    const onPatch = (data: NavbarContext) => setCtx(data)
+    listeners.add(onPatch)
+    return () => {
+      listeners.delete(onPatch)
+    }
+  }, [])
+  return ctx
 }

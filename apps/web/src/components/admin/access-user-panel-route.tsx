@@ -5,6 +5,7 @@ import {
   type AccessDepartamentoOpt,
   type AccessRoleOpt,
   type AccessUsuario,
+  type OwnerOcupadoPor,
 } from '@/components/admin/access-user-panel'
 import { useGuardedRouter } from '@/lib/unsaved-changes'
 
@@ -15,6 +16,7 @@ export interface AccessUserPanelRouteProps {
   tipoSede: string
   /** Volta para a listagem preservando filtros, ordenação e página. */
   voltarHref: string
+  ownerOcupadoPor?: OwnerOcupadoPor | null
 }
 
 /**
@@ -28,6 +30,7 @@ export function AccessUserPanelRoute({
   departamentos,
   tipoSede,
   voltarHref,
+  ownerOcupadoPor = null,
 }: AccessUserPanelRouteProps) {
   const router = useGuardedRouter()
 
@@ -38,6 +41,7 @@ export function AccessUserPanelRoute({
       roles={roles}
       departamentos={departamentos}
       tipoSede={tipoSede}
+      ownerOcupadoPor={ownerOcupadoPor}
       onClose={() => {
         void router.unsafe.replace(voltarHref, { scroll: false })
       }}

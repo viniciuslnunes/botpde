@@ -13,10 +13,12 @@ const menorIbope = calcularMenorValorEstimadosConhecido()
 
 const casos = [
   {
+    // Flamengo está nas DUAS bases. Desde 2026-08-27 a pesquisa ganha do IBOPE:
+    // Datafolha mede torcedor, IBOPE mede seguidor de rede social.
     nome: 'Flamengo',
     uf: 'RJ',
-    tipo: 'IBOPE_DIGITAL',
-    minValor: 67_000_000,
+    tipo: 'PESQUISA',
+    minValor: 30_000_000,
   },
   {
     nome: 'Goiás',
@@ -42,5 +44,17 @@ for (const c of casos) {
 
 assert.ok(menorIbope > 0, 'menor IBOPE > 0')
 assert.notEqual(menorIbope, 10_000, 'teto LIMITE não é mais 10 mil fixo')
+
+// A precedência é o ponto: o mesmo clube tem número nas duas bases e elas medem
+// coisas diferentes. Se isso inverter, o card do onboarding passa a anunciar
+// seguidor como se fosse torcedor.
+const flamengo = resolverTorcedoresEstimados(chaveGrupoClube('Flamengo', 'RJ'))
+assert.equal(flamengo.tipo, 'PESQUISA', 'pesquisa ganha do IBOPE')
+assert.match(flamengo.fonte, /Datafolha/, 'fonte da pesquisa é citada')
+
+// Clube de 1–2% na pesquisa fica com a ressalva da margem de erro na fonte.
+const remo = resolverTorcedoresEstimados(chaveGrupoClube('Remo', 'PA'))
+assert.equal(remo.tipo, 'PESQUISA', 'Remo entrou no recorte da pesquisa')
+assert.match(remo.fonte, /margem/, 'ressalva de margem na fonte')
 
 console.log(`✓ ${casos.length} casos resolverTorcedoresEstimados (menor IBOPE: ${menorIbope.toLocaleString('pt-BR')})`)

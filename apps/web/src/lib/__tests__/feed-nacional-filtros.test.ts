@@ -13,6 +13,10 @@ vi.mock('@torcida/db', () => ({
   },
 }))
 
+vi.mock('@/lib/praca', () => ({
+  listarTopicosParaFeed: vi.fn().mockResolvedValue([]),
+}))
+
 vi.mock('@/lib/comunidade-contexto', () => ({ getTenantIdsPorAfiliacao }))
 vi.mock('@/lib/comunidade', () => ({ getFeedComunidade: vi.fn() }))
 vi.mock('@/lib/hierarquia', () => ({ getVisibleTenantIds: vi.fn() }))
@@ -74,7 +78,12 @@ describe('getPostsFeedNacional', () => {
     findFirstTenant.mockReset()
     getTenantIdsPorAfiliacao.mockReset()
     getTenantIdsPorAfiliacao.mockResolvedValue(['syn-1', 't1'])
-    findFirstTenant.mockResolvedValue({ id: 'syn-1' })
+    findFirstTenant.mockResolvedValue({
+      id: 'syn-1',
+      nome: 'CN',
+      logoUrl: null,
+      torcidaConhecida: null,
+    })
   })
 
   it('não usa autorId in:[] quando o viewer não segue ninguém', async () => {

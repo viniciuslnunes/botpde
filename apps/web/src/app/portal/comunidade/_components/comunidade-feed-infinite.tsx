@@ -27,6 +27,7 @@ import {
 } from '@/lib/feed-live-refresh'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import { useLatestRef } from '@/lib/use-latest-ref'
+import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 
 interface CurrentUser {
   id: string
@@ -41,28 +42,7 @@ interface PageInfo {
 
 type Filtro = 'descobrir' | 'seguindo' | 'grupos' | 'canal'
 
-function filtroAceitaPublicacao(
-  filtro: Filtro,
-  filtroAlvo?: PostPublicadoEventDetail['filtroAlvo'],
-): boolean {
-  return filtro === (filtroAlvo ?? 'descobrir')
-}
-
-export function ComunidadeFeedInfinite({
-  tenantId,
-  currentUser,
-  filtro,
-  conversaId,
-  escopo,
-  afiliacaoId,
-  incluirFeedInterno = false,
-  initialPosts,
-  initialPageInfo,
-  initialCursor,
-  salvoIds,
-  seedFromSsr = true,
-  podeCompartilhar = true,
-}: {
+type ComunidadeFeedInfiniteProps = {
   tenantId: string
   currentUser: CurrentUser
   filtro: Filtro
@@ -77,7 +57,39 @@ export function ComunidadeFeedInfinite({
   salvoIds: string[]
   seedFromSsr?: boolean
   podeCompartilhar?: boolean
-}) {
+}
+
+function filtroAceitaPublicacao(
+  filtro: Filtro,
+  filtroAlvo?: PostPublicadoEventDetail['filtroAlvo'],
+): boolean {
+  return filtro === (filtroAlvo ?? 'descobrir')
+}
+
+/** Provider na mesma árvore client — o do layout não cobre o SSR do slot RSC. */
+export function ComunidadeFeedInfinite(props: ComunidadeFeedInfiniteProps) {
+  return (
+    <ComunidadeQueryProvider>
+      <ComunidadeFeedInfiniteView {...props} />
+    </ComunidadeQueryProvider>
+  )
+}
+
+function ComunidadeFeedInfiniteView({
+  tenantId,
+  currentUser,
+  filtro,
+  conversaId,
+  escopo,
+  afiliacaoId,
+  incluirFeedInterno = false,
+  initialPosts,
+  initialPageInfo,
+  initialCursor,
+  salvoIds,
+  seedFromSsr = true,
+  podeCompartilhar = true,
+}: ComunidadeFeedInfiniteProps) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
   const isNacional = escopo === 'nacional'
 

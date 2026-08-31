@@ -49,6 +49,12 @@ export interface ListagemFiltroSpec {
    * cargo em outra torcida.
    */
   clausulas?: Record<string, Record<string, unknown>>
+  /**
+   * Quando `campo` atravessa `relação.some.campo` (ex.: `user.membros.some.sedeId`),
+   * estes predicados entram DENTRO do `some` junto do valor concreto. Use
+   * `ESCOPO_TENANT` para não casar membro de outra torcida pelo mesmo `sedeId`.
+   */
+  escopoSome?: Record<string, unknown>
 }
 
 /**

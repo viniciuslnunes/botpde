@@ -202,13 +202,13 @@ export default async function AdminCarnavalPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/portal/departamentos/carnaval"
-              className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               Cockpit no portal
             </Link>
             <Link
               href="/admin/eventos"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <CalendarRange className="h-4 w-4" aria-hidden />
               Agenda

@@ -49,6 +49,11 @@ type Props = {
   resultadosBusca?: AfiliacaoOnboarding[]
   buscando?: boolean
   onLimparPainel?: () => void
+  /**
+   * Vitrine nacional: o SVG permanece no Brasil inteiro. Clique em UF/região
+   * ainda filtra o painel, mas não dá zoom (evita parecer “só São Paulo”).
+   */
+  mapaCompleto?: boolean
 }
 
 function isViewportBrasil(v: MapViewport): boolean {
@@ -77,6 +82,7 @@ function EstadoSvg({
   selecionado,
   hovered,
   dimmed,
+  emRegiao,
   semClubes,
   total,
   onEnter,
@@ -90,6 +96,7 @@ function EstadoSvg({
   selecionado: boolean
   hovered: boolean
   dimmed: boolean
+  emRegiao: boolean
   semClubes: boolean
   total: number
   onEnter: () => void
@@ -98,7 +105,7 @@ function EstadoSvg({
   reduceMotion: boolean
 }) {
   const fill = corRegiao(uf)
-  const ativo = selecionado || hovered
+  const ativo = selecionado || hovered || emRegiao
   const centro = CENTRO_UF[uf]
 
   return (
@@ -131,14 +138,16 @@ function EstadoSvg({
         style={{ cursor: semClubes ? 'not-allowed' : 'pointer', outline: 'none' }}
         initial={false}
         animate={{
-          opacity: dimmed ? 0.28 : semClubes ? 0.45 : ativo ? 1 : 0.88,
+          opacity: dimmed ? 0.22 : semClubes ? 0.45 : ativo ? 1 : 0.88,
           filter: selecionado
             ? `brightness(1.2) drop-shadow(0 0 14px ${fill})`
-            : hovered
-              ? 'brightness(1.1)'
-              : semClubes
-                ? 'saturate(0.35)'
-                : 'brightness(1)',
+            : emRegiao
+              ? `brightness(1.18) drop-shadow(0 0 10px ${fill})`
+              : hovered
+                ? 'brightness(1.1)'
+                : semClubes
+                  ? 'saturate(0.35)'
+                  : 'brightness(1)',
         }}
         transition={reduceMotion ? { duration: 0 } : springSnappy}
         onMouseEnter={onEnter}
@@ -393,6 +402,7 @@ export function MapaBrasilEstados({
   resultadosBusca = [],
   buscando = false,
   onLimparPainel,
+  mapaCompleto = false,
 }: Props) {
   const reduceMotion = useReducedMotion()
   const [ufHover, setUfHover] = useState<string | null>(null)
@@ -404,11 +414,13 @@ export function MapaBrasilEstados({
   // Derivado, não estado: o enquadramento é função de (busca, uf, região).
   // Como estado, um effect corrigia depois e o mapa mostrava o enquadramento
   // anterior por um frame.
-  const viewport: MapViewport = buscaAtiva
+  const viewport: MapViewport = mapaCompleto
     ? VIEWBOX_BRASIL
-    : ((ufSelecionada ? VIEWBOX_UF[ufSelecionada] : null) ??
-      (regiaoDestaque ? VIEWBOX_REGIAO[regiaoDestaque] : null) ??
-      VIEWBOX_BRASIL)
+    : buscaAtiva
+      ? VIEWBOX_BRASIL
+      : ((ufSelecionada ? VIEWBOX_UF[ufSelecionada] : null) ??
+        (regiaoDestaque ? VIEWBOX_REGIAO[regiaoDestaque] : null) ??
+        VIEWBOX_BRASIL)
   const painelAtivo = Boolean(ufSelecionada) || buscaAtiva || Boolean(regiaoDestaque)
   const modoPainel: 'estado' | 'regiao' | 'busca' | null = buscaAtiva
     ? 'busca'
@@ -453,7 +465,7 @@ export function MapaBrasilEstados({
   }, [afiliacoes, metaRegiaoDestaque])
 
   const ufTooltip = ufHover && ufHover !== ufSelecionada ? ufHover : null
-  const zoomAtivo = !isViewportBrasil(viewport)
+  const zoomAtivo = !mapaCompleto && !isViewportBrasil(viewport)
 
   // Trocar o recorte do painel zera o filtro local — no render, senão o campo
   // fica um frame com o texto do recorte anterior.
@@ -505,7 +517,9 @@ export function MapaBrasilEstados({
   }
 
   function estadoDimmed(uf: string): boolean {
-    if (buscaAtiva) return true
+    // `mapaCompleto` só trava o zoom — o recorte de UF/região ainda precisa
+    // apagar o resto do país, senão o chip de região não aparece no SVG.
+    if (buscaAtiva) return !mapaCompleto
     if (ufSelecionada && uf !== ufSelecionada) return true
     if (regiaoDestaque) {
       const meta = REGIOES_BRASIL.find((r) => r.id === regiaoDestaque)
@@ -520,7 +534,9 @@ export function MapaBrasilEstados({
       ? `Escolha seu clube em ${NOME_UF[ufSelecionada] ?? ufSelecionada}`
       : regiaoDestaque
         ? `Explore os estados do ${REGIOES_BRASIL.find((r) => r.id === regiaoDestaque)?.nome}`
-        : 'Toque num estado colorido para ver os clubes da região'
+        : mapaCompleto
+          ? 'Toque num estado para ver os clubes — o mapa permanece no Brasil inteiro'
+          : 'Toque num estado colorido para ver os clubes da região'
 
   return (
     <div
@@ -574,7 +590,7 @@ export function MapaBrasilEstados({
         <div
           className={`relative flex shrink-0 flex-col overflow-hidden transition-opacity ${
             painelAtivo
-              ? 'h-[min(32vh,200px)] lg:h-auto lg:min-h-0 lg:flex-1'
+              ? 'h-[min(32dvh,200px)] lg:h-auto lg:min-h-0 lg:flex-1'
               : 'flex-1'
           } ${buscaAtiva ? 'opacity-60' : ''}`}
         >
@@ -615,6 +631,13 @@ export function MapaBrasilEstados({
               >
                 {BRASIL_ESTADOS_PATHS.map((estado) => {
                   const total = totalPorUf.get(estado.uf) ?? 0
+                  const emRegiao = Boolean(
+                    !ufSelecionada &&
+                      regiaoDestaque &&
+                      REGIOES_BRASIL.find((r) => r.id === regiaoDestaque)?.ufs.includes(
+                        estado.uf,
+                      ),
+                  )
                   return (
                     <EstadoSvg
                       key={estado.uf}
@@ -624,6 +647,7 @@ export function MapaBrasilEstados({
                       selecionado={ufSelecionada === estado.uf}
                       hovered={ufHover === estado.uf}
                       dimmed={estadoDimmed(estado.uf)}
+                      emRegiao={emRegiao}
                       semClubes={total === 0}
                       total={total}
                       onEnter={() => setUfHover(estado.uf)}

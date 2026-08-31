@@ -67,6 +67,12 @@ export async function ComunidadeAsideWidgets({
                 </a>
               ))}
             </div>
+            <Link
+              href="/portal/comunidade/noticias?escopo=nacional"
+              className="mt-3 inline-flex text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            >
+              Ver todas
+            </Link>
           </div>
         </MotionReveal>
       )}

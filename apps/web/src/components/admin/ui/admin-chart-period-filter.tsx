@@ -25,7 +25,7 @@ const PERIODS: Array<{ id: Exclude<AdminChartPeriod, 'custom'>; label: string }>
 ]
 
 const tabBase =
-  'inline-flex h-7 items-center justify-center whitespace-nowrap rounded-md px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary)_/_0.35)]'
+  'app-touch-target inline-flex h-7 items-center justify-center whitespace-nowrap rounded-md px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary)_/_0.35)]'
 
 /**
  * Controle URL-driven para séries temporais. Presets funcionam sem JS e o

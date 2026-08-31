@@ -131,8 +131,11 @@ export function SacolaItens({
     )
   }
 
+  // A folga de baixo cobre a barra fixa de checkout (só existe no mobile).
+  // Ela cresce com o inset inferior, então a folga cresce junto — senão o
+  // último item da sacola fica atrás do CTA no iPhone.
   return (
-    <div className="space-y-6 pb-28 sm:pb-8">
+    <div className="space-y-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pb-8">
       <LojaCheckoutStepper atual="sacola" lojasCount={grupos.length} />
 
       <div className="space-y-5">
@@ -227,7 +230,7 @@ export function SacolaItens({
                           onClick={() => remover(item)}
                           whileTap={{ scale: 0.9 }}
                           transition={springSnappy}
-                          className="border border-[rgb(var(--foreground-muted)_/_0.25)] p-2 text-red-500 hover:border-red-400/50 hover:bg-red-500/10"
+                          className="app-touch-target border border-[rgb(var(--foreground-muted)_/_0.25)] p-2 text-red-500 hover:border-red-400/50 hover:bg-red-500/10"
                           aria-label={`Remover ${item.produto.nome}`}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -269,7 +272,9 @@ export function SacolaItens({
       </div>
 
       {/* Mobile sticky bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[rgb(var(--border))] bg-[rgb(var(--background)_/_0.92)] p-3 backdrop-blur-md sm:hidden">
+      {/* `p-3` sozinho jogava o botão de checkout embaixo do home indicator do
+          iPhone (34px). O inset entra só no padding de baixo. */}
+      <div className="app-inset-x fixed inset-x-0 bottom-0 z-40 border-t border-[rgb(var(--border))] bg-[rgb(var(--background)_/_0.92)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md [--app-inset-x:0.75rem] sm:hidden">
         <div className="mb-2 flex items-baseline justify-between px-1">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[rgb(var(--foreground-muted))]">
             {totalItens} itens

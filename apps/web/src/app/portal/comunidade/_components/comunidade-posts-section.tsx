@@ -27,9 +27,12 @@ interface ComunidadePostsSectionProps {
   conversaId?: string
   /**
    * Mural de canal oficial: mistura posts do canal + "Só torcida" do feed
-   * aberto deste `tenantId`. Temáticos ignoram.
+   * aberto. Temáticos ignoram. O tenant do balde interno vem de
+   * `feedInternoTenantId` (Caso B ≠ tenant da aba).
    */
   incluirFeedInterno?: boolean
+  /** Tenant dos posts "Só torcida" quando `incluirFeedInterno`. */
+  feedInternoTenantId?: string | null
   /** Feed da Comunidade Nacional do clube — `tenantId` é o sintético. */
   escopo?: EscopoComunidade
   /** Obrigatório quando `escopo === 'nacional'`. */
@@ -45,6 +48,7 @@ export async function ComunidadePostsSection({
   filtro = 'descobrir',
   conversaId,
   incluirFeedInterno = false,
+  feedInternoTenantId = null,
   escopo = 'torcida',
   afiliacaoId,
   podeCompartilhar = true,
@@ -87,7 +91,7 @@ export async function ComunidadePostsSection({
       cursor,
       take: 20,
       incluirFeedInterno,
-      viewerTenantId: tenantId,
+      viewerTenantId: feedInternoTenantId ?? tenantId,
     })
     return (
       <ComunidadeFeedInfinite
@@ -140,14 +144,18 @@ export async function ComunidadePostsSection({
     )
   }
 
-  const feed = await getPostsParaFeed(tenantId, currentUser.id || undefined, { cursor, take: 20 })
+  const feed = await getPostsParaFeed(tenantId, currentUser.id || undefined, {
+    cursor,
+    take: 20,
+    escopoForum: escopo === 'unidade' ? 'unidade' : 'torcida',
+  })
 
   return (
     <ComunidadeFeedInfinite
       tenantId={tenantId}
       currentUser={currentUser}
       filtro={filtro}
-      escopo="torcida"
+      escopo={escopo === 'unidade' ? 'unidade' : 'torcida'}
       initialPosts={feed.posts}
       initialPageInfo={feed.pageInfo}
       initialCursor={cursor ?? null}

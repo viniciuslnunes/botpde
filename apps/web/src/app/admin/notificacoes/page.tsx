@@ -8,6 +8,7 @@ import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AdminMarcarTodasLidasButton } from '@/app/admin/notificacoes/admin-marcar-todas-lidas-button'
 import { AdminNotificacaoLink } from '@/app/admin/notificacoes/admin-notificacao-link'
 import { AdminNotificacoesAutoRead } from '@/app/admin/notificacoes/admin-notificacoes-auto-read'
+import { AdminNotificacoesLive } from '@/app/admin/notificacoes/admin-notificacoes-live'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { redirect } from 'next/navigation'
@@ -22,6 +23,7 @@ type NotificacaoAdminRow = {
   link: string | null
   lida: boolean
   criadoEm: Date
+  ator: { id: string; nome: string | null; avatarUrl: string | null } | null
 }
 
 export default async function AdminNotificacoesPage() {
@@ -48,6 +50,7 @@ export default async function AdminNotificacoesPage() {
       link: true,
       lida: true,
       criadoEm: true,
+      ator: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
 
@@ -58,13 +61,14 @@ export default async function AdminNotificacoesPage() {
           <div>
             <h1 className="text-2xl font-semibold text-[rgb(var(--foreground))]">Notificações</h1>
             <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-              Alertas operacionais desta torcida (alianças, denúncias, comunicados).
+              Alertas operacionais desta torcida, do mais recente ao mais antigo.
             </p>
           </div>
           {notificacoes.some((n) => !n.lida) && <AdminMarcarTodasLidasButton />}
         </div>
       </MotionReveal>
 
+      <AdminNotificacoesLive />
       <AdminNotificacoesAutoRead
         ids={notificacoes.filter((n) => !n.lida).map((n) => n.id)}
       />
@@ -87,6 +91,7 @@ export default async function AdminNotificacoesPage() {
                 link={n.link}
                 lida={n.lida}
                 criadoEm={n.criadoEm}
+                ator={n.ator}
               />
             </li>
           ))}

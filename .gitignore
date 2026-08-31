@@ -63,6 +63,8 @@ Thumbs.db
 
 # Playwright (captura visual de fluxos — artefato local, ver apps/web/e2e/README.md)
 apps/web/e2e/.auth/
+# ids resolvidos do banco LOCAL para a auditoria de responsividade — por máquina.
+apps/web/e2e/.rotas-dinamicas.json
 apps/web/e2e/screenshots/
 apps/web/e2e/.test-results/
 apps/web/e2e/CREDENTIALS.local.md

@@ -1,9 +1,24 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import { formatNomeTorcida } from '@torcida/types'
-import { getAncestorTenantIds } from '@/lib/hierarquia'
+import {
+  calculateEffectivePermissions,
+  formatNomeTorcida,
+  hasPermission,
+  PERMISSIONS,
+  resolveLojaVitrine,
+  resolverCapaLoja,
+} from '@torcida/types'
+import {
+  getAlliedTenantIds,
+  getAncestorTenantIds,
+  getDescendantTenantIds,
+  getVisibleTenantIds,
+} from '@/lib/hierarquia'
 import { getTenantsRestritos } from '@/lib/isolamento'
-import { resolveTenantLogoUrl } from '@/lib/tenant'
+import { getUserPermissionsInTenant, resolveTenantLogoUrl, getActiveTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
+import { escoparLojaAoPortalAtivo, blocoLoja, compararLojasListagem, type EscopoLoja } from '@/lib/loja-escopo'
 
 /**
  * Tenants com vínculo APROVADO que liberam a loja: sócio (qualquer registro,
@@ -35,14 +50,10 @@ const listarTenantIdsComAcessoLoja = cache(async function listarTenantIdsComAces
 })
 
 /**
- * IDs de tenant onde o usuário pode comprar: vínculos APROVADO (sócio ou
- * torcedor do convite) mais a torcida raiz de cada vínculo — **só** quando a
- * Sede liberou `lojaVisivelNasUnidades` (default true). Canal restrito: só a
- * própria unidade.
+ * União de vínculos + ponte da Sede (`lojaVisivelNasUnidades`). Só usada
+ * quando não há portal ativo (torcedor na Comunidade Nacional).
  */
-export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
-  userId: string,
-): Promise<Set<string>> {
+async function tenantsPorVinculo(userId: string): Promise<Set<string>> {
   const [vinculoIds, restritos]: [string[], Set<string>] = await Promise.all([
     listarTenantIdsComAcessoLoja(userId),
     getTenantsRestritos(),
@@ -52,8 +63,6 @@ export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
   const raizesPendentes = new Set<string>()
 
   for (const tenantId of vinculoIds) {
-    // R5 — a loja da unidade isolada continua para os membros dela; o que o
-    // isolamento corta é a ponte com a loja da Sede (e a dela com o resto).
     if (restritos.has(tenantId)) {
       ids.add(tenantId)
       continue
@@ -78,28 +87,109 @@ export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
   }
 
   return ids
+}
+
+const resolverEscopoLoja = cache(async function resolverEscopoLoja(
+  userId: string,
+  email?: string | null,
+): Promise<EscopoLoja & { raizId: string | null; worktreeIds: Set<string>; aliadosIds: Set<string> }> {
+  const [vinculoIds, ativo]: [string[], Awaited<ReturnType<typeof getActiveTenant>>] =
+    await Promise.all([listarTenantIdsComAcessoLoja(userId), getActiveTenant(userId, email)])
+
+  if (!ativo) {
+    const porVinculo = await tenantsPorVinculo(userId)
+    return {
+      visiveis: porVinculo,
+      comprar: new Set(porVinculo),
+      raizId: null,
+      worktreeIds: new Set(),
+      aliadosIds: new Set(),
+    }
+  }
+
+  const [ancestrais, descendentes, visiveisDoAtivo, aliadosDoAtivo]: [
+    string[],
+    string[],
+    string[],
+    string[],
+  ] = await Promise.all([
+    getAncestorTenantIds(ativo.id),
+    getDescendantTenantIds(ativo.id),
+    getVisibleTenantIds(ativo.id, 'loja'),
+    getAlliedTenantIds(ativo.id),
+  ])
+
+  const raizDaCadeia = ancestrais[ancestrais.length - 1]
+  const raizId = raizDaCadeia ?? ativo.id
+  const worktreeIds = new Set([ativo.id, ...ancestrais, ...descendentes])
+
+  const [socioRow, raizRow]: [{ id: string } | null, { lojaVisivelNasUnidades: boolean } | null] =
+    await Promise.all([
+      db.saasMembro.findFirst({
+        where: {
+          userId,
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          tenantId: { in: [...worktreeIds] },
+        },
+        select: { id: true },
+      }),
+      db.tenant.findFirst({
+        where: { id: raizId },
+        select: { lojaVisivelNasUnidades: true },
+      }),
+    ])
+  const socioNaWorktree = socioRow !== null
+
+  const escopo = escoparLojaAoPortalAtivo({
+    vinculoIds,
+    ativoId: ativo.id,
+    worktreeIds: [...worktreeIds],
+    visiveisDoAtivo,
+    aliadosDoAtivo,
+    raizId,
+    socioNaWorktree,
+    isSuperAdmin: isSuperAdminEmail(email),
+    lojaVisivelNasUnidades: raizRow?.lojaVisivelNasUnidades !== false,
+  })
+
+  return { ...escopo, raizId, worktreeIds, aliadosIds: new Set(aliadosDoAtivo) }
 })
 
 /**
- * Leitura da vitrine no portal. Membership (`tenantsPermitidosLoja`) **ou**
- * super-admin no tenant ativo do modo operador — mesma ideia da Comunidade
- * (vê o catálogo da torcida que está operando; compra continua só com vínculo).
+ * IDs de tenant onde o usuário pode **comprar**: vínculo na família do portal
+ * ativo (ou ponte da Sede). Super-admin operador lê o catálogo sem comprar.
+ */
+export const tenantsPermitidosLoja = cache(async function tenantsPermitidosLoja(
+  userId: string,
+  email?: string | null,
+): Promise<Set<string>> {
+  return (await resolverEscopoLoja(userId, email)).comprar
+})
+
+/**
+ * IDs de tenant cuja vitrine o portal pode **mostrar**: worktree do tenant
+ * ativo + aliados se sócio. Super-admin no modo operador vê a família que
+ * está operando, nunca a união de vínculos de outras torcidas.
+ */
+export const tenantsVisiveisLoja = cache(async function tenantsVisiveisLoja(
+  userId: string,
+  email?: string | null,
+): Promise<Set<string>> {
+  return (await resolverEscopoLoja(userId, email)).visiveis
+})
+
+/**
+ * Leitura da vitrine no portal. Recorte pelo tenant ativo — Super Admin
+ * troca de canal, mas não leva o catálogo da torcida-casa junto.
  */
 export async function podeVerLojaTenant(
   userId: string,
   tenantId: string,
   email?: string | null,
 ): Promise<boolean> {
-  const permitidos = await tenantsPermitidosLoja(userId)
-  if (permitidos.has(tenantId)) return true
-
-  if (!email) return false
-  const { isSuperAdminEmail } = await import('@/lib/tenant-context')
-  if (!isSuperAdminEmail(email)) return false
-
-  const { getActiveTenant } = await import('@/lib/tenant')
-  const ativo = await getActiveTenant(userId, email)
-  return ativo?.id === tenantId
+  const visiveis = await tenantsVisiveisLoja(userId, email)
+  return visiveis.has(tenantId)
 }
 
 export interface LojaResumo {
@@ -111,33 +201,53 @@ export interface LojaResumo {
   corPrimaria: string
   principal: boolean
   totalProdutos: number
+  /** Capa visível (banner próprio ou fallback do produto em destaque). */
+  capaUrl: string | null
+  /** True quando `design.loja.bannerUrl` está gravado — dá para excluir no hover. */
+  capaCustom: boolean
 }
 
 /**
- * Lojas visíveis ao membro (sócio ou torcedor do convite): uma por tenant onde
- * `tenantsPermitidosLoja` libera acesso. `principal: true` marca a torcida raiz
- * de algum vínculo. Sem `unstable_cache` — depende de membership em tempo real;
- * dedup só via `cache()` do React por request.
+ * Quem pode editar a vitrine desta loja: `store:manage` efetivo no tenant
+ * (gestor de Materiais/Loja, owner/admin/vice, override) ou super-admin
+ * **no portal que está operando** (não em rival listada por engano).
+ * Nunca por nome de cargo. Não exige `SaasMembro` — Super Admin em torcida
+ * sem presidente (Camisa 12 e similares) gerencia a capa/produtos da loja.
+ */
+export async function podeGerirLoja(
+  userId: string,
+  tenantId: string,
+  email?: string | null,
+): Promise<boolean> {
+  const visiveis = await tenantsVisiveisLoja(userId, email)
+  if (!visiveis.has(tenantId)) return false
+  if (isSuperAdminEmail(email)) return true
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
+  const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
+  return hasPermission(effective, PERMISSIONS.STORE_MANAGE)
+}
+
+/**
+ * Lojas visíveis no portal ativo: worktree da torcida (sede + unidades) e
+ * aliadas se sócio. `principal: true` marca a raiz **do portal**, não a
+ * torcida-casa de outro vínculo.
  */
 export const listLojasDoSocio = cache(async function listLojasDoSocio(
   userId: string,
+  email?: string | null,
 ): Promise<LojaResumo[]> {
-  const [vinculoIds, permitidos] = await Promise.all([
-    listarTenantIdsComAcessoLoja(userId),
-    tenantsPermitidosLoja(userId),
-  ])
-
-  const raizes = new Set<string>()
-  for (const tenantId of vinculoIds) {
-    const ancestrais = await getAncestorTenantIds(tenantId)
-    raizes.add(ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : tenantId)
-  }
-
-  const tenantIds = [...permitidos]
+  const escopo = await resolverEscopoLoja(userId, email)
+  const tenantIds = [...escopo.visiveis]
   if (tenantIds.length === 0) return []
 
-  const [tenants, sedes, produtosPorTenant]: [
-    Array<{ id: string; nome: string; logoUrl: string | null; corPrimaria: string }>,
+  const [tenants, sedes, produtosPorTenant, destaques]: [
+    Array<{
+      id: string
+      nome: string
+      logoUrl: string | null
+      corPrimaria: string
+      design: unknown
+    }>,
     Array<{
       id: string
       tenantId: string | null
@@ -146,10 +256,11 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
       cidade: string | null
     }>,
     Array<{ tenantId: string; _count: { _all: number } }>,
+    Array<{ tenantId: string; imagensUrl: string[] }>,
   ] = await Promise.all([
     db.tenant.findMany({
       where: { id: { in: tenantIds }, ativo: true },
-      select: { id: true, nome: true, logoUrl: true, corPrimaria: true },
+      select: { id: true, nome: true, logoUrl: true, corPrimaria: true, design: true },
     }),
     db.sede.findMany({
       where: { tenantId: { in: tenantIds } },
@@ -160,15 +271,18 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
       where: { tenantId: { in: tenantIds }, ativo: true },
       _count: { _all: true },
     }),
+    db.saasProduto.findMany({
+      where: { tenantId: { in: tenantIds }, ativo: true, destaque: true },
+      orderBy: [{ ordem: 'asc' }, { criadoEm: 'desc' }],
+      select: { tenantId: true, imagensUrl: true },
+    }),
   ])
 
-  // PDE/subsede: logo vive em Sede.fotoUrl / canal — não em Tenant.logoUrl.
   const logos = await Promise.all(
     tenants.map((t) => resolveTenantLogoUrl(t.id, t.logoUrl)),
   )
   const logoPorTenant = new Map(tenants.map((t, i) => [t.id, logos[i] ?? null]))
 
-  // Preferir a sede raiz do tenant (mesma regra de resolveTenantLogoUrl).
   const sedeMap = new Map<string, { tipo: string; cidade: string | null }>()
   const sedesPorTenant = new Map<string, typeof sedes>()
   for (const s of sedes) {
@@ -185,8 +299,17 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
 
   const produtosMap = new Map(produtosPorTenant.map((p) => [p.tenantId, p._count._all]))
 
+  const destaqueImgPorTenant = new Map<string, string>()
+  for (const p of destaques) {
+    if (destaqueImgPorTenant.has(p.tenantId)) continue
+    const url = firstProdutoImagemUrl(p.imagensUrl)
+    if (url) destaqueImgPorTenant.set(p.tenantId, url)
+  }
+
   const resumos: LojaResumo[] = tenants.map((t) => {
     const sede = sedeMap.get(t.id)
+    const vitrine = resolveLojaVitrine(t.design, t.corPrimaria)
+    const capa = resolverCapaLoja(vitrine, destaqueImgPorTenant.get(t.id) ?? null)
     return {
       tenantId: t.id,
       nome: formatNomeTorcida(t.nome),
@@ -194,15 +317,41 @@ export const listLojasDoSocio = cache(async function listLojasDoSocio(
       cidade: sede?.cidade ?? null,
       logoUrl: logoPorTenant.get(t.id) ?? null,
       corPrimaria: t.corPrimaria,
-      principal: raizes.has(t.id),
+      principal: escopo.raizId === t.id,
       totalProdutos: produtosMap.get(t.id) ?? 0,
+      capaUrl: capa.capaUrl,
+      capaCustom: capa.capaCustom,
     }
   })
 
-  resumos.sort((a, b) => {
-    if (a.principal !== b.principal) return a.principal ? -1 : 1
-    return a.nome.localeCompare(b.nome, 'pt-BR')
-  })
+  const blocoPorTenant = new Map(
+    resumos.map((l) => [
+      l.tenantId,
+      blocoLoja({
+        tenantId: l.tenantId,
+        raizId: escopo.raizId,
+        worktreeIds: escopo.worktreeIds,
+        aliadosIds: escopo.aliadosIds,
+      }),
+    ]),
+  )
+
+  resumos.sort((a, b) =>
+    compararLojasListagem(
+      {
+        tenantId: a.tenantId,
+        nome: a.nome,
+        tipo: a.tipo,
+        bloco: blocoPorTenant.get(a.tenantId) ?? 'unidade',
+      },
+      {
+        tenantId: b.tenantId,
+        nome: b.nome,
+        tipo: b.tipo,
+        bloco: blocoPorTenant.get(b.tenantId) ?? 'unidade',
+      },
+    ),
+  )
 
   return resumos
 })

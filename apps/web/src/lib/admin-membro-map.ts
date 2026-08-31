@@ -3,6 +3,7 @@ import type {
   AdminMembroItem,
   MembroReprovacaoDetalhe,
 } from '@/app/admin/membros/admin-membro-item'
+import type { OrigemCanal } from '@/lib/membro-origem'
 import { formatRg, labelCategoriaReprovacao } from '@torcida/types'
 import { areaPendenteDeEfetivacao } from '@/lib/area-efetivada'
 
@@ -78,6 +79,7 @@ export const membroDetalheSelect = {
   atualizadoEm: true,
   espelhado: true,
   aprovadoNaUnidadeTenantId: true,
+  importacaoId: true,
   user: { select: { email: true, avatarUrl: true } },
   departamento: { select: { id: true, nome: true } },
   departamentoSede: { select: { nome: true } },
@@ -135,6 +137,7 @@ export type MembroDetalheRow = {
   atualizadoEm: Date | null
   espelhado: boolean
   aprovadoNaUnidadeTenantId: string | null
+  importacaoId: string | null
   user: { email: string | null; avatarUrl: string | null }
   departamento: { id: string; nome: string } | null
   departamentoSede: { nome: string } | null
@@ -149,6 +152,7 @@ export function mapToAdminMembroItem(
     reprovacoesOutraTorcida?: number
     tentativas?: number
     ultimoMotivoReprovacao?: string
+    origemCanal?: OrigemCanal | null
     /** Áreas já em vigor deste usuário neste tenant (`getAreasEfetivadasPorUser`). */
     areasEfetivadas?: Set<string>
   },
@@ -236,5 +240,7 @@ export function mapToAdminMembroItem(
     ultimoMotivoReprovacao: opts?.ultimoMotivoReprovacao,
     espelhado: membro.espelhado,
     aprovadoNaUnidadeNome: opts?.aprovadoNaUnidadeNome ?? null,
+    origemCanal: opts?.origemCanal ?? null,
+    importacaoId: membro.importacaoId,
   }
 }

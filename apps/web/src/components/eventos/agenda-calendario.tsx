@@ -215,7 +215,7 @@ function DiaDetalhe({
 }) {
   const weekday = calendarPartsToUtcNoon(dia).getUTCDay()
   const iconBtn =
-    'inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]'
+    'app-touch-target inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]'
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -290,7 +290,7 @@ function DiaDetalhe({
                   <button
                     type="button"
                     onClick={() => onIrParaDia(proximoDia)}
-                    className="mt-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))] hover:underline"
+                    className="app-touch-line mt-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Ir para o próximo evento
                   </button>
@@ -364,7 +364,7 @@ function NavChrome({
   nextLabel: string
 }) {
   const btn =
-    'inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50'
+    'app-touch-target inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50'
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className={pending ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
@@ -387,7 +387,7 @@ function NavChrome({
           type="button"
           onClick={onHoje}
           disabled={pending}
-          className="h-9 rounded-xl border border-[rgb(var(--border))] px-3 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+          className="app-touch-target h-9 rounded-xl border border-[rgb(var(--border))] px-3 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
         >
           Hoje
         </button>

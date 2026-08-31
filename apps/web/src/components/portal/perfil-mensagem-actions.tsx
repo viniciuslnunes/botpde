@@ -142,7 +142,7 @@ export function PerfilMensagemActions({
               role="dialog"
               aria-modal="true"
               aria-labelledby={tituloId}
-              className="flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
+              className="flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pb-[env(safe-area-inset-bottom)] shadow-xl sm:rounded-2xl sm:pb-0"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-3.5">

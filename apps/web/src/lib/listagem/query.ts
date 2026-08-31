@@ -98,6 +98,25 @@ function resolverSentinela(valor: unknown, tenantId: string | null): unknown {
   return valor
 }
 
+/**
+ * `user.membros.some.sedeId` + extras `{ tenantId, tipo }` vira
+ * `{ user: { membros: { some: { tenantId, tipo, sedeId } } } }`.
+ */
+function clausulaSomeComEscopo(
+  campo: string,
+  valorCampo: unknown,
+  extras: Record<string, unknown>,
+): ListagemWhere {
+  const marker = '.some.'
+  const idx = campo.indexOf(marker)
+  if (idx < 0) return clausula(campo, valorCampo)
+  const prefix = campo.slice(0, idx)
+  const campoDentro = campo.slice(idx + marker.length)
+  const some: ListagemWhere = { ...extras }
+  atribuirCaminho(some, campoDentro, valorCampo)
+  return clausula(prefix, { some })
+}
+
 function clausulaEnum(filtro: ListagemFiltroSpec, valores: string[]): ListagemWhere | null {
   const nulo = filtro.valorNulo
   const querNulo = nulo !== undefined && valores.includes(nulo)
@@ -114,8 +133,11 @@ function clausulaEnum(filtro: ListagemFiltroSpec, valores: string[]): ListagemWh
   const alternativas: ListagemWhere[] = [...especiais]
   if (querNulo) alternativas.push(clausula(filtro.campo, null))
   if (concretos.length > 0) {
+    const valorCampo = concretos.length === 1 ? concretos[0] : { in: concretos }
     alternativas.push(
-      clausula(filtro.campo, concretos.length === 1 ? concretos[0] : { in: concretos }),
+      filtro.escopoSome
+        ? clausulaSomeComEscopo(filtro.campo, valorCampo, filtro.escopoSome)
+        : clausula(filtro.campo, valorCampo),
     )
   }
 

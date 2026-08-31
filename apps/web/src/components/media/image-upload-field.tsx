@@ -8,8 +8,7 @@ import {
   type ImageDropFileMeta,
 } from '@/components/media/image-drop-zone'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
-
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede' | 'patrimonio'
+import type { UploadPurpose } from '@/lib/cloudinary-upload'
 
 type Props = {
   name: string

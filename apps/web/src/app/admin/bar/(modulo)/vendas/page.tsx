@@ -118,7 +118,7 @@ export default async function AdminBarVendasPage({
         {podeGerir && (
           <Link
             href="/admin/bar/estornos"
-            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver estornos
           </Link>

@@ -66,7 +66,7 @@ export default async function AdminBarEstoquePage() {
         </p>
         <Link
           href="/admin/bar/fornecedores"
-          className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Fornecedores
         </Link>

@@ -1320,10 +1320,16 @@ describe('fluxo: comentários e integração em canais', () => {
       where: { tenantId: alvo.id, status: 'APROVADO' },
       select: { userId: true },
     })
-    const intruso = await db.saasMembro.findFirst({
-      where: { tenantId: rival.id, status: 'APROVADO' },
-      select: { userId: true },
-    })
+    // Super-admin lê comentários de qualquer torcida (leitura de plataforma
+    // para moderar) — o invariante medido aqui é o do sócio rival comum.
+    const { isSuperAdminEmail } = await import('@/lib/tenant-context')
+    const candidatosIntruso: Array<{ userId: string; user: { email: string | null } }> =
+      await db.saasMembro.findMany({
+        where: { tenantId: rival.id, status: 'APROVADO' },
+        select: { userId: true, user: { select: { email: true } } },
+        take: 20,
+      })
+    const intruso = candidatosIntruso.find((c) => !isSuperAdminEmail(c.user.email)) ?? null
     if (!post || !local || !intruso) {
       alerta('comunidade', 'Fixture insuficiente para o fluxo real de comentários')
       return

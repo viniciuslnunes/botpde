@@ -22,6 +22,8 @@ import {
   getStatusInboxMensageria,
 } from '@/lib/mensageria-api'
 import { emitMensagemNova } from '@/lib/mensageria-bus'
+import { assertCapacidadeConfianca } from '@/lib/confianca'
+import { isExpectedError } from '@/lib/expected-error'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { resolveTenantMinhaTorcida, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { criarNotificacao } from '@/lib/notificacoes'
@@ -160,8 +162,11 @@ async function comTicketDeepLink(
   if (!conversaId || conversas.some((c) => c.id === conversaId)) return conversas
   const { montarInboxItemTicketStaff } = await import('@/lib/loja-ticket')
   const sintetica = await montarInboxItemTicketStaff(conversaId, userId)
-  if (!sintetica) return conversas
-  return [sintetica, ...conversas]
+  if (sintetica) return [sintetica, ...conversas]
+  const { montarInboxItemBrechoStaff } = await import('@/lib/brecho-ticket')
+  const brecho = await montarInboxItemBrechoStaff(conversaId, userId)
+  if (!brecho) return conversas
+  return [brecho, ...conversas]
 }
 
 export async function GET(request: NextRequest) {
@@ -327,6 +332,15 @@ export async function POST(request: NextRequest) {
         { error: 'Você não tem permissão para criar grupos.' },
         { status: 403 },
       )
+    }
+
+    try {
+      await assertCapacidadeConfianca(userId, tenant.id, 'grupo:criar')
+    } catch (err) {
+      if (isExpectedError(err)) {
+        return NextResponse.json({ error: err.message }, { status: 403 })
+      }
+      throw err
     }
 
     const limiterKey = `grupo:${tenant.id}:${userId}`

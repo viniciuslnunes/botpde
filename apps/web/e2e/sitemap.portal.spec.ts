@@ -17,6 +17,11 @@ const ROTAS: Array<{ fluxo: string; path: string }> = [
   { fluxo: 'portal-loja', path: '/portal/loja' },
   { fluxo: 'portal-loja-pedidos', path: '/portal/loja/pedidos' },
   { fluxo: 'portal-comunidade-seguindo', path: '/portal/comunidade/seguindo' },
+  { fluxo: 'portal-comunidade-noticias', path: '/portal/comunidade/noticias' },
+  { fluxo: 'portal-comunidade-forum', path: '/portal/comunidade/forum' },
+  { fluxo: 'portal-associe-se', path: '/portal/associe-se' },
+  { fluxo: 'portal-mapa-brasil', path: '/portal/mapa-brasil' },
+  { fluxo: 'portal-memoria', path: '/portal/memoria' },
 
   { fluxo: 'admin-home', path: '/admin' },
   { fluxo: 'admin-torcedores', path: '/admin/torcedores' },

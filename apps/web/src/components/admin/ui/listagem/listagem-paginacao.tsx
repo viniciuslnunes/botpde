@@ -21,10 +21,10 @@ export interface ListagemPaginacaoProps {
 }
 
 const BTN =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
+  'app-touch-target inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
 
 const BTN_INERTE =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[rgb(var(--border)_/_0.5)] px-2 text-xs text-[rgb(var(--foreground-muted)_/_0.5)]'
+  'app-touch-target inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-[rgb(var(--border)_/_0.5)] px-2 text-xs text-[rgb(var(--foreground-muted)_/_0.5)]'
 
 /** Janela de até 5 números centrada na página atual. */
 function janelaDePaginas(pagina: number, totalPaginas: number): number[] {
@@ -89,7 +89,7 @@ export function ListagemPaginacao({
                 className={[
                   // h-8/min-w-8: mesmo alvo de toque dos botões de página — no
                   // mobile o px-1.5 py-0.5 dava 25×20, pequeno demais pro dedo.
-                  'inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-xs tabular-nums transition-colors',
+                  'app-touch-target inline-flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-xs tabular-nums transition-colors',
                   opcao.ativo
                     ? 'bg-[rgb(var(--color-primary)_/_0.16)] font-semibold text-[rgb(var(--color-primary-fg))]'
                     : 'hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -131,7 +131,7 @@ export function ListagemPaginacao({
               aria-current={numero === pagina ? 'page' : undefined}
               className={
                 numero === pagina
-                  ? 'inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.16)] px-2 text-xs font-semibold tabular-nums text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                  ? 'app-touch-target inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.16)] px-2 text-xs font-semibold tabular-nums text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                   : `${BTN} tabular-nums`
               }
             >

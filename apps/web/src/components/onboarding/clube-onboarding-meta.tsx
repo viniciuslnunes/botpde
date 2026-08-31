@@ -5,6 +5,7 @@ import {
 import {
   formatTorcedoresEstimados,
   TOOLTIP_ESTIMATIVA_INDISPONIVEL,
+  TOOLTIP_ESTIMATIVA_PESQUISA,
 } from '@/lib/format-contagem'
 import type { StatsClubeOnboarding } from '@/lib/onboarding-clube-stats'
 import type { TorcedoresEstimadosTipo } from '@/lib/onboarding'
@@ -31,11 +32,13 @@ export function ClubeOnboardingMeta({
 
   const tooltipEstimativa =
     torcedoresEstimadosFonte ??
-    (torcedoresEstimadosTipo === 'IBOPE_DIGITAL'
-      ? 'Base digital oficial (5 redes) — IBOPE Repucom'
-      : torcedoresEstimadosTipo === 'PLATAFORMA'
-        ? 'Contagem real na plataforma Torcida SaaS'
-        : TOOLTIP_ESTIMATIVA_INDISPONIVEL)
+    (torcedoresEstimadosTipo === 'PESQUISA'
+      ? TOOLTIP_ESTIMATIVA_PESQUISA
+      : torcedoresEstimadosTipo === 'IBOPE_DIGITAL'
+        ? 'Base digital oficial (5 redes) — IBOPE Repucom'
+        : torcedoresEstimadosTipo === 'PLATAFORMA'
+          ? 'Contagem real na plataforma Torcida SaaS'
+          : TOOLTIP_ESTIMATIVA_INDISPONIVEL)
 
   return (
     <div className="mt-auto flex w-full min-h-[52px] flex-col justify-end gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">

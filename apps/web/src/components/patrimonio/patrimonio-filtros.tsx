@@ -20,10 +20,13 @@ export function PatrimonioFiltros({
    * trava real é da query no servidor.
    */
   categoriaTravada,
+  /** Tab da URL a preservar no GET (admin). Ausente no portal. */
+  tab,
 }: {
   basePath: string
   values: PatrimonioFiltroValues
   categoriaTravada?: string | null
+  tab?: string
 }) {
   const hasAny = Boolean(
     (!categoriaTravada && values.categoria) ||
@@ -31,6 +34,7 @@ export function PatrimonioFiltros({
       values.q ||
       values.incluirBaixados,
   )
+  const limparHref = tab ? `${basePath}?tab=${encodeURIComponent(tab)}` : basePath
 
   return (
     <form
@@ -38,6 +42,7 @@ export function PatrimonioFiltros({
       action={basePath}
       className="flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
     >
+      {tab ? <input type="hidden" name="tab" value={tab} /> : null}
       <div
         className={
           categoriaTravada
@@ -106,7 +111,7 @@ export function PatrimonioFiltros({
         </button>
         {hasAny && (
           <Link
-            href={basePath}
+            href={limparHref}
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
           >
             Limpar

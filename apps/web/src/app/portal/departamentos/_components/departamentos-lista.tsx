@@ -26,6 +26,8 @@ import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { ArrowRight, Briefcase, Eye, Layers, LayoutGrid, Settings2 } from 'lucide-react'
 import { DepartamentoIcone } from './departamento-icone'
 import { DepartamentoCorPicker } from './departamento-cor-picker'
+import { DeptoCardPendencia } from './depto-card-pendencia'
+import { DepartamentoNovidades } from './departamento-novidades'
 
 interface MembershipLite {
   departamentoId: string
@@ -107,7 +109,10 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
 
   return (
     <MotionReveal index={index} className="h-full">
-      <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 transition-[border-color,box-shadow] duration-150 hover:border-[rgb(var(--primary)_/_0.45)] hover:shadow-sm">
+      <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-[border-color,box-shadow] duration-150 hover:border-[rgb(var(--primary)_/_0.45)] hover:shadow-sm">
+        <DeptoCardPendencia slug={depto.slug} />
+        <div className="h-1 w-full shrink-0" style={{ backgroundColor: depto.cor }} aria-hidden />
+        <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start gap-3">
           {depto.podeEditarCor ? (
             <DepartamentoCorPicker
@@ -202,13 +207,14 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
 
           {mostraGestao && (
             <Link
-              href={`${homeHref}#gestao`}
+              href={hrefHomeDepartamento(depto.slug, 'equipe')}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
             >
               <Settings2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Gestão
             </Link>
           )}
+        </div>
         </div>
       </div>
     </MotionReveal>
@@ -486,11 +492,14 @@ export async function DepartamentosSection() {
 
   if (cards.length === 0) {
     return (
-      <MotionEmptyState
-        icon={<Briefcase className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
-        title="Você ainda não faz parte de nenhum departamento."
-        description="Quando a diretoria te incluir em um departamento, eles aparecem aqui."
-      />
+      <div className="space-y-8">
+        <DepartamentoNovidades />
+        <MotionEmptyState
+          icon={<Briefcase className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+          title="Você ainda não faz parte de nenhum departamento."
+          description="Quando a diretoria te incluir em um departamento, eles aparecem aqui."
+        />
+      </div>
     )
   }
 
@@ -501,6 +510,7 @@ export async function DepartamentosSection() {
 
   return (
     <div className="space-y-8">
+      <DepartamentoNovidades />
       {demaisDepartamentos.length > 0 && (
         <p className="rounded-xl border border-[rgb(var(--primary)_/_0.2)] bg-[rgb(var(--primary)_/_0.06)] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
           {gereDemais

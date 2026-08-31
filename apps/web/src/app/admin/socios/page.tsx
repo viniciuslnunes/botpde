@@ -1,7 +1,8 @@
 import { type ReactNode } from 'react'
 import { db, type Prisma } from '@torcida/db'
 import { assertAnyPermission } from '@/lib/authz'
-import { getAncestorTenantIds, tenantsAreRivais } from '@/lib/hierarquia'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { alertasRecrutamentoCrossTenant } from '@/lib/membro-alertas-cross-tenant'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
@@ -10,6 +11,7 @@ import {
   type MembroDetalheRow,
 } from '@/lib/admin-membro-map'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
+import { carregarResumoRecrutamento } from '@/lib/membro-recrutamento-logs'
 import {
   calculateEffectivePermissions,
   hasPermission,
@@ -44,6 +46,7 @@ import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { AdminSociosClient } from './admin-socios-client'
 import { AdminMembrosTable } from '@/app/admin/membros/admin-membros-client'
 import { SincronizarNumerosAviso } from './sincronizar-numeros-aviso'
+import { sugerirProximoNumeroAssociado } from '@/lib/membros-sede'
 import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
 import type { Metadata } from 'next'
 
@@ -291,93 +294,21 @@ export default async function SociosPage({
 
     const userIds = rows.map((m) => m.userId)
     const membroIds = rows.map((m) => m.id)
-    type LogMembro = { entidadeId: string | null; acao: string; detalhes: unknown }
-    const [sociosOutros, reprovacoesOutros, logsMembros, nomesUnidade, areasEfetivadas]: [
-      { userId: string; tenantId: string }[],
-      { userId: string }[],
-      LogMembro[],
+    const [alertasCross, resumoRecrutamento, nomesUnidade, areasEfetivadas]: [
+      Awaited<ReturnType<typeof alertasRecrutamentoCrossTenant>>,
+      Awaited<ReturnType<typeof carregarResumoRecrutamento>>,
       Map<string, string>,
       Map<string, Set<string>>,
     ] = await Promise.all([
-      userIds.length > 0
-        ? db.saasMembro.findMany({
-            where: {
-              userId: { in: userIds },
-              status: 'APROVADO',
-              tipo: 'SOCIO',
-              tenantId: { not: tenant.id },
-            },
-            select: { userId: true, tenantId: true },
-          })
-        : Promise.resolve([]),
-      userIds.length > 0
-        ? db.saasMembro.findMany({
-            where: {
-              userId: { in: userIds },
-              status: 'REPROVADO',
-              tipo: 'SOCIO',
-              tenantId: { not: tenant.id },
-            },
-            select: { userId: true },
-          })
-        : Promise.resolve([]),
-      membroIds.length > 0
-        ? db.auditLog.findMany({
-            where: {
-              tenantId: tenant.id,
-              entidade: 'SaasMembro',
-              entidadeId: { in: membroIds },
-              acao: {
-                in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'],
-              },
-            },
-            orderBy: { criadoEm: 'desc' },
-            select: { entidadeId: true, acao: true, detalhes: true },
-          })
-        : Promise.resolve([]),
+      alertasRecrutamentoCrossTenant(tenant.id, userIds),
+      carregarResumoRecrutamento(tenant.id, membroIds),
       resolverNomesUnidade(rows.map((m) => m.aprovadoNaUnidadeTenantId)),
       getAreasEfetivadasPorUser(tenant.id, userIds),
     ])
-
-    let userIdsComRivalSocio = new Set<string>()
-    if (sociosOutros.length > 0) {
-      const outrosTenantIds = [...new Set(sociosOutros.map((s) => s.tenantId))]
-      const checagens = await Promise.all(
-        outrosTenantIds.map(
-          async (id) => [id, await tenantsAreRivais(tenant.id, id)] as const,
-        ),
-      )
-      const tenantsRivais = new Set(checagens.filter(([, rival]) => rival).map(([id]) => id))
-      userIdsComRivalSocio = new Set(
-        sociosOutros.filter((s) => tenantsRivais.has(s.tenantId)).map((s) => s.userId),
-      )
-    }
-    const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
-    for (const r of reprovacoesOutros) {
-      reprovacoesOutraTorcidaPorUser.set(
-        r.userId,
-        (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
-      )
-    }
-    const tentativasPorMembro = new Map<string, number>()
-    const motivoReprovacaoPorMembro = new Map<string, string>()
-    for (const log of logsMembros) {
-      if (!log.entidadeId) continue
-      if (log.acao === 'CADASTRO_SOLICITADO' || log.acao === 'RECADASTRO_SOLICITADO') {
-        tentativasPorMembro.set(log.entidadeId, (tentativasPorMembro.get(log.entidadeId) ?? 0) + 1)
-      }
-      if (log.acao === 'MEMBRO_REPROVADO' && !motivoReprovacaoPorMembro.has(log.entidadeId)) {
-        const detalhes = log.detalhes
-        if (
-          detalhes &&
-          typeof detalhes === 'object' &&
-          'motivo' in detalhes &&
-          typeof (detalhes as { motivo: unknown }).motivo === 'string'
-        ) {
-          motivoReprovacaoPorMembro.set(log.entidadeId, (detalhes as { motivo: string }).motivo)
-        }
-      }
-    }
+    const { userIdsComRivalSocio, reprovacoesRivalPorUser: reprovacoesOutraTorcidaPorUser } =
+      alertasCross
+    const { tentativasPorMembro, motivoReprovacaoPorMembro, origemCanalPorMembro } =
+      resumoRecrutamento
 
     for (const m of rows) {
       const item = mapToAdminMembroItem(m, {
@@ -388,6 +319,7 @@ export default async function SociosPage({
         reprovacoesOutraTorcida: reprovacoesOutraTorcidaPorUser.get(m.userId),
         tentativas: tentativasPorMembro.get(m.id) ?? 1,
         ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(m.id),
+        origemCanal: origemCanalPorMembro.get(m.id) ?? null,
         areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
       })
       solicitacoesItens.push(item)
@@ -415,9 +347,10 @@ export default async function SociosPage({
     elegiveisDetalhe = rows
     totalLista = total
 
-    const [nomesUnidade, areasEfetivadas] = await Promise.all([
+    const [nomesUnidade, areasEfetivadas, resumoRecrutamento] = await Promise.all([
       resolverNomesUnidade(rows.map((m) => m.aprovadoNaUnidadeTenantId)),
       getAreasEfetivadasPorUser(tenant.id, rows.map((m) => m.userId)),
+      carregarResumoRecrutamento(tenant.id, rows.map((m) => m.id)),
     ])
     for (const m of rows) {
       detalhePorUserId.set(
@@ -426,6 +359,7 @@ export default async function SociosPage({
           aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
             ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
             : null,
+          origemCanal: resumoRecrutamento.origemCanalPorMembro.get(m.id) ?? null,
           areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
         }),
       )
@@ -485,9 +419,10 @@ export default async function SociosPage({
         },
         select: membroDetalheSelect,
       })) as MembroDetalheRow[]
-      const [nomesUnidade, areasEfetivadas] = await Promise.all([
+      const [nomesUnidade, areasEfetivadas, resumoRecrutamento] = await Promise.all([
         resolverNomesUnidade(membrosPagina.map((m) => m.aprovadoNaUnidadeTenantId)),
         getAreasEfetivadasPorUser(tenant.id, membrosPagina.map((m) => m.userId)),
+        carregarResumoRecrutamento(tenant.id, membrosPagina.map((m) => m.id)),
       ])
       for (const m of membrosPagina) {
         numeroAssociadoPorUserId.set(m.userId, m.numeroAssociado?.trim() || null)
@@ -497,6 +432,7 @@ export default async function SociosPage({
             aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
               ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
               : null,
+            origemCanal: resumoRecrutamento.origemCanalPorMembro.get(m.id) ?? null,
             areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
           }),
         )
@@ -534,26 +470,29 @@ export default async function SociosPage({
     sede: { nome: string } | null
     departamento: { nome: string } | null
   }
-  const elegiveisModal: OptRow[] = podeEmitir
-    ? await db.saasMembro.findMany({
-        where: elegivelBase,
-        select: {
-          id: true,
-          userId: true,
-          nome: true,
-          numeroAssociado: true,
-          discordTag: true,
-          cidade: true,
-          telefone: true,
-          aprovadoEm: true,
-          user: { select: { avatarUrl: true } },
-          sede: { select: { nome: true } },
-          departamento: { select: { nome: true } },
-        },
-        orderBy: { nome: 'asc' },
-        take: 300,
-      })
-    : []
+  const [elegiveisModal, proximoNumero]: [OptRow[], string] = podeEmitir
+    ? await Promise.all([
+        db.saasMembro.findMany({
+          where: elegivelBase,
+          select: {
+            id: true,
+            userId: true,
+            nome: true,
+            numeroAssociado: true,
+            discordTag: true,
+            cidade: true,
+            telefone: true,
+            aprovadoEm: true,
+            user: { select: { avatarUrl: true } },
+            sede: { select: { nome: true } },
+            departamento: { select: { nome: true } },
+          },
+          orderBy: { nome: 'asc' },
+          take: 300,
+        }),
+        sugerirProximoNumeroAssociado(tenant.id),
+      ])
+    : [[], '1']
 
   const paginacao = resumirPaginacao(totalLista, listagem)
 
@@ -741,6 +680,7 @@ export default async function SociosPage({
         temFiltroAtivo={
           listagem.q.length > 0 || Object.keys(listagem.filtros).length > 0
         }
+        proximoNumero={proximoNumero}
       />
     </div>
   )

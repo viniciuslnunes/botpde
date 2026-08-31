@@ -71,13 +71,20 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 1. `TenantDesignBridge` nos layouts portal/admin aplica CSS vars via `applyTenantDesign`.
 2. Grade `.app-shell-bg` usa `--grid-size`, `--grid-line`, `--grid-opacity`, `--grid-base`; `html[data-grid=off]` desliga o padrão.
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
-4. Vars de texto legível: `--color-primary-fg` (alias `--primary-fg`),
+   O Tailwind `dark:` **não** usa `prefers-color-scheme`: `@custom-variant dark`
+   em `globals.css` só dispara com class `.dark` no `<html>`. Sem isso, Windows
+   no escuro + app no claro pinta `dark:text-yellow-300` no papel branco.
+4. CSS crítico (`tenantDesignCriticalCss`) emite **os dois temas**:
+   `:root` = claro, `.dark` = escuro. Não despejar o escuro em `:root`
+   (o `*-fg` do âmbar/rosa no escuro some no claro).
+5. Vars de texto legível: `--color-primary-fg` (alias `--primary-fg`),
    `--color-secondary-fg`, `--color-success-fg` / `--color-success-on`, …  
-   Soft/badge/menu/tab/link/ícone → `*-fg` (também `.text-primary` /
+   Soft/badge/menu/tab/link/ícone/kpi → `*-fg` (também `.text-primary` /
+   `.text-warning` / `.text-danger` / `.text-success` / `.text-info` /
    `.bg-primary-soft` / `.btn-primary` em `globals.css`); botão sólido → `*-on`.  
    **Proibido** `text-[rgb(var(--primary))]` ou fill crua em texto/ícone —
-   com marca preta some no escuro (ex.: “Ver todas”, “Diretoria”, ícone do
-   próximo evento).
+   com marca preta some no escuro; âmbar/amarelo some no claro
+   (ex.: resumo de sócios, “Ver todas”, “Diretoria”).
 
 ## Sugestões de cor
 
@@ -96,14 +103,25 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 2. **Rivalidade / identidade** — ver knowledge acima. Sucesso segue a **marca**
    (não azul genérico nem verde forçado); verde só se identidade já for verde;
    neutros sem saturação artificial; sem análoga/complementar.
-3. **Paleta do clube** — `CLUBE_PALETAS` / `paletaDoClube`.
+3. **Paleta do clube** — `CLUBE_PALETAS` / `paletaDoClube` / `CLUBE_PALETA_ALIASES`.
+   Matching: chave exata → alias de nome oficial → hífen → **palavra inteira
+   mais longa** (nunca `sport` dentro de “Sport Club Corinthians”).
 4. **Escudo/logo** — `extrairPaletaDeImagem`; verdes fora de contexto
    filtrados.
-5. **Superfícies derivadas** — `derivarSuperficiesDaMarca` preenche
-   `background`, `backgroundSubtle`, `surface` e `surfaceRaised` (light/dark)
-   com tint leve; `aplicarPaletaAoDesign` sempre reaplica ações + superfícies +
-   texto automático.
-6. **Antes/depois** na prévia.
+5. **Superfícies derivadas** — `derivarSuperficiesDaMarca` + `completarSuperficies`
+   preenchem **todos** os tokens (fundo, texto, borda) nos dois temas.
+   Claro: papel alto-L (pastel do hue; **branco puro se P&B** — não misturar o
+   hex escuro no cinza, que sujava o muted). Escuro: zinc + sombra cromática.
+   Texto principal e secundário fecham WCAG AA (4.5:1) contra todas as
+   superfícies. `aplicarPaletaAoDesign` / `aplicarMarcaAoDesign` reaplicam
+   ações + superfícies + texto automático.
+6. **Fill vs tema** — a identidade gravada (`brand.primary` / `secondary`) não
+   muda; `resolverFillDaMarca` empurra L quando branco some no claro ou preto
+   some no escuro, e o CSS desenha um anel (`--color-*-ring`) se ainda faltar
+   3:1 (WCAG 1.4.11). `textoSobreFill` escolhe branco/preto pelo ratio real
+   (âmbar pede preto). `resolveActionTextColors` fecha 4.5:1 no botão e no
+   link, 3:1 no badge soft, **por tema**.
+7. **Antes/depois** na prévia.
 
 ## UX do estúdio (`/admin/design`)
 
@@ -115,7 +133,9 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 - Inspector: scroll com `px-1`/`pr-2`; tabs sticky no topo da coluna; cards de
   ação com `p-3` (swatches não colados na barra de rolagem).
 - Aba **Identidade**: cor primária/secundária + **texto da marca** (menus/tabs;
-  vazio = automático — clareia P&B no escuro).
+  vazio = automático — clareia P&B no escuro). **Mudar a primária recalcula
+  superfícies e ações** dos dois temas. Paletas sugeridas mostram selo
+  “Claro+escuro” quando o card já fecha AA.
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
   Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
   Texto manual só vale onde o contraste fecha (botão sólido vs badge soft);
@@ -123,15 +143,21 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 - Seletor de cor: swatch abre o **color picker nativo** direto (sem popover
   intermediário).
 - Prévia **sem** overlay de hotspot/label ao focar token — estado não salvo
-  fica só no rodapé (`StickyPersistBar`).
+  fica só no rodapé (`StickyPersistBar`). A prévia usa o mesmo `resolverFillDaMarca`
+  / `resolverSuperficies` do runtime.
 - Contraste WCAG no rodapé avalia **claro e escuro juntos** (marca, ações,
-  superfícies e grade). Identidade/Ações: amostras soft+botão nos dois temas.
-  **Superfícies**: campos **Claro** e **Escuro** lado a lado + amostra visual
-  dual. **Fundo**: linha/base automáticas herdam por tema; amostra da grade nos
-  dois modos. Alertas usam token info (não emerald).
+  superfícies e grade) com o fill efetivo de cada tema. Falhas oferecem
+  **Corrigir contraste nos dois temas** (`sanearContrasteDoDesign`: mantém
+  fundos, saneia texto/borda, zera overrides de fg). Identidade/Ações: amostras
+  soft+botão nos dois temas. **Superfícies**: campos **Claro** e **Escuro**
+  lado a lado + amostra visual dual. **Fundo**: linha/base automáticas herdam
+  por tema; amostra da grade nos dois modos. Alertas usam token info (não emerald).
 - **Agenda / Eventos** — badges e CTAs de marca usam `--color-primary-fg` /
   `--color-primary-on` (nunca `--primary` cru como texto). Com identidade P&B,
   `EventoTipoBadge` GERAL e “Próximo compromisso” permanecem legíveis no escuro.
+- **Status no papel** (resumo de sócios, kpi, erro de formulário) usa
+  `.text-warning` / `.text-danger` (`*-fg`), nunca `dark:text-yellow-300` nem
+  a fill crua `--color-warning`.
 
 ## Actions
 
@@ -143,6 +169,7 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 | Peça | Onde |
 |------|------|
 | Schema + paletas + contraste | `packages/types/src/design.js` |
+| Testes de contraste / clube | `apps/web/src/lib/__tests__/design.test.ts` |
 | CSS vars / `applyTenantDesign` | `packages/ui/src/services/theme.tsx` |
 | Badge | `packages/ui/src/components/badge.tsx` |
 | Form + paletas UI | `apps/web/src/components/admin/design-form.tsx` |

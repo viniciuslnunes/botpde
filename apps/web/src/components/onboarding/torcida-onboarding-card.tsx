@@ -44,7 +44,7 @@ export function TorcidaOnboardingCard({
         <p className="line-clamp-2 w-full text-xs font-semibold uppercase leading-snug tracking-wide text-[rgb(var(--foreground))] sm:text-sm">
           {torcida.nome}
         </p>
-        <TorcidaOnboardingMeta stats={torcida.stats} align="center" />
+        <TorcidaOnboardingMeta stats={torcida.stats} setor={torcida.setor} align="center" />
         {!torcida.acessivelNoHost && (
           <p className="text-[10px] leading-snug text-amber-600 dark:text-amber-400">
             Portal em outro endereço — aprovação na torcida escolhida.

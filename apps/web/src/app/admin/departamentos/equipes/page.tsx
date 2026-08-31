@@ -1,6 +1,6 @@
 import { db, type Prisma } from '@torcida/db'
 import Link from 'next/link'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, hrefHomeDepartamento } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import {
   ListagemPaginacao,
@@ -18,8 +18,9 @@ import {
   montarWhereListagem,
   resumirPaginacao,
 } from '@/lib/listagem/query'
-import { Users } from 'lucide-react'
+import { ArrowUpRight, Users } from 'lucide-react'
 import type { Metadata } from 'next'
+import { EquipeRowAcoes } from '../_components/equipe-row-acoes'
 
 export const metadata: Metadata = { title: 'Equipes — Departamentos' }
 
@@ -60,7 +61,7 @@ export default async function DepartamentoEquipesPage({
     papel: string
     criadoEm: Date
     user: { nome: string | null; nickname: string | null; email: string }
-    area: { nome: string; departamento: { nome: string; slug: string; cor: string } }
+    area: { nome: string; departamento: { id: string; nome: string; slug: string; cor: string } }
   }
 
   const [vinculos, total]: [VinculoRow[], number] = await Promise.all([
@@ -75,7 +76,7 @@ export default async function DepartamentoEquipesPage({
         criadoEm: true,
         user: { select: { nome: true, nickname: true, email: true } },
         area: {
-          select: { nome: true, departamento: { select: { nome: true, slug: true, cor: true } } },
+          select: { nome: true, departamento: { select: { id: true, nome: true, slug: true, cor: true } } },
         },
       },
     }),
@@ -111,6 +112,10 @@ export default async function DepartamentoEquipesPage({
         escopoChave={tenant.id}
       />
 
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Quem atua em cada área. Nomeie responsável ou remova daqui; o departamento continua o lugar da equipe completa.
+      </p>
+
       {vinculos.length === 0 ? (
         <ListagemVazia
           spec={SPEC}
@@ -124,7 +129,7 @@ export default async function DepartamentoEquipesPage({
             ),
             title: 'Ninguém em áreas ainda',
             description:
-              'A entrada em área é feita pelo gestor no portal do departamento — aqui é só a visão consolidada.',
+              'Inclua pessoas no departamento em Acessos · Pessoas e nomeie o responsável na aba Áreas.',
           }}
         />
       ) : (
@@ -141,26 +146,52 @@ export default async function DepartamentoEquipesPage({
                   className={coluna.id === 'criadoEm' ? 'hidden lg:table-cell' : undefined}
                 />
               ))}
+              <th className="w-10 px-4 py-3">
+                <span className="sr-only">Ações</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {vinculos.map((v) => (
               <tr key={`${v.areaId}-${v.userId}`} className="border-t border-[rgb(var(--border))]">
                 <td className="px-4 py-3">
-                  <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
-                    {v.user.nome ?? v.user.email}
-                  </span>
-                  {v.user.nickname && (
-                    <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                      @{v.user.nickname}
+                  <Link
+                    href={hrefHomeDepartamento(v.area.departamento.slug, 'equipe', {
+                      pessoa: v.userId,
+                    })}
+                    className="group inline-flex items-start gap-1.5"
+                    aria-label={`Abrir ${v.user.nome ?? v.user.email} na equipe de ${v.area.departamento.nome}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-[rgb(var(--foreground))] group-hover:underline">
+                        {v.user.nome ?? v.user.email}
+                      </span>
+                      {v.user.nickname && (
+                        <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                          @{v.user.nickname}
+                        </span>
+                      )}
                     </span>
-                  )}
+                    <ArrowUpRight
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                      aria-hidden
+                    />
+                  </Link>
                 </td>
-                <td className="px-4 py-3 text-sm text-[rgb(var(--foreground))]">{v.area.nome}</td>
+                <td className="px-4 py-3 text-sm text-[rgb(var(--foreground))]">
+                  <Link
+                    href={hrefHomeDepartamento(v.area.departamento.slug, 'areas', {
+                      area: v.areaId,
+                    })}
+                    className="app-touch-line hover:underline"
+                  >
+                    {v.area.nome}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/portal/departamentos/${v.area.departamento.slug}#equipe`}
-                    className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
+                    href={hrefHomeDepartamento(v.area.departamento.slug, 'equipe')}
+                    className="app-touch-line inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
                   >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -176,6 +207,18 @@ export default async function DepartamentoEquipesPage({
                 <td className="hidden px-4 py-3 text-right text-sm text-[rgb(var(--foreground-muted))] lg:table-cell">
                   {fmtData.format(v.criadoEm)}
                 </td>
+                <EquipeRowAcoes
+                  areaId={v.areaId}
+                  areaNome={v.area.nome}
+                  departamentoId={v.area.departamento.id}
+                  slug={v.area.departamento.slug}
+                  userId={v.userId}
+                  pessoaNome={v.user.nome ?? v.user.email}
+                  papel={v.papel}
+                  hrefPessoa={hrefHomeDepartamento(v.area.departamento.slug, 'equipe', {
+                    pessoa: v.userId,
+                  })}
+                />
               </tr>
             ))}
           </tbody>

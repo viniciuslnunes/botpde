@@ -28,7 +28,7 @@ export function ComunidadePageHeader({
       <Link
         href={voltarHref}
         aria-label="Voltar ao feed"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className="app-touch-target flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
       >
         <ArrowLeft className="h-[18px] w-[18px]" />
       </Link>

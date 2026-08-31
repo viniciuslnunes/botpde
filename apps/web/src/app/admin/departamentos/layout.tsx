@@ -19,8 +19,8 @@ export default async function DepartamentosModuloLayout({ children }: { children
 
   const permissoes = await permissoesEfetivasNoAdmin()
 
-  // Área sem responsável é a pendência mais acionável do módulo — vira contagem
-  // na tab de Áreas para não precisar entrar para descobrir.
+  // Pendência acionável do módulo: áreas ativas sem responsável. Vai na Visão
+  // (índice da organização), não na aba Áreas — senão o número parece total.
   const [areasAtivas, areasComResponsavel]: [number, Array<{ areaId: string }>] = await Promise.all([
     db.departamentoArea.count({ where: { tenantId: tenant.id, ativa: true } }),
     db.departamentoAreaMembro.findMany({
@@ -33,12 +33,12 @@ export default async function DepartamentosModuloLayout({ children }: { children
 
   // Estrutura vem de ADMIN_MODULOS; aqui só ícone e contagem.
   const tabs = montarTabsModulo('departamentos', permissoes, {
-    visao: { icon: <Building2 className={ICONE} /> },
-    areas: {
-      icon: <Layers className={ICONE} />,
+    visao: {
+      icon: <Building2 className={ICONE} />,
       count: areasSemResponsavel,
       countClass: 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
+    areas: { icon: <Layers className={ICONE} /> },
     equipes: { icon: <Users className={ICONE} /> },
     projetos: { icon: <Target className={ICONE} /> },
   })
@@ -49,7 +49,7 @@ export default async function DepartamentosModuloLayout({ children }: { children
     <>
       <AdminPageHeader
         title="Departamentos"
-        description="Áreas de atuação, equipes e responsáveis de cada departamento da torcida."
+        description="Visão da torcida: abra um departamento para gerir áreas, equipe e projetos."
         icon={<Building2 className="h-5 w-5" />}
       />
 

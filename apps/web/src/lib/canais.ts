@@ -30,6 +30,7 @@ import {
 import {
   decidePodeVerCanal,
   orPostsDoMuralCanal,
+  decidirFeedInternoDoMural,
   canalOficialTemPortalProprio,
   type CanalItem,
   type CandidatoMembroCanalItem,
@@ -1460,18 +1461,14 @@ export async function resolverFeedInternoDoMural(opts: {
     },
     select: { tenantId: true },
   })
-  // Caso B: vínculo na unidade com tenant próprio (viewer ainda na Sede).
-  if (vinculo && vinculo.tenantId !== opts.viewerTenantId) {
-    return { incluir: true, feedInternoTenantId: vinculo.tenantId }
-  }
-  // Tenant ativo = unidade (Caso B) ou Minha unidade Caso A no tenant da
-  // mãe: mural próprio pode misturar "Só torcida" deste tenant. Listagem
-  // `/canais/[id]` não chega aqui (sem `feedInterno=1`).
-  if (vinculo && vinculo.tenantId === opts.viewerTenantId && oficialSede?.id !== opts.canalId) {
-    return { incluir: true, feedInternoTenantId: vinculo.tenantId }
-  }
 
-  return { incluir: false, feedInternoTenantId: null }
+  return decidirFeedInternoDoMural({
+    canalOficial: opts.canalOficial,
+    canalId: opts.canalId,
+    oficialSedeId: oficialSede?.id ?? null,
+    vinculoTenantId: vinculo?.tenantId ?? null,
+    viewerTenantId: opts.viewerTenantId,
+  })
 }
 
 export async function getPostsDoCanal(

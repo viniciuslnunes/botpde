@@ -1,0 +1,1675 @@
+{
+ "descricao": "Clubes que constam do Ranking Nacional de Clubes 2026 da CBF e NÃO existem em `Afiliacao`. Insumo para completar `afiliacoes-brasil.js`.",
+ "geradoEm": "2026-08-27",
+ "criterioCasamento": "nome canônico (normalizeNome + ALIASES + chaveMatch) + UF; complementado por Wikidata e Ogol para cidade/fundação/estádio.",
+ "total": 91,
+ "comCidadeSugerida": 84,
+ "clubes": [
+  {
+   "nome": "Amazonas",
+   "uf": "AM",
+   "rncPos": 40,
+   "rncPontos": 3403,
+   "cidade": "Manaus",
+   "fundacao": "2019",
+   "estadio": "Estádio Municipal Carlos Zamith",
+   "capacidade": null,
+   "site": "http://www.amazonasfc.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/244128_imgbank_1685114064.png",
+   "qid": "Q86729529",
+   "ogolId": "244128",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Tombense",
+   "uf": "MG",
+   "rncPos": 42,
+   "rncPontos": 3240,
+   "cidade": "Tombos",
+   "fundacao": "1914-01-01",
+   "estadio": "Estádio Antônio Guimarães de Almeida",
+   "capacidade": null,
+   "site": "http://www.tombense.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3497_imgbank_1683708413.png",
+   "qid": "Q1138634",
+   "ogolId": "3497",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Retrô",
+   "uf": "PE",
+   "rncPos": 49,
+   "rncPontos": 2707,
+   "cidade": "Camaragibe",
+   "fundacao": "2016",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/240756_imgbank_1683626367.png",
+   "qid": null,
+   "ogolId": "240756",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Ypiranga",
+   "uf": "RS",
+   "rncPos": 50,
+   "rncPontos": 2686,
+   "cidade": "Erechim",
+   "fundacao": "1924-01-01",
+   "estadio": "Estádio Olímpico Colosso da Lagoa",
+   "capacidade": 30000,
+   "site": "https://www.yfc.com.br/",
+   "logoOgol": null,
+   "qid": "Q674632",
+   "ogolId": null,
+   "fontesCidade": [
+    "wikidata"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Athletic",
+   "uf": "MG",
+   "rncPos": 51,
+   "rncPontos": 2570,
+   "cidade": "São João Del Rei",
+   "fundacao": "1909",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/233398_imgbank_1683623794.png",
+   "qid": null,
+   "ogolId": "233398",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Aparecidense",
+   "uf": "GO",
+   "rncPos": 55,
+   "rncPontos": 2091,
+   "cidade": "Aparecida de Goiânia",
+   "fundacao": "1985",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3111_imgbank_1685114149.png",
+   "qid": null,
+   "ogolId": "3111",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Floresta",
+   "uf": "CE",
+   "rncPos": 61,
+   "rncPontos": 1838,
+   "cidade": "Fortaleza",
+   "fundacao": "1954-01-01",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/86295_imgbank_1685114219.png",
+   "qid": "Q10282853",
+   "ogolId": "86295",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Manaus",
+   "uf": "AM",
+   "rncPos": 64,
+   "rncPontos": 1697,
+   "cidade": "Manaus",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/20/92120_logo_manaus_ec.jpg",
+   "qid": null,
+   "ogolId": "92125",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Altos",
+   "uf": "PI",
+   "rncPos": 65,
+   "rncPontos": 1575,
+   "cidade": "Altos",
+   "fundacao": "2013",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/104537_imgbank_1683563226.png",
+   "qid": null,
+   "ogolId": "104537",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Águia de Marabá",
+   "uf": "PA",
+   "rncPos": 67,
+   "rncPontos": 1437,
+   "cidade": "Marabá",
+   "fundacao": "1982-01-01",
+   "estadio": "Estádio Municipal Zinho de Oliveira",
+   "capacidade": 4500,
+   "site": "https://aguiademarabafc.com",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3087_imgbank_1683641670.png",
+   "qid": "Q2493830",
+   "ogolId": "3087",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Tocantinópolis",
+   "uf": "TO",
+   "rncPos": 71,
+   "rncPontos": 1297,
+   "cidade": "Tocantinópolis",
+   "fundacao": "1989-01-01",
+   "estadio": "Estádio João Ribeiro",
+   "capacidade": 6000,
+   "site": "https://tocantinopolisec.com",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3494_imgbank_1683708367.png",
+   "qid": "Q7811956",
+   "ogolId": "3494",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Pouso Alegre",
+   "uf": "MG",
+   "rncPos": 76,
+   "rncPontos": 1168,
+   "cidade": "Pouso Alegre",
+   "fundacao": "1913-01-01",
+   "estadio": "Estádio Municipal Irmão Gino Maria Rossi",
+   "capacidade": 25000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/30794_imgbank_1685114385.png",
+   "qid": "Q10352225",
+   "ogolId": "30794",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Portuguesa",
+   "uf": "RJ",
+   "rncPos": 78,
+   "rncPontos": 1101,
+   "cidade": "Rio de Janeiro",
+   "fundacao": "1924-01-01",
+   "estadio": "Estádio Luso-Brasileiro",
+   "capacidade": 4400,
+   "site": "http://www.aaportuguesario.com.br/",
+   "logoOgol": null,
+   "qid": "Q2341011",
+   "ogolId": null,
+   "fontesCidade": [
+    "wikidata"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Inter de Limeira",
+   "uf": "SP",
+   "rncPos": 79,
+   "rncPontos": 1070,
+   "cidade": "Limeira",
+   "fundacao": "1913",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3291_imgbank_1683649721.png",
+   "qid": null,
+   "ogolId": "3291",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Humaitá",
+   "uf": "AC",
+   "rncPos": 80,
+   "rncPontos": 1064,
+   "cidade": "Porto Acre",
+   "fundacao": "2015",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/102079_imgbank_1683626176.png",
+   "qid": null,
+   "ogolId": "102079",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Trem",
+   "uf": "AP",
+   "rncPos": 80,
+   "rncPontos": 1064,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Juazeirense",
+   "uf": "BA",
+   "rncPos": 83,
+   "rncPontos": 1016,
+   "cidade": "Juazeiro",
+   "fundacao": "2006",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/33837_imgbank_1774488782.png",
+   "qid": null,
+   "ogolId": "33837",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "São Raimundo",
+   "uf": "RR",
+   "rncPos": 88,
+   "rncPontos": 965,
+   "cidade": "Boa Vista",
+   "fundacao": "1963",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3471_imgbank_1683708164.png",
+   "qid": null,
+   "ogolId": "3471",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Cianorte",
+   "uf": "PR",
+   "rncPos": 90,
+   "rncPontos": 940,
+   "cidade": "Cianorte",
+   "fundacao": "2002-02-13",
+   "estadio": "Estádio Municipal Olímpico Albino Turbay",
+   "capacidade": 8000,
+   "site": "http://www.leaodovale.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3196_imgbank_1717166397.png",
+   "qid": "Q617367",
+   "ogolId": "3196",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Iguatu",
+   "uf": "CE",
+   "rncPos": 91,
+   "rncPontos": 926,
+   "cidade": "Iguatu",
+   "fundacao": "2010",
+   "estadio": "Estádio Elmo Moreno",
+   "capacidade": 8000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/44198_imgbank_1683641132.png",
+   "qid": "Q10300994",
+   "ogolId": "44198",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Jacuipense",
+   "uf": "BA",
+   "rncPos": 94,
+   "rncPontos": 756,
+   "cidade": "Riachão do Jacuípe",
+   "fundacao": "1965-04-21",
+   "estadio": "Estádio Eliel Martins",
+   "capacidade": 4000,
+   "site": "https://esporteclubejacuipense.com",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3311_imgbank_1683649803.png",
+   "qid": "Q5399102",
+   "ogolId": "3311",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Capital",
+   "uf": "DF",
+   "rncPos": 95,
+   "rncPontos": 755,
+   "cidade": "Brasília",
+   "fundacao": "2005",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/35142_imgbank_1717426536.png",
+   "qid": null,
+   "ogolId": "35142",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Real Noroeste",
+   "uf": "ES",
+   "rncPos": 96,
+   "rncPontos": 754,
+   "cidade": "Águia Branca",
+   "fundacao": "2008",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/44192_imgbank_1685115473.png",
+   "qid": null,
+   "ogolId": "44192",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Fluminense",
+   "uf": "PI",
+   "rncPos": 97,
+   "rncPontos": 734,
+   "cidade": "Teresina",
+   "fundacao": "1938-01-31",
+   "estadio": "Estádio Lindolfo Monteiro",
+   "capacidade": 8000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3248_imgbank_1685115207.png",
+   "qid": "Q10282979",
+   "ogolId": "3248",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "São Luiz",
+   "uf": "RS",
+   "rncPos": 98,
+   "rncPontos": 707,
+   "cidade": "Ijuí",
+   "fundacao": "1938-01-01",
+   "estadio": "Estádio 19 de Outubro",
+   "capacidade": 4500,
+   "site": "http://www.saoluizdeijui.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3465_imgbank.png",
+   "qid": "Q5399137",
+   "ogolId": "3465",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Barra",
+   "uf": "SC",
+   "rncPos": 99,
+   "rncPontos": 704,
+   "cidade": "Balneário Camboriú",
+   "fundacao": "2013",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/92879_imgbank_1675262365.png",
+   "qid": null,
+   "ogolId": "92879",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Atlético",
+   "uf": "CE",
+   "rncPos": 101,
+   "rncPontos": 679,
+   "cidade": "Fortaleza",
+   "fundacao": "1988",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/18/58718_logo_atletico_ce.gif",
+   "qid": null,
+   "ogolId": "86292",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Manauara",
+   "uf": "AM",
+   "rncPos": 103,
+   "rncPontos": 665,
+   "cidade": "Manaus",
+   "fundacao": "2020",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/261909_imgbank_1717426185.png",
+   "qid": null,
+   "ogolId": "261909",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Concórdia",
+   "uf": "SC",
+   "rncPos": 108,
+   "rncPontos": 607,
+   "cidade": "Concórdia",
+   "fundacao": "2005",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3203_imgbank_1683642025.png",
+   "qid": null,
+   "ogolId": "3203",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Azuriz",
+   "uf": "PR",
+   "rncPos": 111,
+   "rncPontos": 559,
+   "cidade": "Pato Branco",
+   "fundacao": "2017",
+   "estadio": null,
+   "capacidade": null,
+   "site": "http://azuriz.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/238974_imgbank.png",
+   "qid": "Q65162331",
+   "ogolId": "238974",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "GAS",
+   "uf": "RR",
+   "rncPos": 113,
+   "rncPontos": 531,
+   "cidade": "Caracaraí",
+   "fundacao": "1965",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/15721_imgbank_1709307996.png",
+   "qid": null,
+   "ogolId": "15721",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Guarany de Bagé",
+   "uf": "RS",
+   "rncPos": 116,
+   "rncPontos": 505,
+   "cidade": "Bagé",
+   "fundacao": "1907",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3280_imgbank_1688482671.png",
+   "qid": null,
+   "ogolId": "3280",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "União",
+   "uf": "TO",
+   "rncPos": 116,
+   "rncPontos": 505,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Iporá",
+   "uf": "GO",
+   "rncPos": 122,
+   "rncPontos": 459,
+   "cidade": "Iporá",
+   "fundacao": "2000-01-01",
+   "estadio": "Estádio Francisco José Ferreira",
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/36313_imgbank_1683641191.png",
+   "qid": "Q10303505",
+   "ogolId": "274764",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Costa Rica",
+   "uf": "MS",
+   "rncPos": 123,
+   "rncPontos": 456,
+   "cidade": "Costa Rica",
+   "fundacao": "2004",
+   "estadio": "Estádio Municipal Laerte Paes Coelho",
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/15594_imgbank_1742380058.png",
+   "qid": "Q2998372",
+   "ogolId": "15594",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Princesa do Solimões",
+   "uf": "AM",
+   "rncPos": 125,
+   "rncPontos": 448,
+   "cidade": "Manacapuru",
+   "fundacao": "1971-01-01",
+   "estadio": "Estádio Olímpico Municipal Gilberto Mestrinho",
+   "capacidade": 15000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/15310_imgbank_1683641368.png",
+   "qid": "Q3403436",
+   "ogolId": "15310",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Patrocinense",
+   "uf": "MG",
+   "rncPos": 126,
+   "rncPontos": 438,
+   "cidade": "Patrocínio",
+   "fundacao": "2010-01-01",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/84/44784_logo_20190329181939_se_patrocinense.jpg",
+   "qid": "Q7178112",
+   "ogolId": "44784",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "CSE",
+   "uf": "AL",
+   "rncPos": 128,
+   "rncPontos": 431,
+   "cidade": "Palmeira dos Índios",
+   "fundacao": "1947",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3218_imgbank_1717166526.png",
+   "qid": null,
+   "ogolId": "3218",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Real Brasília",
+   "uf": "DF",
+   "rncPos": 129,
+   "rncPontos": 429,
+   "cidade": "Brasília",
+   "fundacao": "2016",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/115301_imgbank_1674046429.png",
+   "qid": "Q65167374",
+   "ogolId": "115301",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Capital",
+   "uf": "TO",
+   "rncPos": 130,
+   "rncPontos": 404,
+   "cidade": "Palmas",
+   "fundacao": "2012",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/85267_imgbank_1772736182.jpg",
+   "qid": null,
+   "ogolId": "85267",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Barcelona",
+   "uf": "BA",
+   "rncPos": 132,
+   "rncPontos": 380,
+   "cidade": "Ilhéus",
+   "fundacao": "2019",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/255062_imgbank_1673372717.png",
+   "qid": null,
+   "ogolId": "255062",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Independência",
+   "uf": "AC",
+   "rncPos": 132,
+   "rncPontos": 380,
+   "cidade": "Rio Branco",
+   "fundacao": "1946-08-02",
+   "estadio": "Estádio José de Melo",
+   "capacidade": 8000,
+   "site": "https://independenciafc.com",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3287_imgbank_1673278511.png",
+   "qid": "Q3150038",
+   "ogolId": "3287",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Jequié",
+   "uf": "BA",
+   "rncPos": 132,
+   "rncPontos": 380,
+   "cidade": "Jequié",
+   "fundacao": "1969",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3315_imgbank_1683111668.png",
+   "qid": null,
+   "ogolId": "3315",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "CRAC",
+   "uf": "GO",
+   "rncPos": 138,
+   "rncPontos": 361,
+   "cidade": "Catalão",
+   "fundacao": "1931",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3211_imgbank_1783433697.png",
+   "qid": null,
+   "ogolId": "3211",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Globo",
+   "uf": "RN",
+   "rncPos": 140,
+   "rncPontos": 355,
+   "cidade": "Ceará-Mirim",
+   "fundacao": "2012-01-01",
+   "estadio": "Estádio Manoel Dantas Barretto",
+   "capacidade": null,
+   "site": "http://www.globofc.com/",
+   "logoOgol": null,
+   "qid": "Q18480811",
+   "ogolId": null,
+   "fontesCidade": [
+    "wikidata"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Goiatuba",
+   "uf": "GO",
+   "rncPos": 146,
+   "rncPontos": 330,
+   "cidade": "Goiatuba",
+   "fundacao": "1970-01-01",
+   "estadio": null,
+   "capacidade": null,
+   "site": "http://goiatubaec.webcindario.com/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3260_imgbank_1722502158.png",
+   "qid": "Q3109914",
+   "ogolId": "3260",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Camboriú",
+   "uf": "SC",
+   "rncPos": 148,
+   "rncPontos": 324,
+   "cidade": "Camboriú",
+   "fundacao": "2003-01-01",
+   "estadio": "Estádio Roberto Santos Garcia",
+   "capacidade": null,
+   "site": "http://www.camboriufc.com/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3170_imgbank_1683641830.png",
+   "qid": "Q5025221",
+   "ogolId": "3170",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Nova Venécia",
+   "uf": "ES",
+   "rncPos": 149,
+   "rncPontos": 320,
+   "cidade": "Nova Venécia",
+   "fundacao": "2021",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/262496_imgbank.png",
+   "qid": "Q107110027",
+   "ogolId": "262496",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Luverdense",
+   "uf": "MT",
+   "rncPos": 151,
+   "rncPontos": 315,
+   "cidade": "Lucas do Rio Verde",
+   "fundacao": "2004-01-01",
+   "estadio": "Estádio Municipal Passo das Emas",
+   "capacidade": 10000,
+   "site": "https://luverdense.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/13679_imgbank.png",
+   "qid": "Q1029032",
+   "ogolId": "13679",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Aimoré",
+   "uf": "RS",
+   "rncPos": 152,
+   "rncPontos": 314,
+   "cidade": "São Leopoldo",
+   "fundacao": "1936-01-01",
+   "estadio": "Estádio João Corrêa da Silveira",
+   "capacidade": 12000,
+   "site": "http://www.ceaimore.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/24900_imgbank_1685115053.png",
+   "qid": "Q5136497",
+   "ogolId": "24900",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Maricá",
+   "uf": "RJ",
+   "rncPos": 153,
+   "rncPontos": 305,
+   "cidade": "Maricá",
+   "fundacao": "2003",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/33822_imgbank_1740410608.png",
+   "qid": "Q10275183",
+   "ogolId": "33822",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Audax Rio",
+   "uf": "RJ",
+   "rncPos": 155,
+   "rncPontos": 304,
+   "cidade": "São João de Meriti",
+   "fundacao": "2005",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/16211_imgbank_1742380171.png",
+   "qid": null,
+   "ogolId": "16211",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Murici",
+   "uf": "AL",
+   "rncPos": 158,
+   "rncPontos": 276,
+   "cidade": "Murici",
+   "fundacao": "1974-09-07",
+   "estadio": "Estádio José Gomes da Costa",
+   "capacidade": 5000,
+   "site": "https://muricifc.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3355_imgbank_1673452435.png",
+   "qid": "Q3328098",
+   "ogolId": "3355",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Goiânia",
+   "uf": "GO",
+   "rncPos": 161,
+   "rncPontos": 255,
+   "cidade": "Goiânia",
+   "fundacao": "1938-01-01",
+   "estadio": "Estádio Olímpico Pedro Ludovico",
+   "capacidade": 10000,
+   "site": "http://www.goianiaesporteclube.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3259_imgbank.png",
+   "qid": "Q1534448",
+   "ogolId": "3259",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Itabirito",
+   "uf": "MG",
+   "rncPos": 161,
+   "rncPontos": 255,
+   "cidade": "Itabirito",
+   "fundacao": "2022",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/272125_imgbank_1688375840.png",
+   "qid": null,
+   "ogolId": "272125",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Monte Azul",
+   "uf": "SP",
+   "rncPos": 161,
+   "rncPontos": 255,
+   "cidade": "Monte Azul Paulista",
+   "fundacao": "1920",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/16130_imgbank.png",
+   "qid": null,
+   "ogolId": "16130",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Pacajus",
+   "uf": "CE",
+   "rncPos": 161,
+   "rncPontos": 255,
+   "cidade": "Pacajus",
+   "fundacao": "2017",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/217512_imgbank_1683626300.png",
+   "qid": "Q48867733",
+   "ogolId": "217512",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Penedense",
+   "uf": "AL",
+   "rncPos": 161,
+   "rncPontos": 255,
+   "cidade": "Penedo",
+   "fundacao": "1909",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3391_imgbank.png",
+   "qid": null,
+   "ogolId": "3391",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Real Ariquemes",
+   "uf": "RO",
+   "rncPos": 169,
+   "rncPontos": 238,
+   "cidade": "Ariquemes",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/62320_imgbank_1683623726.png",
+   "qid": null,
+   "ogolId": "234448",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Nova Mutum",
+   "uf": "MT",
+   "rncPos": 172,
+   "rncPontos": 229,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Cordino",
+   "uf": "MA",
+   "rncPos": 173,
+   "rncPontos": 228,
+   "cidade": "Barra do Corda",
+   "fundacao": "2010-01-01",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/50293_imgbank_1683624792.png",
+   "qid": "Q5170017",
+   "ogolId": "50293",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Falcon",
+   "uf": "SE",
+   "rncPos": 173,
+   "rncPontos": 228,
+   "cidade": "Barra dos Coqueiros",
+   "fundacao": "2020",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/263307_imgbank_1683625311.png",
+   "qid": null,
+   "ogolId": "263307",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "São Francisco",
+   "uf": "AC",
+   "rncPos": 173,
+   "rncPontos": 228,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Avenida",
+   "uf": "RS",
+   "rncPos": 178,
+   "rncPontos": 204,
+   "cidade": "Santa Cruz do Sul",
+   "fundacao": "1944-01-06",
+   "estadio": "Estádio dos Eucaliptos (Santa Cruz do Sul)",
+   "capacidade": null,
+   "site": "http://www.esporteclubeavenida.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3133_imgbank_1717166014.png",
+   "qid": "Q5399077",
+   "ogolId": "3133",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Juventude",
+   "uf": "MA",
+   "rncPos": 187,
+   "rncPontos": 178,
+   "cidade": "São Mateus do Maranhão",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/45471_imgbank.png",
+   "qid": null,
+   "ogolId": "255588",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Tuntum",
+   "uf": "MA",
+   "rncPos": 188,
+   "rncPontos": 175,
+   "cidade": "Tuntum",
+   "fundacao": "2021",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/264165_imgbank.png",
+   "qid": null,
+   "ogolId": "264165",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Cruzeiro",
+   "uf": "AL",
+   "rncPos": 189,
+   "rncPontos": 153,
+   "cidade": "Arapiraca",
+   "fundacao": "1983",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/24523_imgbank_1683640843.png",
+   "qid": null,
+   "ogolId": "24523",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Interporto",
+   "uf": "TO",
+   "rncPos": 189,
+   "rncPontos": 153,
+   "cidade": "Porto Nacional",
+   "fundacao": "1990-01-01",
+   "estadio": "Estádio General Sampaio",
+   "capacidade": 4000,
+   "site": "http://www.interportofc.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3296_imgbank_1683649756.png",
+   "qid": "Q6056430",
+   "ogolId": "363287",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Sãojoseense",
+   "uf": "PR",
+   "rncPos": 189,
+   "rncPontos": 153,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Barcelona",
+   "uf": "RO",
+   "rncPos": 198,
+   "rncPontos": 125,
+   "cidade": "Porto Velho",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/209129_imgbank_1783518387.png",
+   "qid": null,
+   "ogolId": "227282",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Dourados",
+   "uf": "MS",
+   "rncPos": 198,
+   "rncPontos": 125,
+   "cidade": "Dourados",
+   "fundacao": "2020",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/259275_imgbank_1675099450.png",
+   "qid": null,
+   "ogolId": "259275",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Oratório",
+   "uf": "AP",
+   "rncPos": 198,
+   "rncPontos": 125,
+   "cidade": "Macapá",
+   "fundacao": "1969",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/32994_imgbank.png",
+   "qid": null,
+   "ogolId": "32994",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Ação",
+   "uf": "MT",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": "Várzea Grande",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": "https://www.acaofc.com",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/15426_imgbank.png",
+   "qid": "Q10372589",
+   "ogolId": "272051",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Afogados",
+   "uf": "PE",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Náutico",
+   "uf": "RR",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": "Caracaraí",
+   "fundacao": "1962-01-01",
+   "estadio": "Estádio Flamarion Vasconcelos",
+   "capacidade": 10000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3362_imgbank.png",
+   "qid": "Q7071377",
+   "ogolId": "3362",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Pérolas Negras",
+   "uf": "RJ",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": null,
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": null,
+   "qid": null,
+   "ogolId": null,
+   "fontesCidade": [],
+   "revisar": true
+  },
+  {
+   "nome": "Próspera",
+   "uf": "SC",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": "Criciúma",
+   "fundacao": "1946-01-01",
+   "estadio": null,
+   "capacidade": null,
+   "site": "http://www.timedaraca.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/13941_imgbank.png",
+   "qid": "Q3058514",
+   "ogolId": "270706",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "São Paulo Crystal",
+   "uf": "PB",
+   "rncPos": 202,
+   "rncPontos": 102,
+   "cidade": "Cruz do Espírito Santo",
+   "fundacao": null,
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/214366_imgbank_1675182767.png",
+   "qid": "Q18472516",
+   "ogolId": "323641",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Glória",
+   "uf": "RS",
+   "rncPos": 209,
+   "rncPontos": 100,
+   "cidade": "Vacaria",
+   "fundacao": "1956",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3257_imgbank.png",
+   "qid": null,
+   "ogolId": "3257",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Independente",
+   "uf": "AP",
+   "rncPos": 209,
+   "rncPontos": 100,
+   "cidade": "Santana",
+   "fundacao": "1962-01-19",
+   "estadio": null,
+   "capacidade": null,
+   "site": "https://independenteap.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3288_imgbank_1738173340.png",
+   "qid": "Q3150036",
+   "ogolId": "3288",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Esportivo",
+   "uf": "RS",
+   "rncPos": 215,
+   "rncPontos": 83,
+   "cidade": "Bento Gonçalves",
+   "fundacao": "1919",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3233_imgbank_1674816207.png",
+   "qid": null,
+   "ogolId": "3233",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Penarol",
+   "uf": "AM",
+   "rncPos": 216,
+   "rncPontos": 77,
+   "cidade": "Itacoatiara",
+   "fundacao": "1947",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/24618_imgbank.png",
+   "qid": null,
+   "ogolId": "24618",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Atlético",
+   "uf": "AC",
+   "rncPos": 217,
+   "rncPontos": 76,
+   "cidade": "Rio Branco",
+   "fundacao": "1952",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3121_imgbank.png",
+   "qid": null,
+   "ogolId": "3121",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Galvez",
+   "uf": "AC",
+   "rncPos": 217,
+   "rncPontos": 76,
+   "cidade": "Rio Branco",
+   "fundacao": "2011-01-01",
+   "estadio": "Estádio Antônio Aquino Lopes",
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/61587_imgbank_1783432313.png",
+   "qid": "Q10288157",
+   "ogolId": "238097",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Jaraguá",
+   "uf": "GO",
+   "rncPos": 217,
+   "rncPontos": 76,
+   "cidade": "Jaraguá",
+   "fundacao": "1929",
+   "estadio": "Estádio Amintas de Freitas",
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/41583_imgbank.png",
+   "qid": "Q10305358",
+   "ogolId": "41583",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Paragominas",
+   "uf": "PA",
+   "rncPos": 226,
+   "rncPontos": 63,
+   "cidade": "Paragominas",
+   "fundacao": "2012-01-01",
+   "estadio": "Estádio Arena do Município Verde",
+   "capacidade": null,
+   "site": "http://paragominasfc.com/site/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/77537_imgbank.png",
+   "qid": "Q10344540",
+   "ogolId": "77537",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Picos",
+   "uf": "PI",
+   "rncPos": 227,
+   "rncPontos": 60,
+   "cidade": "Picos",
+   "fundacao": "1976-01-01",
+   "estadio": "Estádio Municipal Helvídio Nunes de Barros",
+   "capacidade": 4000,
+   "site": "http://sociedadeesportivadepicos.com/site/index.php",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3395_imgbank.png",
+   "qid": "Q9200565",
+   "ogolId": "270615",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Boa Esporte",
+   "uf": "MG",
+   "rncPos": 228,
+   "rncPontos": 51,
+   "cidade": "Varginha",
+   "fundacao": "1947-01-01",
+   "estadio": "Estádio Municipal Prefeito Dilzon Luiz de Melo",
+   "capacidade": 15471,
+   "site": "http://www.boaec.com.br/",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/3306_imgbank.png",
+   "qid": "Q919695",
+   "ogolId": "3306",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Santa Cruz",
+   "uf": "RS",
+   "rncPos": 233,
+   "rncPontos": 25,
+   "cidade": "Santa Cruz do Sul",
+   "fundacao": "1913-01-01",
+   "estadio": "Estádio dos Plátanos",
+   "capacidade": 7000,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/46/3446_logo_santa_cruz_rs.gif",
+   "qid": "Q5510505",
+   "ogolId": "3446",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Aquidauanense",
+   "uf": "MS",
+   "rncPos": 234,
+   "rncPontos": 10,
+   "cidade": "Aquidauana",
+   "fundacao": "2001",
+   "estadio": null,
+   "capacidade": null,
+   "site": null,
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/15590_imgbank.png",
+   "qid": null,
+   "ogolId": "15590",
+   "fontesCidade": [
+    "ogol"
+   ],
+   "revisar": false
+  },
+  {
+   "nome": "Santana",
+   "uf": "AP",
+   "rncPos": 234,
+   "rncPontos": 10,
+   "cidade": "Santana",
+   "fundacao": "1955-09-25",
+   "estadio": null,
+   "capacidade": null,
+   "site": "https://santanaec.com.br",
+   "logoOgol": "https://cdn-img.staticzz.com/img/logos/equipas/32993_imgbank_1709044650.png",
+   "qid": "Q2082726",
+   "ogolId": "32993",
+   "fontesCidade": [
+    "wikidata",
+    "ogol"
+   ],
+   "revisar": false
+  }
+ ]
+}
