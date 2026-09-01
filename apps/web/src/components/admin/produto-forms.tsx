@@ -250,7 +250,7 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
         >
           + Novo produto
         </button>
@@ -285,7 +285,7 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
                 type="submit"
                 form={formId}
                 disabled={pending}
-                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
               >
                 {pending ? 'Salvando...' : 'Criar produto'}
               </button>
@@ -355,7 +355,7 @@ export function EditarProdutoForm({
         }}
       />
       {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950">{state.error}</p>}
-      {state.success && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950">Produto atualizado!</p>}
+      {state.success && <p className="alert-success rounded-lg px-3 py-2 text-sm">Produto atualizado!</p>}
       <StickyPersistBar
         locked={pending || isDirty}
         dirtyLabel={
@@ -371,7 +371,7 @@ export function EditarProdutoForm({
           type="submit"
           form={formId}
           disabled={pending}
-          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Salvando...' : 'Salvar alterações'}
         </button>
@@ -399,7 +399,7 @@ export function ToggleProdutoButton({ id, ativo }: { id: string; ativo: boolean 
         'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
         ativo
           ? 'border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950'
-          : 'border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950',
+          : 'btn-success-soft',
       ].join(' ')}
     >
       {pending ? '...' : ativo ? 'Desativar' : 'Ativar'}
@@ -411,8 +411,8 @@ export function ToggleProdutoButton({ id, ativo }: { id: string; ativo: boolean 
 
 const STATUS_PEDIDO_COR: Record<string, string> = {
   PENDENTE: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-  CONFIRMADO: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  ENTREGUE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+  CONFIRMADO: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
+  ENTREGUE: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
   CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
 }
 
@@ -461,7 +461,7 @@ export function StatusPedidoSelect({ id, statusAtual }: { id: string; statusAtua
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1 text-xs font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
       >
         {pending ? '...' : 'OK'}
       </button>

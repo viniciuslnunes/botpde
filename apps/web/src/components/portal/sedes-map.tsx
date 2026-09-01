@@ -20,21 +20,32 @@ type Props = {
   sedes: MapPoint[]
   selectedId: string | null
   onSelect: (id: string) => void
-  /** Posição do usuário — pin azul “você está aqui”. */
+  /** Posição do usuário — pin na cor da marca (nunca azul de mapa genérico). */
   userLocation?: { lat: number; lng: number } | null
   className?: string
 }
 
 const DEFAULT_CENTER = { lat: -23.55, lng: -46.63 }
 
+function cssVarRgb(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  if (!raw) return fallback
+  const ch = raw.split(/[\s,/]+/).filter(Boolean)
+  if (ch.length >= 3) return `rgb(${ch[0]} ${ch[1]} ${ch[2]})`
+  return raw.startsWith('#') || raw.startsWith('rgb') ? raw : fallback
+}
+
 function pinContent(
   markerLib: GoogleMapsMarkerLibrary,
   kind: 'sede' | 'sede-selected' | 'user',
 ): HTMLElement {
   // PinElement é HTMLElement — usar a instância direto (`.element` está deprecated).
+  const primary = cssVarRgb('--color-primary', '#0a0a0a')
+  const muted = cssVarRgb('--foreground-muted', '#71717a')
   if (kind === 'user') {
     return new markerLib.PinElement({
-      background: '#2563eb',
+      background: primary,
       borderColor: '#ffffff',
       glyphColor: '#ffffff',
       scale: 1.05,
@@ -42,14 +53,14 @@ function pinContent(
   }
   if (kind === 'sede-selected') {
     return new markerLib.PinElement({
-      background: 'rgb(124, 58, 237)',
+      background: primary,
       borderColor: '#ffffff',
       glyphColor: '#ffffff',
       scale: 1.25,
     })
   }
   return new markerLib.PinElement({
-    background: 'rgb(99, 102, 241)',
+    background: muted,
     borderColor: '#ffffff',
     glyphColor: '#ffffff',
     scale: 1,

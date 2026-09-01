@@ -164,6 +164,8 @@ export const TenantDesignSchema = z
       .object({
         primary: hexColor,
         secondary: hexOrNull.default(null),
+        /** Cor de arquirrival gravada na torcida. Null = padrao do catalogo. */
+        arquirrival: hexOrNull.default(null),
       })
       .strict(),
     grid: z
@@ -204,6 +206,9 @@ export const CONTRASTE_AA_GRANDE = 3
 export const CONTRASTE_FILL_MIN = 1.25
 /** WCAG 1.4.11 componentes de UI (botão discernível do fundo). */
 export const CONTRASTE_UI = 3
+/** Wash de badge/soft no produto (`/_0.16`). É o par mais difícil: no claro
+ *  o fundo escurece; no escuro clareia — texto de 10px precisa de 4.5:1 aqui. */
+export const WASH_ACAO = 0.16
 
 export const DEFAULT_SURFACE_LIGHT = /** @type {const} */ ({
   background: '#ffffff',
@@ -229,7 +234,7 @@ export const DEFAULT_SURFACE_DARK = /** @type {const} */ ({
 
 export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
   version: 1,
-  brand: { primary: '#7c3aed', secondary: null },
+  brand: { primary: '#7c3aed', secondary: null, arquirrival: null },
   grid: {
     enabled: true,
     sizePx: 48,
@@ -247,50 +252,115 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
 })
 
 /**
- * Normaliza JSON do banco (ou null) + corPrimaria legada → TenantDesign válido.
- * @param {unknown} raw
- * @param {string} [corPrimaria]
+ * @param {unknown} corArquirrivalOuOpts
+ * @returns {{
+ *   corArquirrival?: string | null,
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ * }}
+ */
+function parseResolveRivalOpts(corArquirrivalOuOpts) {
+  if (corArquirrivalOuOpts == null) return {}
+  if (typeof corArquirrivalOuOpts === 'string') {
+    return { corArquirrival: corArquirrivalOuOpts }
+  }
+  if (typeof corArquirrivalOuOpts === 'object') {
+    return /** @type {{ corArquirrival?: string | null, slug?: string | null, clubeNome?: string | null, clubeApelido?: string | null }} */ (
+      corArquirrivalOuOpts
+    )
+  }
+  return {}
+}
+
+/**
+ * Recolore `actions.*` contra o arquirrival da unidade (info/aviso inclusos).
+ * @param {TenantDesign} design
+ * @param {{ corArquirrival?: string | null, slug?: string | null, clubeNome?: string | null, clubeApelido?: string | null }} extra
  * @returns {TenantDesign}
  */
-export function resolveTenantDesign(raw, corPrimaria) {
+function comAcoesSemRivalidade(design, extra = {}) {
+  return {
+    ...design,
+    actions: sanearAcoesContraRivalidade(
+      { ...DEFAULT_ACTIONS, ...design.actions },
+      {
+        corPrimaria: design.brand.primary,
+        corArquirrival: extra.corArquirrival ?? design.brand.arquirrival,
+        slug: extra.slug,
+        clubeNome: extra.clubeNome,
+        clubeApelido: extra.clubeApelido,
+        design,
+      },
+    ),
+  }
+}
+
+/**
+ * Normaliza JSON do banco (ou null) + corPrimaria / corArquirrival legadas → TenantDesign válido.
+ * Tokens de ação passam por `sanearAcoesContraRivalidade` (Galoucura não pinta
+ * aviso/informativo com o azul da Máfia Azul).
+ * @param {unknown} raw
+ * @param {string} [corPrimaria]
+ * @param {string | null | {
+ *   corArquirrival?: string | null,
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ * }} [corArquirrivalOuOpts] hex legado **ou** opts (slug para o catálogo)
+ * @returns {TenantDesign}
+ */
+export function resolveTenantDesign(raw, corPrimaria, corArquirrivalOuOpts) {
+  const extra = parseResolveRivalOpts(corArquirrivalOuOpts)
   const primary =
     typeof corPrimaria === 'string' && /^#[0-9a-fA-F]{6}$/.test(corPrimaria)
       ? corPrimaria
       : DEFAULT_TENANT_DESIGN.brand.primary
+  const rival = asHexCor(extra.corArquirrival)
 
   if (raw == null || typeof raw !== 'object') {
-    return {
-      ...DEFAULT_TENANT_DESIGN,
-      brand: { primary, secondary: null },
-      actions: { ...DEFAULT_ACTIONS },
-      actionsFg: { ...DEFAULT_ACTIONS_FG },
-      brandFg: { ...DEFAULT_BRAND_FG },
-      customPalettes: [],
-      loja: { ...DEFAULT_LOJA_VITRINE },
-    }
+    return comAcoesSemRivalidade(
+      {
+        ...DEFAULT_TENANT_DESIGN,
+        brand: { primary, secondary: null, arquirrival: rival },
+        actions: { ...DEFAULT_ACTIONS },
+        actionsFg: { ...DEFAULT_ACTIONS_FG },
+        brandFg: { ...DEFAULT_BRAND_FG },
+        customPalettes: [],
+        loja: { ...DEFAULT_LOJA_VITRINE },
+      },
+      extra,
+    )
   }
 
   const parsed = TenantDesignSchema.safeParse(raw)
   if (parsed.success) {
-    // corPrimaria do Tenant continua a fonte de verdade da marca se divergir.
-    return {
-      ...parsed.data,
-      brand: { ...parsed.data.brand, primary },
-      actions: { ...DEFAULT_ACTIONS, ...parsed.data.actions },
-      actionsFg: {
-        ...DEFAULT_ACTIONS_FG,
-        ...(parsed.data.actionsFg ?? {}),
+    // Colunas do Tenant vencem o JSON se divergirem.
+    return comAcoesSemRivalidade(
+      {
+        ...parsed.data,
+        brand: {
+          ...parsed.data.brand,
+          primary,
+          arquirrival: rival ?? parsed.data.brand.arquirrival ?? null,
+        },
+        actions: { ...DEFAULT_ACTIONS, ...parsed.data.actions },
+        actionsFg: {
+          ...DEFAULT_ACTIONS_FG,
+          ...(parsed.data.actionsFg ?? {}),
+        },
+        brandFg: {
+          ...DEFAULT_BRAND_FG,
+          ...(parsed.data.brandFg ?? {}),
+        },
+        customPalettes: parsed.data.customPalettes ?? [],
+        loja: {
+          ...DEFAULT_LOJA_VITRINE,
+          ...(parsed.data.loja ?? {}),
+        },
       },
-      brandFg: {
-        ...DEFAULT_BRAND_FG,
-        ...(parsed.data.brandFg ?? {}),
-      },
-      customPalettes: parsed.data.customPalettes ?? [],
-      loja: {
-        ...DEFAULT_LOJA_VITRINE,
-        ...(parsed.data.loja ?? {}),
-      },
-    }
+      extra,
+    )
   }
 
   // JSON legado sem `loja` (ou com chaves extras) — tenta recuperar capa da vitrine
@@ -301,17 +371,20 @@ export function resolveTenantDesign(raw, corPrimaria) {
       ? LojaVitrineSchema.safeParse(loose.loja)
       : null
 
-  return {
-    ...DEFAULT_TENANT_DESIGN,
-    brand: { primary, secondary: null },
-    actions: { ...DEFAULT_ACTIONS },
-    actionsFg: { ...DEFAULT_ACTIONS_FG },
-    brandFg: { ...DEFAULT_BRAND_FG },
-    customPalettes: [],
-    loja: lojaLoose?.success
-      ? { ...DEFAULT_LOJA_VITRINE, ...lojaLoose.data }
-      : { ...DEFAULT_LOJA_VITRINE },
-  }
+  return comAcoesSemRivalidade(
+    {
+      ...DEFAULT_TENANT_DESIGN,
+      brand: { primary, secondary: null, arquirrival: rival },
+      actions: { ...DEFAULT_ACTIONS },
+      actionsFg: { ...DEFAULT_ACTIONS_FG },
+      brandFg: { ...DEFAULT_BRAND_FG },
+      customPalettes: [],
+      loja: lojaLoose?.success
+        ? { ...DEFAULT_LOJA_VITRINE, ...lojaLoose.data }
+        : { ...DEFAULT_LOJA_VITRINE },
+    },
+    extra,
+  )
 }
 
 /**
@@ -351,7 +424,7 @@ export function designFromPrimary(primary, secondary = null) {
   const derived = derivarSuperficiesDaMarca(primary)
   return {
     ...DEFAULT_TENANT_DESIGN,
-    brand: { primary, secondary: sec },
+    brand: { primary, secondary: sec, arquirrival: null },
     actions: derivarAcoesDaMarca(primary, { secondary: sec }),
     light: derived.light,
     dark: derived.dark,
@@ -510,6 +583,168 @@ export const TORCIDA_CORES_PRIMARIAS = {
 }
 
 /**
+ * Slug da torcida → chave de `CLUBE_PALETAS`. Fallback quando a afiliação
+ * ainda não veio no request; a cor de rival sai daqui + `CLUBE_ARQUIRRIVAIS`.
+ * @type {Record<string, string>}
+ */
+export const TORCIDA_CLUBE_CHAVE = {
+  'pde-gavioes-fiel': 'corinthians',
+  'camisa-12-corinthians': 'corinthians',
+  'pavilhao-nove': 'corinthians',
+  'mancha-alviverde': 'palmeiras',
+  'tup-palmeiras': 'palmeiras',
+  'tti-sao-paulo': 'sao paulo',
+  'dragoes-da-real': 'sao paulo',
+  'torcida-jovem-santos': 'santos',
+  'furia-independente-guarani': 'guarani',
+  'raca-tricolor-paulista': 'paulista',
+  'torcida-jovem-flamengo': 'flamengo',
+  'raca-rubro-negra': 'flamengo',
+  'forca-jovem-vasco': 'vasco',
+  'young-flu': 'fluminense',
+  'forca-flu': 'fluminense',
+  'furia-jovem-botafogo': 'botafogo',
+  galoucura: 'atletico-mg',
+  'mafia-azul': 'cruzeiro',
+  'pavilhao-independente-cruzeiro': 'cruzeiro',
+  'seita-verde': 'america-mg',
+  'geral-do-gremio': 'gremio',
+  'torcida-jovem-gremio': 'gremio',
+  'camisa-12-inter': 'internacional',
+  'falange-grena-caxias': 'caxias',
+  'imperio-alviverde': 'coritiba',
+  'furia-caterva': 'athletico-pr',
+  'torcida-jovem-avai': 'avai',
+  'torcida-jovem-figueirense': 'figueirense',
+  'trem-bala-fortaleza': 'fortaleza',
+  'esquadrao-tricolor-bahia': 'bahia',
+  'barra-brava-sport': 'sport',
+  'inferno-verde-goias': 'goias',
+}
+
+/**
+ * Arquirrivais para cor de UI (clássicos que isolam). Não é o grafo completo
+ * de `RivalidadeClube` — só o hue que pinta a casa do outro. A ordem importa:
+ * `proporCorArquirrival` pula quem é alvinegro (Santos × Corinthians) e pega
+ * o próximo com hue distinto (Palmeiras / Mancha verde). Accent do rival P&B
+ * (bordo corinthiano) não conta — identidade é primária/secundária.
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const CLUBE_ARQUIRRIVAIS = Object.freeze({
+  corinthians: ['palmeiras'],
+  palmeiras: ['corinthians'],
+  'sao paulo': ['palmeiras', 'corinthians'],
+  santos: ['corinthians', 'palmeiras'],
+  flamengo: ['fluminense', 'vasco'],
+  fluminense: ['flamengo', 'vasco', 'botafogo'],
+  vasco: ['flamengo', 'fluminense'],
+  botafogo: ['flamengo', 'fluminense', 'vasco'],
+  gremio: ['internacional'],
+  internacional: ['gremio'],
+  'atletico-mg': ['cruzeiro', 'america-mg'],
+  cruzeiro: ['atletico-mg', 'america-mg'],
+  'america-mg': ['atletico-mg', 'cruzeiro'],
+  bahia: ['vitoria'],
+  vitoria: ['bahia'],
+  fortaleza: ['ceara'],
+  ceara: ['fortaleza'],
+  coritiba: ['athletico-pr'],
+  'athletico-pr': ['coritiba'],
+  sport: ['nautico'],
+  nautico: ['sport'],
+  avai: ['figueirense'],
+  figueirense: ['avai'],
+  guarani: ['ponte preta'],
+  'ponte preta': ['guarani'],
+})
+
+/**
+ * Cor de arquirrival curada por clube — dado, não palpite de paleta.
+ * Vence o walk quando a chave existe: hex = tabu; `null` = sem tabu extra
+ * (Cruzeiro × Galo P&B não inventa verde América). Clube ausente do mapa
+ * cai em `proporCorArquirrival`. Hex = a cor que a UI não pinta (Gaviões:
+ * verde Palmeiras).
+ * @type {Readonly<Record<string, string | null>>}
+ */
+export const CLUBE_COR_ARQUIRRIVAL = Object.freeze({
+  corinthians: '#006437',
+  palmeiras: null,
+  'sao paulo': '#006437',
+  santos: '#006437',
+  flamengo: '#006633',
+  fluminense: '#c8102e',
+  vasco: '#c8102e',
+  botafogo: '#c8102e',
+  gremio: '#e30613',
+  internacional: '#0080c8',
+  'atletico-mg': '#003da5',
+  cruzeiro: null,
+  'america-mg': null,
+  bahia: null,
+  vitoria: '#003da5',
+  fortaleza: null,
+  ceara: '#e30613',
+  coritiba: '#e30613',
+  'athletico-pr': '#006b3f',
+  sport: null,
+  nautico: '#e30613',
+  avai: null,
+  figueirense: '#0066cc',
+  guarani: null,
+  'ponte preta': '#006b3f',
+  goias: null,
+})
+
+/**
+ * Override por slug da torcida quando o tabu nao e o do clube.
+ * Vazio de proposito — preencha so excecao.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const TORCIDA_COR_ARQUIRRIVAL = Object.freeze({})
+
+/**
+ * Hex de arquirrival efetivo: override da unidade, JSON do design, slug,
+ * mapa curado do clube (hex ou `null` explícito), senão o walk
+ * `proporCorArquirrival` (pula clássico alvinegro).
+ * @param {{
+ *   corArquirrival?: string | null,
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   design?: unknown,
+ * }} [opts]
+ * @returns {string | null}
+ */
+export function corArquirrivalCatalogo(opts = {}) {
+  const gravada =
+    typeof opts.corArquirrival === 'string' && /^#[0-9a-fA-F]{6}$/.test(opts.corArquirrival)
+      ? opts.corArquirrival
+      : null
+  if (gravada) return gravada.toLowerCase()
+  const design = opts.design && typeof opts.design === 'object' ? opts.design : null
+  const doDesign =
+    design && 'brand' in /** @type {object} */ (design)
+      ? /** @type {{ brand?: { arquirrival?: unknown } }} */ (design).brand?.arquirrival
+      : null
+  if (typeof doDesign === 'string' && /^#[0-9a-fA-F]{6}$/.test(doDesign)) {
+    return doDesign.toLowerCase()
+  }
+  if (opts.slug && TORCIDA_COR_ARQUIRRIVAL[opts.slug]) {
+    return TORCIDA_COR_ARQUIRRIVAL[opts.slug].toLowerCase()
+  }
+  const key =
+    chavePaletaClube(opts.clubeNome, opts.clubeApelido) ??
+    (opts.slug ? TORCIDA_CLUBE_CHAVE[opts.slug] : null) ??
+    null
+  if (key && Object.prototype.hasOwnProperty.call(CLUBE_COR_ARQUIRRIVAL, key)) {
+    const hex = CLUBE_COR_ARQUIRRIVAL[key]
+    return typeof hex === 'string' ? hex.toLowerCase() : null
+  }
+  const proposta = proporCorArquirrival(opts)
+  return proposta.hex
+}
+
+/**
  * @param {string | null | undefined} hex
  * @returns {boolean}
  */
@@ -612,12 +847,6 @@ export function resolverMarcaTorcida(opts = {}) {
 }
 
 /**
- * Busca paleta curada pelo nome ou apelido da afiliação.
- * @param {string | null | undefined} nome
- * @param {string | null | undefined} apelido
- * @returns {{ primary: string, secondary: string, accents: string[], fonte: 'clube' } | null}
- */
-/**
  * @param {string} s
  * @returns {string}
  */
@@ -629,28 +858,45 @@ function escapeRegex(s) {
  * Casa nome/apelido oficial com o catálogo — chave exata, alias, hífen,
  * depois a chave mais longa como palavra inteira (nunca `sport` dentro de
  * “Sport Club Corinthians”).
- * @param {string} normalized
- * @returns {{ primary: string, secondary: string, accents?: string[] } | null}
  */
-function lookupPaletaClube(normalized) {
+function lookupChavePaletaClube(normalized) {
   if (!normalized) return null
-  const exact = CLUBE_PALETAS[normalized]
-  if (exact) return exact
+  if (CLUBE_PALETAS[normalized]) return normalized
   const aliased = CLUBE_PALETA_ALIASES[normalized]
-  if (aliased && CLUBE_PALETAS[aliased]) return CLUBE_PALETAS[aliased]
+  if (aliased && CLUBE_PALETAS[aliased]) return aliased
   const hyphen = normalized.replace(/\s+/g, '-')
-  if (hyphen !== normalized && CLUBE_PALETAS[hyphen]) return CLUBE_PALETAS[hyphen]
-  let best = /** @type {{ primary: string, secondary: string, accents?: string[] } | null} */ (null)
+  if (hyphen !== normalized && CLUBE_PALETAS[hyphen]) return hyphen
+  let bestKey = /** @type {string | null} */ (null)
   let bestLen = 0
-  for (const [k, v] of Object.entries(CLUBE_PALETAS)) {
+  for (const k of Object.keys(CLUBE_PALETAS)) {
     if (k.length < 4 || k.length <= bestLen) continue
     const re = new RegExp(`(?:^|\\s)${escapeRegex(k)}(?:\\s|$)`)
     if (re.test(normalized)) {
-      best = v
+      bestKey = k
       bestLen = k.length
     }
   }
-  return best
+  return bestKey
+}
+
+function lookupPaletaClube(normalized) {
+  const key = lookupChavePaletaClube(normalized)
+  return key ? CLUBE_PALETAS[key] : null
+}
+
+/**
+ * Chave de `CLUBE_PALETAS` a partir do nome/apelido da afiliação.
+ * @param {string | null | undefined} nome
+ * @param {string | null | undefined} apelido
+ * @returns {string | null}
+ */
+export function chavePaletaClube(nome, apelido) {
+  const candidates = [apelido, nome].filter(Boolean)
+  for (const c of candidates) {
+    const key = lookupChavePaletaClube(normalizeClubeKey(/** @type {string} */ (c)))
+    if (key) return key
+  }
+  return null
 }
 
 /**
@@ -892,11 +1138,402 @@ export function isVerdeIdentidade(hex) {
  * @returns {string[]}
  */
 export function filtrarVerdeForaDeContexto(hexes, identidadeHexes = []) {
-  const identidadeAceitaVerde = identidadeHexes.some(isVerdeIdentidade)
-  if (identidadeAceitaVerde) return hexes.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
-  return hexes.filter(
-    (c) => /^#[0-9a-fA-F]{6}$/.test(c) && !isVerdeIdentidade(c),
-  )
+  return filtrarCoresDeRival(hexes, { identidadeHexes })
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function asHexCor(value) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
+}
+
+/**
+ * Hexes que definem a identidade (marca + catálogo da torcida + clube).
+ * @param {{
+ *   slug?: string | null,
+ *   corPrimaria?: string | null,
+ *   design?: unknown,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ * }} [opts]
+ * @returns {string[]}
+ */
+export function hexesIdentidadeMarca(opts = {}) {
+  /** @type {string[]} */
+  const out = []
+  /** @param {unknown} v */
+  const push = (v) => {
+    const hex = asHexCor(v)
+    if (hex) out.push(hex)
+  }
+  push(opts.corPrimaria)
+  if (opts.slug && TORCIDA_CORES_PRIMARIAS[opts.slug]) {
+    push(TORCIDA_CORES_PRIMARIAS[opts.slug])
+  }
+  const design = opts.design && typeof opts.design === 'object' ? opts.design : null
+  const brand =
+    design && 'brand' in /** @type {object} */ (design)
+      ? /** @type {{ primary?: unknown, secondary?: unknown, accents?: unknown }} */ (
+          /** @type {{ brand?: unknown }} */ (design).brand
+        )
+      : null
+  if (brand && typeof brand === 'object') {
+    push(brand.primary)
+    push(brand.secondary)
+    if (Array.isArray(brand.accents)) brand.accents.forEach(push)
+  }
+  const clube = opts.clube ?? paletaDoClube(opts.clubeNome, opts.clubeApelido)
+  if (clube) {
+    push(clube.primary)
+    push(clube.secondary)
+    for (const accent of clube.accents ?? []) push(accent)
+  }
+  return out
+}
+
+/**
+ * Paletas dos arquirrivais (clássicos) a partir do clube ou do slug da torcida.
+ * @param {{
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ * }} [opts]
+ * @returns {Array<{ primary: string, secondary: string, accents?: string[] }>}
+ */
+export function paletasArquirrivais(opts = {}) {
+  const key =
+    chavePaletaClube(opts.clubeNome, opts.clubeApelido) ??
+    (opts.slug ? TORCIDA_CLUBE_CHAVE[opts.slug] : null) ??
+    null
+  if (!key) return []
+  const rivais = CLUBE_ARQUIRRIVAIS[key] ?? []
+  /** @type {Array<{ primary: string, secondary: string, accents?: string[] }>} */
+  const out = []
+  for (const rivalKey of rivais) {
+    const paleta = CLUBE_PALETAS[rivalKey]
+    if (paleta) out.push(paleta)
+  }
+  return out
+}
+
+/** Nome curto para copy do estúdio Design. */
+export const CLUBE_ROTULO = Object.freeze({
+  corinthians: 'Corinthians',
+  palmeiras: 'Palmeiras',
+  santos: 'Santos',
+  'sao paulo': 'São Paulo',
+  flamengo: 'Flamengo',
+  fluminense: 'Fluminense',
+  vasco: 'Vasco',
+  botafogo: 'Botafogo',
+  gremio: 'Grêmio',
+  internacional: 'Internacional',
+  'atletico-mg': 'Atlético-MG',
+  cruzeiro: 'Cruzeiro',
+  'america-mg': 'América-MG',
+  bahia: 'Bahia',
+  vitoria: 'Vitória',
+  fortaleza: 'Fortaleza',
+  ceara: 'Ceará',
+  coritiba: 'Coritiba',
+  'athletico-pr': 'Athletico-PR',
+  sport: 'Sport',
+  nautico: 'Náutico',
+  avai: 'Avaí',
+  figueirense: 'Figueirense',
+  guarani: 'Guarani',
+  'ponte preta': 'Ponte Preta',
+  goias: 'Goiás',
+})
+
+/**
+ * @param {string | null | undefined} chave
+ * @returns {string}
+ */
+export function rotuloClubeChave(chave) {
+  if (!chave) return ''
+  return CLUBE_ROTULO[chave] ?? chave
+}
+
+/**
+ * Identidade só P&B / cinza — clássico alvinegro não gera hue a isolar.
+ * @param {{ primary: string, secondary: string, accents?: string[] } | null | undefined} paleta
+ */
+function paletaIdentidadeEhNeutra(paleta) {
+  if (!paleta) return true
+  return !familiaHueCromatica(paleta.primary) && !familiaHueCromatica(paleta.secondary)
+}
+
+/**
+ * Primeira cor cromática da camisa (primária/secundária — sem accent).
+ * @param {{ primary: string, secondary: string, accents?: string[] }} paleta
+ * @returns {string | null}
+ */
+function hexIdentidadeCromatica(paleta) {
+  for (const hex of [paleta.primary, paleta.secondary]) {
+    if (typeof hex === 'string' && familiaHueCromatica(hex)) return hex.toLowerCase()
+  }
+  return null
+}
+
+/**
+ * Percorre a lista de arquirrivais: pula quem é alvinegro (mesma casa P&B, ou
+ * sem hue para isolar) e quem já é a cor da própria camisa. O primeiro hue
+ * distinto vira a proposta (Santos × Corinthians → Palmeiras / Mancha verde).
+ *
+ * @param {{
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   corPrimaria?: string | null,
+ *   design?: unknown,
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ * }} [opts]
+ * @returns {{
+ *   hex: string | null,
+ *   clubeChave: string | null,
+ *   rivalChave: string | null,
+ *   rivalRotulo: string | null,
+ *   pulados: Array<{ chave: string, rotulo: string }>,
+ *   mesmoAlvinegro: boolean,
+ * }}
+ */
+export function proporCorArquirrival(opts = {}) {
+  const clubeChave =
+    chavePaletaClube(opts.clubeNome, opts.clubeApelido) ??
+    (opts.slug ? TORCIDA_CLUBE_CHAVE[opts.slug] : null) ??
+    null
+  const casa = clubeChave ? CLUBE_PALETAS[clubeChave] : null
+  /** @type {Set<string>} */
+  const own = new Set()
+  for (const hex of hexesIdentidadeMarca({
+    ...opts,
+    clube: opts.clube ?? casa ?? undefined,
+  })) {
+    const fam = familiaHueCromatica(hex)
+    if (fam) own.add(fam)
+  }
+  const casaNeutra = paletaIdentidadeEhNeutra(casa)
+  /** @type {Array<{ chave: string, rotulo: string }>} */
+  const pulados = []
+  const vazio = {
+    hex: /** @type {string | null} */ (null),
+    clubeChave,
+    rivalChave: /** @type {string | null} */ (null),
+    rivalRotulo: /** @type {string | null} */ (null),
+    pulados,
+    mesmoAlvinegro: false,
+  }
+  if (!clubeChave) return vazio
+
+  for (const rivalKey of CLUBE_ARQUIRRIVAIS[clubeChave] ?? []) {
+    const paleta = CLUBE_PALETAS[rivalKey]
+    const rotulo = rotuloClubeChave(rivalKey)
+    if (!paleta || paletaIdentidadeEhNeutra(paleta)) {
+      pulados.push({ chave: rivalKey, rotulo })
+      continue
+    }
+    const hex = hexIdentidadeCromatica(paleta)
+    const fam = hex ? familiaHueCromatica(hex) : null
+    if (!hex || !fam || own.has(fam)) {
+      pulados.push({ chave: rivalKey, rotulo })
+      continue
+    }
+    return {
+      hex,
+      clubeChave,
+      rivalChave: rivalKey,
+      rivalRotulo: rotulo,
+      pulados,
+      mesmoAlvinegro: casaNeutra && pulados.length > 0,
+    }
+  }
+
+  return {
+    ...vazio,
+    pulados,
+    mesmoAlvinegro: casaNeutra && pulados.length > 0,
+  }
+}
+
+/**
+ * Hue cromático agrupado para rivalidade. Neutro (P&B/cinza) retorna null —
+ * preto e branco compartilhados nunca são “cor de rival”.
+ * @param {string} hex
+ * @returns {'verde' | 'teal' | 'azul' | 'roxo' | 'magenta' | 'vermelho' | 'laranja' | 'amarelo' | null}
+ */
+export function familiaHueCromatica(hex) {
+  const parsed = asHexCor(hex)
+  if (!parsed) return null
+  const { h, s } = hexToHsl(parsed)
+  if (s < 0.18) return null
+  // Mesma faixa de `isVerdeIdentidade` (verde de campo / Palmeiras).
+  if (h >= 85 && h <= 165) return 'verde'
+  if (h > 165 && h <= 200) return 'teal'
+  if (h > 200 && h < 255) return 'azul'
+  if (h >= 255 && h < 290) return 'roxo'
+  if (h >= 290 && h < 345) return 'magenta'
+  if (h >= 345 || h < 15) return 'vermelho'
+  if (h >= 15 && h < 45) return 'laranja'
+  if (h >= 45 && h < 85) return 'amarelo'
+  return null
+}
+
+/**
+ * Famílias cromáticas da identidade × famílias da cor de arquirrival gravada.
+ * Só o hue do arquirrival é tabu (Galoucura: azul da Máfia; Gaviões: verde
+ * Palmeiras). Verde de aliada (Mancha × Galoucura) não é bloqueado.
+ * @param {string[]} identidadeHexes
+ * @param {string[]} [coresArquirrival]
+ * @returns {Set<string>}
+ */
+export function familiasProibidasPorRivalidade(identidadeHexes = [], coresArquirrival = []) {
+  /** @type {Set<string>} */
+  const own = new Set()
+  for (const hex of identidadeHexes) {
+    const fam = familiaHueCromatica(hex)
+    if (fam) own.add(fam)
+  }
+  /** @type {Set<string>} */
+  const forbidden = new Set()
+  for (const hex of coresArquirrival) {
+    const fam = familiaHueCromatica(hex)
+    if (fam && !own.has(fam)) forbidden.add(fam)
+  }
+  // Azul e teal leem como a mesma casa (Cruzeiro / Grêmio / Máfia Azul).
+  if (forbidden.has('azul') && !own.has('teal')) forbidden.add('teal')
+  if (forbidden.has('teal') && !own.has('azul')) forbidden.add('azul')
+  return forbidden
+}
+
+/**
+ * Remove cores cuja família é do arquirrival (ou verde fora de contexto).
+ * @param {string[]} hexes
+ * @param {{
+ *   identidadeHexes?: string[],
+ *   paletasRivais?: Array<{ primary: string, secondary: string, accents?: string[] }>,
+ *   slug?: string | null,
+ *   corPrimaria?: string | null,
+ *   design?: unknown,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ * }} [opts]
+ * @returns {string[]}
+ */
+export function filtrarCoresDeRival(hexes, opts = {}) {
+  const identidade = opts.identidadeHexes ?? hexesIdentidadeMarca(opts)
+  const tabu = corArquirrivalCatalogo(opts)
+  const forbidden = familiasProibidasPorRivalidade(identidade, tabu ? [tabu] : [])
+  return hexes.filter((c) => {
+    if (!asHexCor(c)) return false
+    const fam = familiaHueCromatica(c)
+    return !fam || !forbidden.has(fam)
+  })
+}
+
+/**
+ * Recolore um hex de UI (card de departamento, badge) para não pintar a casa
+ * com a cor do arquirrival. Preserva S/L e gira o hue até uma família permitida.
+ * @param {string} hex
+ * @param {{
+ *   identidadeHexes?: string[],
+ *   paletasRivais?: Array<{ primary: string, secondary: string, accents?: string[] }>,
+ *   slug?: string | null,
+ *   corPrimaria?: string | null,
+ *   corArquirrival?: string | null,
+ *   design?: unknown,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ * }} [opts]
+ * @returns {string}
+ */
+export function resolverCorSemRivalidade(hex, opts = {}) {
+  const parsed = asHexCor(hex)
+  if (!parsed) return hex
+  const identidade = opts.identidadeHexes ?? hexesIdentidadeMarca(opts)
+  const tabu = corArquirrivalCatalogo(opts)
+  const forbidden = familiasProibidasPorRivalidade(identidade, tabu ? [tabu] : [])
+  const fam = familiaHueCromatica(parsed)
+  if (!fam || !forbidden.has(fam)) return parsed.toLowerCase()
+
+  const { h, s, l } = hexToHsl(parsed)
+  for (const delta of [180, 150, 210, 120, 240, 90, 270, 60, 300]) {
+    const candidate = hslToHex((h + delta) % 360, s, l)
+    const nextFam = familiaHueCromatica(candidate)
+    if (nextFam && !forbidden.has(nextFam)) return candidate.toLowerCase()
+  }
+  return hslToHex(0, 0, l).toLowerCase()
+}
+
+/**
+ * Recolore o jogo de tokens de ação para não pintar a casa com a família do
+ * arquirrival (nem verde de campo fora de contexto). Gira o hue até uma
+ * família permitida e **distinta** das outras ações — info não cai no
+ * warning, success não vira o mesmo laranja.
+ *
+ * Ordem: danger → warning (semântica estável) → success → info.
+ *
+ * @param {{ success: string, danger: string, warning: string, info: string }} actions
+ * @param {{
+ *   identidadeHexes?: string[],
+ *   slug?: string | null,
+ *   corPrimaria?: string | null,
+ *   corArquirrival?: string | null,
+ *   design?: unknown,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ * }} [opts]
+ * @returns {{ success: string, danger: string, warning: string, info: string }}
+ */
+export function sanearAcoesContraRivalidade(actions, opts = {}) {
+  const identidade = opts.identidadeHexes ?? hexesIdentidadeMarca(opts)
+  const tabu = corArquirrivalCatalogo(opts)
+  const forbidden = familiasProibidasPorRivalidade(identidade, tabu ? [tabu] : [])
+  /** @type {Set<string>} */
+  const used = new Set()
+
+  /**
+   * @param {string} hex
+   * @param {boolean} [preferVerde] sucesso/positivo: Mancha é aliada da Galoucura
+   */
+  const remap = (hex, preferVerde = false) => {
+    const parsed = asHexCor(hex)
+    if (!parsed) return hex
+    const fam = familiaHueCromatica(parsed)
+    // Família permitida permanece mesmo se outra ação já a usa (success e
+    // info default são os dois azuis). Só evita colisão ao girar o hue.
+    if (!fam || !forbidden.has(fam)) {
+      if (fam) used.add(fam)
+      return parsed.toLowerCase()
+    }
+    const { s, l } = hexToHsl(parsed)
+    if (preferVerde && !forbidden.has('verde') && !used.has('verde')) {
+      used.add('verde')
+      return hslToHex(145, Math.max(s, 0.5), Math.min(Math.max(l, 0.32), 0.48)).toLowerCase()
+    }
+    const { h } = hexToHsl(parsed)
+    for (const delta of [180, 150, 210, 120, 240, 90, 270, 60, 300, 30, 330]) {
+      const candidate = hslToHex((h + delta) % 360, Math.max(s, 0.42), l)
+      const nextFam = familiaHueCromatica(candidate)
+      if (nextFam && !forbidden.has(nextFam) && !used.has(nextFam)) {
+        used.add(nextFam)
+        return candidate.toLowerCase()
+      }
+    }
+    return hslToHex(0, 0, l).toLowerCase()
+  }
+
+  return {
+    danger: remap(actions.danger),
+    warning: remap(actions.warning),
+    success: remap(actions.success, true),
+    info: remap(actions.info),
+  }
 }
 
 /**
@@ -915,9 +1552,8 @@ export function corMarcaLegivel(brandHex, surfaceHex, minRatio = CONTRASTE_AA) {
  * Texto de botão sólido (`on`) e de badge/soft/link (`fg`) para uma ação.
  *
  * - Automático: `on` é branco ou preto conforme o ratio real no fill (não o
- *   cutoff 0.4 de luminância); `fg` precisa fechar 4.5:1 na superfície (link)
- *   e 3:1 no wash do badge. `fill` é o hex visível naquele tema (branco no
- *   claro ganha um empurrão para não sumir).
+ *   cutoff 0.4 de luminância); `fg` precisa fechar 4.5:1 na superfície (KPI)
+ *   e 4.5:1 no wash do badge (10px). `fill` é o hex visível naquele tema.
  * - Override manual: só vale onde o contraste fecha; senão volta ao auto —
  *   assim um branco no botão escuro não quebra o badge no claro.
  *
@@ -929,18 +1565,25 @@ export function corMarcaLegivel(brandHex, surfaceHex, minRatio = CONTRASTE_AA) {
 export function resolveActionTextColors(actionHex, overrideHex, surfaceHex) {
   const fill = resolverFillDaMarca(actionHex, surfaceHex)
   const autoOn = textoSobreFill(fill)
-  const softBg = mixHex(surfaceHex, fill, 0.14)
-  let autoFg = ajustarParaContraste(actionHex, surfaceHex, CONTRASTE_AA)
-  autoFg = ajustarParaContraste(autoFg, softBg, CONTRASTE_AA_GRANDE)
+  const papers = [
+    surfaceHex,
+    mixHex(surfaceHex, fill, 0.1),
+    mixHex(surfaceHex, fill, 0.14),
+    mixHex(surfaceHex, fill, WASH_ACAO),
+  ]
+  let autoFg = actionHex
+  for (let round = 0; round < 2; round++) {
+    for (const paper of papers) {
+      autoFg = ajustarParaContraste(autoFg, paper, CONTRASTE_AA)
+    }
+  }
 
   if (typeof overrideHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrideHex)) {
     const onOk = contrasteRatio(overrideHex, fill) >= CONTRASTE_AA
-    const fgSoftOk = contrasteRatio(overrideHex, softBg) >= CONTRASTE_AA_GRANDE
-    // Texto de status/link é 14–16px: 4.5:1 no papel, não o piso de texto grande.
-    const fgSurfOk = contrasteRatio(overrideHex, surfaceHex) >= CONTRASTE_AA
+    const fgOk = papers.every((p) => contrasteRatio(overrideHex, p) >= CONTRASTE_AA)
     return {
       on: onOk ? overrideHex : autoOn,
-      fg: fgSoftOk && fgSurfOk ? overrideHex : autoFg,
+      fg: fgOk ? overrideHex : autoFg,
       fill,
     }
   }
@@ -950,10 +1593,19 @@ export function resolveActionTextColors(actionHex, overrideHex, surfaceHex) {
 
 /**
  * Deriva cores de ação a partir da marca/clube.
- * Sucesso só é verde se a identidade já for verde (ex.: Palmeiras, Goiás).
- * Caso contrário usa azul (ou tom da marca) — nunca injeta verde de rivalidade.
+ * Verde de sucesso só se a identidade já for verde. Quando o arquirrival é
+ * outra família (Galoucura × azul), `sanearAcoesContraRivalidade` recolore o
+ * sucesso default (azul) para verde de aliada. Gaviões permanece sem verde.
  * @param {string} primaryHex
- * @param {{ secondary?: string | null, accents?: string[] }} [opts]
+ * @param {{
+ *   secondary?: string | null,
+ *   accents?: string[],
+ *   slug?: string | null,
+ *   corArquirrival?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   identidadeHexes?: string[],
+ * }} [opts]
  */
 export function derivarAcoesDaMarca(primaryHex, opts = {}) {
   const { h } = hexToHsl(primaryHex)
@@ -961,9 +1613,10 @@ export function derivarAcoesDaMarca(primaryHex, opts = {}) {
     .filter(Boolean)
     .filter(isVerdeIdentidade)
   const marcaEhVerde = verdesNaMarca.length > 0
+  const identidade = opts.identidadeHexes ?? hexesIdentidadeMarca({ ...opts, corPrimaria: primaryHex })
+  const tabu = corArquirrivalCatalogo({ ...opts, corPrimaria: primaryHex })
+  const forbidden = familiasProibidasPorRivalidade(identidade, tabu ? [tabu] : [])
 
-  // Positivo = cor da marca (legível em botão). Só verde se a identidade for verde.
-  // Nunca injetar azul “genérico” que some da paleta sugerida (ex.: Gaviões P&B+vermelho).
   const success = marcaEhVerde
     ? clampHexLightness(/** @type {string} */ (verdesNaMarca[0]), 0.28, 0.45)
     : clampHexLightness(primaryHex, 0.14, 0.42)
@@ -978,10 +1631,14 @@ export function derivarAcoesDaMarca(primaryHex, opts = {}) {
     0.35,
     0.52,
   )
-  // Info continua azul-neutro (status informativo, não “aprovação”).
-  const info = clampHexLightness(mixHex('#2563eb', primaryHex, 0.3), 0.28, 0.55)
+  const info = !forbidden.has('azul')
+    ? clampHexLightness(mixHex('#2563eb', primaryHex, 0.3), 0.28, 0.55)
+    : clampHexLightness(mixHex('#a21caf', primaryHex, 0.25), 0.28, 0.55)
 
-  return { success, danger, warning, info }
+  return sanearAcoesContraRivalidade(
+    { success, danger, warning, info },
+    { ...opts, corPrimaria: primaryHex },
+  )
 }
 
 /**
@@ -1039,6 +1696,10 @@ function accentDestaque(primary, secondary, accents = []) {
  *   accents?: string[],
  *   identidade?: string[],
  *   fonte: PaletaSugerida['fonte'],
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   corArquirrival?: string | null,
  * }} spec
  * @returns {PaletaSugerida}
  */
@@ -1053,6 +1714,12 @@ function fecharPaletaSugerida(spec) {
   const actions = derivarAcoesDaMarca(spec.primary, {
     secondary: spec.secondary,
     accents,
+    slug: spec.slug,
+    clubeNome: spec.clubeNome,
+    clubeApelido: spec.clubeApelido,
+    corArquirrival: spec.corArquirrival,
+    identidadeHexes: identidade,
+    corPrimaria: spec.primary,
   })
   const destaque = accentDestaque(spec.primary, spec.secondary, accents)
   if (destaque) {
@@ -1096,6 +1763,9 @@ function fecharPaletaSugerida(spec) {
  *   extraidas?: string[],
  *   secondary?: string | null,
  *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   corArquirrival?: string | null,
  * }} [opts]
  * @returns {PaletaSugerida[]}
  */
@@ -1121,6 +1791,16 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     ...marcaAccents,
   ].filter(Boolean)
 
+  /** @param {Parameters<typeof fecharPaletaSugerida>[0]} spec */
+  const fechar = (spec) =>
+    fecharPaletaSugerida({
+      ...spec,
+      slug: opts.slug,
+      clubeNome: opts.clubeNome,
+      clubeApelido: opts.clubeApelido,
+      corArquirrival: opts.corArquirrival,
+    })
+
   const descricaoMarca =
     marca.fonte === 'catalogo'
       ? 'Cores curadas desta torcida (não o roxo padrão da plataforma)'
@@ -1131,7 +1811,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
           : 'Primária · secundária · destaque (sem inventar cor de rival)'
 
   // 1) Marca da torcida
-  const paletaMarca = fecharPaletaSugerida({
+  const paletaMarca = fechar({
     id: 'marca-torcida',
     nome: 'Marca da torcida',
     descricao: descricaoMarca,
@@ -1148,7 +1828,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
   /** @type {PaletaSugerida} */
   let paletaEscudo
   if (extra.length >= 2) {
-    paletaEscudo = fecharPaletaSugerida({
+    paletaEscudo = fechar({
       id: 'escudo',
       nome: 'Do escudo / logo',
       descricao: 'Extraído da imagem da torcida',
@@ -1160,7 +1840,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     })
   } else {
     // Sem extrato: mesma família da marca (aplicável), sem inventar hue de rival.
-    paletaEscudo = fecharPaletaSugerida({
+    paletaEscudo = fechar({
       id: 'escudo',
       nome: 'Do escudo / logo',
       descricao:
@@ -1183,7 +1863,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     const secondary =
       opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
     const accents = opts.clube.accents ?? []
-    paletaClube = fecharPaletaSugerida({
+    paletaClube = fechar({
       id: 'clube',
       nome: 'Paleta do clube',
       descricao: 'Cores oficiais do time afiliado',
@@ -1194,7 +1874,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       fonte: 'clube',
     })
   } else {
-    paletaClube = fecharPaletaSugerida({
+    paletaClube = fechar({
       id: 'clube',
       nome: 'Paleta do clube',
       descricao: 'Sem clube afiliado — espelho da marca da torcida',
@@ -1329,6 +2009,7 @@ export function aplicarPaletaAoDesign(design, paleta) {
     accents: paleta.swatches?.slice(2) ?? [],
     actions: paleta.actions,
     actionsFg: paleta.actionsFg,
+    corArquirrival: design.brand?.arquirrival,
   })
 }
 
@@ -1344,6 +2025,10 @@ export function aplicarPaletaAoDesign(design, paleta) {
  *   actions?: PaletaSugerida['actions'],
  *   actionsFg?: PaletaSugerida['actionsFg'],
  *   rederiveSurfaces?: boolean,
+ *   slug?: string | null,
+ *   clubeNome?: string | null,
+ *   clubeApelido?: string | null,
+ *   corArquirrival?: string | null,
  * }} [opts]
  */
 export function aplicarMarcaAoDesign(design, opts = {}) {
@@ -1352,9 +2037,17 @@ export function aplicarMarcaAoDesign(design, opts = {}) {
     opts.secondary !== undefined ? opts.secondary : (design.brand.secondary ?? null)
   const derived = derivarSuperficiesDaMarca(primary)
   const accents = opts.accents ?? []
-  const actions = opts.actions
+  const actionsBrutas = opts.actions
     ? { ...DEFAULT_ACTIONS, ...opts.actions }
-    : derivarAcoesDaMarca(primary, { secondary, accents })
+    : derivarAcoesDaMarca(primary, {
+        secondary,
+        accents,
+        slug: opts.slug,
+        clubeNome: opts.clubeNome,
+        clubeApelido: opts.clubeApelido,
+        corArquirrival: opts.corArquirrival ?? design.brand?.arquirrival,
+        corPrimaria: primary,
+      })
   if (!opts.actions) {
     const destaque = accentDestaque(
       primary,
@@ -1362,9 +2055,18 @@ export function aplicarMarcaAoDesign(design, opts = {}) {
       accents,
     )
     if (destaque) {
-      actions.danger = clampHexLightness(destaque, 0.28, 0.52)
+      actionsBrutas.danger = clampHexLightness(destaque, 0.28, 0.52)
     }
   }
+  const arquirrival = design.brand?.arquirrival ?? opts.corArquirrival ?? null
+  const actions = sanearAcoesContraRivalidade(actionsBrutas, {
+    corPrimaria: primary,
+    corArquirrival: arquirrival,
+    slug: opts.slug,
+    clubeNome: opts.clubeNome,
+    clubeApelido: opts.clubeApelido,
+    design: { ...design, brand: { primary, secondary, arquirrival } },
+  })
   const rederive = opts.rederiveSurfaces !== false
   return {
     ...design,
@@ -1375,6 +2077,7 @@ export function aplicarMarcaAoDesign(design, opts = {}) {
         typeof secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(secondary)
           ? secondary
           : null,
+      arquirrival,
     },
     brandFg: { ...DEFAULT_BRAND_FG },
     actions,
@@ -1567,12 +2270,22 @@ export function precisaAnelFill(fillHex, surfaceHex) {
  */
 export function paletaTemContrasteOk(paleta) {
   const d = aplicarPaletaAoDesign(DEFAULT_TENANT_DESIGN, paleta)
+  const actions = { ...DEFAULT_ACTIONS, ...paleta.actions }
   for (const mode of /** @type {const} */ (['light', 'dark'])) {
     const s = resolverSuperficies(d, mode)
     if (contrasteRatio(s.foreground, s.background) < CONTRASTE_AA) return false
     if (contrasteRatio(s.foregroundMuted, s.background) < CONTRASTE_AA) return false
-    const text = resolveActionTextColors(paleta.primary, null, s.surface)
-    if (contrasteRatio(text.on, text.fill) < CONTRASTE_AA) return false
+    if (contrasteRatio(s.foregroundMuted, s.surface) < CONTRASTE_AA) return false
+    const brand = resolveActionTextColors(paleta.primary, null, s.surface)
+    if (contrasteRatio(brand.on, brand.fill) < CONTRASTE_AA) return false
+    if (contrasteRatio(brand.fg, s.surface) < CONTRASTE_AA) return false
+    for (const key of ACTION_TOKEN_KEYS) {
+      const text = resolveActionTextColors(actions[key], null, s.surface)
+      if (contrasteRatio(text.on, text.fill) < CONTRASTE_AA) return false
+      if (contrasteRatio(text.fg, s.surface) < CONTRASTE_AA) return false
+      const soft = mixHex(s.surface, text.fill, WASH_ACAO)
+      if (contrasteRatio(text.fg, soft) < CONTRASTE_AA) return false
+    }
   }
   return true
 }

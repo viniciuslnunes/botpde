@@ -44,7 +44,7 @@ const DIA_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const TIPO_DOT: Record<string, string> = {
   GERAL: 'bg-[rgb(var(--color-primary-fg))]',
   CARAVANA: 'bg-amber-500',
-  ENSAIO: 'bg-sky-500',
+  ENSAIO: 'bg-[rgb(var(--color-info))]',
 }
 
 function tipoKey(tipo: string): string {
@@ -211,7 +211,7 @@ export function AgendaSemanaCompact({
                   <span
                     className={cx(
                       'h-1.5 w-1.5 rounded-sm',
-                      ativo ? 'bg-[rgb(var(--color-primary-on))]' : 'bg-emerald-500',
+                      ativo ? 'bg-[rgb(var(--color-primary-on))]' : 'bg-[rgb(var(--color-success))]',
                     )}
                   />
                 ) : null}
@@ -250,8 +250,8 @@ export function AgendaSemanaCompact({
                 Operação do dia
               </p>
               {partidaDia ? (
-                <div className="mt-1.5 flex items-start gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/8 px-2.5 py-2">
-                  <Trophy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                <div className="mt-1.5 flex items-start gap-2 rounded-xl border border-[rgb(var(--color-success)_/_0.25)] bg-[rgb(var(--color-success)_/_0.08)] px-2.5 py-2">
+                  <Trophy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
                       Jogo

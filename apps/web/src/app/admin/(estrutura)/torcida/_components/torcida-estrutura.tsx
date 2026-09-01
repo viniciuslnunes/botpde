@@ -6,17 +6,12 @@ import {
   type TorcidaWorktreeNode,
 } from '@/lib/hierarquia'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { sedeTipoBadgeClass } from '@/lib/sede-tipo-badge'
 
 const TIPO_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'PDE',
-}
-
-const TIPO_BADGE_CLASS: Record<string, string> = {
-  SEDE: 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]',
-  SUBSEDE: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-  PONTO_ENCONTRO: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
 }
 
 /**
@@ -46,12 +41,14 @@ export async function TorcidaEstrutura({
   return (
     <div className="app-container space-y-6 py-8">
       <MotionReveal>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
+        <div className="space-y-3">
+          <p className="portal-kicker text-[rgb(var(--color-primary-fg))]">
             Estrutura
           </p>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Estrutura da torcida</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
+          <h1 className="portal-display text-2xl text-[rgb(var(--foreground))]">
+            Estrutura da torcida
+          </h1>
+          <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
         </div>
       </MotionReveal>
 
@@ -85,7 +82,7 @@ export async function TorcidaEstrutura({
                 <span
                   className={[
                     'ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
-                    TIPO_BADGE_CLASS[n.tipo] ?? TIPO_BADGE_CLASS.PONTO_ENCONTRO,
+                    sedeTipoBadgeClass(n.tipo),
                   ].join(' ')}
                 >
                   {TIPO_LABEL[n.tipo] ?? n.tipo}

@@ -25,7 +25,12 @@ export default async function CriarContaPage({
   return (
     <div className="app-shell-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-4">
       {tenant ? (
-        <TenantDesignBridge corPrimaria={tenant.corPrimaria} design={tenant.design} />
+        <TenantDesignBridge
+          corPrimaria={tenant.corPrimaria}
+          design={tenant.design}
+          slug={tenant.slug}
+          corArquirrival={tenant.corArquirrival}
+        />
       ) : null}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"

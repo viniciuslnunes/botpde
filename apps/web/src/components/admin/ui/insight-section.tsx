@@ -17,10 +17,10 @@ export function InsightSection({ title, description, children }: InsightSectionP
   return (
     <MotionRevealOnce id={title} index={0} seenIds={seenIds}>
       <section className="space-y-3" aria-label={title}>
-        <div>
-          <h2 className="font-semibold text-[rgb(var(--foreground))]">{title}</h2>
+        <div className="space-y-2">
+          <h2 className="portal-kicker text-[rgb(var(--foreground))]">{title}</h2>
           {description ? (
-            <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{description}</p>
+            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">{description}</p>
           ) : null}
         </div>
         {/* Track base `minmax(0,1fr)` + `min-w-0` nos filhos: coluna implícita

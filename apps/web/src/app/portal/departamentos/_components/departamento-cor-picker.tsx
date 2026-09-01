@@ -33,7 +33,11 @@ export function DepartamentoCorPicker({
     setCorAtual(next)
     startTransition(async () => {
       const ok = await runPersistAction(
-        () => atualizarCorDepartamento(departamentoId, next),
+        async () => {
+          const result = await atualizarCorDepartamento(departamentoId, next)
+          if (result.ok) setCorAtual(result.cor)
+          return result
+        },
         { success: `Cor de ${nome} atualizada.` },
       )
       if (!ok) setCorAtual(cor)

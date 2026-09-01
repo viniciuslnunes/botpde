@@ -72,7 +72,7 @@ export default async function EditarProdutoBarPage({
             <ArrowLeft className="h-4 w-4" /> Produtos
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{serializado.nome}</h1>
+            <h1 className="portal-display text-xl text-[rgb(var(--foreground))]">{serializado.nome}</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               {serializado.ativo ? '● Ativo' : '● Inativo'}
             </p>

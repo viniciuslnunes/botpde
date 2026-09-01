@@ -192,9 +192,10 @@ export function montarChips(
 }
 
 /**
- * Nomes de todos os params que o contrato controla. Base do snapshot persistido:
- * o que não está aqui (aba, seção, período de gráfico) não é da listagem e
- * continua sendo decidido pela URL.
+ * Nomes de todos os params que o contrato controla. A persistência usa este
+ * conjunto menos busca e página (`snapshotContratoListagem`): o que não está
+ * aqui (aba, seção, período de gráfico) não é da listagem e continua sendo
+ * decidido pela URL.
  */
 export function paramsDoContrato(spec: ListagemSpec): string[] {
   const nomes = [...PARAMS_RESERVADOS]

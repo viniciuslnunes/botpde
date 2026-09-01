@@ -140,6 +140,7 @@ export interface PostSocialItem {
     nickname: string | null
     avatarUrl: string | null
     sedeNome: string | null
+    sedeTipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO' | null
     cargoNome: string | null
     departamentoNome: string | null
   }
@@ -254,6 +255,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
       nickname: autor?.nickname ?? null,
       avatarUrl: durableImageUrl(autor?.avatarUrl ?? null),
       sedeNome: null,
+      sedeTipo: null,
       cargoNome: null,
       departamentoNome: null,
     },
@@ -351,6 +353,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
       ...post.autor,
       avatarUrl: durableImageUrl(post.autor.avatarUrl),
       sedeNome: null,
+      sedeTipo: null,
       cargoNome: null,
       departamentoNome: null,
     },
@@ -405,7 +408,8 @@ export function postIncludeLista(userId?: string) {
           : ({ where: { id: '' }, select: { opcaoId: true }, take: 1 } as const),
       },
     },
-    _count: { select: { reacoes: true, comentarios: true } },
+    // Comentário ocultado pela moderação não conta no badge do card.
+    _count: { select: { reacoes: true, comentarios: { where: { oculto: false } } } },
     reacoes: userId
       ? { where: { userId }, select: { tipo: true }, take: 1 }
       : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
@@ -472,7 +476,8 @@ export function postInclude(userId?: string) {
           : ({ where: { id: '' }, select: { opcaoId: true }, take: 1 } as const),
       },
     },
-    _count: { select: { reacoes: true, comentarios: true } },
+    // Comentário ocultado pela moderação não conta no badge do card.
+    _count: { select: { reacoes: true, comentarios: { where: { oculto: false } } } },
     reacoes: userId
       ? { where: { userId }, select: { tipo: true }, take: 1 }
       : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
@@ -509,7 +514,8 @@ export function postIncludeGrupo(userId?: string) {
           : ({ where: { id: '' }, select: { opcaoId: true }, take: 1 } as const),
       },
     },
-    _count: { select: { reacoes: true, comentarios: true } },
+    // Comentário ocultado pela moderação não conta no badge do card.
+    _count: { select: { reacoes: true, comentarios: { where: { oculto: false } } } },
     reacoes: userId
       ? { where: { userId }, select: { tipo: true }, take: 1 }
       : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
@@ -720,6 +726,7 @@ export function projetarTopicoParaFeed(
       nickname: t.autor.nickname,
       avatarUrl: durableImageUrl(t.autor.avatarUrl),
       sedeNome: null,
+      sedeTipo: null,
       cargoNome: null,
       departamentoNome: null,
     },

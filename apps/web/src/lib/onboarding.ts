@@ -13,8 +13,10 @@ import {
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
 import { formatNomeAfiliacao, formatNomeTorcida, isDepartamentoLegado, SETORES_ARQUIBANCADA } from '@torcida/types'
+import { comCorDepartamento } from '@/lib/cor-departamento'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 import { getTenantsRestritos } from '@/lib/isolamento'
+import { listarPlanosOnboardingPorTenants } from '@/lib/planos-associacao'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
@@ -275,6 +277,13 @@ export type TorcidaOnboarding = {
   exigirDocumentosCadastro: boolean
   /** Periodicidades oferecidas em «Já sou sócio» (vazio = fallback Gaviões). */
   periodicidadesOnboarding: string[]
+  /** Planos ativos com valor — o wizard mostra nome/preço quando existem. */
+  planosAssociacao: {
+    id: string
+    nome: string
+    valor: number
+    periodicidade: string
+  }[]
   /** Setor da Sede no estádio do time apoiado. Null se ainda não cadastrado. */
   setor: SetorArquibancadaOnboarding | null
 }
@@ -588,7 +597,7 @@ export const getTorcidasPorAfiliacao = cache(
     const restritos = await getTenantsRestritos()
     const raizes = unicos.filter((t) => !idsFilho.has(t.id) && !restritos.has(t.id))
 
-    const [statsMap, sedesPorRaiz] = await Promise.all([
+    const [statsMap, sedesPorRaiz, planosPorTenant] = await Promise.all([
       calcularStatsTorcidasOnboarding(raizes.map((t) => t.id)),
       Promise.all(
         raizes.map(async (t) => ({
@@ -596,6 +605,7 @@ export const getTorcidasPorAfiliacao = cache(
           sedes: await getSedesDaTorcidaOnboarding(t.id),
         })),
       ),
+      listarPlanosOnboardingPorTenants(raizes.map((t) => t.id)),
     ])
     const sedesMap = new Map(sedesPorRaiz.map((r) => [r.tenantId, r.sedes]))
 
@@ -612,6 +622,7 @@ export const getTorcidasPorAfiliacao = cache(
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
         exigirDocumentosCadastro: t.exigirDocumentosCadastro,
         periodicidadesOnboarding: t.periodicidadesOnboarding ?? [],
+        planosAssociacao: planosPorTenant.get(t.id) ?? [],
         setor: t.setorArquibancada
           ? {
               cardeal: t.setorArquibancada,
@@ -630,12 +641,23 @@ export const getTorcidasPorAfiliacao = cache(
  */
 export const getDepartamentosDoTenant = cache(
   async (tenantId: string): Promise<DepartamentoOnboarding[]> => {
-    const departamentos: DepartamentoOnboarding[] = await db.departamento.findMany({
-      where: { tenantId },
-      select: { id: true, nome: true, cor: true, slug: true },
-      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    })
-    return departamentos.filter((d) => !isDepartamentoLegado(d))
+    const [tenant, departamentos]: [
+      { slug: string; corPrimaria: string; corArquirrival: string | null; design: unknown; afiliacaoId: string | null } | null,
+      DepartamentoOnboarding[],
+    ] = await Promise.all([
+      db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { slug: true, corPrimaria: true, corArquirrival: true, design: true, afiliacaoId: true },
+      }),
+      db.departamento.findMany({
+        where: { tenantId },
+        select: { id: true, nome: true, cor: true, slug: true },
+        orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+      }),
+    ])
+    const visiveis = departamentos.filter((d) => !isDepartamentoLegado(d))
+    if (!tenant) return visiveis
+    return comCorDepartamento(visiveis, tenant)
   },
 )
 

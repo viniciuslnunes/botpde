@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "lint:mobile": "node scripts/lint-mobile.mjs --ci",
+    "lint:rival-hues": "node scripts/lint-rival-hues.mjs --ci",
     "rotas:dinamicas": "node scripts/rotas-dinamicas.mjs --json",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -33,7 +34,8 @@
     "audit:carteirinha-patrimonio": "vitest run --config vitest.audit.config.ts src/lib/__audit__/carteirinha-patrimonio.audit.ts",
     "audit:tudo": "node scripts/audit-tudo.mjs",
     "audit:partidas-sync": "vitest run --config vitest.audit.config.ts src/lib/__audit__/partidas-sync.audit.ts",
-    "seed:partidas-sync": "vitest run --config vitest.seed.config.ts src/lib/__seed__/partidas-sync.seed.ts"
+    "seed:partidas-sync": "vitest run --config vitest.seed.config.ts src/lib/__seed__/partidas-sync.seed.ts",
+    "audit:moderacao": "vitest run --config vitest.audit.config.ts src/lib/__audit__/moderacao.audit.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

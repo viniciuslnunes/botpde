@@ -12,6 +12,7 @@ export type PlanoListaItem = {
   periodicidadeLabel: string
   ativo: boolean
   membrosCount: number
+  noOnboarding: boolean
 }
 
 export function AdminPlanosListaClient({
@@ -25,8 +26,23 @@ export function AdminPlanosListaClient({
     return (
       <MotionEmptyState
         icon={<CreditCard className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />}
-        title="Nenhum plano cadastrado"
-        description="Crie o primeiro plano de associação para vincular aos membros."
+        title="Nenhum plano com valor cadastrado"
+        description={
+          podeGerir ? (
+            <>
+              A oferta do onboarding acima já define os ciclos.{' '}
+              <Link
+                href="/admin/financeiro/planos/novo"
+                className="app-touch-line font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              >
+                Cadastrar valor na tab Novo plano
+              </Link>
+              .
+            </>
+          ) : (
+            'A oferta do onboarding acima já define os ciclos. Cadastre o valor oficial de cada um para o wizard mostrar o plano e vincular o sócio.'
+          )
+        }
         className="rounded-2xl border border-dashed border-[rgb(var(--border))] py-12 text-center"
       />
     )
@@ -59,6 +75,7 @@ export function AdminPlanosListaClient({
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">
                   {plano.periodicidadeLabel}
                   {plano.membrosCount > 0 ? ` · ${plano.membrosCount} membro(s)` : ''}
+                  {plano.noOnboarding ? ' · no onboarding' : ''}
                 </p>
                 {plano.descricao && (
                   <p className="mt-0.5 line-clamp-1 text-xs text-[rgb(var(--foreground-muted))]">
@@ -74,7 +91,7 @@ export function AdminPlanosListaClient({
                   className={[
                     'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
                     plano.ativo
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      ? 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]'
                       : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
                   ].join(' ')}
                 >
@@ -84,8 +101,8 @@ export function AdminPlanosListaClient({
               <td className="px-4 py-3 text-right">
                 {podeGerir ? (
                   <Link
-                    href={`/admin/financeiro/planos?edit=${plano.id}`}
-                    className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                    href={`/admin/financeiro/planos/novo?edit=${plano.id}`}
+                    className="app-touch-line text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Editar
                   </Link>

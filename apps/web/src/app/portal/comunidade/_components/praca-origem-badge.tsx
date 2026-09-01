@@ -1,4 +1,7 @@
+import { MessagesSquare, Newspaper, Pin } from 'lucide-react'
 import { rotuloOrigemPraca } from '@torcida/types'
+
+export type ModuloPraca = 'forum' | 'noticias'
 
 const CLASSE: Record<'imprensa' | 'oficial' | 'verificada' | 'forum', string> = {
   imprensa:
@@ -20,6 +23,34 @@ export function PracaOrigemBadge({
       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${CLASSE[origem]}`}
     >
       {rotuloOrigemPraca(origem)}
+    </span>
+  )
+}
+
+const MODULO_ICONE = {
+  forum: MessagesSquare,
+  noticias: Newspaper,
+} as const
+
+const badgeModuloClass =
+  'inline-flex shrink-0 items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]'
+
+/** Módulo de destino no feed (Fórum / Notícias) — não confunde com origem da matéria. */
+export function PracaModuloBadge({ modulo }: { modulo: ModuloPraca }) {
+  const Icone = MODULO_ICONE[modulo]
+  return (
+    <span className={badgeModuloClass}>
+      <Icone className="h-3 w-3" aria-hidden />
+      {modulo === 'forum' ? 'Fórum' : 'Notícias'}
+    </span>
+  )
+}
+
+export function FixadoBadge() {
+  return (
+    <span className={badgeModuloClass}>
+      <Pin className="h-3 w-3" aria-hidden />
+      Fixado
     </span>
   )
 }

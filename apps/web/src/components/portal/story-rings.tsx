@@ -113,7 +113,7 @@ export function StoryRings({
                   <Avatar nome={currentUserNome} avatarUrl={currentUserAvatar} size="md" />
                 </div>
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[rgb(var(--primary))] p-0.5 text-white">
+              <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[rgb(var(--primary))] p-0.5 text-primary-on">
                 {ocupado ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (

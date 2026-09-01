@@ -63,7 +63,7 @@ export function FeedLiveBanner({
             onClick={verNovos}
             whileTap={{ scale: 0.95 }}
             transition={springSnappy}
-            className="flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-lg"
+            className="flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on shadow-lg"
           >
             <ArrowUp className="h-4 w-4" />
             {label}

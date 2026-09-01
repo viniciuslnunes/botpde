@@ -21,9 +21,12 @@ import {
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
+import { CONFIRMA_VINCULO_UNIDADE, CONFIRMA_VINCULO_AO_PEDIR_CANAL, CONFIRMA_TROCA_UNIDADE, CONFIRMA_DESVINCULO_UNIDADE, mensagemTravaVinculoUnidade } from '@torcida/types/associe-se'
 import {
   entrarCanal,
   pedirEntradaCanal,
+  vincularUnidadePeloCanal,
+  desvincularUnidadePeloCanal,
   sairCanal,
   alternarSilencioCanal,
   alterarAdminCanal,
@@ -129,6 +132,10 @@ export function CanalFeedComposition({
   }
 
   function inscrever() {
+    if (canal.podeVincularUnidade && window.confirm(CONFIRMA_VINCULO_AO_PEDIR_CANAL)) {
+      vincularUnidade(true)
+      return
+    }
     startTransition(async () => {
       try {
         await entrarCanal(canal.id)
@@ -141,6 +148,10 @@ export function CanalFeedComposition({
   }
 
   function pedirEntrada() {
+    if (canal.podeVincularUnidade && window.confirm(CONFIRMA_VINCULO_AO_PEDIR_CANAL)) {
+      vincularUnidade(true)
+      return
+    }
     startTransition(async () => {
       try {
         await pedirEntradaCanal(canal.id)
@@ -148,6 +159,41 @@ export function CanalFeedComposition({
         window.location.reload()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível enviar o pedido.')
+      }
+    })
+  }
+
+  function vincularUnidade(jaConfirmado = false) {
+    if (
+      !jaConfirmado &&
+      !window.confirm(canal.podeTrocarUnidade ? CONFIRMA_TROCA_UNIDADE : CONFIRMA_VINCULO_UNIDADE)
+    ) {
+      return
+    }
+    startTransition(async () => {
+      try {
+        const { nomeUnidade } = await vincularUnidadePeloCanal(canal.id)
+        toast.success(
+          canal.podeTrocarUnidade
+            ? `Unidade alterada para ${nomeUnidade}.`
+            : `Você está vinculado a ${nomeUnidade}.`,
+        )
+        window.location.reload()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível vincular-se à unidade.')
+      }
+    })
+  }
+
+  function desvincularUnidade() {
+    if (!window.confirm(CONFIRMA_DESVINCULO_UNIDADE)) return
+    startTransition(async () => {
+      try {
+        const { nomeUnidade } = await desvincularUnidadePeloCanal(canal.id)
+        toast.success(`Você deixou ${nomeUnidade}. Continua sócio da torcida.`)
+        window.location.reload()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível desvincular da unidade.')
       }
     })
   }
@@ -205,7 +251,7 @@ export function CanalFeedComposition({
       }
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <CanalNavbarOverride
         brand={navbarBrand}
         canalOficial={canal.canalOficial || canal.ehCanalDepartamento}
@@ -427,8 +473,52 @@ export function CanalFeedComposition({
                           Sair do canal
                         </button>
                       ) : null}
+                      {canal.podeDesvincularUnidade ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={pending}
+                          onClick={() => {
+                            setMenuOpen(false)
+                            desvincularUnidade()
+                          }}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                          Desvincular desta unidade
+                        </button>
+                      ) : canal.vinculoUnidadeLiberaEm ? (
+                        <p className="px-4 py-2 text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+                          {mensagemTravaVinculoUnidade(canal.vinculoUnidadeLiberaEm)}
+                        </p>
+                      ) : null}
                     </>
                   )}
+                  {(canal.podeVincularUnidade || canal.podeTrocarUnidade) && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={pending}
+                      onClick={() => {
+                        setMenuOpen(false)
+                        vincularUnidade()
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                    >
+                      <MapPin className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                      {canal.podeTrocarUnidade
+                        ? 'Trocar para esta unidade'
+                        : 'Esta é a minha unidade'}
+                    </button>
+                  )}
+                  {!souMembro &&
+                  !canal.podeVincularUnidade &&
+                  !canal.podeTrocarUnidade &&
+                  canal.vinculoUnidadeLiberaEm ? (
+                    <p className="px-4 py-2 text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+                      {mensagemTravaVinculoUnidade(canal.vinculoUnidadeLiberaEm)}
+                    </p>
+                  ) : null}
                   <CanaisListLink
                     href="/portal/comunidade/canais"
                     onClick={() => setMenuOpen(false)}
@@ -461,41 +551,45 @@ export function CanalFeedComposition({
         <PedidosCanalModal canalId={canal.id} onClose={() => setPedidosOpen(false)} />
       )}
 
-      {souMembro && podePublicar ? (
-        <div key="canal-composer" className="contents">
-          {composer}
-        </div>
-      ) : null}
+      <div
+        className={
+          souMembro && podePublicar && verMural
+            ? 'flex min-w-0 flex-col gap-6'
+            : 'flex min-w-0 flex-col gap-4'
+        }
+      >
+        {souMembro && podePublicar ? (
+          <div key="canal-composer">{composer}</div>
+        ) : null}
 
-      {!verMural ? (
-        <MotionEmptyState
-          key="canal-empty"
-          className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-12 text-center"
-          icon={
-            <Avatar
-              nome={canalNome}
-              avatarUrl={canal.avatarUrl}
-              size="lg"
-              fit="contain"
-              className="mb-3"
-            />
-          }
-          title={
-            canal.ehCanalDepartamento
-              ? 'Canal interno do departamento'
-              : 'Inscreva-se no canal'
-          }
-          description={
-            canal.ehCanalDepartamento
-              ? 'A entrada é automática pelo cargo na equipe — não há inscrição nem pedido.'
-              : 'Para ver o mural completo e participar do chat.'
-          }
-        />
-      ) : (
-        <div key="canal-mural" className="contents">
-          {children}
-        </div>
-      )}
+        {!verMural ? (
+          <MotionEmptyState
+            key="canal-empty"
+            className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-12 text-center"
+            icon={
+              <Avatar
+                nome={canalNome}
+                avatarUrl={canal.avatarUrl}
+                size="lg"
+                fit="contain"
+                className="mb-3"
+              />
+            }
+            title={
+              canal.ehCanalDepartamento
+                ? 'Canal interno do departamento'
+                : 'Inscreva-se no canal'
+            }
+            description={
+              canal.ehCanalDepartamento
+                ? 'A entrada é automática pelo cargo na equipe — não há inscrição nem pedido.'
+                : 'Para ver o mural completo e participar do chat.'
+            }
+          />
+        ) : (
+          <div key="canal-mural">{children}</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -851,7 +945,7 @@ function PedidosCanalModal({
                         disabled={pending && pendingUserId === p.userId}
                         onClick={() => decidir(p.userId, true)}
                         aria-label="Aprovar"
-                        className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                        className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-success transition-colors hover:bg-[rgb(var(--color-success)_/_0.12)] disabled:opacity-50"
                       >
                         {pending && pendingUserId === p.userId ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />

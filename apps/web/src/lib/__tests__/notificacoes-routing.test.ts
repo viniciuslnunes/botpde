@@ -368,17 +368,18 @@ describe('agregarBadgesDeInbox', () => {
     expect(badges.tabBadges).toEqual({})
   })
 
-  it('conta departamentos no portal por slug e seção (?tab= ou #hash)', () => {
+  it('conta departamentos no portal por slug e seção (rota, ?tab= ou #hash)', () => {
     const badges = agregarBadgesDeInbox([
       { tipo: 'DEPARTAMENTO_ADICIONADO', link: '/portal/departamentos/financeiro?tab=areas' },
       { tipo: 'DEPARTAMENTO_ADICIONADO', link: '/portal/departamentos/financeiro#projetos' },
+      { tipo: 'DEPARTAMENTO_ADICIONADO', link: '/portal/departamentos/financeiro/areas/a1' },
       { tipo: 'ACESSO_ATUALIZADO', link: '/portal/departamentos/bateria?tab=equipe' },
       { tipo: 'DEPARTAMENTO_REMOVIDO', link: '/portal/departamentos' },
     ])
-    expect(badges.portalNavBadges.departamentos).toBe(4)
-    expect(badges.portalNavBadges.porSlug).toEqual({ financeiro: 2, bateria: 1 })
+    expect(badges.portalNavBadges.departamentos).toBe(5)
+    expect(badges.portalNavBadges.porSlug).toEqual({ financeiro: 3, bateria: 1 })
     expect(badges.portalNavBadges.porSecao).toEqual({
-      financeiro: { areas: 1, projetos: 1 },
+      financeiro: { areas: 2, projetos: 1 },
       bateria: { equipe: 1 },
     })
     expect(badges.menuBadges).toEqual({})

@@ -313,7 +313,7 @@ function SedeStepNav({
                       </span>
                     ) : null}
                     {item.id === 'localizacao' && hasCoords ? (
-                      <span className="ml-auto shrink-0 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                      <span className="ml-auto shrink-0 rounded-md bg-[rgb(var(--color-success))]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success">
                         OK
                       </span>
                     ) : null}
@@ -822,7 +822,7 @@ function SedeLocalizacaoFields({
         className={[
           'flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3',
           hasCoords
-            ? 'border-emerald-500/25 bg-emerald-500/8'
+            ? 'border-[rgb(var(--color-success)_/_0.25)] bg-[rgb(var(--color-success)_/_0.08)]'
             : 'border-amber-500/30 bg-amber-500/10',
         ].join(' ')}
       >
@@ -996,7 +996,7 @@ function SedeLocalizacaoFields({
             )}
 
             {(linkStatus === 'ok' || searchStatus === 'ok' || geoStatus === 'ok') && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              <p className="text-xs text-success">
                 Coordenadas atualizadas. Confirme no mapa e ajuste o Street View.
               </p>
             )}
@@ -1743,7 +1743,7 @@ export function CriarSedeForm({
           type="submit"
           form={formId}
           disabled={pending}
-          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Criando…' : 'Criar sede'}
         </button>
@@ -1826,7 +1826,7 @@ export function EditarSedeForm({
           type="submit"
           form={formId}
           disabled={pending}
-          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Salvando…' : 'Salvar alterações'}
         </button>
@@ -1941,7 +1941,7 @@ export function SedeAcoesMenu({
                 'app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium hover:bg-[rgb(var(--background-subtle))]',
                 ativa
                   ? 'text-[rgb(var(--foreground))]'
-                  : 'text-emerald-700 dark:text-emerald-400',
+                  : 'text-success',
               ].join(' ')}
             >
               {ativa ? (

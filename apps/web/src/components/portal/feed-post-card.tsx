@@ -1,4 +1,4 @@
-import { Repeat2, Pin, Megaphone } from 'lucide-react'
+import { Repeat2, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade, linkTopicoForum } from '@/lib/comunidade-social'
 import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
@@ -22,8 +22,8 @@ import { PostComunicadoEmbed } from './post-comunicado-embed'
 import { PostEventoEmbed } from './post-evento-embed'
 import { ComunicadoShareButton } from './comunicado-share-button'
 import type { PostSocialItem } from '@/lib/feed'
-import { formatAutorCargoBadge, formatAutorUnidadeBadge } from '@/lib/autor-badges-format'
-import { PracaOrigemBadge } from '@/app/portal/comunidade/_components/praca-origem-badge'
+import { CARGO_TORCEDOR, formatAutorCargoBadge, formatAutorUnidadeBadge, formatTorcidaNoFeed } from '@/lib/autor-badges-format'
+import { PracaModuloBadge, FixadoBadge } from '@/app/portal/comunidade/_components/praca-origem-badge'
 import { ForumTopicoMenu } from '@/app/portal/comunidade/_components/forum-topico-menu'
 import { editarTopico } from '@/app/portal/comunidade/praca-actions'
 
@@ -36,6 +36,8 @@ interface FeedPostCardProps {
   podeModerarGrupo?: boolean
   /** Sócio compartilha; torcedor só curte/comenta/salva. Default true. */
   podeCompartilhar?: boolean
+  /** Comunidade já aberta (clube na CN, torcida no mural). Não repetir o nome. */
+  contextoComunidadeNome?: string | null
 }
 
 export function FeedPostCard({
@@ -46,6 +48,7 @@ export function FeedPostCard({
   salvo = false,
   podeModerarGrupo = false,
   podeCompartilhar = true,
+  contextoComunidadeNome = null,
 }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
   const forum = post.forum
@@ -61,12 +64,17 @@ export function FeedPostCard({
     ? linkTorcidaComunidadePublica(post.tenantId)
     : `/portal/comunidade/perfil/${post.autor.id}`
   const headerNome = isComunicadoOficial ? post.tenant.nome : (post.autor.nome ?? 'Membro')
-  const tenantBadge = showTenantBadge && !isComunicadoOficial && !forum ? post.tenant.nome : null
-  // Unidade que repete a torcida (Caso B, ou Sede raiz "Sede — <Torcida>") não
-  // vira badge — compara com a torcida do post mesmo quando ela não é exibida.
-  const unidadeBadge = isComunicadoOficial || forum
-    ? null
-    : formatAutorUnidadeBadge(post.autor.sedeNome, post.tenant.nome)
+  const torcidaLinha =
+    showTenantBadge && !isComunicadoOficial
+      ? formatTorcidaNoFeed(post.tenant.nome, contextoComunidadeNome)
+      : null
+  // Unidade extra (subsede/PDE) ao lado do nome; cadastrado na torcida vira "Sede".
+  const unidadeBadge =
+    isComunicadoOficial || post.autor.cargoNome === CARGO_TORCEDOR
+      ? null
+      : formatAutorUnidadeBadge(post.autor.sedeNome, post.tenant.nome, {
+          tipo: post.autor.sedeTipo,
+        })
   const headerAvatar = isComunicadoOficial ? post.tenant.logoUrl : post.autor.avatarUrl
   const midias = ensureSocialEmbedInMidias(post.conteudo, post.midiaUrls)
   const conteudoVisivel = stripEmbeddedSocialUrls(post.conteudo, midias)
@@ -94,8 +102,8 @@ export function FeedPostCard({
             : undefined
         }
       >
-      <header className="flex items-center gap-3">
-        <ComunidadePrefetchLink href={headerHref}>
+      <header className="flex items-start gap-3">
+        <ComunidadePrefetchLink href={headerHref} className="shrink-0">
           <Avatar
             nome={headerNome}
             avatarUrl={headerAvatar}
@@ -104,70 +112,70 @@ export function FeedPostCard({
           />
         </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2">
+          <div className="flex min-w-0 w-full flex-col gap-1">
             <ComunidadePrefetchLink
               href={headerHref}
-              className="text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
+              className="block truncate text-sm font-semibold leading-snug text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
             >
               {headerNome}
+              {unidadeBadge ? (
+                <span className="font-medium text-[rgb(var(--foreground-muted))]">
+                  {' '}
+                  - {unidadeBadge}
+                </span>
+              ) : null}
             </ComunidadePrefetchLink>
-            {tenantBadge && (
-              <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-                {tenantBadge}
+            {torcidaLinha ? (
+              <span className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+                {torcidaLinha}
               </span>
-            )}
-            {unidadeBadge && (
-              <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                {unidadeBadge}
-              </span>
-            )}
+            ) : null}
             {cargoBadge && (
-              <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-secondary-fg))]">
+              <span className="text-[11px] font-medium leading-snug text-[rgb(var(--foreground-muted))]">
                 {cargoBadge}
               </span>
             )}
-            {forum && <PracaOrigemBadge origem="forum" />}
-            {post.fixado && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                <Pin className="h-3 w-3" />
-                Fixado
-              </span>
+            {!isComunicadoOficial && post.autor.nickname && (
+              <ComunidadePrefetchLink
+                href={`/portal/comunidade/perfil/${post.autor.id}`}
+                className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+              >
+                @{post.autor.nickname}
+              </ComunidadePrefetchLink>
             )}
+            <ComunidadePrefetchLink
+              href={permalink}
+              className="block text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            >
+              <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
+                {formatRelative(post.criadoEm)}
+              </time>
+            </ComunidadePrefetchLink>
             {post.grupo && (
               <ComunidadePrefetchLink
                 href={`/portal/comunidade/grupos/${post.grupo.id}`}
-                className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+                className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
                 em {post.grupo.nome ?? 'grupo'}
               </ComunidadePrefetchLink>
             )}
           </div>
-          {!isComunicadoOficial && post.autor.nickname && (
-            <ComunidadePrefetchLink
-              href={`/portal/comunidade/perfil/${post.autor.id}`}
-              className="block truncate text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-            >
-              @{post.autor.nickname}
-            </ComunidadePrefetchLink>
-          )}
-          <ComunidadePrefetchLink
-            href={permalink}
-            className="text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-          >
-            <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
-              {formatRelative(post.criadoEm)}
-            </time>
-          </ComunidadePrefetchLink>
         </div>
-        {mostrarMenu && forum && author && (
-          <ForumTopicoMenu topicoId={post.id} escopo={forum.escopo} />
-        )}
-        {mostrarMenu && !forum && (
-          <FeedPostMenu
-            postId={post.id}
-            fixado={post.fixado}
-            modo={author ? 'autor' : 'moderar-grupo'}
-          />
+        {(forum || post.fixado || mostrarMenu) && (
+          <div className="flex shrink-0 items-center gap-1.5 self-start">
+            {post.fixado ? <FixadoBadge /> : null}
+            {forum ? <PracaModuloBadge modulo="forum" /> : null}
+            {forum && (mostrarMenu || !author) ? (
+              <ForumTopicoMenu topicoId={post.id} escopo={forum.escopo} isAutor={author} />
+            ) : null}
+            {mostrarMenu && !forum ? (
+              <FeedPostMenu
+                postId={post.id}
+                fixado={post.fixado}
+                modo={author ? 'autor' : 'moderar-grupo'}
+              />
+            ) : null}
+          </div>
         )}
       </header>
 
@@ -248,9 +256,10 @@ export function FeedPostCard({
         <ForumFeedEngagement
           topicoId={post.id}
           escopo={forum.escopo}
-          totalReacoes={post.totalReacoes}
-          totalComentarios={post.totalComentarios}
-          minhaReacao={post.minhaReacao === 'CURTIR' ? 'CURTIR' : null}
+          gostei={forum.gostei}
+          naoGostei={forum.naoGostei}
+          meuVoto={forum.meuVoto}
+          totalRespostas={post.totalComentarios}
           currentUser={currentUser}
         />
       ) : (

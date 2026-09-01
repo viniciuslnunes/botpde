@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Completar cadastro' }
 
 /**
- * A ficha mora na carteirinha. Query `secao=cadastro` sobrevive ao redirect
+ * A ficha mora na aba Cadastro de sócio da carteirinha. Query `secao=cadastro`
  * (o hash `#` some no Location do App Router).
  */
 export default function CadastroAssociacaoPage() {

@@ -81,7 +81,7 @@ export default async function AdminLojaTicketsArquivoPage({
     [
       'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
       ativa
-        ? 'bg-[rgb(var(--primary))] text-white'
+        ? 'bg-[rgb(var(--primary))] text-primary-on'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
     ].join(' ')
 
@@ -120,7 +120,7 @@ export default async function AdminLojaTicketsArquivoPage({
         />
         <button
           type="submit"
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-primary-on hover:opacity-90"
         >
           Buscar
         </button>
@@ -207,7 +207,7 @@ export default async function AdminLojaTicketsArquivoPage({
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/admin/loja/tickets/${t.id}`}
-                        className="inline-flex rounded-md bg-[rgb(var(--primary))] px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                        className="inline-flex rounded-md bg-[rgb(var(--primary))] px-2.5 py-1.5 text-xs font-semibold text-primary-on hover:opacity-90"
                       >
                         Abrir conversa
                       </Link>

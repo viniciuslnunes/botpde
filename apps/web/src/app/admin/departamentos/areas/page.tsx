@@ -1,26 +1,23 @@
 import { db, type Prisma } from '@torcida/db'
-import Link from 'next/link'
-import { PERMISSIONS, hrefHomeDepartamento } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
 import {
-  ListagemPaginacao,
-  ListagemTh,
-  ListagemToolbar,
-  ListagemVazia,
-  TableShell,
-} from '@/components/admin/ui'
+  PERMISSIONS,
+  STATUS_PROJETO_ABERTOS,
+  checklistItemsFromMeta,
+  checklistProgress,
+  hrefHomeDepartamento,
+  resolverCorSemRivalidade,
+} from '@torcida/types'
+import { assertPermission } from '@/lib/authz'
+import { optsCorDoTenant } from '@/lib/cor-departamento'
+import { ListagemToolbar, ListagemVazia, KpiGrid, StatCard } from '@/components/admin/ui'
 import { parseListagemParams, type ListagemFacetas } from '@/lib/listagem'
 import { LISTAGEM_DEPARTAMENTO_AREAS } from '@/lib/listagem/specs'
-import {
-  carregarFacetas,
-  montarOrderByListagem,
-  montarPaginacao,
-  montarWhereListagem,
-  resumirPaginacao,
-} from '@/lib/listagem/query'
-import { ArrowUpRight, Layers } from 'lucide-react'
+import { carregarFacetas, montarWhereListagem, resumirPaginacao } from '@/lib/listagem/query'
+import { AlertTriangle, Layers, Users } from 'lucide-react'
 import type { Metadata } from 'next'
-import { AreaGestaoCelulas } from '../_components/area-gestao-celulas'
+import { AreaGestaoAcoes } from '../_components/area-gestao-celulas'
+import { AreaChecklistInline } from '../_components/area-checklist-inline'
+import { AreaSaudeGrupo, AreaSaudeRow } from '@/components/departamentos/area-saude-lista'
 
 export const metadata: Metadata = { title: 'Áreas — Departamentos' }
 
@@ -46,22 +43,30 @@ export default async function DepartamentoAreasPage({
     descricao: string | null
     ativa: boolean
     sazonal: boolean
+    meta: unknown
     departamento: { id: string; nome: string; slug: string; cor: string }
     _count: { membros: number }
     membros: Array<{ user: { nome: string | null; nickname: string | null } }>
+    projetos: Array<{ id: string }>
   }
 
-  const [areas, total]: [AreaRow[], number] = await Promise.all([
+  const [areas, total, semResponsavelCount, pessoasCount]: [
+    AreaRow[],
+    number,
+    number,
+    number,
+  ] = await Promise.all([
     db.departamentoArea.findMany({
       where,
-      orderBy: montarOrderByListagem(SPEC, listagem),
-      ...montarPaginacao(listagem),
+      orderBy: [{ departamento: { ordem: 'asc' } }, { ordem: 'asc' }, { nome: 'asc' }],
+      take: 200,
       select: {
         id: true,
         nome: true,
         descricao: true,
         ativa: true,
         sazonal: true,
+        meta: true,
         departamento: { select: { id: true, nome: true, slug: true, cor: true } },
         _count: { select: { membros: true } },
         membros: {
@@ -69,12 +74,22 @@ export default async function DepartamentoAreasPage({
           take: 3,
           select: { user: { select: { nome: true, nickname: true } } },
         },
+        projetos: {
+          where: { status: { in: [...STATUS_PROJETO_ABERTOS] } },
+          select: { id: true },
+        },
       },
     }),
     db.departamentoArea.count({ where }),
+    db.departamentoArea.count({
+      where: {
+        tenantId: tenant.id,
+        ativa: true,
+        membros: { none: { papel: 'RESPONSAVEL' } },
+      },
+    }),
+    db.departamentoAreaMembro.count({ where: { area: { tenantId: tenant.id } } }),
   ])
-
-  const paginacao = resumirPaginacao(total, listagem)
 
   const facetas: ListagemFacetas = await carregarFacetas(
     SPEC,
@@ -93,8 +108,35 @@ export default async function DepartamentoAreasPage({
     },
   )
 
+  const corOpts = await optsCorDoTenant(tenant)
+  const grupos = new Map<string, { nome: string; cor: string; areas: AreaRow[] }>()
+  for (const a of areas) {
+    const cor = resolverCorSemRivalidade(a.departamento.cor, corOpts)
+    const area: AreaRow = { ...a, departamento: { ...a.departamento, cor } }
+    const g = grupos.get(a.departamento.id) ?? {
+      nome: a.departamento.nome,
+      cor,
+      areas: [],
+    }
+    g.areas.push(area)
+    grupos.set(a.departamento.id, g)
+  }
+
+  const paginacao = resumirPaginacao(total, { ...listagem, pagina: 1, porPagina: 200 })
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
+      <KpiGrid cols={3}>
+        <StatCard label="Áreas nesta lista" value={total} icon={<Layers className="h-5 w-5" />} />
+        <StatCard
+          label="Ativas sem responsável"
+          value={semResponsavelCount}
+          tone={semResponsavelCount > 0 ? 'warning' : 'default'}
+          icon={<AlertTriangle className="h-5 w-5" />}
+        />
+        <StatCard label="Pessoas nas frentes" value={pessoasCount} icon={<Users className="h-5 w-5" />} />
+      </KpiGrid>
+
       <ListagemToolbar
         spec={SPEC}
         params={listagem}
@@ -104,7 +146,8 @@ export default async function DepartamentoAreasPage({
       />
 
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        Clique na área para abrir no departamento, ou nomeie o responsável daqui — sem sair da lista.
+        Cada linha é uma frente de trabalho. Nomeie o responsável e marque o checklist daqui —
+        a ficha completa fica no portal do departamento.
       </p>
 
       {areas.length === 0 ? (
@@ -120,105 +163,68 @@ export default async function DepartamentoAreasPage({
             ),
             title: 'Nenhuma área cadastrada',
             description:
-              'Rode `pnpm --filter @torcida/db seed:departamento-areas` para semear as áreas canônicas, ou abra um departamento na Visão e crie as frentes lá.',
+              'Rode `pnpm --filter @torcida/db seed:departamento-areas` para semear as áreas canônicas, ou crie as frentes no portal do departamento.',
           }}
         />
       ) : (
-        <TableShell
-          empty={{ title: 'Nenhuma área', description: '' }}
-          isEmpty={false}
-        >
-          <thead>
-            <tr>
-              {SPEC.colunas.map((coluna) => (
-                <ListagemTh
-                  key={coluna.id}
-                  spec={SPEC}
-                  params={listagem}
-                  coluna={coluna}
-                  facetas={facetas}
-                  className={coluna.id === 'sazonal' ? 'hidden sm:table-cell' : undefined}
-                />
-              ))}
-              <th className="px-4 py-3 text-left text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                Responsável
-              </th>
-              <th className="w-10 px-4 py-3">
-                <span className="sr-only">Ações</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {areas.map((a) => (
-              <tr key={a.id} className="border-t border-[rgb(var(--border))]">
-                <td className="px-4 py-3">
-                  <Link
-                    href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
-                    className="group inline-flex max-w-md items-start gap-1.5"
-                    aria-label={`Abrir ${a.nome} em ${a.departamento.nome}`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-[rgb(var(--foreground))] group-hover:underline">
-                        {a.nome}
-                      </span>
-                      {a.descricao && (
-                        <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
-                          {a.descricao}
-                        </span>
-                      )}
-                    </span>
-                    <ArrowUpRight
-                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
-                      aria-hidden
-                    />
-                  </Link>
-                </td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={hrefHomeDepartamento(a.departamento.slug, 'areas')}
-                    className="app-touch-line inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))] hover:underline"
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: a.departamento.cor }}
-                      aria-hidden
-                    />
-                    {a.departamento.nome}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-                  {a.ativa ? 'Ativa' : 'Inativa'}
-                </td>
-                <td className="hidden px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] sm:table-cell">
-                  {a.sazonal ? 'Sim' : '—'}
-                </td>
-                <td className="px-4 py-3 text-right text-sm text-[rgb(var(--foreground))]">
-                  <Link
-                    href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
-                    className="app-touch-line hover:underline"
-                    aria-label={`${a._count.membros} ${a._count.membros === 1 ? 'pessoa' : 'pessoas'} em ${a.nome}`}
-                  >
-                    {a._count.membros}
-                  </Link>
-                </td>
-                <AreaGestaoCelulas
-                  areaId={a.id}
-                  areaNome={a.nome}
-                  departamentoId={a.departamento.id}
-                  slug={a.departamento.slug}
-                  href={hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })}
-                  semResponsavel={a.membros.length === 0}
-                  responsaveis={a.membros.map(
-                    (m) => m.user.nome?.trim() || (m.user.nickname ? `@${m.user.nickname}` : 'Pessoa'),
-                  )}
-                />
-              </tr>
-            ))}
-          </tbody>
-        </TableShell>
+        <div className="space-y-6">
+          {[...grupos.values()].map((grupo) => (
+            <AreaSaudeGrupo key={grupo.nome} nome={grupo.nome} cor={grupo.cor}>
+              {grupo.areas.map((a) => {
+                const progress = checklistProgress(a.meta)
+                const responsaveis = a.membros.map(
+                  (m) => m.user.nome?.trim() || (m.user.nickname ? `@${m.user.nickname}` : 'Pessoa'),
+                )
+                const href = hrefHomeDepartamento(a.departamento.slug, 'areas', { area: a.id })
+                return (
+                  <AreaSaudeRow
+                    key={a.id}
+                    item={{
+                      id: a.id,
+                      nome: a.nome,
+                      descricao: a.descricao,
+                      ativa: a.ativa,
+                      sazonal: a.sazonal,
+                      href,
+                      pessoas: a._count.membros,
+                      responsaveis,
+                      checklistDone: progress.done,
+                      checklistTotal: progress.total,
+                      projetosAbertos: a.projetos.length,
+                    }}
+                    acoes={
+                      <AreaGestaoAcoes
+                        areaId={a.id}
+                        areaNome={a.nome}
+                        departamentoId={a.departamento.id}
+                        slug={a.departamento.slug}
+                        href={href}
+                        semResponsavel={a.membros.length === 0}
+                        responsaveis={responsaveis}
+                      />
+                    }
+                    extra={
+                      checklistItemsFromMeta(a.meta).length > 0 ? (
+                        <AreaChecklistInline
+                          areaId={a.id}
+                          departamentoId={a.departamento.id}
+                          slug={a.departamento.slug}
+                          items={checklistItemsFromMeta(a.meta)}
+                        />
+                      ) : undefined
+                    }
+                  />
+                )
+              })}
+            </AreaSaudeGrupo>
+          ))}
+          {total > areas.length ? (
+            <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
+              Mostrando {areas.length} de {total}. Afine a busca para recortar.
+            </p>
+          ) : null}
+        </div>
       )}
-
-      <ListagemPaginacao spec={SPEC} params={listagem} paginacao={paginacao} />
     </div>
   )
 }

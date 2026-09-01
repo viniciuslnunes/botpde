@@ -1,5 +1,7 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, IdCard } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, IdCard } from 'lucide-react'
+import Link from 'next/link'
 import { AssociacaoAtualizarForm } from '@/app/portal/cadastro/associacao/associacao-atualizar-form'
+import { hrefCarteirinhaSecao } from '@/lib/carteirinha-tabs'
 import type { CompletudeItemId } from '@/lib/completude-cadastro-socio'
 import type { FichaAssociacaoPortal } from '@/lib/ficha-associacao-portal'
 
@@ -45,13 +47,13 @@ export function CarteirinhaCadastroPanel({ ficha }: Props) {
     <section id="cadastro" className="scroll-mt-24 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-[rgb(var(--foreground))]">Cadastro de sócio</h2>
+          <h2 className="portal-display text-lg text-[rgb(var(--foreground))]">Cadastro de sócio</h2>
           <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Dados da ficha, documentos e da carteirinha — sempre à mão nesta aba.
+            Ficha, documentos e dados da associação — edite quando precisar.
           </p>
         </div>
         {completo ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200">
+          <span className="btn-success-soft inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold">
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
             Etapa concluída
           </span>
@@ -80,6 +82,7 @@ export function CarteirinhaCadastroPanel({ ficha }: Props) {
           exigirDocumentos={ficha.exigirDocumentos}
           temCarteirinha={ficha.temCarteirinha}
           periodicidades={ficha.periodicidades}
+          planos={ficha.planos}
           prefillOrigemNome={ficha.prefillOrigemNome}
           operacao={ficha.operacao}
           tabInicial={tabInicial}
@@ -90,7 +93,7 @@ export function CarteirinhaCadastroPanel({ ficha }: Props) {
   )
 }
 
-/** Chip no topo da carteirinha: em dia ou atalho para a ficha. */
+/** Atalho na aba do cartão: vai para a ficha quando ainda falta dado. */
 export function CarteirinhaCadastroChip({
   completo,
   ok,
@@ -103,17 +106,17 @@ export function CarteirinhaCadastroChip({
   faltando: number
 }) {
   return (
-    <a
-      href="#cadastro"
+    <Link
+      href={hrefCarteirinhaSecao('cadastro')}
       className={[
         'flex min-h-11 items-center gap-3 rounded-xl border px-4 py-3 transition-colors',
         completo
-          ? 'border-green-200 bg-green-50 hover:bg-green-100/80 dark:border-green-900 dark:bg-green-950/30 dark:hover:bg-green-950/50'
+          ? 'alert-success hover:brightness-[0.97]'
           : 'border-amber-200 bg-amber-50 hover:bg-amber-100/80 dark:border-amber-900 dark:bg-amber-950/30 dark:hover:bg-amber-950/50',
       ].join(' ')}
     >
       {completo ? (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-700 dark:text-green-400" />
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-success" />
       ) : (
         <IdCard className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
       )}
@@ -122,7 +125,7 @@ export function CarteirinhaCadastroChip({
           className={[
             'text-sm font-semibold',
             completo
-              ? 'text-green-900 dark:text-green-100'
+              ? 'text-success'
               : 'text-amber-950 dark:text-amber-100',
           ].join(' ')}
         >
@@ -132,7 +135,7 @@ export function CarteirinhaCadastroChip({
           className={[
             'text-xs',
             completo
-              ? 'text-green-800/80 dark:text-green-200/80'
+              ? 'text-success'
               : 'text-amber-900/80 dark:text-amber-200/80',
           ].join(' ')}
         >
@@ -141,7 +144,7 @@ export function CarteirinhaCadastroChip({
             : `${ok}/${total} · ${faltando} obrigatório(s) faltando`}
         </p>
       </div>
-      <ChevronDown className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
-    </a>
+      <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
+    </Link>
   )
 }

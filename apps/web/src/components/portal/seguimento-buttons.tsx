@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { ChevronDown, UserMinus } from 'lucide-react'
+import { ChevronDown, UserMinus, UserPlus } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { deixarDeSeguir, solicitarSeguir } from '@/app/portal/comunidade/actions'
 import { fadeScale, springSnappy, menuItemStagger } from '@/lib/motion-presets'
+import { PERFIL_ACAO, PERFIL_ACAO_ICON } from './perfil/perfil-acao'
 import { FloatingMenu } from './floating-menu'
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' | null
@@ -16,9 +17,17 @@ interface SeguimentoButtonsProps {
   isSelf?: boolean
   /** Labels curtos e `whitespace-nowrap` — para sidebars estreitas (ex.: Para seguir). */
   compact?: boolean
+  /** Mesma altura, fonte e ícone dos outros botões do cabeçalho de perfil. */
+  toolbar?: boolean
 }
 
-export function SeguimentoButtons({ userId, status, isSelf, compact = false }: SeguimentoButtonsProps) {
+export function SeguimentoButtons({
+  userId,
+  status,
+  isSelf,
+  compact = false,
+  toolbar = false,
+}: SeguimentoButtonsProps) {
   const [pending, startTransition] = useTransition()
   const [menuOpen, setMenuOpen] = useState(false)
   const [localStatus, setLocalStatus] = useState(status)
@@ -31,8 +40,9 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
 
   if (isSelf) return null
 
-  const actionPad = compact ? 'px-2 py-1' : 'px-3 py-1.5'
-  const actionText = compact ? 'text-[11px]' : 'text-xs'
+  const actionClass = toolbar
+    ? PERFIL_ACAO
+    : `inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg ${compact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} font-semibold`
 
   return (
     <AnimatePresence mode="wait">
@@ -54,10 +64,10 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
             aria-expanded={menuOpen}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg border border-[rgb(var(--border))] ${actionPad} ${actionText} font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60`}
+            className={`${actionClass} border border-[rgb(var(--border))] text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60`}
           >
             Seguindo
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className={toolbar ? PERFIL_ACAO_ICON : 'h-3.5 w-3.5'} />
           </m.button>
           <FloatingMenu
             open={menuOpen}
@@ -101,7 +111,13 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
           exit="hidden"
           transition={springSnappy}
           title="Solicitação pendente"
-          className={`inline-flex shrink-0 whitespace-nowrap rounded-full bg-amber-100 ${compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200`}
+          className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-amber-100 font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200 ${
+            toolbar
+              ? 'app-action px-3 text-sm'
+              : compact
+                ? 'px-2 py-0.5 text-[11px]'
+                : 'px-2.5 py-1 text-xs'
+          }`}
         >
           {compact ? 'Pendente' : 'Solicitação pendente'}
         </m.span>
@@ -132,8 +148,9 @@ export function SeguimentoButtons({ userId, status, isSelf, compact = false }: S
           }
           whileTap={{ scale: 0.94 }}
           transition={springSnappy}
-          className={`shrink-0 whitespace-nowrap rounded-lg bg-[rgb(var(--primary))] ${actionPad} ${actionText} font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60`}
+          className={`${actionClass} bg-[rgb(var(--primary))] text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60`}
         >
+          {toolbar ? <UserPlus className={PERFIL_ACAO_ICON} /> : null}
           Seguir
         </m.button>
       )}
@@ -177,7 +194,7 @@ export function SeguimentoReviewButtons({
             transition={springSnappy}
             className="flex flex-col items-end gap-2"
           >
-            <span className="text-xs font-semibold text-emerald-600">Aprovado</span>
+            <span className="text-xs font-semibold text-success">Aprovado</span>
             <div className="flex items-center gap-2">
               <m.button
                 type="button"
@@ -209,7 +226,7 @@ export function SeguimentoReviewButtons({
                 }
                 whileTap={{ scale: 0.94 }}
                 transition={springSnappy}
-                className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 Seguir de volta
               </m.button>
@@ -231,7 +248,7 @@ export function SeguimentoReviewButtons({
             exit={{ opacity: 0, scale: 0.9 }}
             transition={springSnappy}
             onAnimationComplete={concluir}
-            className="text-xs font-semibold text-emerald-600"
+            className="text-xs font-semibold text-success"
           >
             Aprovado
           </m.span>
@@ -242,7 +259,7 @@ export function SeguimentoReviewButtons({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={springSnappy}
-          className="text-xs font-semibold text-emerald-600"
+          className="text-xs font-semibold text-success"
         >
           Seguindo
         </m.span>
@@ -287,7 +304,7 @@ export function SeguimentoReviewButtons({
             }
             whileTap={{ scale: 0.94 }}
             transition={springSnappy}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="btn-success rounded-lg px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             Aprovar
           </m.button>

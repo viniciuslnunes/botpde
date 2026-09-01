@@ -2,6 +2,13 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  aplicarSnapshotListagem,
+  limparSkipRestoreListagem,
+  snapshotContratoListagem,
+  temSkipRestoreListagem,
+  urlTemParamContrato,
+} from '@/lib/listagem/form-query'
 
 export interface ListagemPersistenciaProps {
   listagemId: string
@@ -23,8 +30,19 @@ export interface ListagemPersistenciaProps {
 const PREFIXO = 'torcida:listagem:'
 
 /**
+ * Sobrevive a remount do client component no mesmo JS (troca de `?q=` para
+ * URL nua). Sem isso, "Limpar busca" gravava o snapshot vazio, o componente
+ * remontava e o effect da montagem nova ressuscitava o `q` antigo.
+ */
+const restoreBloqueado = new Set<string>()
+
+/**
  * Guarda a última visão de uma listagem (filtros, ordenação, tamanho de página)
  * e a restaura quando o admin volta pela URL nua.
+ *
+ * Busca (`q`) e offset (`pagina`) ficam de fora: são consulta pontual. Sem
+ * isso, procurar um nome e sair da aba reabria a lista já filtrada na próxima
+ * visita — e o X do campo não "pegava", porque o snapshot reaplicava o termo.
  *
  * Precedência é explícita: **a URL sempre ganha**. O snapshot só entra quando
  * nenhum param do contrato está presente — assim um link compartilhado nunca é
@@ -32,6 +50,9 @@ const PREFIXO = 'torcida:listagem:'
  * então não cria entrada nova no histórico, e acontece no máximo uma vez por
  * montagem: é isso que faz "Limpar tudo" realmente limpar em vez de ser
  * ressuscitado pelo snapshot no render seguinte.
+ *
+ * Limpar a busca (URL nua depois de ter tido params) marca a chave em
+ * `restoreBloqueado` para um remount imediato não reaplicar o snapshot.
  */
 export function ListagemPersistencia({
   listagemId,
@@ -46,16 +67,13 @@ export function ListagemPersistencia({
   useEffect(() => {
     const chave = `${PREFIXO}${escopoChave}:${listagemId}`
     const atuais = new URLSearchParams(searchParams.toString())
-    const doContrato = new URLSearchParams()
-    for (const nome of paramsDoContrato) {
-      const valor = atuais.get(nome)
-      if (valor !== null) doContrato.set(nome, valor)
-    }
-    const serializado = doContrato.toString()
+    const urlTemContrato = urlTemParamContrato(atuais, paramsDoContrato)
+    const serializado = snapshotContratoListagem(atuais, paramsDoContrato).toString()
 
     if (!restaurado.current) {
       restaurado.current = true
-      if (serializado === '') {
+      const skipRestore = temSkipRestoreListagem(basePath) || restoreBloqueado.has(chave)
+      if (!urlTemContrato && !skipRestore) {
         let salvo: string | null = null
         try {
           salvo = window.localStorage.getItem(chave)
@@ -63,21 +81,40 @@ export function ListagemPersistencia({
           // Modo privativo / storage bloqueado: segue sem persistência.
         }
         if (salvo) {
-          const destino = new URLSearchParams(atuais.toString())
-          for (const [nome, valor] of new URLSearchParams(salvo).entries()) {
-            if (!paramsDoContrato.includes(nome)) continue
-            destino.set(nome, valor)
-          }
+          const destino = aplicarSnapshotListagem(atuais, salvo, paramsDoContrato)
           const qs = destino.toString()
-          router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false })
-          return
+          if (qs) {
+            router.replace(`${basePath}?${qs}`, { scroll: false })
+            return
+          }
         }
       }
     }
 
     try {
-      if (serializado) window.localStorage.setItem(chave, serializado)
-      else window.localStorage.removeItem(chave)
+      if (serializado) {
+        limparSkipRestoreListagem(basePath)
+        restoreBloqueado.delete(chave)
+        window.localStorage.setItem(chave, serializado)
+      } else if (!urlTemContrato) {
+        restoreBloqueado.add(chave)
+        window.localStorage.removeItem(chave)
+      } else {
+        // URL só com busca/página: não grava o termo, e tira `q` de snapshot velho.
+        let salvo: string | null = null
+        try {
+          salvo = window.localStorage.getItem(chave)
+        } catch {
+          // storage bloqueado
+        }
+        if (!salvo) return
+        const limpo = snapshotContratoListagem(
+          new URLSearchParams(salvo),
+          paramsDoContrato,
+        ).toString()
+        if (limpo) window.localStorage.setItem(chave, limpo)
+        else window.localStorage.removeItem(chave)
+      }
     } catch {
       // Idem: persistência é conveniência, nunca requisito.
     }

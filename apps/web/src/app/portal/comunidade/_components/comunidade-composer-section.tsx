@@ -60,6 +60,7 @@ export async function ComunidadeComposerSection({
         cargoNome: ctx.userCard.cargoNome,
         departamentoNome: ctx.userCard.departamentoNome,
         sedeNome: ctx.userCard.sedeNome,
+        sedeTipo: ctx.userCard.sedeTipo,
       }}
     />
   )

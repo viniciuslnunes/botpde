@@ -333,7 +333,7 @@ export async function DepartamentoThinAside({
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               <Link
-                href="?tab=projetos"
+                href={`/portal/departamentos/${slug}/projetos`}
                 className="text-[11px] font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver projetos
@@ -415,7 +415,7 @@ export async function DepartamentoThinAside({
             )}
             {projetosAtivos > 0 && (
               <Link
-                href="?tab=projetos"
+                href={`/portal/departamentos/${slug}/projetos`}
                 className="mt-2 block text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--color-primary-fg))]"
               >
                 {projetosAtivos} projeto{projetosAtivos === 1 ? '' : 's'} em andamento →
@@ -428,7 +428,7 @@ export async function DepartamentoThinAside({
       {moduloHref && (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
         >
           {ctaModulo}
           <ArrowRight className="h-4 w-4" />

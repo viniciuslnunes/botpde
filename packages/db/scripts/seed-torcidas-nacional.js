@@ -16,6 +16,7 @@
 import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissions.js'
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
+import { corArquirrivalCatalogo } from '../../types/src/design.js'
 import { normalizeNome } from '../src/data/afiliacoes-normalize.js'
 import { prepareSeedEnv } from './lib/seed-env.js'
 
@@ -37,13 +38,13 @@ const SYSTEM_ROLE_DEFS = [
   },
   {
     nome: SYSTEM_ROLES.VICE,
-    cor: '#0ea5e9',
+    cor: '#71717a',
     ordem: 95,
     permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
   },
   {
     nome: SYSTEM_ROLES.ADMIN,
-    cor: '#3b82f6',
+    cor: '#52525b',
     ordem: 90,
     permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
   },
@@ -148,18 +149,24 @@ async function main() {
       return
     }
 
+    const corArquirrival =
+      torcida.corArquirrival ??
+      corArquirrivalCatalogo({ slug: torcida.slug, clubeNome: torcida.clube })
+
     const tenant = await db.tenant.upsert({
       where: { slug: torcida.slug },
       create: {
         slug: torcida.slug,
         nome: torcida.nome,
         corPrimaria: torcida.corPrimaria ?? '#7c3aed',
+        corArquirrival,
         afiliacaoId,
         ativo: true,
       },
       update: {
         nome: torcida.nome,
         corPrimaria: torcida.corPrimaria ?? '#7c3aed',
+        corArquirrival,
         afiliacaoId,
         ativo: true,
       },

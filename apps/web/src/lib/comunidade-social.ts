@@ -130,3 +130,11 @@ export function linkTopicoForum(
 ): string {
   return `/portal/comunidade/forum/${id}?escopo=${escopo}`
 }
+
+/** Permalink da notícia ou artigo no portal de notícias do canal ativo. */
+export function linkNoticiaPortal(
+  id: string,
+  escopo: 'nacional' | 'torcida' | 'unidade',
+): string {
+  return `/portal/comunidade/noticias/${id}?escopo=${escopo}`
+}

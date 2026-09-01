@@ -40,7 +40,27 @@ export default async function DesignPage() {
       : Promise.resolve(null),
   ])
 
-  const design = resolveTenantDesign(tenant.design, tenant.corPrimaria) as TenantDesign
+  // Coluna `corArquirrival` é o tabu de runtime (seed/catálogo). O estúdio só
+  // trata como “confirmado pelo usuário” o hex gravado no JSON `design.brand`.
+  const confirmadoNoJson =
+    tenant.design &&
+    typeof tenant.design === 'object' &&
+    'brand' in tenant.design
+      ? (tenant.design as { brand?: { arquirrival?: unknown } }).brand
+          ?.arquirrival
+      : null
+  const arquirrivalConfirmado =
+    typeof confirmadoNoJson === 'string' &&
+    /^#[0-9a-fA-F]{6}$/.test(confirmadoNoJson)
+      ? confirmadoNoJson
+      : null
+
+  const design = resolveTenantDesign(tenant.design, tenant.corPrimaria, {
+    corArquirrival: arquirrivalConfirmado,
+    slug: tenant.slug,
+    clubeNome: afiliacao?.nome ?? null,
+    clubeApelido: afiliacao?.apelido ?? null,
+  }) as TenantDesign
 
   const imagemUrls = [
     tenant.logoUrl,

@@ -202,7 +202,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
             disabled={criando}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-primary-on disabled:opacity-60"
           >
             {criando ? 'Publicando…' : 'Publicar enquete'}
           </m.button>
@@ -277,7 +277,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                               <span className="text-sm font-medium text-[rgb(var(--foreground))]">
                                 {opcao.texto}
                                 {lider && enquete.totalVotos > 1 && (
-                                  <span className="ml-2 text-xs font-semibold text-emerald-400">Líder</span>
+                                  <span className="ml-2 text-xs font-semibold text-success">Líder</span>
                                 )}
                               </span>
                             </div>

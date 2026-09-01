@@ -3,6 +3,7 @@ import {
   deveListarCanalDepartamentoNaComunidade,
   deveManterCanalDeptoNoInbox,
   filtrarLiderancaOperadorPlataforma,
+  hrefDepartamentoDoCanal,
   nomeCanalArea,
   rosterCanalArea,
   rosterCanalDepartamento,
@@ -118,6 +119,22 @@ describe('filtrarLiderancaOperadorPlataforma', () => {
         userIdsComVinculoLocal: [],
       }),
     ).toEqual(['a', 'b'])
+  })
+})
+
+describe('hrefDepartamentoDoCanal', () => {
+  it('sem slug não gera href; depto vai à home; área vai à ficha', () => {
+    expect(hrefDepartamentoDoCanal({})).toBeNull()
+    expect(hrefDepartamentoDoCanal({ departamentoSlug: null })).toBeNull()
+    expect(hrefDepartamentoDoCanal({ departamentoSlug: 'bandeiras' })).toBe(
+      '/portal/departamentos/bandeiras',
+    )
+    expect(
+      hrefDepartamentoDoCanal({
+        departamentoSlug: 'bandeiras',
+        departamentoAreaId: 'area-escala',
+      }),
+    ).toBe('/portal/departamentos/bandeiras/areas/area-escala')
   })
 })
 

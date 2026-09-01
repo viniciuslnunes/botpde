@@ -49,7 +49,7 @@ export default async function DepartamentosModuloLayout({ children }: { children
     <>
       <AdminPageHeader
         title="Departamentos"
-        description="Visão da torcida: abra um departamento para gerir áreas, equipe e projetos."
+        description="Áreas e projetos têm tela própria. Equipe, fila e o painel do domínio ficam aqui."
         icon={<Building2 className="h-5 w-5" />}
       />
 

@@ -185,7 +185,7 @@ export function NicknameField({
         Verificando disponibilidade…
       </p>
     ) : status.kind === 'available' ? (
-      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-success">
         <Check className="h-3.5 w-3.5" />
         {status.proprio ? 'Este é o seu apelido atual.' : '@ disponível'}
       </p>

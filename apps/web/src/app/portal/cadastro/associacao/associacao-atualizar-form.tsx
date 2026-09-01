@@ -13,8 +13,8 @@ import { toast } from '@torcida/ui'
 import {
   maskRg,
   maskTelefone,
+  montarOpcoesPlanoOnboarding,
   normalizarCpf,
-  PERIODICIDADE_PLANO_LABEL,
   validarCpfDigitos,
   validarRg,
 } from '@torcida/types'
@@ -33,6 +33,7 @@ import {
   completarDadosAssociacao,
   type CompletarAssociacaoState,
 } from './actions'
+import type { NivelVinculoView } from '@/lib/carteirinha-vinculo'
 
 export type ValoresAssociacaoForm = {
   numeroAssociado: string
@@ -54,6 +55,7 @@ export type ValoresAssociacaoForm = {
   responsavelDocumento: string
   dataExpedicaoIso: string
   periodicidadeAtual: string
+  planoAssociacaoId: string
   termoAceito: boolean
   anosSocio: string
 }
@@ -61,6 +63,8 @@ export type ValoresAssociacaoForm = {
 export type OperacaoView = {
   unidadeNome: string | null
   departamentoNome: string | null
+  /** Um nível na raiz; dois no Caso B (unidade × sede, papéis independentes). */
+  niveis: NivelVinculoView[]
   aprovadoEmLabel: string | null
   adimplente: boolean
   carteirinhaValidadeLabel: string | null
@@ -76,6 +80,7 @@ type Props = {
   tenantId: string
   valores: ValoresAssociacaoForm
   periodicidades: string[]
+  planos?: { id: string; nome: string; valor: number; periodicidade: string }[]
   exigirDocumentos: boolean
   temCarteirinha: boolean
   prefillOrigemNome?: string | null
@@ -280,6 +285,32 @@ function DadoLeitura({ label, value }: { label: string; value: string }) {
   )
 }
 
+function VinculoNiveis({ niveis }: { niveis: NivelVinculoView[] }) {
+  if (niveis.length === 0) return null
+  const dual = niveis.length > 1
+  return (
+    <div className="sm:col-span-2 grid grid-cols-1 gap-3">
+      {niveis.map((n) => (
+        <article
+          key={n.nivel}
+          className="rounded-xl border border-[rgb(var(--border)_/_0.7)] bg-[rgb(var(--background)_/_0.45)] px-3.5 py-3"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[rgb(var(--foreground-muted))]">
+            {n.rotulo}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[rgb(var(--foreground))]">{n.localNome}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground))]">{n.atuacao}</p>
+          {dual ? (
+            <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+              {n.situacaoLabel}
+            </p>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  )
+}
+
 function ProgressoBarra({ ok, total }: { ok: number; total: number }) {
   const pct = total > 0 ? Math.round((ok / total) * 100) : 0
   return (
@@ -313,6 +344,7 @@ export function AssociacaoAtualizarForm({
   tenantId,
   valores,
   periodicidades,
+  planos = [],
   exigirDocumentos,
   temCarteirinha,
   prefillOrigemNome,
@@ -348,9 +380,27 @@ export function AssociacaoAtualizarForm({
   const [residencia, setResidencia] = useState(valores.comprovanteResidenciaUrl)
   const [expedicao, setExpedicao] = useState(valores.dataExpedicaoIso)
   const [anosSocio, setAnosSocio] = useState(valores.anosSocio)
-  const [periodicidade, setPeriodicidade] = useState(
-    valores.periodicidadeAtual || periodicidades[0] || '',
+  const opcoesPlano = useMemo(
+    () => montarOpcoesPlanoOnboarding(periodicidades, planos),
+    [periodicidades, planos],
   )
+  const [chavePlano, setChavePlano] = useState(() => {
+    if (valores.planoAssociacaoId) {
+      const hit = `plano:${valores.planoAssociacaoId}`
+      if (opcoesPlano.some((o) => o.chave === hit)) return hit
+    }
+    if (valores.periodicidadeAtual) {
+      const doCiclo = opcoesPlano.filter((o) => o.periodicidade === valores.periodicidadeAtual)
+      if (doCiclo.length === 1) return doCiclo[0]!.chave
+      const per = `per:${valores.periodicidadeAtual}`
+      if (opcoesPlano.some((o) => o.chave === per)) return per
+    }
+    return opcoesPlano[0]?.chave ?? ''
+  })
+  const opcaoPlano = opcoesPlano.find((o) => o.chave === chavePlano)
+  const periodicidade =
+    opcaoPlano?.periodicidade ?? (valores.periodicidadeAtual || '')
+  const planoAssociacaoId = opcaoPlano?.planoAssociacaoId ?? ''
   const [cepBusy, startCep] = useTransition()
 
   const resumo = useMemo(() => {
@@ -411,6 +461,7 @@ export function AssociacaoAtualizarForm({
   }, [cpf, rg, numeroAssociado, cep, dataNascimento, temCarteirinha, expedicao])
 
   const podeSalvar = resumo.completo && formatosOk && !pending
+  const niveis = operacao.niveis ?? []
 
   const badgeCadastro = useMemo(() => {
     const ids: CompletudeItemId[] = [
@@ -637,6 +688,20 @@ export function AssociacaoAtualizarForm({
                     value={operacao.adimplente ? 'Adimplente' : 'Inadimplente'}
                   />
                   <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
+                  <DadoLeitura
+                    label={niveis.length > 1 ? 'Áreas' : 'Área'}
+                    value={
+                      niveis.length > 0
+                        ? niveis
+                            .map((n) =>
+                              niveis.length > 1
+                                ? `${n.atuacao} (${n.nivel === 'unidade' ? 'unidade' : 'sede'})`
+                                : n.atuacao,
+                            )
+                            .join(' · ')
+                        : (operacao.departamentoNome ?? '—')
+                    }
+                  />
                   <DadoLeitura
                     label="Nº da carteirinha"
                     value={operacao.carteirinhaNumeroLabel ?? 'Aguardando emissão'}
@@ -980,15 +1045,14 @@ export function AssociacaoAtualizarForm({
                   </div>
                   <div id="campo-periodicidadePretendida" className="sm:col-span-2">
                     <label htmlFor="campo-periodicidade-input" className="block space-y-1.5">
-                      <span className="block text-sm font-medium">Periodicidade / plano</span>
+                      <span className="block text-sm font-medium">Plano</span>
                       <span className="block text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
-                        Usado para calcular a validade da carteirinha digital.
+                        Ciclo da contribuição e, se a torcida cadastrou, o valor oficial.
                       </span>
                       <select
                         id="campo-periodicidade-input"
-                        name="periodicidadePretendida"
-                        value={periodicidade}
-                        onChange={(e) => setPeriodicidade(e.target.value)}
+                        value={chavePlano}
+                        onChange={(e) => setChavePlano(e.target.value)}
                         aria-invalid={faltandoIds.has('periodicidadePretendida') || undefined}
                         className={[
                           inputClass,
@@ -997,14 +1061,14 @@ export function AssociacaoAtualizarForm({
                             : '',
                         ].join(' ')}
                       >
-                        {periodicidades.map((p) => (
-                          <option key={p} value={p}>
-                            {PERIODICIDADE_PLANO_LABEL[
-                              p as keyof typeof PERIODICIDADE_PLANO_LABEL
-                            ] ?? p}
+                        {opcoesPlano.map((opcao) => (
+                          <option key={opcao.chave} value={opcao.chave}>
+                            {opcao.rotulo}
                           </option>
                         ))}
                       </select>
+                      <input type="hidden" name="periodicidadePretendida" value={periodicidade} />
+                      <input type="hidden" name="planoAssociacaoId" value={planoAssociacaoId} />
                     </label>
                   </div>
                   {temCarteirinha ? (
@@ -1035,13 +1099,13 @@ export function AssociacaoAtualizarForm({
               <div className="space-y-5">
                 <Secao
                   titulo="Vínculo na torcida"
-                  descricao="Somente leitura — alterações de unidade passam pela administração."
+                  descricao={
+                    niveis.length > 1
+                      ? 'Área e papel são independentes em cada nível — você pode ser gestor na unidade e membro na sede. Somente leitura: mudanças passam pela administração.'
+                      : 'Somente leitura — alterações de unidade passam pela administração.'
+                  }
                 >
-                  <DadoLeitura label="Unidade" value={operacao.unidadeNome ?? '—'} />
-                  <DadoLeitura
-                    label="Departamento pretendido"
-                    value={operacao.departamentoNome ?? '—'}
-                  />
+                  <VinculoNiveis niveis={niveis} />
                   <DadoLeitura label="Status" value={operacao.statusLabel} />
                   <DadoLeitura
                     label="Situação financeira"
@@ -1066,8 +1130,9 @@ export function AssociacaoAtualizarForm({
                   />
                 </Secao>
                 <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                  Para mudar unidade ou área, fale com a administração da torcida. Aqui o foco é
-                  completar a ficha para manter a vigência em dia.
+                  {niveis.length > 1
+                    ? 'Para mudar unidade, área ou papel, fale com a diretoria de cada nível — a da unidade efetiva a equipe dela; a da sede, a dela.'
+                    : 'Para mudar unidade ou área, fale com a administração da torcida. Aqui o foco é completar a ficha para manter a vigência em dia.'}
                 </p>
               </div>
             ) : null}
@@ -1109,6 +1174,7 @@ export function AssociacaoAtualizarForm({
           <input type="hidden" name="anosSocio" value={anosSocio} />
           <input type="hidden" name="dataExpedicaoCarteirinha" value={expedicao} />
           <input type="hidden" name="periodicidadePretendida" value={periodicidade} />
+          <input type="hidden" name="planoAssociacaoId" value={planoAssociacaoId} />
         </>
       ) : null}
 

@@ -13,11 +13,11 @@ export default async function SucessoPage({
 
   return (
     <div className="app-container max-w-2xl space-y-6 py-8">
-      <div className="flex items-start gap-4 rounded-2xl border border-emerald-300 bg-emerald-50 p-6 dark:border-emerald-800 dark:bg-emerald-950/50">
-        <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        <div>
-          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Torcida criada!</h1>
-          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+      <div className="flex items-start gap-4 rounded-2xl border alert-success">
+        <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-success" />
+        <div className="space-y-3">
+          <h1 className="portal-display text-xl text-[rgb(var(--foreground))]">Torcida criada!</h1>
+          <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
             O tenant foi criado com as roles de sistema (owner, admin, member) e você já foi
             atribuído como <strong className="text-[rgb(var(--foreground))]">owner</strong>.
           </p>

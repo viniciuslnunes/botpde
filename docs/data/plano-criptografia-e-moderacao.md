@@ -139,10 +139,10 @@ parcialmente cobertos pelo as-is estão anotados.
 
 | # | Item | Status | Nota as-is |
 |---|---|---|---|
-| P1 | Documento interno de **política de conteúdo** (proibido: CSAM, abuso sexual de menor, pornografia não consentida / exploração, ódio/racismo, etc.) e o que acontece em cada classe (ocultar, ban, retenção, reportar autoridade) | [ ] | Não existe doc dedicado no repo |
-| P2 | Papel do **super-admin vs moderador de tenant**: o que cada um pode ver em claro, em que fila, e quando a plataforma assume o caso | [ ] | Filas existem; política de fronteira não está escrita |
-| P3 | **Retenção** de conteúdo denunciado / removido (quanto tempo o plaintext/ciphertext+chave fica disponível para safety e para LGPD) | [ ] | Soft-delete / `oculto` existem; política de prazo não |
-| P4 | Fluxo **CSAM**: quem é acionado, o que se preserva, o que se apaga, se há obrigação de report externo — validado com assessoria jurídica (não improvisar na eng) | [ ] | Fora do código; bloqueia B se B tocar mídia/DM sem isso |
+| P1 | Documento interno de **política de conteúdo** (proibido: CSAM, abuso sexual de menor, pornografia não consentida / exploração, ódio/racismo, etc.) e o que acontece em cada classe (ocultar, ban, retenção, reportar autoridade) | [x] | **`docs/data/politica-de-conteudo.md` (2026-09-01)** — taxonomia com 30 categorias, escala S0–S4, matriz de resposta, strikes |
+| P2 | Papel do **super-admin vs moderador de tenant**: o que cada um pode ver em claro, em que fila, e quando a plataforma assume o caso | [x] | Escrito em `politica-de-conteudo.md` §5 — S4 é sempre da plataforma, com exposição minimizada ao moderador local |
+| P3 | **Retenção** de conteúdo denunciado / removido (quanto tempo o plaintext/ciphertext+chave fica disponível para safety e para LGPD) | [~] | Desenho pronto (`ConteudoPreservado.expiraEm`, padrão 180 d, leitura auditada); **prazo ainda precisa de aval jurídico** |
+| P4 | Fluxo **CSAM**: quem é acionado, o que se preserva, o que se apaga, se há obrigação de report externo — validado com assessoria jurídica (não improvisar na eng) | [~] | Fluxo técnico escrito em `politica-de-conteudo.md` §4 (preservar → escalar → comunicar). 🔴 **Destinatário formal e prazo continuam pendentes de assessoria** — é o bloqueio real |
 | P5 | Texto de produto/ToS/privacidade **não** promete E2EE; se mencionar criptografia, usa “proteção at-rest / da plataforma” alinhado à Fase B | [ ] | Evitar marketing mentiroso antes do ship |
 
 ### 2. Moderação no produto (funcional, ainda em plaintext)
@@ -150,9 +150,9 @@ parcialmente cobertos pelo as-is estão anotados.
 | # | Item | Status | Nota as-is |
 |---|---|---|---|
 | M1 | Denúncia de **post** e de **mensagem** com caminho ponta a ponta testado (criar → fila tenant → resolver/descartar; caminho SA) | [ ] | Fluxo existe; falta checklist de aceite / audit de regressão explícito para o gate |
-| M2 | **Categorias estruturadas** de denúncia (não só `motivo` String livre) cobrindo no mínimo: ódio/racismo, pornografia/sexual, abuso infantil/CSAM, assédio, outro — com prioridade/SLA na UI da fila | [ ] | Hoje `Denuncia.motivo` / `DenunciaMensagem.motivo` são texto livre |
-| M3 | Triagem: denúncias da classe CSAM / abuso infantil **sobem** para fila plataforma (ou flag imediata) e não ficam só no moderador local sem alerta | [ ] | SA já tem fila cross-tenant; falta routing por categoria |
-| M4 | `AuditLog` de resolução SA revisado: dá para responder “quem viu/agiu em quê” nas ações de moderação (`viaSuperAdmin` já grava nas actions) | [ ] | Parcial — confirmar cobertura e se há log de **leitura** sensível (hoje costuma logar mutação, não view) |
+| M2 | **Categorias estruturadas** de denúncia (não só `motivo` String livre) cobrindo no mínimo: ódio/racismo, pornografia/sexual, abuso infantil/CSAM, assédio, outro — com prioridade/SLA na UI da fila | [~] | **Especificado** em `docs/data/modulo-moderacao.md` (Fase 1, item 2) com `CategoriaViolacao` + SLA por gravidade. Ainda não implementado |
+| M3 | Triagem: denúncias da classe CSAM / abuso infantil **sobem** para fila plataforma (ou flag imediata) e não ficam só no moderador local sem alerta | [~] | **Especificado** — escalonamento automático de S4 (`ModeracaoCaso.escalado`), com auditoria `audit:moderacao`. Ainda não implementado |
+| M4 | `AuditLog` de resolução SA revisado: dá para responder “quem viu/agiu em quê” nas ações de moderação (`viaSuperAdmin` já grava nas actions) | [~] | Lacuna confirmada: hoje só se registra **mutação**, não leitura. `AcessoPreservadoLog` cobre a leitura de material sensível (spec Fase 1) |
 | M5 | Decisão explícita: na Fase B a moderação **continua desencriptando no server** (escrow). Sem isso, não é B — é C | [x] | Já decidido neste plano |
 
 ### 3. Ops / acesso ao dado em claro
@@ -248,3 +248,4 @@ Fan-out (`FeedTimeline` só com ids) em si é compatível; o problema é a
 |---|---|
 | 2026-08-07 | Análise; decisão de permanecer na Fase A; fases B/C documentadas para retomada |
 | 2026-08-07 | Gate “Pré-requisitos para abrir a Fase B” (checklists P/M/O/S/T) adicionado |
+| 2026-09-01 | Pesquisa de moderação (STF Tema 987, ECA Digital, benchmark de plataformas) → **P1 e P2 fechados**; P3/P4/M2/M3/M4 saem de vazio para especificados. Docs novos: `docs/knowledge/moderacao-plataformas.md`, `docs/data/politica-de-conteudo.md`, `docs/data/modulo-moderacao.md`; decisão em `ARCHITECTURE.md` §5.33. **Fase A segue** — nada aqui abre a Fase B |

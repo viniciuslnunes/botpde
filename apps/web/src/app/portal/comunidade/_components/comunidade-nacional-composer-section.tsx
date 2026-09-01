@@ -44,6 +44,7 @@ export async function ComunidadeNacionalComposerSection({
         cargoNome: autorBadges?.cargoNome ?? CARGO_TORCEDOR,
         departamentoNome: autorBadges?.departamentoNome ?? null,
         sedeNome: autorBadges?.sedeNome ?? null,
+        sedeTipo: autorBadges?.sedeTipo ?? null,
       }}
     />
   )

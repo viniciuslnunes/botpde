@@ -196,6 +196,11 @@ model Tenant {
 
   corPrimaria String   @default("#7c3aed") @map("cor_primaria")
 
+  /// Hex da cor de arquirrival (ex. verde Palmeiras na casa do Gavioes).
+  /// A UI da unidade nao pinta essa familia de hue. Null = padrao do catalogo
+  /// do clube, ou so a regra de verde de campo.
+  corArquirrival String? @map("cor_arquirrival")
+
   logoUrl     String?  @map("logo_url")
 
   /// Tema visual completo (marca, grade, superfícies claro/escuro). Ver TenantDesignSchema.
@@ -342,6 +347,8 @@ model Tenant {
   conversas         Conversa[]
 
   denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
+
+  moderacaoDenuncias ModeracaoDenuncia[]  @relation("ModeracaoDenunciaTenant")
 
   membroBloqueios   MembroBloqueio[]
 
@@ -619,6 +626,10 @@ model User {
   denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
 
   denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
+
+  moderacaoDenuncias           ModeracaoDenuncia[] @relation("ModeracaoDenunciaDenunciante")
+
+  moderacaoDenunciasResolvidas ModeracaoDenuncia[] @relation("ModeracaoDenunciaResolvidoPor")
 
   votosEnquetePost            VotoEnquetePost[]
 
@@ -3223,6 +3234,8 @@ model Afiliacao {
 
   forumTopicos       ForumTopico[]
 
+  moderacaoDenuncias ModeracaoDenuncia[] @relation("ModeracaoDenunciaAfiliacao")
+
   forumScoreSaldos  ForumScoreSaldo[]
 
   torcedores         PerfilTorcedor[]
@@ -3932,6 +3945,9 @@ model Comentario {
 
   conteudo  String
 
+  /// Ocultado por decisao de moderacao — some das listagens e da contagem.
+  oculto    Boolean  @default(false)
+
   criadoEm  DateTime @default(now()) @map("criado_em")
 
 
@@ -4265,6 +4281,9 @@ model MomentoStory {
   conteudo String?
 
 
+
+  /// Ocultado por decisao de moderacao — some dos rings e do player.
+  oculto   Boolean  @default(false)
 
   criadoEm DateTime @default(now()) @map("criado_em")
 
@@ -5029,7 +5048,9 @@ enum ForumEscopo {
 }
 
 enum ForumTopicoStatus {
+  PENDENTE
   VISIVEL
+  REJEITADO
   OCULTO
   REMOVIDO
 }
@@ -5094,7 +5115,9 @@ model ForumTopico {
   gostei          Int     @default(0)
   naoGostei       Int     @default(0) @map("nao_gostei")
   fixado          Boolean @default(false)
+  /// VISIVEL entra no ranking público. PENDENTE só autor + moderação.
   status          ForumTopicoStatus @default(VISIVEL)
+  rejeitadoMotivo String?           @map("rejeitado_motivo")
 
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
@@ -5157,6 +5180,109 @@ model PracaComentario {
 
   @@index([alvoTipo, alvoId, criadoEm])
   @@map("saas_praca_comentarios")
+}
+
+enum GravidadeViolacao {
+  S0
+  S1
+  S2
+  S3
+  S4
+}
+
+/// Taxonomia da politica de conteudo (docs/data/politica-de-conteudo.md 2.1-2.4).
+/// Os codigos sao os mesmos de CATEGORIAS_VIOLACAO em packages/types/src/moderacao.js.
+enum CategoriaViolacao {
+  CSAM
+  ALICIAMENTO_MENOR
+  AUTOLESAO
+  TERRORISMO
+  TRAFICO_PESSOAS
+  ATO_ANTIDEMOCRATICO
+  AMEACA_CRIVEL
+  NCII
+  RACISMO
+  ODIO_IDENTIDADE
+  VIOLENCIA_GENERO
+  INCITACAO_VIOLENCIA
+  ARMAS_ARTEFATOS
+  DOXXING
+  ASSEDIO
+  CONTEUDO_SEXUAL
+  FACCAO
+  DROGAS
+  PROVOCACAO_AGRESSIVA
+  PALAVRAO_PESADO
+  SPAM
+  GOLPE
+  DESINFORMACAO_DANOSA
+  IDENTIDADE_FALSA
+  VIOLENCIA_GRAFICA
+  PALAVRAO_LEVE
+  OFF_TOPIC
+  BAIXA_QUALIDADE
+}
+
+/// Toda superficie denunciavel do produto. Regra de projeto: superficie nova
+/// exige valor novo aqui — o registro ALVOS_MODERACAO
+/// (apps/web/src/lib/moderacao-alvos.ts) e Record<AlvoModeracao, AlvoSpec>,
+/// entao alvo sem tratamento vira erro de compilacao, nao buraco silencioso.
+enum AlvoModeracao {
+  POST
+  COMENTARIO
+  MENSAGEM
+  FORUM_TOPICO
+  FORUM_RESPOSTA
+  PRACA_COMENTARIO
+  STORY
+  MEMORIA_FATO
+  BRECHO_ANUNCIO
+  BRECHO_LOJA
+  COMUNICADO
+  EVENTO
+  PERFIL
+  GRUPO
+  CANAL
+  SALA
+}
+
+/// Denuncia sobre qualquer superficie do produto (AlvoModeracao). tenantId e
+/// nulo de proposito: superficie global (praca de escopo CLUBE) nao tem tenant
+/// dono e a fila e da plataforma. Gravidade, SLA e escalonamento derivam da
+/// categoria (packages/types/src/moderacao.js); S4 nasce escalado.
+model ModeracaoDenuncia {
+  id       String        @id @default(uuid())
+  alvoTipo AlvoModeracao @map("alvo_tipo")
+  alvoId   String        @map("alvo_id")
+
+  tenantId String? @map("tenant_id")
+  tenant   Tenant? @relation("ModeracaoDenunciaTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  afiliacaoId String?    @map("afiliacao_id")
+  afiliacao   Afiliacao? @relation("ModeracaoDenunciaAfiliacao", fields: [afiliacaoId], references: [id], onDelete: Cascade)
+
+  denuncianteId String @map("denunciante_id")
+  denunciante   User   @relation("ModeracaoDenunciaDenunciante", fields: [denuncianteId], references: [id], onDelete: Cascade)
+
+  categoria CategoriaViolacao
+  gravidade GravidadeViolacao
+  /// Complemento livre do denunciante — a categoria ja e o sinal estruturado.
+  motivo    String?
+  status    StatusDenuncia    @default(PENDENTE)
+  prazoSla  DateTime?         @map("prazo_sla")
+  /// S4 vai para a fila da plataforma sem depender do moderador do tenant.
+  escalado  Boolean           @default(false)
+
+  resolvidoPorId String?   @map("resolvido_por_id")
+  resolvidoPor   User?     @relation("ModeracaoDenunciaResolvidoPor", fields: [resolvidoPorId], references: [id], onDelete: SetNull)
+  resolvidoEm    DateTime? @map("resolvido_em")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, status, gravidade])
+  @@index([escalado, status, criadoEm])
+  @@index([alvoTipo, alvoId])
+  @@map("saas_moderacao_denuncias")
 }
 
 model ForumScoreEvento {

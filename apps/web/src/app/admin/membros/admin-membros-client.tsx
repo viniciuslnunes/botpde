@@ -18,6 +18,10 @@ import {
   type ListagemParams,
   type ListagemSpec,
 } from '@/lib/listagem'
+import {
+  formatCaixaAltaListagem,
+  formatTelefoneListagem,
+} from '@/lib/admin-listagem-format'
 import { MembroDetalheModal } from './membro-detalhe-modal'
 import type { AdminMembroItem } from './admin-membro-item'
 
@@ -38,69 +42,75 @@ const CELULA: Record<
       {membro.numeroAssociado?.trim() || '—'}
     </span>
   ),
-  nome: (membro) => (
-    <div className="flex items-center gap-3">
-      {membro.avatarUrl ? (
-        canOptimizeImageUrl(membro.avatarUrl) ? (
-          <Image
-            src={membro.avatarUrl}
-            alt={membro.nome}
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-full object-cover"
-          />
+  nome: (membro) => {
+    const telefone = formatTelefoneListagem(membro.telefone)
+    return (
+      <div className="flex items-center gap-3">
+        {membro.avatarUrl ? (
+          canOptimizeImageUrl(membro.avatarUrl) ? (
+            <Image
+              src={membro.avatarUrl}
+              alt={membro.nome}
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={membro.avatarUrl}
+              alt={membro.nome}
+              loading="lazy"
+              decoding="async"
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          )
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={membro.avatarUrl}
-            alt={membro.nome}
-            loading="lazy"
-            decoding="async"
-            className="h-8 w-8 rounded-full object-cover"
-          />
-        )
-      ) : (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-xs font-bold text-[rgb(var(--color-primary-fg))]">
-          {membro.inicial}
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-xs font-bold text-[rgb(var(--color-primary-fg))]">
+            {membro.inicial}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="truncate font-medium text-[rgb(var(--foreground))] group-hover:underline">
+            {membro.nome}
+          </p>
+          {telefone ? (
+            <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{telefone}</p>
+          ) : null}
+          <StatusBadge dominio="membro" status={membro.status} className="mt-1 sm:hidden" />
+          {membro.alertaRivalSocio && (
+            <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+              <TriangleAlert className="h-3 w-3 shrink-0" />
+              Sócio rival
+            </p>
+          )}
+          {!!membro.reprovacoesOutraTorcida && (
+            <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
+              <TriangleAlert className="h-3 w-3 shrink-0" />
+              Reprovado em torcida rival
+            </p>
+          )}
         </div>
-      )}
-      <div className="min-w-0">
-        <p className="truncate font-medium text-[rgb(var(--foreground))] group-hover:underline">
-          {membro.nome}
-        </p>
-        <StatusBadge dominio="membro" status={membro.status} className="mt-1 sm:hidden" />
-        {membro.alertaRivalSocio && (
-          <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-            <TriangleAlert className="h-3 w-3 shrink-0" />
-            Sócio rival
-          </p>
-        )}
-        {!!membro.reprovacoesOutraTorcida && (
-          <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
-            <TriangleAlert className="h-3 w-3 shrink-0" />
-            Reprovado em torcida rival
-          </p>
-        )}
       </div>
-    </div>
-  ),
+    )
+  },
   tipo: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.tipo}</span>
   ),
   departamento: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">
-      {membro.departamentoNome ?? '—'}
+      {formatCaixaAltaListagem(membro.departamentoNome) ?? '—'}
     </span>
   ),
   sede: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">
-      {membro.sedeNome ?? '—'}
+      {formatCaixaAltaListagem(membro.sedeNome) ?? '—'}
     </span>
   ),
   origem: (membro) => <MembroOrigemCell membro={membro} />,
   cidade: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">
-      {membro.cidade ?? '—'}
+      {formatCaixaAltaListagem(membro.cidade) ?? '—'}
     </span>
   ),
   status: (membro, { bloqueado }) => (

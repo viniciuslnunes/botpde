@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, FORUM_CORPO_MAX, tituloDeConteudoForum } from '@torcida/types'
 import {
   publicarPost,
   publicarEnquete,
@@ -166,11 +166,14 @@ interface FeedComposerProps {
    * exclusivo com `canal` / `nacional` / `comunicado`.
    */
   forum?: EscopoComunidade
+  /** UGC entra na fila; o botão e a prévia avisam. */
+  forumFilaAprovacao?: boolean
   /** Cargo/sede/depto do autor — prepend otimista no feed. */
   autorBadges?: {
     cargoNome: string | null
     departamentoNome: string | null
     sedeNome: string | null
+    sedeTipo?: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO' | null
   }
   /**
    * Quando `true`, publica um Comunicado oficial (admin) em vez de post de
@@ -198,6 +201,7 @@ export function FeedComposer({
   canal,
   nacional = false,
   forum,
+  forumFilaAprovacao = false,
   autorBadges,
   comunicado = false,
 }: FeedComposerProps) {
@@ -223,6 +227,7 @@ export function FeedComposer({
       canal={canal}
       nacional={nacional}
       forum={forum}
+      forumFilaAprovacao={forumFilaAprovacao}
       autorBadges={autorBadges}
       comunicado={comunicado}
     />
@@ -242,6 +247,7 @@ function FeedComposerActive({
   canal,
   nacional = false,
   forum,
+  forumFilaAprovacao = false,
   autorBadges,
   comunicado = false,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
@@ -324,6 +330,7 @@ function FeedComposerActive({
           nome: userName,
           avatarUrl: userAvatar,
           sedeNome: autorBadges?.sedeNome ?? null,
+          sedeTipo: autorBadges?.sedeTipo ?? null,
           cargoNome: autorBadges?.cargoNome ?? null,
           departamentoNome: autorBadges?.departamentoNome ?? null,
         },
@@ -409,9 +416,13 @@ function FeedComposerActive({
 
   useEffect(() => {
     if (!forum || !forumState.success || !forumState.topicoId) return
-    toast.success('Tópico publicado.')
+    toast.success(
+      forumState.pendente
+        ? 'Tópico enviado para aprovação.'
+        : 'Tópico publicado.',
+    )
     router.push(`/portal/comunidade/forum/${forumState.topicoId}?escopo=${forum}`)
-  }, [forum, forumState.success, forumState.token, forumState.topicoId, router])
+  }, [forum, forumState.pendente, forumState.success, forumState.token, forumState.topicoId, router])
 
   return (
     <div id="feed-composer" className="scroll-mt-24">
@@ -442,6 +453,7 @@ function FeedComposerActive({
       canal={canal}
       nacional={nacional}
       forum={forum}
+      forumFilaAprovacao={forumFilaAprovacao}
       comunicado={comunicado}
       onPrependOtimista={registrarPrependOtimista}
       serverError={
@@ -467,6 +479,63 @@ interface MediaItem {
   url: string | null
   progress: number
   error: string | null
+}
+
+function ForumComposerPreview({
+  userName,
+  userAvatar,
+  texto,
+  midias,
+  fila,
+}: {
+  userName: string | null
+  userAvatar: string | null
+  texto: string
+  midias: string[]
+  fila: boolean
+}) {
+  const titulo = tituloDeConteudoForum(texto)
+  const vazio = !texto.trim() && midias.length === 0
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Prévia — como o tópico aparece
+      </p>
+      {vazio ? (
+        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-8 text-center text-xs text-[rgb(var(--foreground-muted))]">
+          Escreva à esquerda. Foto, vídeo e texto aparecem aqui na hora.
+        </p>
+      ) : (
+        <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
+          <div className="flex items-center gap-2.5">
+            <Avatar nome={userName} avatarUrl={userAvatar} size="sm" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                {userName ?? 'Você'}
+              </p>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">agora</p>
+            </div>
+          </div>
+          {titulo ? (
+            <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</h3>
+          ) : null}
+          {texto.trim() ? (
+            <ExpandableText
+              conteudo={texto.trim()}
+              lines={6}
+              className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+            />
+          ) : null}
+          {midias.length > 0 ? <PostMedia urls={midias} caption={texto} /> : null}
+        </article>
+      )}
+      {fila ? (
+        <p className="mt-2 text-[11px] text-[rgb(var(--foreground-muted))]">
+          Entra na fila de aprovação deste canal antes de aparecer no ranking.
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 function ComposerBody({
@@ -496,6 +565,7 @@ function ComposerBody({
   canal,
   nacional = false,
   forum,
+  forumFilaAprovacao = false,
   comunicado = false,
   onPrependOtimista,
 }: {
@@ -525,6 +595,7 @@ function ComposerBody({
   canal?: CanalComposerAlvo
   nacional?: boolean
   forum?: EscopoComunidade
+  forumFilaAprovacao?: boolean
   comunicado?: boolean | ComunicadoEdicaoAlvo
   onPrependOtimista: (opts: {
     conteudo: string
@@ -541,7 +612,7 @@ function ComposerBody({
       : undefined
 
   const [expanded, setExpanded] = useState(
-    Boolean(eventoPreselecionado) || Boolean(comunicadoEdicao),
+    Boolean(forum) || Boolean(eventoPreselecionado) || Boolean(comunicadoEdicao),
   )
   const [modoEnquete, setModoEnquete] = useState(false)
   const [modoEvento, setModoEvento] = useState(Boolean(eventoPreselecionado))
@@ -595,6 +666,10 @@ function ComposerBody({
     if (comunicadoEdicao) {
       const ok = unsavedChangesCtx ? await unsavedChangesCtx.confirmDiscard() : true
       if (ok) comunicadoEdicao.onCancelar?.()
+      return
+    }
+    if (forum) {
+      router.push(`/portal/comunidade/forum?escopo=${forum}&aba=topicos`)
       return
     }
     setExpanded(false)
@@ -973,7 +1048,7 @@ function ComposerBody({
       }}
       className={[
         'card-soft relative min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4',
-        popoverAberto ? 'overflow-visible' : 'overflow-hidden',
+        (forum && expanded) || popoverAberto ? 'overflow-visible' : 'overflow-hidden',
       ].join(' ')}
     >
       <FileDropOverlay active={fileDrag.active} />
@@ -989,6 +1064,14 @@ function ComposerBody({
       )}
       {modoEvento && <input type="hidden" name="eventoId" value={eventoId} />}
 
+      <div
+        className={
+          forum && expanded
+            ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-start lg:gap-5'
+            : undefined
+        }
+      >
+      <div className="min-w-0">
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
         <div ref={composerFieldRef} className="relative min-w-0 flex-1 space-y-2">
@@ -1044,8 +1127,8 @@ function ComposerBody({
                   ref={textareaRef}
                   name="conteudo"
                   required
-                  maxLength={3000}
-                  rows={3}
+                  maxLength={forum ? FORUM_CORPO_MAX : 3000}
+                  rows={forum ? 6 : 3}
                   value={texto}
                   onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
                   onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
@@ -1300,6 +1383,18 @@ function ComposerBody({
                   A prévia aparece aqui conforme você escreve.
                 </p>
               )}
+            </div>
+          )}
+
+          {forum && (
+            <div className="mt-3 lg:hidden">
+              <ForumComposerPreview
+                userName={userName}
+                userAvatar={userAvatar}
+                texto={texto}
+                midias={finalMidias}
+                fila={forumFilaAprovacao}
+              />
             </div>
           )}
 
@@ -1826,7 +1921,9 @@ function ComposerBody({
                         : comunicado
                           ? 'Publicar comunicado'
                           : forum
-                            ? 'Publicar tópico'
+                            ? forumFilaAprovacao
+                              ? 'Enviar tópico'
+                              : 'Publicar tópico'
                           : modoEnquete
                             ? 'Publicar enquete'
                             : modoEvento
@@ -1839,6 +1936,19 @@ function ComposerBody({
           </m.div>
         )}
       </AnimatePresence>
+      </div>
+      {forum && expanded ? (
+        <aside className="mt-4 hidden min-w-0 lg:sticky lg:top-24 lg:mt-0 lg:block">
+          <ForumComposerPreview
+            userName={userName}
+            userAvatar={userAvatar}
+            texto={texto}
+            midias={finalMidias}
+            fila={forumFilaAprovacao}
+          />
+        </aside>
+      ) : null}
+      </div>
     </m.form>
   )
 }

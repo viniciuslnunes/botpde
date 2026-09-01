@@ -102,6 +102,7 @@ export async function ComunidadeNacionalShell({
           cargoNome: CARGO_TORCEDOR,
           departamentoNome: null,
           sedeNome: null,
+          sedeTipo: null,
         }}
       />
 
@@ -116,6 +117,7 @@ export async function ComunidadeNacionalShell({
                 key={post.id}
                 post={post}
                 showTenantBadge
+                contextoComunidadeNome={nomeClube}
                 currentUser={currentUser}
                 salvo={false}
               />

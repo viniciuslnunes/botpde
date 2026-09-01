@@ -116,7 +116,7 @@ export function UnidadeOnboardingCard({
         <span
           className={`absolute right-2 top-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full border backdrop-blur-sm ${
             selecionada
-              ? 'border-white bg-[rgb(var(--color-primary))] text-white'
+              ? 'border-white bg-[rgb(var(--color-primary))] text-primary-on'
               : 'border-white/40 bg-black/45 text-transparent'
           }`}
           aria-hidden

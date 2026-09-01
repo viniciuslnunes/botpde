@@ -48,6 +48,7 @@ export default async function RedeComunidadePage({
         initialPageInfo={pageInfo}
         initialCursor={params.cursor ?? null}
         salvoIds={[...salvoIds]}
+        contextoComunidadeNome={tenant.nome}
       />
     </div>
   )

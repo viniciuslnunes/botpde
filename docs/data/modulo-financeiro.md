@@ -57,7 +57,8 @@ Enums:
 - Backlog operacional: [`docs/product/backlog-caixa-operacional.md`](../product/backlog-caixa-operacional.md)
 - Admin: `/admin/financeiro` — **Direção** (inbox: inadimplência, caixa 7/30d,
   projetos estourados, despesas sem rateio). Lançamentos em
-  `/admin/financeiro/lancamentos`. Gate: manage OU (view + audit).
+  `/admin/financeiro/lancamentos`. Planos de sócio em `/admin/financeiro/planos`;
+  cadastro/edição de valor na tab **Novo plano**. Gate: manage OU (view + audit).
 - Schemas Zod: `packages/types/src/financeiro.js`
 - Lib: `apps/web/src/lib/financeiro.ts`, `financeiro-direcao.ts` (`React.cache`)
 - Programa de comando: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md)

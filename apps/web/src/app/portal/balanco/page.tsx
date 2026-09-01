@@ -205,7 +205,7 @@ export default async function PortalBalancoPage({ searchParams }: Props) {
                       <td className="px-4 py-3 font-medium text-[rgb(var(--foreground))]">
                         {rotuloCategoria(row.categoria)}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                      <td className="px-4 py-3 text-right tabular-nums text-success">
                         {formatarMoedaBRL(row.receitas)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400">
@@ -215,7 +215,7 @@ export default async function PortalBalancoPage({ searchParams }: Props) {
                         className={[
                           'px-4 py-3 text-right font-semibold tabular-nums',
                           row.saldo >= 0
-                            ? 'text-emerald-700 dark:text-emerald-400'
+                            ? 'text-success'
                             : 'text-red-600 dark:text-red-400',
                         ].join(' ')}
                       >

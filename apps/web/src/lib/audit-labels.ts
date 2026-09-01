@@ -118,6 +118,10 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   FONTE_VERIFICADA_REVOGADA: 'Fonte verificada revogada',
   TOPICO_FIXADO: 'Tópico do fórum fixado ou desafixado',
   TOPICO_OCULTO: 'Tópico do fórum ocultado',
+  FORUM_DENUNCIADO: 'Conteúdo do fórum denunciado',
+  DENUNCIA_FORUM_RESOLVIDA: 'Denúncia do fórum resolvida',
+  DENUNCIA_FORUM_DESCARTADA: 'Denúncia do fórum descartada',
+  DENUNCIA_FORUM_ESCALADA: 'Denúncia encaminhada para a plataforma',
 
   // Acesso / governança
   ACESSO_USUARIO_ATUALIZADO: 'Acesso de usuário atualizado',
@@ -195,6 +199,7 @@ export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
   Post: 'Post',
   Announcement: 'Comunicado',
   Denuncia: 'Denúncia',
+  ModeracaoDenuncia: 'Denúncia de moderação',
   Noticia: 'Notícia',
   ArtigoPortal: 'Artigo da praça',
   ForumTopico: 'Tópico do fórum',

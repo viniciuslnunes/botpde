@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatUnidadeLabel, nomesEquivalentes, unidadeRepeteTorcida } from '@/lib/torcida-labels'
+import { formatUnidadeLabel, nomeUnidadeEhSede, nomesEquivalentes, unidadeRepeteTorcida } from '@/lib/torcida-labels'
 
 describe('rótulo de unidade ao lado da torcida', () => {
   it('reconhece unidade promovida a tenant próprio (Caso B)', () => {
@@ -15,6 +15,11 @@ describe('rótulo de unidade ao lado da torcida', () => {
     expect(unidadeRepeteTorcida('Sede — Camisa 12', 'CAMISA 12')).toBe(true)
     expect(unidadeRepeteTorcida('Sede — Fúria Jovem do Botafogo', 'FÚRIA JOVEM DO BOTAFOGO')).toBe(true)
     expect(unidadeRepeteTorcida('Sede', 'CAMISA 12')).toBe(true)
+    expect(nomeUnidadeEhSede('Sede')).toBe(true)
+    expect(nomeUnidadeEhSede('Sede — Camisa 12')).toBe(true)
+    expect(nomeUnidadeEhSede('Sede Santos')).toBe(true)
+    expect(nomeUnidadeEhSede('PDE Praia Grande')).toBe(false)
+    expect(nomeUnidadeEhSede('GAVIÕES DA FIEL')).toBe(false)
   })
 
   it('mantém unidade que identifica um lugar próprio', () => {

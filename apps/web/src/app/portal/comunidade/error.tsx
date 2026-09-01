@@ -32,7 +32,7 @@ export default function ComunidadeError({
         <button
           type="button"
           onClick={() => reset()}
-          className="rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white"
+          className="rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-primary-on"
         >
           Tentar de novo
         </button>

@@ -19,6 +19,11 @@ import {
   podeVerTopicoNoEscopo,
   wherePracaNoEscopo,
   moderarTopicoSchema,
+  moderarRespostaSchema,
+  denunciarPracaSchema,
+  escalaParaPlataforma,
+  gravidadeDaCategoria,
+  prazoSlaDe,
 } from '@torcida/types'
 import { assertComunidadeNacional, assertNaoOperador } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
@@ -31,9 +36,16 @@ import {
   PESOS_PRACA,
   assertTetoSinaisPraca,
   podeModerarPraca,
+  podeAprovarPracaNaHora,
+  tenantModeracaoPraca,
   listarRespostasTopico,
 } from '@/lib/praca'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
+import {
+  excedeuLimiteEngajamento,
+  registrarAcaoEngajamento,
+} from '@/lib/engagement-rate-limit'
+import { notificarDenunciaModeracao } from '@/lib/notificacoes-routing'
 
 async function contextoEscopo(escopoParam: string | undefined) {
   const session = await auth()
@@ -81,17 +93,22 @@ type ComposerTopicoState = {
   success?: boolean
   token?: string
   topicoId?: string
+  pendente?: boolean
 }
 
 async function persistirTopico(opts: {
   userId: string
   escopo: 'nacional' | 'torcida' | 'unidade'
   ancora: { tenantId: string | null; afiliacaoId: string | null }
+  tenantModeracao: string | null
   titulo: string
   corpo: string
   midiaUrls: string[]
-}): Promise<{ id: string } | { error: string }> {
-  const { userId, escopo, ancora, titulo, corpo, midiaUrls } = opts
+}): Promise<{ id: string; pendente: boolean } | { error: string }> {
+  const { userId, escopo, ancora, tenantModeracao, titulo, corpo, midiaUrls } = opts
+  const naHora =
+    escopo === 'nacional' || (await podeAprovarPracaNaHora(userId, tenantModeracao))
+  const status = naHora ? 'VISIVEL' : 'PENDENTE'
 
   if (escopo === 'nacional') {
     const cn = await assertComunidadeNacional()
@@ -104,19 +121,22 @@ async function persistirTopico(opts: {
         titulo,
         corpo,
         midiaUrls,
+        status,
       },
     })
-    await registrarScorePraca({
-      userId,
-      ancora: { tenantId: null, afiliacaoId: cn.afiliacaoId },
-      sinal: 'topico',
-      peso: PESOS_PRACA.topico,
-      origemTipo: 'ForumTopico',
-      origemId: topico.id,
-      campo: 'topicos',
-    })
+    if (status === 'VISIVEL') {
+      await registrarScorePraca({
+        userId,
+        ancora: { tenantId: null, afiliacaoId: cn.afiliacaoId },
+        sinal: 'topico',
+        peso: PESOS_PRACA.topico,
+        origemTipo: 'ForumTopico',
+        origemId: topico.id,
+        campo: 'topicos',
+      })
+    }
     revalidatePath('/portal/comunidade/forum')
-    return { id: topico.id }
+    return { id: topico.id, pendente: status === 'PENDENTE' }
   }
 
   if (!ancora.tenantId) return { error: 'Canal sem tenant.' }
@@ -130,19 +150,22 @@ async function persistirTopico(opts: {
       titulo,
       corpo,
       midiaUrls,
+      status,
     },
   })
-  await registrarScorePraca({
-    userId,
-    ancora,
-    sinal: 'topico',
-    peso: PESOS_PRACA.topico,
-    origemTipo: 'ForumTopico',
-    origemId: topico.id,
-    campo: 'topicos',
-  })
+  if (status === 'VISIVEL') {
+    await registrarScorePraca({
+      userId,
+      ancora,
+      sinal: 'topico',
+      peso: PESOS_PRACA.topico,
+      origemTipo: 'ForumTopico',
+      origemId: topico.id,
+      campo: 'topicos',
+    })
+  }
   revalidatePath('/portal/comunidade/forum')
-  return { id: topico.id }
+  return { id: topico.id, pendente: status === 'PENDENTE' }
 }
 
 export async function criarTopicoAction(formData: FormData): Promise<{ ok: true; id: string } | { error: string }> {
@@ -153,11 +176,12 @@ export async function criarTopicoAction(formData: FormData): Promise<{ ok: true;
   if (!parsed.success) return { error: 'Título e texto são obrigatórios.' }
 
   try {
-    const { session, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    const { session, ctx, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
     const r = await persistirTopico({
       userId: session.user.id,
       escopo,
       ancora,
+      tenantModeracao: tenantModeracaoPraca(ancora, ctx),
       titulo: parsed.data.titulo,
       corpo: parsed.data.corpo,
       midiaUrls: [],
@@ -185,17 +209,18 @@ export async function criarTopicoComposerAction(
   if (!titulo) return { message: 'Escreva pelo menos 3 caracteres.' }
 
   try {
-    const { session, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    const { session, ctx, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
     const r = await persistirTopico({
       userId: session.user.id,
       escopo,
       ancora,
+      tenantModeracao: tenantModeracaoPraca(ancora, ctx),
       titulo,
       corpo: parsed.data.conteudo,
       midiaUrls: parsed.data.midias ?? [],
     })
     if ('error' in r) return { message: r.error }
-    return { success: true, token: crypto.randomUUID(), topicoId: r.id }
+    return { success: true, token: crypto.randomUUID(), topicoId: r.id, pendente: r.pendente }
   } catch (e) {
     return { message: e instanceof Error ? e.message : 'Não foi possível criar o tópico.' }
   }
@@ -226,7 +251,9 @@ export async function editarTopico(
       status: true,
     },
   })
-  if (!topico || topico.status !== 'VISIVEL') throw new ExpectedError('Tópico não encontrado.')
+  if (!topico || (topico.status !== 'VISIVEL' && topico.status !== 'PENDENTE')) {
+    throw new ExpectedError('Tópico não encontrado.')
+  }
   if (!podeVerTopicoNoEscopo(escopo, ancora, topico)) throw new ExpectedError('Tópico fora deste canal.')
   if (topico.autorId !== session.user.id) throw new ExpectedError('Só o autor edita o tópico.')
 
@@ -264,7 +291,9 @@ export async function excluirTopico(topicoId: string, escopoParam: string): Prom
       status: true,
     },
   })
-  if (!topico || topico.status !== 'VISIVEL') throw new ExpectedError('Tópico não encontrado.')
+  if (!topico || (topico.status !== 'VISIVEL' && topico.status !== 'PENDENTE')) {
+    throw new ExpectedError('Tópico não encontrado.')
+  }
   if (!podeVerTopicoNoEscopo(escopo, ancora, topico)) throw new ExpectedError('Tópico fora deste canal.')
   if (topico.autorId !== session.user.id) throw new ExpectedError('Só o autor exclui o tópico.')
 
@@ -422,7 +451,7 @@ export async function comentarTopicoFeed(
 
 export async function votarTopicoFeed(
   topicoId: string,
-  valor: 1 | 0,
+  valor: 1 | -1 | 0,
   escopoParam: string,
 ): Promise<{ ok: true } | { error: string }> {
   try {
@@ -475,22 +504,35 @@ export async function votarTopicoFeed(
         userId: session.user.id,
         alvoTipo: 'TOPICO',
         alvoId: topicoId,
-        valor: 1,
+        valor,
       },
-      update: { valor: 1 },
+      update: { valor },
     })
-    await aplicarDeltaVotoTopico(topicoId, 1, anterior?.valor ?? null)
+    await aplicarDeltaVotoTopico(topicoId, valor, anterior?.valor ?? null)
 
-    if (topico.autorId !== session.user.id && (!anterior || anterior.valor !== 1)) {
-      await registrarScorePraca({
-        userId: topico.autorId,
-        ancora,
-        sinal: 'gostei_recebido',
-        peso: PESOS_PRACA.gostei,
-        origemTipo: 'ForumTopico',
-        origemId: topicoId,
-        campo: 'gosteiRecebidos',
-      })
+    if (topico.autorId !== session.user.id) {
+      if (valor === 1 && anterior?.valor !== 1) {
+        await registrarScorePraca({
+          userId: topico.autorId,
+          ancora,
+          sinal: 'gostei_recebido',
+          peso: PESOS_PRACA.gostei,
+          origemTipo: 'ForumTopico',
+          origemId: topicoId,
+          campo: 'gosteiRecebidos',
+        })
+      }
+      if (valor === -1 && anterior?.valor !== -1) {
+        await registrarScorePraca({
+          userId: topico.autorId,
+          ancora,
+          sinal: 'nao_gostei_recebido',
+          peso: PESOS_PRACA.naoGostei,
+          origemTipo: 'ForumTopico',
+          origemId: topicoId,
+          campo: 'naoGosteiRecebidos',
+        })
+      }
     }
     if (!anterior) {
       await registrarScorePraca({
@@ -711,17 +753,30 @@ export async function moderarTopicoAction(
   const parsed = moderarTopicoSchema.safeParse({
     topicoId: formData.get('topicoId'),
     acao: formData.get('acao'),
+    motivo: formData.get('motivo') || undefined,
   })
   if (!parsed.success) return { error: 'Pedido inválido.' }
+  if (parsed.data.acao === 'rejeitar' && !parsed.data.motivo) {
+    return { error: 'Diga o motivo da recusa.' }
+  }
 
   try {
-    const { session, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
-    if (!(await podeModerarPraca(session.user.id, ancora.tenantId))) {
+    const { session, ctx, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    const tenantMod = tenantModeracaoPraca(ancora, ctx)
+    if (!(await podeModerarPraca(session.user.id, tenantMod))) {
       return { error: 'Sem permissão para moderar neste canal.' }
     }
     const topico = await db.forumTopico.findUnique({
       where: { id: parsed.data.topicoId },
-      select: { id: true, escopo: true, tenantId: true, afiliacaoId: true, status: true, fixado: true },
+      select: {
+        id: true,
+        escopo: true,
+        tenantId: true,
+        afiliacaoId: true,
+        status: true,
+        fixado: true,
+        autorId: true,
+      },
     })
     if (!topico || !podeVerTopicoNoEscopo(escopo, ancora, topico)) {
       return { error: 'Tópico fora deste canal.' }
@@ -732,6 +787,28 @@ export async function moderarTopicoAction(
         where: { id: topico.id },
         data: { status: 'OCULTO' },
       })
+    } else if (parsed.data.acao === 'aprovar') {
+      if (topico.status !== 'PENDENTE' && topico.status !== 'REJEITADO') {
+        return { error: 'Este tópico não está na fila.' }
+      }
+      await db.forumTopico.update({
+        where: { id: topico.id },
+        data: { status: 'VISIVEL', rejeitadoMotivo: null },
+      })
+      await registrarScorePraca({
+        userId: topico.autorId,
+        ancora,
+        sinal: 'topico',
+        peso: PESOS_PRACA.topico,
+        origemTipo: 'ForumTopico',
+        origemId: topico.id,
+        campo: 'topicos',
+      })
+    } else if (parsed.data.acao === 'rejeitar') {
+      await db.forumTopico.update({
+        where: { id: topico.id },
+        data: { status: 'REJEITADO', rejeitadoMotivo: parsed.data.motivo, fixado: false },
+      })
     } else {
       await db.forumTopico.update({
         where: { id: topico.id },
@@ -739,14 +816,27 @@ export async function moderarTopicoAction(
       })
     }
 
+    const acaoAudit =
+      parsed.data.acao === 'ocultar'
+        ? 'TOPICO_OCULTO'
+        : parsed.data.acao === 'aprovar'
+          ? 'TOPICO_APROVADO'
+          : parsed.data.acao === 'rejeitar'
+            ? 'TOPICO_REJEITADO'
+            : 'TOPICO_FIXADO'
+
     await db.auditLog.create({
       data: {
         tenantId: ancora.tenantId,
         atorId: session.user.id,
-        acao: parsed.data.acao === 'ocultar' ? 'TOPICO_OCULTO' : 'TOPICO_FIXADO',
+        acao: acaoAudit,
         entidade: 'ForumTopico',
         entidadeId: topico.id,
-        detalhes: { acao: parsed.data.acao, fixado: parsed.data.acao === 'fixar' ? !topico.fixado : undefined },
+        detalhes: {
+          acao: parsed.data.acao,
+          fixado: parsed.data.acao === 'fixar' ? !topico.fixado : undefined,
+          motivo: parsed.data.motivo,
+        },
       },
     })
     revalidatePath('/portal/comunidade/forum')
@@ -754,6 +844,255 @@ export async function moderarTopicoAction(
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível moderar.' }
+  }
+}
+
+export async function moderarRespostaAction(
+  formData: FormData,
+): Promise<{ ok: true } | { error: string }> {
+  const parsed = moderarRespostaSchema.safeParse({
+    respostaId: formData.get('respostaId'),
+    acao: formData.get('acao'),
+    motivo: formData.get('motivo') || undefined,
+  })
+  if (!parsed.success) return { error: 'Pedido inválido.' }
+  if (parsed.data.acao === 'rejeitar' && !parsed.data.motivo) {
+    return { error: 'Diga o motivo da recusa.' }
+  }
+
+  try {
+    const { session, ctx, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    const tenantMod = tenantModeracaoPraca(ancora, ctx)
+    if (!(await podeModerarPraca(session.user.id, tenantMod))) {
+      return { error: 'Sem permissão para moderar neste canal.' }
+    }
+    const resposta: {
+      id: string
+      oculto: boolean
+      topicoId: string
+      topico: {
+        escopo: 'CLUBE' | 'TORCIDA'
+        tenantId: string | null
+        afiliacaoId: string | null
+        status: string
+      }
+    } | null = await db.forumResposta.findUnique({
+      where: { id: parsed.data.respostaId },
+      select: {
+        id: true,
+        oculto: true,
+        topicoId: true,
+        topico: { select: { escopo: true, tenantId: true, afiliacaoId: true, status: true } },
+      },
+    })
+    if (!resposta || !podeVerTopicoNoEscopo(escopo, ancora, resposta.topico)) {
+      return { error: 'Resposta fora deste canal.' }
+    }
+
+    const oculto = parsed.data.acao === 'rejeitar'
+    await db.forumResposta.update({
+      where: { id: resposta.id },
+      data: { oculto },
+    })
+    if (oculto !== resposta.oculto) {
+      await db.forumTopico.update({
+        where: { id: resposta.topicoId },
+        data: { respostasCount: { increment: oculto ? -1 : 1 } },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        tenantId: ancora.tenantId,
+        atorId: session.user.id,
+        acao: oculto ? 'RESPOSTA_REJEITADA' : 'RESPOSTA_RESTAURADA',
+        entidade: 'ForumResposta',
+        entidadeId: resposta.id,
+        detalhes: { motivo: parsed.data.motivo, topicoId: resposta.topicoId },
+      },
+    })
+    revalidatePath(`/portal/comunidade/forum/${resposta.topicoId}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível moderar a resposta.' }
+  }
+}
+
+type AlvoDenunciaResolvido = {
+  autorId: string
+  /** Trecho curto que a fila mostra — nunca o conteúdo inteiro. */
+  trecho: string
+}
+
+/**
+ * Denúncia na praça (tópico, resposta e comentário) — a única superfície
+ * cross-tenant, e até aqui a única sem caminho de denúncia.
+ *
+ * Nunca lança: em produção, throw de Server Action vira HTTP 500 sem corpo.
+ * Gravidade, SLA e escalonamento saem das regras puras de `@torcida/types` —
+ * o cliente só escolhe a categoria.
+ */
+export async function denunciarPracaAction(
+  formData: FormData,
+): Promise<{ ok: true } | { error: string }> {
+  const parsed = denunciarPracaSchema.safeParse({
+    alvoTipo: formData.get('alvoTipo'),
+    alvoId: formData.get('alvoId'),
+    categoria: formData.get('categoria'),
+    motivo: formData.get('motivo') || undefined,
+  })
+  if (!parsed.success) return { error: 'Escolha um motivo para a denúncia.' }
+
+  try {
+    const { session, ctx, escopo, ancora } = await contextoEscopo(
+      String(formData.get('escopo') ?? ''),
+    )
+    const viewerId = session.user.id
+
+    let alvo: AlvoDenunciaResolvido | null = null
+
+    if (parsed.data.alvoTipo === 'FORUM_TOPICO') {
+      const topico: {
+        escopo: 'CLUBE' | 'TORCIDA'
+        tenantId: string | null
+        afiliacaoId: string | null
+        status: string
+        autorId: string
+        titulo: string
+        corpo: string
+      } | null = await db.forumTopico.findUnique({
+        where: { id: parsed.data.alvoId },
+        select: {
+          escopo: true,
+          tenantId: true,
+          afiliacaoId: true,
+          status: true,
+          autorId: true,
+          titulo: true,
+          corpo: true,
+        },
+      })
+      if (!topico || !podeVerTopicoNoEscopo(escopo, ancora, topico)) {
+        return { error: 'Tópico fora deste canal.' }
+      }
+      alvo = { autorId: topico.autorId, trecho: topico.titulo || topico.corpo }
+    } else if (parsed.data.alvoTipo === 'FORUM_RESPOSTA') {
+      const resposta: {
+        autorId: string
+        conteudo: string
+        topico: {
+          escopo: 'CLUBE' | 'TORCIDA'
+          tenantId: string | null
+          afiliacaoId: string | null
+          status: string
+        }
+      } | null = await db.forumResposta.findUnique({
+        where: { id: parsed.data.alvoId },
+        select: {
+          autorId: true,
+          conteudo: true,
+          topico: { select: { escopo: true, tenantId: true, afiliacaoId: true, status: true } },
+        },
+      })
+      if (!resposta || !podeVerTopicoNoEscopo(escopo, ancora, resposta.topico)) {
+        return { error: 'Resposta fora deste canal.' }
+      }
+      alvo = { autorId: resposta.autorId, trecho: resposta.conteudo }
+    } else {
+      const comentario: {
+        autorId: string
+        conteudo: string
+        alvoTipo: 'ARTIGO' | 'NOTICIA' | 'TOPICO' | 'RESPOSTA'
+        alvoId: string
+      } | null = await db.pracaComentario.findUnique({
+        where: { id: parsed.data.alvoId },
+        select: { autorId: true, conteudo: true, alvoTipo: true, alvoId: true },
+      })
+      if (!comentario) return { error: 'Comentário não encontrado.' }
+
+      if (comentario.alvoTipo === 'ARTIGO') {
+        const artigo: { tenantId: string; status: string } | null =
+          await db.artigoPortal.findUnique({
+            where: { id: comentario.alvoId },
+            select: { tenantId: true, status: true },
+          })
+        if (!artigo || !podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+          return { error: 'Comentário fora deste canal.' }
+        }
+      } else if (comentario.alvoTipo === 'NOTICIA') {
+        if (escopo !== 'nacional') return { error: 'Comentário fora deste canal.' }
+      } else {
+        return { error: 'Comentário fora deste canal.' }
+      }
+      alvo = { autorId: comentario.autorId, trecho: comentario.conteudo }
+    }
+
+    if (alvo.autorId === viewerId) {
+      return { error: 'Não é possível denunciar o próprio conteúdo.' }
+    }
+
+    const limiterKey = `report:praca:${escopo}:${viewerId}`
+    if (excedeuLimiteEngajamento(limiterKey)) {
+      return { error: 'Você atingiu o limite de denúncias por minuto.' }
+    }
+    registrarAcaoEngajamento(limiterKey)
+
+    const gravidade = gravidadeDaCategoria(parsed.data.categoria)
+    const escalado = escalaParaPlataforma(gravidade)
+    const prazoSla = prazoSlaDe(gravidade)
+    const tenantModeracao = tenantModeracaoPraca(ancora, ctx)
+    const motivo = parsed.data.motivo?.trim() || null
+
+    const denuncia: { id: string } = await db.moderacaoDenuncia.create({
+      data: {
+        alvoTipo: parsed.data.alvoTipo,
+        alvoId: parsed.data.alvoId,
+        tenantId: tenantModeracao,
+        afiliacaoId: ancora.afiliacaoId,
+        denuncianteId: viewerId,
+        categoria: parsed.data.categoria,
+        gravidade,
+        motivo,
+        prazoSla,
+        escalado,
+      },
+      select: { id: true },
+    })
+
+    await notificarDenunciaModeracao({
+      tenantId: tenantModeracao,
+      categoria: parsed.data.categoria,
+      motivo,
+      denuncianteUserId: viewerId,
+      escalado,
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenantModeracao,
+        atorId: viewerId,
+        acao: 'FORUM_DENUNCIADO',
+        entidade: 'ModeracaoDenuncia',
+        entidadeId: denuncia.id,
+        detalhes: {
+          alvoTipo: parsed.data.alvoTipo,
+          alvoId: parsed.data.alvoId,
+          categoria: parsed.data.categoria,
+          gravidade,
+          escalado,
+          escopo,
+          trecho: alvo.trecho.slice(0, 140),
+        },
+      },
+    })
+
+    revalidatePath('/admin/comunidade/moderacao')
+    // S4 (e escopo sem tenant) nasce na fila da plataforma — não espera o
+    // moderador local abrir o caso.
+    if (escalado || !tenantModeracao) revalidatePath('/super-admin/moderacao')
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível denunciar.' }
   }
 }
 

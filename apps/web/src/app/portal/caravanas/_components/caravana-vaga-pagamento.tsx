@@ -38,13 +38,13 @@ export function CaravanaVagaPagamento({
       </p>
 
       {cobranca?.status === 'PAGA' ? (
-        <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+        <p className="mt-3 text-sm font-medium text-success">
           Vaga paga — lugar garantido.
         </p>
       ) : cobranca && cobranca.status !== 'CANCELADA' ? (
         <Link
           href={`/portal/cobrancas/${cobranca.id}`}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90"
         >
           Pagar agora ({cobranca.status.toLowerCase()})
         </Link>
@@ -63,7 +63,7 @@ export function CaravanaVagaPagamento({
               if (res?.error) setError(res.error)
             })
           }}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Pagar vaga

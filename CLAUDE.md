@@ -160,6 +160,10 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
 - **Prisma / TypeScript**: **anote explicitamente o tipo de retorno** de queries novas
   (`const x: XLite[] = await db.modelo.findMany(...)`). A inferência automática quebra
   silenciosamente neste schema (ver `ARCHITECTURE.md` §5.2). Sem `any` (`no-any`).
+  **E o `tsc` não valida payload de escrita (medido 2026-09-01):** campo
+  inexistente no `data` de um `create`/`update` **passa limpo** na compilação.
+  Conferir campo a campo e valor de enum contra `schema.prisma` ao escrever
+  mutação nova — só auditoria de fluxo (`audit:*`, contra banco real) pega isso.
 - **Visibilidade**: use `resolveVisibility`/`canViewRecurso` de `packages/types/src/visibility.js`.
   `self`/`ancestor` = tudo; `descendant` e `allied` = só PÚBLICO; `unrelated` = nada.
 - **UX**: cubra estados de vazio, erro e loading. Formulários longos de
@@ -322,8 +326,9 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   (`lib/departamentos-portal-access.ts`); conhecimento canônico em
   `packages/types/src/departamento-areas-canonicas.js` (seed
   `seed:departamento-areas`, que nunca sobrescreve `ativa`/`nome`). Cockpit do
-  portal usa o loader `[slug]/_lib/contexto.ts` e mostra bloco sem permissão
-  como `blocked` com motivo, não escondido. Admin: `/admin/departamentos`
+  portal usa o loader `[slug]/_lib/contexto.ts`. Bloco sem permissão de
+  leitura não aparece (aba, contagem, painel) — quem não aprova a fila não
+  vê a aba Fila nem o número de pendentes. Admin: `/admin/departamentos`
   (gate `roles:manage`); pacotes de permissão seguem em `/admin/acessos`.
   Ver `ARCHITECTURE.md` §5.15.
   **Projetos / campanhas (2026-08-03):** `Projeto` + `ProjetoParticipante`
@@ -434,6 +439,24 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   **Criptografia vs moderação (2026-08-07):** Fase A (plaintext + ACL + filas);
   sem E2EE prometido; plano B/C em `docs/data/plano-criptografia-e-moderacao.md`
   e `ARCHITECTURE.md` §5.23.
+- **Moderação (2026-09-01)** — deixou de ser feature e virou requisito:
+  **STF Tema 987** impõe **dever de cuidado proativo** em discriminação/ódio
+  (sem o limiar de "risco sistêmico" que pouparia plataforma pequena), o
+  **ECA Digital** (Lei 15.211/2025, vigente desde 17/03/2026) exige preservação
+  de prova e comunicação às autoridades, e a **Lei 14.532/2023** agrava racismo
+  em contexto esportivo. Princípios do módulo: **rotular ≠ decidir** (sinal vs.
+  política, piso da plataforma que o tenant só endurece), **três ações**
+  (remover / reduzir alcance / informar) em vez de só `oculto`, **fila de
+  retenção**, AND com **Confiança** (§5.32) para escolher quem é classificado,
+  **devido processo** (autor notificado + recurso com revisor ≠ decisor) e
+  **preservar antes de remover**. Classificação por `claude-haiku-4-5` com a
+  política no system prompt sob `cache_control` — **não** usar Perspective API
+  (descontinuada após dez/2026); mídia pelos add-ons do Cloudinary. Superfície
+  nova de UGC **exige** entrada em `AlvoModeracao` — hoje só Post, DM e brechó
+  têm denúncia, e o fórum da praça (cross-tenant, torcidas rivais) não tem.
+  Spec: `docs/data/modulo-moderacao.md`; política normativa (e prompt do
+  classificador): `docs/data/politica-de-conteudo.md`; pesquisa e fontes:
+  `docs/knowledge/moderacao-plataformas.md`; decisão: `ARCHITECTURE.md` §5.33.
 - **Design** — personalização visual do tenant (`/admin/design`): marca, ações,
   grade `.app-shell-bg`, superfícies; paletas priorizam torcida→escudo→clube
   (3 cores; sem verde/rival forçado; P&B sem virar marrom); nav/badges usam

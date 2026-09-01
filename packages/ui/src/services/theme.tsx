@@ -25,6 +25,7 @@ import {
   resolveTenantDesign,
   resolverFillDaMarca,
   resolverSuperficies,
+  sanearAcoesContraRivalidade,
   SURFACE_CSS_VARS,
   SURFACE_TOKEN_KEYS,
   // Import direto do módulo, não do barrel: ThemeProvider está no root layout, e
@@ -34,7 +35,7 @@ import {
 /** Espelha TenantDesign de @torcida/types (JS) para tipagem no pacote UI. */
 export type TenantDesign = {
   version: 1
-  brand: { primary: string; secondary: string | null }
+  brand: { primary: string; secondary: string | null; arquirrival?: string | null }
   brandFg?: {
     primary: string | null
     secondary: string | null
@@ -155,7 +156,14 @@ function writeTenantDesignTokens(
   set('--color-secondary-on', hexToCssRgb(secondaryText.on))
   set('--secondary-fg', hexToCssRgb(secondaryText.fg))
 
-  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const actions = sanearAcoesContraRivalidade(
+    { ...DEFAULT_ACTIONS, ...design.actions },
+    {
+      corPrimaria: primary,
+      corArquirrival: design.brand.arquirrival,
+      design,
+    },
+  )
   const actionsFg = design.actionsFg ?? {}
   for (const key of ACTION_TOKEN_KEYS) {
     const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]

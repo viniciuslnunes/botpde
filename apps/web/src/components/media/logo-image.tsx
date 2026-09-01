@@ -48,6 +48,21 @@ export function LogoImage({
     .filter(Boolean)
     .join(' ')
 
+  if (!pronto) {
+    return (
+      <span
+        aria-hidden
+        className={[
+          className,
+          fill ? 'absolute inset-0 h-full w-full' : '',
+          'skeleton-track animate-pulse rounded-full',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      />
+    )
+  }
+
   if (canOptimizeImageUrl(src)) {
     return fill ? (
       <Image

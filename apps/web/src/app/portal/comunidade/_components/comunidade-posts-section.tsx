@@ -39,6 +39,7 @@ interface ComunidadePostsSectionProps {
   afiliacaoId?: string | null
   /** Sócio compartilha; torcedor só curte/comenta/salva. */
   podeCompartilhar?: boolean
+  contextoComunidadeNome?: string | null
 }
 
 export async function ComunidadePostsSection({
@@ -52,6 +53,7 @@ export async function ComunidadePostsSection({
   escopo = 'torcida',
   afiliacaoId,
   podeCompartilhar = true,
+  contextoComunidadeNome = null,
 }: ComunidadePostsSectionProps) {
   if (escopo === 'nacional' && afiliacaoId) {
     const feedOpts = { cursor, take: 20 }
@@ -77,6 +79,7 @@ export async function ComunidadePostsSection({
         initialCursor={cursor ?? null}
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
+        contextoComunidadeNome={contextoComunidadeNome}
       />
     )
   }
@@ -106,6 +109,7 @@ export async function ComunidadePostsSection({
         initialCursor={cursor ?? null}
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
+        contextoComunidadeNome={contextoComunidadeNome}
       />
     )
   }
@@ -123,6 +127,7 @@ export async function ComunidadePostsSection({
         initialCursor={cursor ?? null}
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
+        contextoComunidadeNome={contextoComunidadeNome}
       />
     )
   }
@@ -140,6 +145,7 @@ export async function ComunidadePostsSection({
         initialCursor={cursor ?? null}
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
+        contextoComunidadeNome={contextoComunidadeNome}
       />
     )
   }
@@ -161,6 +167,7 @@ export async function ComunidadePostsSection({
       initialCursor={cursor ?? null}
       salvoIds={[...salvoIds]}
       podeCompartilhar={podeCompartilhar}
+      contextoComunidadeNome={contextoComunidadeNome}
     />
   )
 }

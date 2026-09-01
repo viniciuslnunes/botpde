@@ -488,7 +488,7 @@ export function GrupoDetalheClient({
               type="button"
               disabled={pendingMembership}
               onClick={entrar}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
             >
               Entrar
             </button>
@@ -498,7 +498,7 @@ export function GrupoDetalheClient({
               type="button"
               disabled={pendingMembership}
               onClick={pedir}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
             >
               Pedir entrada
             </button>
@@ -705,7 +705,7 @@ export function GrupoDetalheClient({
                         type="button"
                         disabled={pendingPedidos && busyUserId === p.userId}
                         onClick={() => decidir(p.userId, true)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-primary-on disabled:opacity-50"
                       >
                         <Check className="h-3.5 w-3.5" />
                         Aprovar
@@ -887,7 +887,7 @@ export function GrupoDetalheClient({
                   </div>
                 </div>
               ) : (
-                <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50">
                   <Link2 className="h-4 w-4" /> Gerar link de convite
                 </button>
               )}

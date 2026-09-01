@@ -15,7 +15,9 @@ import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
   DEFAULT_ACTIONS,
   DEFAULT_ACTIONS_FG,
+  WASH_ACAO,
   contrasteTextoSobre,
+  mixHex,
   resolveActionTextColors,
   resolverSuperficies,
 } from '@torcida/types'
@@ -56,6 +58,17 @@ export type DesignStudioPreviewProps = {
 
 function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
   return resolverSuperficies(design, mode)
+}
+
+function softWashStyle(
+  surfaceHex: string,
+  fillHex: string,
+  fgHex: string,
+): CSSProperties {
+  return {
+    backgroundColor: mixHex(surfaceHex, fillHex, WASH_ACAO),
+    color: fgHex,
+  }
 }
 
 function Hotspot({
@@ -233,10 +246,7 @@ function PortalScene({
                     <Hotspot token="brand.primary" focus={focus} label="Badge primária">
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{
-                          backgroundColor: `${primaryFill}24`,
-                          color: primaryFg,
-                        }}
+                        style={softWashStyle(surfaces.surface, primaryFill, primaryFg)}
                       >
                         Sócio
                       </span>
@@ -244,10 +254,7 @@ function PortalScene({
                     <Hotspot token="brand.secondary" focus={focus} label="Badge secundária">
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{
-                          backgroundColor: `${secondaryFill}24`,
-                          color: secondaryFg,
-                        }}
+                        style={softWashStyle(surfaces.surface, secondaryFill, secondaryFg)}
                       >
                         Destaque
                       </span>
@@ -255,10 +262,7 @@ function PortalScene({
                     <Hotspot token="actions.info" focus={focus} label="Informativo">
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{
-                          backgroundColor: `${actions.info}24`,
-                          color: actionText('info').fg,
-                        }}
+                        style={softWashStyle(surfaces.surface, actionText('info').fill, actionText('info').fg)}
                       >
                         Aviso
                       </span>
@@ -395,9 +399,12 @@ function PortalScene({
                   <span
                     className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold"
                     style={{
-                      color: actionText('danger').fg,
-                      borderColor: `${actions.danger}44`,
-                      backgroundColor: `${actions.danger}1a`,
+                      ...softWashStyle(
+                        surfaces.surface,
+                        actionText('danger').fill,
+                        actionText('danger').fg,
+                      ),
+                      border: `1px solid ${actionText('danger').fill}66`,
                     }}
                   >
                     <X className="h-3 w-3" />
@@ -408,11 +415,11 @@ function PortalScene({
               <Hotspot token="actions.info" focus={focus} label="Informativo">
                 <p
                   className="mt-3 rounded-lg px-3 py-2 text-xs"
-                  style={{
-                    backgroundColor: `${actions.info}1a`,
-                    color: actionText('info').fg,
-                    border: `1px solid ${actions.info}44`,
-                  }}
+                  style={softWashStyle(
+                    surfaces.surface,
+                    actionText('info').fill,
+                    actionText('info').fg,
+                  )}
                 >
                   Informativo: caravana sai às 14h na sede.
                 </p>
@@ -532,9 +539,12 @@ function AdminScene({
                         <span
                           className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold"
                           style={{
-                            color: actionText('danger').fg,
-                            borderColor: `${actions.danger}44`,
-                            backgroundColor: `${actions.danger}1a`,
+                            ...softWashStyle(
+                              surfaces.surface,
+                              actionText('danger').fill,
+                              actionText('danger').fg,
+                            ),
+                            border: `1px solid ${actionText('danger').fill}66`,
                           }}
                         >
                           <X className="h-3 w-3" />
@@ -544,10 +554,11 @@ function AdminScene({
                       <Hotspot token="actions.warning" focus={focus} label="Badge pendente">
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                          style={{
-                            color: actionText('warning').fg,
-                            backgroundColor: `${actions.warning}24`,
-                          }}
+                          style={softWashStyle(
+                            surfaces.surface,
+                            actionText('warning').fill,
+                            actionText('warning').fg,
+                          )}
                         >
                           Pendente
                         </span>
@@ -555,10 +566,11 @@ function AdminScene({
                       <Hotspot token="actions.info" focus={focus} label="Badge informativo">
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                          style={{
-                            color: actionText('info').fg,
-                            backgroundColor: `${actions.info}24`,
-                          }}
+                          style={softWashStyle(
+                            surfaces.surface,
+                            actionText('info').fill,
+                            actionText('info').fg,
+                          )}
                         >
                           Informativo
                         </span>
@@ -724,7 +736,7 @@ export function DesignStudioPreview({
                 Antes (salvo)
               </span>
             ) : (
-              <span className="ml-2 rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+              <span className="ml-2 rounded-md bg-[rgb(var(--color-info)_/_0.15)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-info-fg))]">
                 Depois (rascunho)
               </span>
             )}

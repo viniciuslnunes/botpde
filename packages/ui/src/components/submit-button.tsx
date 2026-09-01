@@ -40,7 +40,7 @@ export function SubmitButton({
       type="submit"
       disabled={isDisabled}
       className={[
-        'flex items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60',
+        'btn-primary flex items-center justify-center gap-2 rounded-lg font-semibold disabled:opacity-60',
         fullWidth ? 'w-full rounded-xl px-6 py-3 text-sm' : 'px-5 py-2.5 text-sm',
       ].join(' ')}
     >

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { db } from '@torcida/db'
 import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
@@ -54,7 +55,7 @@ const PLANO_LABEL: Record<string, { nome: string; descricao: string; classe: str
   BASIC: {
     nome: 'Básico',
     descricao: 'Acesso a recursos essenciais',
-    classe: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    classe: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
   },
   PREMIUM: {
     nome: 'Premium',
@@ -326,6 +327,16 @@ export default async function ConfiguracoesGeralPage({
                     key={String(tenant.exigirDocumentosCadastro)}
                     exigir={tenant.exigirDocumentosCadastro}
                   />
+                  <p className="mb-4 text-sm text-[rgb(var(--foreground-muted))]">
+                    A oferta completa (ciclos, valor e vínculo do sócio) fica em{' '}
+                    <Link
+                      href="/admin/financeiro/planos"
+                      className="app-touch-line font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                    >
+                      Financeiro → Planos de sócio
+                    </Link>
+                    . Atalho abaixo para ligar ou desligar os ciclos do wizard.
+                  </p>
                   <PeriodicidadesOnboardingForm
                     key={periodicidadesOnboarding.join(',') || 'padrao'}
                     periodicidades={periodicidadesOnboarding}

@@ -58,9 +58,9 @@ export default async function AdminNotificacoesPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <MotionReveal>
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-[rgb(var(--foreground))]">Notificações</h1>
-            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+          <div className="space-y-3">
+            <h1 className="portal-display text-2xl text-[rgb(var(--foreground))]">Notificações</h1>
+            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
               Alertas operacionais desta torcida, do mais recente ao mais antigo.
             </p>
           </div>

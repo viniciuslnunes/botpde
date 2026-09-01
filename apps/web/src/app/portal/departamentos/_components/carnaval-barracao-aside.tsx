@@ -155,7 +155,7 @@ export function CarnavalBarracaoAside({
                     className={[
                       'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-xs',
                       done
-                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        ? 'border-[rgb(var(--color-success)_/_0.4)] bg-[rgb(var(--color-success)_/_0.1)] text-[rgb(var(--color-success-fg))]'
                         : critico
                           ? 'border-[rgb(var(--color-danger)_/_0.45)] text-[rgb(var(--color-danger-fg))]'
                           : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
@@ -169,7 +169,7 @@ export function CarnavalBarracaoAside({
                     ) : null}
                   </button>
                 ) : done ? (
-                  <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <Check className="h-4 w-4 text-success" />
                 ) : (
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">—</span>
                 )}

@@ -233,7 +233,7 @@ export function MensagensShell({
                     onClick={() => setModal('dm')}
                     whileTap={{ scale: 0.96 }}
                     transition={springSnappy}
-                    className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on hover:opacity-90"
                   >
                     Nova conversa
                   </m.button>
@@ -605,7 +605,7 @@ function NovaConversaModal({
                   conteudo: mensagemInicial.trim(),
                 })
               }
-              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {criando ? 'Enviando…' : 'Enviar solicitação'}
             </button>
@@ -733,7 +733,7 @@ function NovaConversaModal({
               whileTap={{ scale: 0.98 }}
               transition={springSnappy}
               onClick={() => void criarGrupo()}
-              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {criando ? 'Criando…' : `Criar grupo (${selecionados.length + 1} participantes)`}
             </m.button>

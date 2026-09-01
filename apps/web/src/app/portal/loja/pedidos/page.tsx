@@ -20,8 +20,8 @@ function formatarData(data: Date) {
 
 const STATUS_COR: Record<string, string> = {
   PENDENTE: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-  CONFIRMADO: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  ENTREGUE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+  CONFIRMADO: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
+  ENTREGUE: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
   CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
 }
 

@@ -31,6 +31,7 @@ import {
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { isCloudinaryUrl } from '@/lib/social-embed'
 import { notificarSafe } from '@/lib/notificacoes'
+import { corDepartamentoDoTenant } from '@/lib/cor-departamento'
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
@@ -43,9 +44,12 @@ export type ActionState = { ok?: boolean; error?: string }
 
 function revalidateEscoposArea(slug: string) {
   revalidatePath(`/portal/departamentos/${slug}`)
+  revalidatePath(`/portal/departamentos/${slug}/areas`, 'layout')
+  revalidatePath(`/portal/departamentos/${slug}/projetos`, 'layout')
   revalidatePath('/admin/departamentos')
   revalidatePath('/admin/departamentos/areas')
   revalidatePath('/admin/departamentos/equipes')
+  revalidatePath('/admin/departamentos/projetos')
 }
 
 async function assertPodeGerirArea(departamentoId: string) {
@@ -77,11 +81,11 @@ async function assertPodeGerirArea(departamentoId: string) {
   return { session, tenant }
 }
 
-/** Atualiza só a cor do ícone da área (hub / portal). */
+/** Atualiza só a cor do ícone da área (hub / portal). Recusa hue de arquirrival. */
 export async function atualizarCorDepartamento(
   departamentoId: string,
   cor: string,
-): Promise<void> {
+): Promise<{ ok: true; cor: string }> {
   const idParsed = IdSchema.safeParse(departamentoId)
   const corParsed = CorSchema.safeParse(cor)
   if (!idParsed.success || !corParsed.success) {
@@ -100,9 +104,11 @@ export async function atualizarCorDepartamento(
     throw new Error('Torcedor e Sócio não são departamentos')
   }
 
+  const corFinal = await corDepartamentoDoTenant(corParsed.data, tenant)
+
   await db.departamento.update({
     where: { id: depto.id },
-    data: { cor: corParsed.data },
+    data: { cor: corFinal },
   })
 
   await db.auditLog.create({
@@ -112,13 +118,14 @@ export async function atualizarCorDepartamento(
       acao: 'DEPARTAMENTO_COR_ATUALIZADA',
       entidade: 'Departamento',
       entidadeId: depto.id,
-      detalhes: { corAntes: depto.cor, cor: corParsed.data, slug: depto.slug },
+      detalhes: { corAntes: depto.cor, cor: corFinal, slug: depto.slug },
     },
   })
 
   revalidatePath('/portal/departamentos')
   revalidatePath(`/portal/departamentos/${depto.slug}`)
   revalidatePath('/admin/acessos')
+  return { ok: true, cor: corFinal }
 }
 
 export async function adicionarMembroArea(
@@ -293,7 +300,7 @@ export async function vincularCanalArea(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível vincular o canal' }
@@ -355,7 +362,7 @@ export async function toggleBarracaoItem(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     revalidatePath('/admin/carnaval')
     const { invalidateAdminDirecao } = await import('@/lib/admin-direcao-cache')
     invalidateAdminDirecao(tenant.id)
@@ -416,7 +423,7 @@ export async function salvarDesfileEm(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     revalidatePath('/admin/carnaval')
     const { invalidateAdminDirecao } = await import('@/lib/admin-direcao-cache')
     invalidateAdminDirecao(tenant.id)
@@ -592,7 +599,7 @@ export async function criarAreaDepartamento(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível criar a área' }
@@ -657,7 +664,7 @@ export async function atualizarAreaDepartamento(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar a área' }
@@ -701,7 +708,7 @@ export async function arquivarAreaDepartamento(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar a área' }
@@ -1123,7 +1130,7 @@ export async function toggleChecklistItemArea(
         },
       },
     })
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
@@ -1174,7 +1181,7 @@ export async function adicionarChecklistItemArea(
         detalhes: { itemId: result.item.id, label: result.item.label, area: area.nome },
       },
     })
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível adicionar' }
@@ -1222,7 +1229,7 @@ export async function removerChecklistItemArea(
         detalhes: { itemId: parsed.data.itemId, area: area.nome },
       },
     })
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível remover' }
@@ -1275,7 +1282,7 @@ export async function aplicarModeloChecklistArea(
         },
       },
     })
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível aplicar o modelo' }
@@ -1380,7 +1387,7 @@ export async function vincularCanalDepartamentoArea(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    revalidateEscoposArea(parsed.data.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível vincular o canal' }

@@ -309,7 +309,7 @@ export function LocationPickerFields({
         )}
 
         {(linkStatus === 'ok' || searchStatus === 'ok' || geoStatus === 'ok') && (
-          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+          <p className="text-xs text-success">
             Coordenadas atualizadas.
           </p>
         )}

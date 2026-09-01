@@ -278,10 +278,13 @@ Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).
 Materiais/Loja e Comunicação não ganham app próprio — copy + CTA para o módulo
 portal (`departamento-thin.js`) e widgets compostos (agenda, comunicados, pedidos).
 
-**Fase 5 — Cockpit:** cada home de área tem missão (registry), tabs por `?tab=`
-(Painel / Áreas / Projetos / Equipe / Fila / Pedidos), lista ranqueada de
-fluxos no Painel e painel de domínio na aba ativa. Detalhe:
-`proposta-departamentos-portal-admin.md` § Fase 5.
+**Fase 5 — Cockpit:** cada home de área tem missão (registry), tabs
+(Painel-com-rótulo-de-domínio / Áreas / Projetos / Equipe / Fila / Pedidos),
+lista ranqueada de fluxos no Painel e painel de domínio na aba ativa.
+Bandeiras, Patrimônio e Bateria abrem na primeira aba a **grade com foto**
+do acervo (mesmo card do admin): membro com `*:view` vê; CRUD só com
+`*:manage` — gestor de departamento sem a permissão de inventário não
+ganha botão de editar. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 
 **Onda 4 (MVP):** canal da área (auto-provisionado + sync de roster), vaga paga em caravana
 (`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).
@@ -343,24 +346,27 @@ renomeado/desativado). É semente, não trava: a torcida cria as próprias área
 
 - **Portal** — `/portal/departamentos/[slug]`: o gate e as flags saem de um
   loader único `getDepartamentoContexto` (`[slug]/_lib/contexto.ts`), no mesmo
-  padrão de `configuracoes/_lib/contexto.ts`. O cockpit usa o mesmo sistema de
-  tabs do admin (`AdminTabs` + `?tab=`): Painel (rótulo do domínio) · Áreas ·
-  Projetos · Equipe, mais Fila (Diretoria) e Pedidos (gestor). Só a aba visível
-  consulta o banco pesado; âncoras antigas (`#areas`, `#projetos`) redirecionam
-  para a query. Blocos que a pessoa não pode gerir aparecem **`blocked` com
-  motivo** (`DepartamentoSectionCard`), não somem — descoberta acima de
-  invisibilidade.
+  padrão de `configuracoes/_lib/contexto.ts`. O cockpit (Painel / Equipe / Fila
+  / Pedidos) usa `?tab=` na home. **Áreas** e **Projetos** são rotas próprias:
+  `/portal/departamentos/[slug]/areas` e `/projetos`, com ficha em
+  `/areas/[id]` e `/projetos/[id]`. `hrefHomeDepartamento` gera essas URLs;
+  `?tab=areas` / `?tab=projetos` e âncoras `#areas` / `#projetos` redirecionam.
+  Bloco sem permissão de leitura **não aparece** — nem aba, nem contagem, nem
+  card “só leitura”. Quem não pode ver o livro-caixa não vê o painel de
+  caixa; quem não aprova a fila não vê “3 pendentes”.
 - **Hub** — o card mostra missão, chips das áreas em que a pessoa atua e um KPI
   contextual, cada um gateado pela permissão correspondente.
-- **Admin** — módulo `/admin/departamentos` (tabs Visão / Áreas / Equipes),
-  gate `roles:manage`. O pacote de permissão segue em `/admin/acessos` e **não**
-  vira tab daqui — tab é etapa do próprio módulo (§5.12); o caminho para lá é um
-  link na Visão, travado por `admin-modulos.test.ts`. Gestor de departamento
-  comanda no admin pelo hub do domínio (`DEPARTAMENTO_MODULO_ADMIN_ROTA` +
-  item em `ADMIN_MENU` com `departamentoSlug`); o cockpit do portal continua
-  a execução do time (item 7: colaborador não abre operação admin).
-  Listagens declaradas em `lib/listagem/specs.ts`
-  (`LISTAGEM_DEPARTAMENTO_AREAS`, `LISTAGEM_DEPARTAMENTO_EQUIPES`).
+- **Admin** — módulo `/admin/departamentos` (tabs Visão / Áreas / Equipes /
+  Projetos), gate `roles:manage`. Áreas e Projetos são dashboards de saúde
+  (agrupados, com ação no lugar), não só tabela. O pacote de permissão segue
+  em `/admin/acessos` e **não** vira tab daqui — tab é etapa do próprio
+  módulo (§5.12); o caminho para lá é um link na Visão, travado por
+  `admin-modulos.test.ts`. Gestor de departamento comanda no admin pelo hub
+  do domínio (`DEPARTAMENTO_MODULO_ADMIN_ROTA` + item em `ADMIN_MENU` com
+  `departamentoSlug`); o cockpit do portal continua a execução do time
+  (item 7: colaborador não abre operação admin). Listagens declaradas em
+  `lib/listagem/specs.ts` (`LISTAGEM_DEPARTAMENTO_AREAS`,
+  `LISTAGEM_DEPARTAMENTO_EQUIPES`, `LISTAGEM_DEPARTAMENTO_PROJETOS`).
 
 ### Checklist por frente (`area.meta`, 2026-08-03+)
 
@@ -496,16 +502,18 @@ não é feature do Social.
 
 ### Superfícies
 
-Portal: aba `?tab=projetos` no cockpit, com filtro por área, barra de meta, barra
-de orçamento (vermelha no estouro), badge "Na janela" e **eventos da Agenda
-vinculados** (deep-link). **Abrir campanha do ano** (2026-08-03+): em área
-`sazonal` ativa, o gestor cria com um clique um `Projeto` `CAMPANHA` do ano
-corrente (`slug` = `{área}-{ano}`, janela 1º jan–31 dez, `recorrenteAnual`,
-status `ATIVO`/`PLANEJADO`) — sem auto-criar evento; idempotente. CTA na aba
-Áreas e atalho em Projetos. A **próxima ação** do cockpit (aba Painel) é uma
-lista ranqueada de receitas de domínio (`departamento-fluxos.js`). O loader
-monta fatos do tenant; o ranker corta por papel: **gestor** vê até 5 passos;
-**membro** vê 1 passo que a permissão dele cobre.
+Portal: `/portal/departamentos/[slug]/projetos` (lista de saúde) e
+`/projetos/[id]` (ficha). Links antigos `?tab=projetos` redirecionam. A lista
+mostra meta, orçamento (vermelho no estouro), atraso e “Na janela”; a ficha
+traz filtro por área, eventos da Agenda vinculados e cadastro. **Abrir campanha
+do ano** (2026-08-03+): em área `sazonal` ativa, o gestor cria com um clique um
+`Projeto` `CAMPANHA` do ano corrente (`slug` = `{área}-{ano}`, janela 1º jan–31
+dez, `recorrenteAnual`, status `ATIVO`/`PLANEJADO`) — sem auto-criar evento;
+idempotente. CTA na ficha da área e atalho em Projetos. A **próxima ação** do
+cockpit (aba Painel) é uma lista ranqueada de receitas de domínio
+(`departamento-fluxos.js`). O loader monta fatos do tenant; o ranker corta por
+papel: **gestor** vê até 5 passos; **membro** vê 1 passo que a permissão dele
+cobre.
 
 **Fase 2 — Ativar fluxo + 3 alavancas.** Cinco receitas materializam primitivas
 em um clique (sem tabela nova, sem conceder permissão): campanha do ano →

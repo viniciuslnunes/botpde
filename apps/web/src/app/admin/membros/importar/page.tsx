@@ -35,11 +35,11 @@ const STATUS_BADGE: Record<ImportacaoLite['status'], { label: string; className:
   },
   PROCESSANDO: {
     label: 'Processando',
-    className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    className: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
   },
   CONCLUIDA: {
     label: 'Concluída',
-    className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    className: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
   },
   ERRO: {
     label: 'Erro',

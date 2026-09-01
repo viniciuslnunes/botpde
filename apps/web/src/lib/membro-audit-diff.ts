@@ -19,6 +19,7 @@ export const CAMPO_MEMBRO_LABEL: Record<string, string> = {
   profissao: 'Profissão',
   dataNascimento: 'Data de nascimento',
   planoAssociacaoId: 'Plano de associação',
+  periodicidadePretendida: 'Periodicidade do plano',
   sexo: 'Sexo',
   estadoCivil: 'Estado civil',
   nacionalidade: 'Nacionalidade',
@@ -73,6 +74,8 @@ export const MEMBRO_DIFF_SELECT = {
   comprovanteResidenciaUrl: true,
   responsavelNome: true,
   responsavelDocumento: true,
+  periodicidadePretendida: true,
+  planoAssociacaoId: true,
   sedeId: true,
 } as const
 

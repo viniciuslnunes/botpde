@@ -176,6 +176,9 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
       '/admin/comunidade/moderacao',
     )
     expect(resolverTabHrefDeRota('/admin/afiliacoes')).toBe('/admin/afiliacoes')
+    expect(resolverTabHrefDeRota('/admin/financeiro/planos/novo')).toBe(
+      '/admin/financeiro/planos/novo',
+    )
   })
 
   it('nenhum cabeçalho de seção repete o nome do seu único item', () => {
@@ -283,6 +286,12 @@ describe('tabsPermitidasDoModulo', () => {
   it('sem nenhuma permissão do módulo não sobra etapa', () => {
     expect(tabsPermitidasDoModulo('comunidade', [])).toEqual([])
     expect(primeiraTabPermitida('comunidade', [])).toBeNull()
+  })
+
+  it('leitura do financeiro não vê a etapa de novo plano', () => {
+    const tabs = tabsPermitidasDoModulo('financeiro', [PERMISSIONS.FINANCE_VIEW])
+    expect(tabs.map((t) => t.id)).toContain('planos')
+    expect(tabs.map((t) => t.id)).not.toContain('planos-novo')
   })
 
   it('wildcard do super admin vê tudo', () => {

@@ -93,9 +93,16 @@ export default async function PerfilComunidadePage({
   const aba: PerfilAba = ABAS_VALIDAS.includes(abaRaw as PerfilAba) ? (abaRaw as PerfilAba) : 'publicacoes'
 
   const mesmoTenantViewer = Boolean(viewerTenant && viewerTenant.id === tenant.id)
-  type MembroAdminLite = { id: string }
+  type MembroAdminLite = {
+    id: string
+    nome: string
+    tipo: 'SOCIO' | 'TORCEDOR'
+    status: string
+    desligadoEm: Date | null
+  }
+  type SocioAdminLite = { validade: Date }
 
-  const [user, membro, socio, afiliacao, membroViewer] = await Promise.all([
+  const [user, membro, socio, afiliacao, membroViewer, socioViewer] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
       select: { id: true, nome: true, nickname: true, avatarUrl: true, email: true, criadoEm: true },
@@ -111,6 +118,7 @@ export default async function PerfilComunidadePage({
         discordTag: true,
         tipo: true,
         status: true,
+        desligadoEm: true,
         criadoEm: true,
         sede: { select: { nome: true } },
       },
@@ -129,17 +137,30 @@ export default async function PerfilComunidadePage({
       ? Promise.resolve(null as MembroAdminLite | null)
       : (db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: viewerTenant.id, userId } },
-          select: { id: true },
+          select: { id: true, nome: true, tipo: true, status: true, desligadoEm: true },
         }) as Promise<MembroAdminLite | null>),
+    mesmoTenantViewer || !viewerTenant
+      ? Promise.resolve(null as SocioAdminLite | null)
+      : (db.saasSocio.findUnique({
+          where: { tenantId_userId: { tenantId: viewerTenant.id, userId } },
+          select: { validade: true },
+        }) as Promise<SocioAdminLite | null>),
   ])
 
   if (!user) redirect('/portal/comunidade')
 
   const membroAdmin: MembroAdminLite | null = mesmoTenantViewer
     ? membro
-      ? { id: membro.id }
+      ? {
+          id: membro.id,
+          nome: membro.nome,
+          tipo: membro.tipo,
+          status: membro.status,
+          desligadoEm: membro.desligadoEm,
+        }
       : null
     : membroViewer
+  const socioAdmin = mesmoTenantViewer ? socio : socioViewer
 
   const superAdmin = isSuperAdminEmail(session.user.email)
   let podeVerFicha = superAdmin
@@ -157,6 +178,11 @@ export default async function PerfilComunidadePage({
     membroId: podeVerFicha ? (membroAdmin?.id ?? null) : null,
     userId,
     superAdmin,
+    tipo: membroAdmin?.tipo ?? null,
+    status: membroAdmin?.status ?? null,
+    nome: membroAdmin?.nome || user.nome,
+    desligadoEm: membroAdmin?.desligadoEm ?? null,
+    temCarteirinha: Boolean(socioAdmin),
   })
 
   const isSelf = session.user.id === userId
@@ -277,7 +303,7 @@ export default async function PerfilComunidadePage({
       <>
         {hrefAdmin ? <PerfilAdminLink href={hrefAdmin} /> : null}
         {!isSelf && podeSeguir && (
-          <SeguimentoButtons userId={userId} status={statusSeguimento} />
+          <SeguimentoButtons userId={userId} status={statusSeguimento} toolbar />
         )}
         {!isSelf &&
           mensageriaDisponivel &&

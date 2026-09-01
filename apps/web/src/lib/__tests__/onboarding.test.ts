@@ -67,6 +67,7 @@ vi.mock('@torcida/db', () => ({
     departamento: { findFirst: departamentoFindFirst },
     userDepartamento: { upsert: userDepartamentoUpsert },
     auditLog: { create: auditLogCreate },
+    planoAssociacao: { findMany: vi.fn(async () => []) },
     $transaction: transactionFn,
   },
   Prisma: {

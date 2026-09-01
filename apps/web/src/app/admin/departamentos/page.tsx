@@ -9,12 +9,29 @@ import {
   resolverModuloPortalDepartamento,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
-import { InsightSection, KpiGrid, StatCard } from '@/components/admin/ui'
+import { parseAcervoTab } from '@/lib/acervo-tab'
+import { comCorDepartamento } from '@/lib/cor-departamento'
+import { AdminTabs, adminTabIds, KpiGrid, StatCard, type AdminTabItem } from '@/components/admin/ui'
 import { MiniBarChart } from '@/components/admin/charts'
-import { AlertTriangle, ArrowRight, KeyRound, Layers, ShieldCheck, UserMinus, Users } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  KeyRound,
+  Layers,
+  ShieldCheck,
+  UserMinus,
+  Users,
+} from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Departamentos · Visão' }
+
+const BASE_PATH = '/admin/departamentos'
+const PARAM_TAB = 'tab'
+const VISAO_TABS = ['departamentos', 'distribuicao', 'pendencias'] as const
+const ICONE_TAB = 'h-4 w-4 shrink-0'
 
 type DeptoRow = {
   id: string
@@ -32,8 +49,15 @@ type Pendencia = {
   href: string
 }
 
-export default async function DepartamentosVisaoPage() {
+export default async function DepartamentosVisaoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   const { tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
+  const sp = await searchParams
+  const tab = parseAcervoTab(sp.tab, VISAO_TABS, 'departamentos')
+  const { tabId, panelId } = adminTabIds(PARAM_TAB, tab)
 
   type AreaRow = {
     id: string
@@ -80,7 +104,9 @@ export default async function DepartamentosVisaoPage() {
     }),
   ])
 
-  const deptos = deptosRaw.filter((d) => !isDepartamentoLegado(d))
+  const deptos = (await comCorDepartamento(deptosRaw, tenant)).filter(
+    (d) => !isDepartamentoLegado(d),
+  )
   const deptoPorId = new Map(deptos.map((d) => [d.id, d]))
   const areasDoTenant = areas.filter((a) => deptoPorId.has(a.departamentoId))
   const areasAtivas = areasDoTenant.filter((a) => a.ativa)
@@ -113,7 +139,7 @@ export default async function DepartamentosVisaoPage() {
   )
 
   const pendencias: Pendencia[] = []
-  for (const a of areasSemResponsavel.slice(0, 6)) {
+  for (const a of areasSemResponsavel) {
     const depto = deptoPorId.get(a.departamentoId)
     pendencias.push({
       id: `area-${a.id}`,
@@ -122,7 +148,7 @@ export default async function DepartamentosVisaoPage() {
       href: `/admin/departamentos/areas?q=${encodeURIComponent(a.nome)}`,
     })
   }
-  for (const d of deptosSemGestor.slice(0, 4)) {
+  for (const d of deptosSemGestor) {
     pendencias.push({
       id: `gestor-${d.id}`,
       titulo: `${d.nome} está sem gestor`,
@@ -130,7 +156,7 @@ export default async function DepartamentosVisaoPage() {
       href: '/admin/acessos?secao=pessoas',
     })
   }
-  for (const d of deptosSemArea.slice(0, 4)) {
+  for (const d of deptosSemArea) {
     pendencias.push({
       id: `sem-area-${d.id}`,
       titulo: `${d.nome} não tem áreas de atuação`,
@@ -138,6 +164,29 @@ export default async function DepartamentosVisaoPage() {
       href: hrefHomeDepartamento(d.slug, 'areas'),
     })
   }
+
+  const visaoTabs: AdminTabItem[] = [
+    {
+      id: 'departamentos',
+      label: 'Departamentos',
+      icon: <Building2 className={ICONE_TAB} />,
+    },
+    {
+      id: 'distribuicao',
+      label: 'Distribuição',
+      icon: <BarChart3 className={ICONE_TAB} />,
+    },
+    {
+      id: 'pendencias',
+      label: 'Pendências',
+      icon: <AlertTriangle className={ICONE_TAB} />,
+      count: pendencias.length,
+      countClass:
+        pendencias.length > 0
+          ? 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]'
+          : undefined,
+    },
+  ]
 
   const grafico = deptos
     .map((d) => ({
@@ -194,7 +243,7 @@ export default async function DepartamentosVisaoPage() {
           value={areasSemResponsavel.length}
           tone={areasSemResponsavel.length > 0 ? 'warning' : 'default'}
           icon={<AlertTriangle className="h-5 w-5" />}
-          href="/admin/departamentos/areas"
+          href={`${BASE_PATH}?${PARAM_TAB}=pendencias`}
         />
       </KpiGrid>
 
@@ -211,105 +260,113 @@ export default async function DepartamentosVisaoPage() {
         — área organiza gente, departamento autoriza.
       </p>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Departamentos</h2>
-          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Unidade de trabalho. Abra o departamento para gerir áreas, equipe e projetos.
-          </p>
-        </div>
-        {cards.length === 0 ? (
-          <p className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum departamento nesta torcida.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map((d) => (
-              <li key={d.id} className="min-w-0">
-                <DeptoResumoCard depto={d} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <AdminTabs
+        tabs={visaoTabs}
+        basePath={BASE_PATH}
+        activeId={tab}
+        paramKey={PARAM_TAB}
+      />
 
-      <InsightSection
-        title="Distribuição da torcida"
-        description="Pessoas na equipe de cada departamento e quantas áreas de atuação ele mantém ativas."
-      >
-        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          {grafico.length > 0 ? (
-            <MiniBarChart
-              data={grafico}
-              formato="unidades"
-              legenda={{ principal: 'Pessoas', secundaria: 'Áreas ativas' }}
-            />
-          ) : (
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhum departamento tem equipe ainda. Inclua pessoas em{' '}
-              <Link href="/admin/acessos?secao=pessoas" className="underline">
-                Acessos · Pessoas
-              </Link>
-              .
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-3">
+        {tab === 'departamentos' ? (
+          <>
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Unidade de trabalho. Abra o departamento para gerir áreas, equipe e projetos.
             </p>
-          )}
-        </div>
-      </InsightSection>
+            {cards.length === 0 ? (
+              <p className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                Nenhum departamento nesta torcida.
+              </p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {cards.map((d) => (
+                  <li key={d.id} className="min-w-0">
+                    <DeptoResumoCard depto={d} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : null}
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Pendências de organização
-          </h2>
-          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            O que está incompleto na estrutura — clique para resolver no departamento.
-          </p>
-        </div>
-
-        {pendencias.length === 0 ? (
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center">
-            <ShieldCheck className="mx-auto h-8 w-8 text-[rgb(var(--color-success-fg))]" aria-hidden />
-            <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">
-              Estrutura completa.
+        {tab === 'distribuicao' ? (
+          <>
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Pessoas na equipe de cada departamento e quantas áreas de atuação ele mantém ativas.
             </p>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Todo departamento tem gestor e toda área ativa tem responsável.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {pendencias.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={p.href}
-                  className="flex items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.45)]"
-                >
-                  <AlertTriangle
-                    className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-warning-fg))]"
-                    aria-hidden
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
-                      {p.titulo}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
-                      {p.detalhe}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              {grafico.length > 0 ? (
+                <MiniBarChart
+                  data={grafico}
+                  formato="unidades"
+                  legenda={{ principal: 'Pessoas', secundaria: 'Áreas ativas' }}
+                />
+              ) : (
+                <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                  Nenhum departamento tem equipe ainda. Inclua pessoas em{' '}
+                  <Link href="/admin/acessos?secao=pessoas" className="underline">
+                    Acessos · Pessoas
+                  </Link>
+                  .
+                </p>
+              )}
+            </div>
+          </>
+        ) : null}
 
-        {semArea.length > 0 && (
-          <p className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 text-xs text-[rgb(var(--foreground-muted))]">
-            <UserMinus className="h-4 w-4 shrink-0" aria-hidden />
-            {semArea.length} {semArea.length === 1 ? 'pessoa está' : 'pessoas estão'} em um
-            departamento sem participar de nenhuma área dele.
-          </p>
-        )}
-      </section>
+        {tab === 'pendencias' ? (
+          <>
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              O que está incompleto na estrutura — clique para resolver no departamento.
+            </p>
+            {pendencias.length === 0 ? (
+              <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center">
+                <ShieldCheck
+                  className="mx-auto h-8 w-8 text-[rgb(var(--color-success-fg))]"
+                  aria-hidden
+                />
+                <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">
+                  Estrutura completa.
+                </p>
+                <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                  Todo departamento tem gestor e toda área ativa tem responsável.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {pendencias.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={p.href}
+                      className="flex items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.45)]"
+                    >
+                      <AlertTriangle
+                        className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-warning-fg))]"
+                        aria-hidden
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                          {p.titulo}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                          {p.detalhe}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {semArea.length > 0 ? (
+              <p className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 text-xs text-[rgb(var(--foreground-muted))]">
+                <UserMinus className="h-4 w-4 shrink-0" aria-hidden />
+                {semArea.length} {semArea.length === 1 ? 'pessoa está' : 'pessoas estão'} em um
+                departamento sem participar de nenhuma área dele.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -364,7 +421,7 @@ function DeptoResumoCard({ depto }: { depto: DeptoResumo }) {
       <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
         <Link
           href={depto.homeHref}
-          className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-3 text-sm font-medium text-white hover:opacity-90"
+          className="app-action btn-primary inline-flex items-center gap-1 rounded-lg px-3 text-sm font-medium"
         >
           Abrir
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

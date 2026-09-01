@@ -11,9 +11,16 @@ import {
   faixaEngajamentoTopico,
   parseOrdemTopico,
   parseJanelaRanking,
+  parseForumAba,
   LIMIAR_RANKING_PRACA,
   tituloDeConteudoForum,
   FORUM_TITULO_MAX,
+  wilsonLowerBound,
+  scoreHotTopico,
+  rankTopicosHot,
+  resumoDeCorpoForum,
+  podeVerStatusTopico,
+  whereTopicosNaListagem,
 } from '@torcida/types'
 
 describe('isolamento da praça (notícias/fórum)', () => {
@@ -87,10 +94,118 @@ describe('isolamento da praça (notícias/fórum)', () => {
   })
 
   it('query de listagem/ranking tem default estável', () => {
-    expect(parseOrdemTopico(undefined)).toBe('recentes')
-    expect(parseOrdemTopico('populares')).toBe('populares')
+    expect(parseOrdemTopico(undefined)).toBe('em_alta')
+    expect(parseOrdemTopico('populares')).toBe('em_alta')
+    expect(parseOrdemTopico('recentes')).toBe('recentes')
     expect(parseJanelaRanking('semana')).toBe('semana')
+    expect(parseForumAba(undefined)).toBe('topicos')
+    expect(parseForumAba('ranking')).toBe('ranking')
+    expect(parseForumAba(undefined, '1')).toBe('novo')
     expect(LIMIAR_RANKING_PRACA).toBe(5)
+  })
+
+  it('Wilson não deixa 1 voto positivo passar na frente de consenso', () => {
+    expect(wilsonLowerBound(1, 0)).toBeLessThan(wilsonLowerBound(48, 2))
+    expect(wilsonLowerBound(0, 0)).toBe(0)
+  })
+
+  it('tópico quente sobe; rejeição positiva pesa; mídia dá boost', () => {
+    const agora = new Date('2026-09-01T12:00:00Z')
+    const fresco = {
+      gostei: 12,
+      naoGostei: 1,
+      respostasCount: 8,
+      criadoEm: new Date('2026-09-01T06:00:00Z'),
+      midiaUrls: ['https://cdn.example/a.jpg'],
+    }
+    const velho = {
+      gostei: 12,
+      naoGostei: 1,
+      respostasCount: 8,
+      criadoEm: new Date('2026-07-01T06:00:00Z'),
+      midiaUrls: [],
+    }
+    const odiado = {
+      gostei: 2,
+      naoGostei: 20,
+      respostasCount: 30,
+      criadoEm: new Date('2026-09-01T06:00:00Z'),
+      midiaUrls: [],
+    }
+    expect(scoreHotTopico(fresco, agora)).toBeGreaterThan(scoreHotTopico(velho, agora))
+    expect(scoreHotTopico(fresco, agora)).toBeGreaterThan(scoreHotTopico(odiado, agora))
+  })
+
+  it('rank em alta: pendente acima, fixado acima, depois score', () => {
+    const agora = new Date('2026-09-01T12:00:00Z')
+    const ranked = rankTopicosHot(
+      [
+        {
+          id: 'frio',
+          status: 'VISIVEL',
+          fixado: false,
+          gostei: 0,
+          naoGostei: 0,
+          respostasCount: 0,
+          criadoEm: agora,
+          atualizadoEm: agora,
+        },
+        {
+          id: 'quente',
+          status: 'VISIVEL',
+          fixado: false,
+          gostei: 20,
+          naoGostei: 1,
+          respostasCount: 10,
+          criadoEm: agora,
+          atualizadoEm: agora,
+          midiaUrls: ['https://cdn.example/a.jpg'],
+        },
+        {
+          id: 'fila',
+          status: 'PENDENTE',
+          fixado: false,
+          gostei: 0,
+          naoGostei: 0,
+          respostasCount: 0,
+          criadoEm: agora,
+          atualizadoEm: agora,
+        },
+      ],
+      agora,
+    )
+    expect(ranked.map((t) => t.id)).toEqual(['fila', 'quente', 'frio'])
+  })
+
+  it('resumo do tópico pula a linha do título', () => {
+    expect(resumoDeCorpoForum('Bora', 'Bora\nQuem vai no jogo?')).toBe('Quem vai no jogo?')
+    expect(resumoDeCorpoForum('Bora', 'Bora')).toBeNull()
+  })
+
+  it('pendente/rejeitado só autor ou moderação vê', () => {
+    expect(podeVerStatusTopico('VISIVEL', { autorId: 'a' })).toBe(true)
+    expect(podeVerStatusTopico('PENDENTE', { autorId: 'a', userId: 'x' })).toBe(false)
+    expect(podeVerStatusTopico('PENDENTE', { autorId: 'a', userId: 'a' })).toBe(true)
+    expect(podeVerStatusTopico('REJEITADO', { autorId: 'a', userId: 'm', podeModerar: true })).toBe(
+      true,
+    )
+  })
+
+  it('listagem mistura VISIVEL com fila do autor/moderação', () => {
+    const w = whereTopicosNaListagem(
+      'torcida',
+      { tenantId: 'sede', afiliacaoId: 'sccp' },
+      { userId: 'u1', podeModerar: true },
+    )
+    expect(w.escopo).toBe('TORCIDA')
+    expect(w.tenantId).toBe('sede')
+    expect(w.OR).toEqual(
+      expect.arrayContaining([
+        { status: 'VISIVEL' },
+        { status: 'PENDENTE', autorId: 'u1' },
+        { status: 'PENDENTE' },
+      ]),
+    )
   })
 
   it('título do tópico sai da primeira linha do composer', () => {

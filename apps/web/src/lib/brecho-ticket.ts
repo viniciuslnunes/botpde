@@ -381,6 +381,8 @@ export async function montarInboxItemBrechoStaff(
     silenciada: false,
     totalMembros: conversa._count.membros,
     ehCanalDepartamento: false,
+    departamentoSlug: null,
+    departamentoAreaId: null,
     outroMembro: null,
     ultimaMensagem: null,
     naoLidas: 0,

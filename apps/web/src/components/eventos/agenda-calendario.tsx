@@ -67,20 +67,20 @@ const TIPOS = ['GERAL', 'CARAVANA', 'ENSAIO'] as const
 const TIPO_TINT: Record<string, string> = {
   GERAL: 'border-l-[rgb(var(--color-primary-fg))] bg-[rgb(var(--color-primary)_/_0.08)]',
   CARAVANA: 'border-l-amber-500 bg-amber-500/10',
-  ENSAIO: 'border-l-sky-500 bg-sky-500/10',
+  ENSAIO: 'border-l-[rgb(var(--color-info))] bg-[rgb(var(--color-info)_/_0.1)]',
 }
 
 const TIPO_TEXT: Record<string, string> = {
   GERAL: 'text-[rgb(var(--color-primary-fg))]',
   CARAVANA: 'text-amber-700 dark:text-amber-300',
-  ENSAIO: 'text-sky-700 dark:text-sky-300',
+  ENSAIO: 'text-[rgb(var(--color-info-fg))]',
 }
 
 /** Marcador do dia — GERAL usa `primary-fg`: com marca P&B o `primary` cru some no dark. */
 const TIPO_DOT: Record<string, string> = {
   GERAL: 'bg-[rgb(var(--color-primary-fg))]',
   CARAVANA: 'bg-amber-500',
-  ENSAIO: 'bg-sky-500',
+  ENSAIO: 'bg-[rgb(var(--color-info))]',
 }
 
 const MAX_DOTS = 3
@@ -153,7 +153,7 @@ function EventoDiaCard({ e }: { e: AgendaCalItem }) {
             {formatTimeShort(e.dataIso)}
           </span>
         </div>
-        <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
+        <h3 className="portal-display mt-0.5 line-clamp-2 text-sm leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
           {e.titulo}
         </h3>
         {e.local && (
@@ -368,10 +368,10 @@ function NavChrome({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className={pending ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-        <h2 className="text-xl font-bold tracking-tight text-[rgb(var(--foreground))] first-letter:uppercase sm:text-2xl">
+        <h2 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
           {titulo}
         </h2>
-        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{subtitulo}</p>
+        <p className="portal-kicker mt-1 text-[rgb(var(--foreground-muted))]">{subtitulo}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <button
@@ -736,7 +736,7 @@ export function AgendaCalendario({
                         'mt-1 rounded px-1 text-[8px] font-bold uppercase tracking-wide',
                         ativo
                           ? 'bg-[rgb(var(--color-primary-on)_/_0.2)] text-[rgb(var(--color-primary-on))]'
-                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+                          : 'bg-[rgb(var(--color-success)_/_0.15)] text-[rgb(var(--color-success-fg))]',
                       )}
                     >
                       Jogo

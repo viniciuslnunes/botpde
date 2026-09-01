@@ -20,7 +20,14 @@ import {
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
-import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
+import {
+  CONFIRMA_VINCULO_UNIDADE,
+  CONFIRMA_VINCULO_AO_PEDIR_CANAL,
+  CONFIRMA_TROCA_UNIDADE,
+  CONFIRMA_DESVINCULO_UNIDADE,
+  mensagemTravaVinculoUnidade,
+} from '@torcida/types/associe-se'
+import { criarCanalTematico, entrarCanal, pedirEntradaCanal, vincularUnidadePeloCanal, desvincularUnidadePeloCanal } from '@/app/portal/comunidade/actions'
 import { LogoImage } from '@/components/media/logo-image'
 import { Avatar } from '@/components/portal/avatar'
 import { AbrirCanalNaBarraLink } from './abrir-canal-na-barra-link'
@@ -384,6 +391,68 @@ export function CanaisClient({
     })
   }
 
+  function vincularUnidade(id: string, troca: boolean, jaConfirmado = false) {
+    if (!jaConfirmado && !window.confirm(troca ? CONFIRMA_TROCA_UNIDADE : CONFIRMA_VINCULO_UNIDADE)) {
+      return
+    }
+    startTransition(async () => {
+      try {
+        const { nomeUnidade } = await vincularUnidadePeloCanal(id)
+        setCanais((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  souMembro: true,
+                  pedidoPendente: false,
+                  podeVincularUnidade: false,
+                  podeTrocarUnidade: false,
+                  podeDesvincularUnidade: false,
+                  membros: c.souMembro ? c.membros : c.membros + 1,
+                }
+              : {
+                  ...c,
+                  podeVincularUnidade: false,
+                  podeTrocarUnidade: false,
+                  podeDesvincularUnidade: false,
+                },
+          ),
+        )
+        toast.success(
+          troca
+            ? `Unidade alterada para ${nomeUnidade}.`
+            : `Você está vinculado a ${nomeUnidade}.`,
+        )
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível vincular-se à unidade.')
+      }
+    })
+  }
+
+  function desvincularUnidade(id: string) {
+    if (!window.confirm(CONFIRMA_DESVINCULO_UNIDADE)) return
+    startTransition(async () => {
+      try {
+        const { nomeUnidade } = await desvincularUnidadePeloCanal(id)
+        setCanais((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  podeDesvincularUnidade: false,
+                  podeVincularUnidade: false,
+                  podeTrocarUnidade: false,
+                }
+              : c,
+          ),
+        )
+        toast.success(`Você deixou ${nomeUnidade}. Continua sócio da torcida.`)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível desvincular da unidade.')
+      }
+    })
+  }
+
   function criar(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) return
@@ -712,6 +781,8 @@ export function CanaisClient({
                       destaqueProximo={c.id === maisProximoId}
                       onEntrar={entrar}
                       onPedirEntrada={pedirEntrada}
+                      onVincularUnidade={vincularUnidade}
+                      onDesvincularUnidade={desvincularUnidade}
                       pending={pending}
                     />
                   </m.li>
@@ -733,6 +804,8 @@ function CanalCard({
   destaqueProximo,
   onEntrar,
   onPedirEntrada,
+  onVincularUnidade,
+  onDesvincularUnidade,
   pending,
 }: {
   canal: CanalItem
@@ -742,6 +815,8 @@ function CanalCard({
   destaqueProximo: boolean
   onEntrar: (id: string) => void
   onPedirEntrada: (id: string) => void
+  onVincularUnidade: (id: string, troca: boolean, jaConfirmado?: boolean) => void
+  onDesvincularUnidade: (id: string) => void
   pending: boolean
 }) {
   // Sempre pelo id do canal: SUBSEDE/PDE Caso A compartilham tenantId da mãe —
@@ -872,40 +947,107 @@ function CanalCard({
           </div>
 
           {canal.souMembro || canal.ehCanalDepartamento || leituraSuperAdmin ? (
-            <AbrirCanalNaBarraLink
-              canalId={canal.id}
-              href={href}
-              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
-              aria-label={`Abrir canal ${canalNome}`}
-            >
-              Abrir canal
-            </AbrirCanalNaBarraLink>
-          ) : canal.publica ? (
-            <m.button
-              type="button"
-              disabled={pending}
-              onClick={() => onEntrar(canal.id)}
-              whileTap={{ scale: 0.97 }}
-              transition={springSnappy}
-              className="inline-flex w-full items-center justify-center rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
-            >
-              Entrar
-            </m.button>
-          ) : canal.pedidoPendente ? (
-            <span className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Pedido enviado
-            </span>
+            <>
+              <AbrirCanalNaBarraLink
+                canalId={canal.id}
+                href={href}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+                aria-label={`Abrir canal ${canalNome}`}
+              >
+                Abrir canal
+              </AbrirCanalNaBarraLink>
+              {canal.podeVincularUnidade || canal.podeTrocarUnidade ? (
+                <m.button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onVincularUnidade(canal.id, canal.podeTrocarUnidade)}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  className="inline-flex w-full items-center justify-center px-3 py-1.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-50"
+                >
+                  {canal.podeTrocarUnidade ? 'Trocar para esta unidade' : 'Esta é a minha unidade'}
+                </m.button>
+              ) : canal.podeDesvincularUnidade ? (
+                <m.button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onDesvincularUnidade(canal.id)}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-danger transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                >
+                  Desvincular desta unidade
+                </m.button>
+              ) : canal.vinculoUnidadeLiberaEm ? (
+                <p className="text-center text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+                  {mensagemTravaVinculoUnidade(canal.vinculoUnidadeLiberaEm)}
+                </p>
+              ) : null}
+            </>
           ) : (
-            <m.button
-              type="button"
-              disabled={pending}
-              onClick={() => onPedirEntrada(canal.id)}
-              whileTap={{ scale: 0.97 }}
-              transition={springSnappy}
-              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-            >
-              Solicitar
-            </m.button>
+            <>
+              {canal.publica ? (
+                <m.button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (
+                      canal.podeVincularUnidade &&
+                      window.confirm(CONFIRMA_VINCULO_AO_PEDIR_CANAL)
+                    ) {
+                      onVincularUnidade(canal.id, false, true)
+                      return
+                    }
+                    onEntrar(canal.id)
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+                >
+                  Entrar
+                </m.button>
+              ) : canal.pedidoPendente ? (
+                <span className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  Pedido enviado
+                </span>
+              ) : (
+                <m.button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (
+                      canal.podeVincularUnidade &&
+                      window.confirm(CONFIRMA_VINCULO_AO_PEDIR_CANAL)
+                    ) {
+                      onVincularUnidade(canal.id, false, true)
+                      return
+                    }
+                    onPedirEntrada(canal.id)
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                >
+                  Solicitar
+                </m.button>
+              )}
+              {canal.podeVincularUnidade || canal.podeTrocarUnidade ? (
+                <m.button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onVincularUnidade(canal.id, canal.podeTrocarUnidade)}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  className="inline-flex w-full items-center justify-center px-3 py-1.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-50"
+                >
+                  {canal.podeTrocarUnidade ? 'Trocar para esta unidade' : 'Esta é a minha unidade'}
+                </m.button>
+              ) : canal.vinculoUnidadeLiberaEm ? (
+                <p className="text-center text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+                  {mensagemTravaVinculoUnidade(canal.vinculoUnidadeLiberaEm)}
+                </p>
+              ) : null}
+            </>
           )}
         </div>
       </div>

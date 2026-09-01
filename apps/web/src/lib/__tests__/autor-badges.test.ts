@@ -6,7 +6,7 @@ import {
   resolverDepartamentoBadge,
   rotuloCargoBadge,
 } from '@/lib/autor-badges'
-import { formatAutorUnidadeBadge, formatCargoComNumeroSocio, parseNumeroAssociado } from '@/lib/autor-badges-format'
+import { formatAutorUnidadeBadge, formatCargoComNumeroSocio, formatTorcidaNoFeed, parseNumeroAssociado } from '@/lib/autor-badges-format'
 
 describe('autor-badges', () => {
   it('escolhe owner acima de perfis de área e member', () => {
@@ -125,19 +125,42 @@ describe('autor-badges', () => {
     expect(parseNumeroAssociado('0')).toBeNull()
   })
 
-  it('não repete a unidade quando ela é a própria torcida do post', () => {
-    // Unidade promovida a tenant próprio (Caso B): tenant e sede têm o mesmo nome.
+  it('mostra Sede quando o autor é da raiz da torcida', () => {
+    expect(formatAutorUnidadeBadge('Sede — Camisa 12', 'CAMISA 12')).toBe('Sede')
+    expect(formatAutorUnidadeBadge('Sede', 'GAVIÕES DA FIEL')).toBe('Sede')
+    expect(formatAutorUnidadeBadge(null, 'GAVIÕES DA FIEL')).toBe('Sede')
+    expect(formatAutorUnidadeBadge('   ', 'GAVIÕES DA FIEL')).toBe('Sede')
+    expect(
+      formatAutorUnidadeBadge('GAVIÕES DA FIEL', 'GAVIÕES DA FIEL', { tipo: 'SEDE' }),
+    ).toBe('Sede')
+  })
+
+  it('não chama de Sede uma unidade promovida a tenant próprio', () => {
     expect(
       formatAutorUnidadeBadge('PDE FIEL BAIXADA - PRAIA GRANDE', 'PDE FIEL BAIXADA - PRAIA GRANDE'),
     ).toBeNull()
-    // Sede raiz criada a partir do nome da torcida.
-    expect(formatAutorUnidadeBadge('Sede — Camisa 12', 'CAMISA 12')).toBeNull()
+    expect(
+      formatAutorUnidadeBadge('PDE FIEL BAIXADA - PRAIA GRANDE', 'PDE FIEL BAIXADA - PRAIA GRANDE', {
+        tipo: 'PONTO_ENCONTRO',
+      }),
+    ).toBeNull()
   })
 
   it('mantém a unidade quando ela acrescenta origem', () => {
     expect(formatAutorUnidadeBadge('PDE Praia Grande', 'GAVIÕES DA FIEL')).toBe('PDE Praia Grande')
-    expect(formatAutorUnidadeBadge(null, 'GAVIÕES DA FIEL')).toBeNull()
-    expect(formatAutorUnidadeBadge('   ', 'GAVIÕES DA FIEL')).toBeNull()
+    expect(formatAutorUnidadeBadge('Subsede Piracicaba', 'GAVIÕES DA FIEL')).toBe(
+      'Subsede Piracicaba',
+    )
+  })
+
+  it('mostra a torcida no feed misto e omite o nome da comunidade já aberta', () => {
+    expect(formatTorcidaNoFeed('GAVIÕES DA FIEL')).toBe('GAVIÕES DA FIEL')
+    expect(formatTorcidaNoFeed('CORINGÃO CHOPP')).toBe('CORINGÃO CHOPP')
+    expect(formatTorcidaNoFeed('TIMÃO', 'TIMÃO')).toBeNull()
+    expect(formatTorcidaNoFeed('TIMÃO', 'Timão')).toBeNull()
+    expect(formatTorcidaNoFeed('GAVIÕES DA FIEL', 'TIMÃO')).toBe('GAVIÕES DA FIEL')
+    expect(formatTorcidaNoFeed('GAVIÕES DA FIEL', 'GAVIÕES DA FIEL')).toBeNull()
+    expect(formatTorcidaNoFeed(null)).toBeNull()
   })
 
   it('quem não é sócio de TO real posta como torcedor do clube — no sintético e na torcida', () => {

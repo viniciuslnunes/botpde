@@ -7,6 +7,7 @@ import {
   UserRoundPlus,
 } from 'lucide-react'
 import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
+import { formatCaixaAltaListagem } from '@/lib/admin-listagem-format'
 import {
   resolverOrigemExibicao,
   type OrigemCanal,
@@ -40,7 +41,9 @@ export function MembroOrigemCell({
           className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
           aria-hidden
         />
-        <span className="truncate">{origem.unidadeNome}</span>
+        <span className="truncate">
+          {formatCaixaAltaListagem(origem.unidadeNome) ?? origem.unidadeNome}
+        </span>
       </p>
       {origem.canalLabel ? (
         <p className="mt-0.5 truncate pl-5 text-[11px] leading-tight text-[rgb(var(--foreground-muted))]">

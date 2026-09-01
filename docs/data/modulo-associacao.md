@@ -17,9 +17,9 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
   Aguardando emissão (não para Ativos/Emitidas, que leem `SaasSocio`). A
   emissão pede o nº e grava na ficha (origem + espelho). Completude **não**
   cobra nº/prova/expedição neste caminho — isso era «Já sou sócio».
-- Periodicidades do wizard: `Tenant.periodicidadesOnboarding` (config em Cadastro de sócios); enum inclui `QUADRIMENSAL` e `SEMESTRAL`; fallback vazio = quadrimensal + anual.
+- Periodicidades do wizard: `Tenant.periodicidadesOnboarding` (editável em **Financeiro → Planos de sócio** e atalho em Cadastro de sócios); enum inclui `QUADRIMENSAL` e `SEMESTRAL`; fallback vazio = quadrimensal + anual. Valor oficial do ciclo é cadastrado na tab **Novo plano** (`/admin/financeiro/planos/novo`). Se existir `PlanoAssociacao` ativo na mesma periodicidade, o wizard mostra nome/valor e grava `SaasMembro.planoAssociacaoId`.
 - Campos: `SaasMembro.dataExpedicaoCarteirinha`, `periodicidadePretendida`; `SaasSocio.expedidoEm`.
-- **Pendências de cadastro (2026-08-02):** usa a mesma **completude do cadastro** do card em `/admin/socios` (`lib/completude-cadastro-socio.ts` — CPF, RG, nascimento, endereço, termo, responsável se menor; + documentos se `exigirDocumentosCadastro`). Nº/prova/expedição só são obrigatórios no caminho **Já sou sócio**. Modal no portal (quando a unidade liga o serviço) → `/portal/carteirinha?secao=cadastro`. A ficha também fica **permanente na carteirinha** (ver/editar a qualquer momento, com status concluído vs. precisa atualizar) — `/portal/cadastro/associacao` redireciona. «Não mostrar de novo» → `adimplente = false` até completar (`pendenciasCadastroDispensadas`).
+- **Pendências de cadastro (2026-08-02):** usa a mesma **completude do cadastro** do card em `/admin/socios` (`lib/completude-cadastro-socio.ts` — CPF, RG, nascimento, endereço, termo, responsável se menor; + documentos se `exigirDocumentosCadastro`). Nº/prova/expedição só são obrigatórios no caminho **Já sou sócio**. Modal no portal (quando a unidade liga o serviço) → `/portal/carteirinha?secao=cadastro`. A ficha mora na aba **Cadastro de sócio** da carteirinha (cartão digital na aba **Minha carteirinha**; ver/editar a qualquer momento, com status concluído vs. precisa atualizar) — `/portal/cadastro/associacao` redireciona. «Não mostrar de novo» → `adimplente = false` até completar (`pendenciasCadastroDispensadas`).
 - **Alertas de rival (2026-08-26):** o card só mostra sócio-rival e reprovação **em torcida rival**. Rejeição em clube não-rival não vaza (LGPD). Mutação de dados LGE exige `members:approve` — `members:view` é só leitura.
 - **Quem entra (2026-08-02):** todos os **sócios aprovados** da unidade (`tipo = SOCIO`) — membros, gestores de departamento, presidente/liderança/vice/admin desde que sócios. **Torcedores ficam de fora.**
 - **Pendências por canal:** `Tenant.solicitarPendenciasCadastro` (default `true`) em `/admin/configuracoes` → Cadastro de sócios. Vale **só para o canal/unidade atual** — o modal dispara ao acessar aquele contexto. Quem gerencia: `associacao:pendencias_manage` (owner, admin, vice, liderança + super-admin).
@@ -29,7 +29,7 @@ Escopo da **Fase A/B** de paridade comercial — gestão de contribuições dos 
 
 | Modelo | Uso |
 |---|---|
-| `PlanoAssociacao` | Contribuição periódica da torcida (nome, valor, periodicidade, ativo) |
+| `PlanoAssociacao` | Contribuição periódica da torcida (nome, valor, periodicidade, ativo). Fonte do valor no onboarding quando o ciclo está na oferta. |
 | `CobrancaAssociacao` | Cobrança por membro (mensalidade, adesão, avulsa) — **não** é o gate de vigente neste ciclo |
 | `SaasMembro.adimplente` | Espelho: cobranças abertas **ou** pendência de cadastro dispensada sem completar |
 | `SaasMembro.pendenciasCadastroDispensadas` | Códigos em que o sócio marcou «não mostrar de novo» |
@@ -159,6 +159,34 @@ Exceção pontual à R1 da governança hierárquica — ver
 `docs/data/proposta-governanca-hierarquica.md` §1. Caso A (unidade leve no
 mesmo tenant) não muda: fila única da Sede.
 
+### Sócio da Sede reconhece a unidade depois (2026-09-01)
+
+Quem já é **sócio aprovado** da torcida (Sede) e depois encontra a unidade
+mais perto de casa — em `/portal/comunidade/canais` — usa **Esta é a minha
+unidade** no canal oficial de SUBSEDE/PDE, como **opção extra** (Entrar/
+Solicitar continua sendo o pedido de acesso ao canal). No pedido, se ainda
+não tem casa local, pergunta se aquela unidade é a dele. Não é o botão
+principal do aside «Canais sugeridos».
+
+- Superfície: aba `/portal/comunidade/canais` (opção extra no card/menu) e,
+  no pedido de entrada, se ainda não tem casa local. O aside **Canais
+  sugeridos** não substitui Entrar/Solicitar por «Minha unidade».
+- **Só sócio** `APROVADO` da worktree. Torcedor não vê o CTA.
+- **Caso A** (unidade no tenant da Sede): atualiza `SaasMembro.sedeId`.
+- **Caso B** (portal próprio): cria origem `APROVADO` no tenant da unidade.
+  O vínculo da Sede **permanece direto** (não vira espelho).
+- Canal restrito: continua só por `/convite/<slug>`.
+- Inscreve no canal oficial da unidade (`vincularMembroCanaisAposAprovacao`).
+- **Corrigir erro:** na unidade atual, **Desvincular desta unidade**; em outra,
+  **Trocar para esta unidade**. Continua sócio da torcida. Canal da Sede
+  raiz não desvincula (não é unidade local).
+- **Carência + trava:** 48h depois da última mudança self-service ainda dá
+  para corrigir; em seguida trava **30 dias** (não fica trocando o tempo
+  todo). Diretoria (`reatribuirSedeMembro`) não conta nesse relógio.
+- Regras puras: `avaliarVinculoUnidade` / `avaliarTravaVinculoUnidade` /
+  `decidirFlagsVinculoUnidade` / `jaVinculadoNestaUnidade` em
+  `packages/types/src/associe-se.js`. Mutação: `lib/vinculo-unidade.ts`.
+
 ### Torcedor da unidade também conta na Sede (2026-08-06)
 
 **Regra:** quem entra numa unidade Caso B — sócio **ou torcedor**, pelo
@@ -219,12 +247,13 @@ A carteirinha é da **torcida**, não da unidade. Sócio aprovado na Sede
 número, validade, ficha, mensalidades — ao abrir o portal de uma
 subsede/PDE da mesma linhagem, mesmo sem `SaasMembro` local na unidade.
 
-O espelho continua **unidade → Sede** (quem entra pelo PDE existe nos dois
-níveis). O inverso não cria linha nas unidades: o portal **lê** o vínculo
-canônico da worktree (`lib/associacao-escopo.ts` +
-`associacao-escopo-server.ts`). Prioridade: vínculo no canal atual → Sede
-raiz → origem canônica em outra unidade da linhagem. Vale para toda
-organizada, não só Gaviões.
+O espelho continua **unidade → Sede** na admissão (quem entra pelo PDE existe
+nos dois níveis). O inverso — sócio já aprovado na Sede que depois reconhece
+a unidade em que convive — **não** cria espelho: cria (Caso B) ou atualiza
+(Caso A, `sedeId`) o vínculo local, pelo CTA **Esta é a minha unidade** nos
+canais oficiais de SUBSEDE/PDE. Só `SOCIO` `APROVADO` da worktree; torcedor
+não. Canal restrito continua só por convite. A carteirinha da torcida segue
+sendo lida na worktree (`lib/associacao-escopo.ts`).
 
 `rg`/`cpf`/`dataNascimento`/`logradouro`/`bairro`/`uf` passam a ser
 obrigatórios para SOCIO no próprio onboarding (antes só eram exigidos depois,

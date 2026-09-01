@@ -128,7 +128,7 @@ function QuitarComandaForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? 'Quitando...' : 'Confirmar quitação'}
       </button>

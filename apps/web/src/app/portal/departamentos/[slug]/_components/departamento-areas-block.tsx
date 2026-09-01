@@ -122,7 +122,7 @@ export function DepartamentoAreasBlock({
         {podeGerir && (
           <div className="mt-4 flex justify-center">
             {criando ? (
-              <AreaForm
+              <DepartamentoAreaForm
                 departamentoId={departamentoId}
                 slug={slug}
                 onDone={() => setCriando(false)}
@@ -131,7 +131,7 @@ export function DepartamentoAreasBlock({
               <button
                 type="button"
                 onClick={() => setCriando(true)}
-                className="app-action inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                className="app-action inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90"
               >
                 <Plus className="h-4 w-4" />
                 Criar área
@@ -147,7 +147,7 @@ export function DepartamentoAreasBlock({
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         {areas.map((area) => (
-          <AreaCard
+          <DepartamentoAreaCard
             key={area.id}
             departamentoId={departamentoId}
             slug={slug}
@@ -161,7 +161,7 @@ export function DepartamentoAreasBlock({
 
       {podeGerir &&
         (criando ? (
-          <AreaForm departamentoId={departamentoId} slug={slug} onDone={() => setCriando(false)} />
+          <DepartamentoAreaForm departamentoId={departamentoId} slug={slug} onDone={() => setCriando(false)} />
         ) : (
           <button
             type="button"
@@ -176,7 +176,30 @@ export function DepartamentoAreasBlock({
   )
 }
 
-function AreaCard({
+export function DepartamentoAreaCriar({
+  departamentoId,
+  slug,
+}: {
+  departamentoId: string
+  slug: string
+}) {
+  const [criando, setCriando] = useState(false)
+  if (criando) {
+    return <DepartamentoAreaForm departamentoId={departamentoId} slug={slug} onDone={() => setCriando(false)} />
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setCriando(true)}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
+    >
+      <Plus className="h-4 w-4" />
+      Nova área
+    </button>
+  )
+}
+
+export function DepartamentoAreaCard({
   departamentoId,
   slug,
   area,
@@ -242,7 +265,7 @@ function AreaCard({
             </span>
           )}
           {area.campanhaAnoAberta && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+            <span className="rounded-full bg-[rgb(var(--color-success)_/_0.14)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-success-fg))]">
               Campanha {ano}
             </span>
           )}
@@ -353,7 +376,7 @@ function AreaCard({
 
       {editando && (
         <div className="mt-3 border-t border-[rgb(var(--border))] pt-3">
-          <AreaForm
+          <DepartamentoAreaForm
             departamentoId={departamentoId}
             slug={slug}
             area={area}
@@ -603,7 +626,7 @@ function AreaChecklistPainel({
                     className={[
                       'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border',
                       item.done
-                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        ? 'border-[rgb(var(--color-success)_/_0.4)] bg-[rgb(var(--color-success)_/_0.1)] text-[rgb(var(--color-success-fg))]'
                         : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                     aria-label={item.done ? `Desmarcar ${item.label}` : `Marcar ${item.label}`}
@@ -615,7 +638,7 @@ function AreaChecklistPainel({
                     ) : null}
                   </button>
                 ) : item.done ? (
-                  <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <Check className="h-4 w-4 shrink-0 text-success" />
                 ) : (
                   <span className="inline-block w-4 shrink-0 text-center text-[rgb(var(--foreground-muted))]">
                     —
@@ -685,7 +708,7 @@ function AreaChecklistPainel({
           <button
             type="submit"
             disabled={pending || label.trim().length < 2}
-            className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--primary))] px-2 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--primary))] px-2 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             Add
@@ -696,7 +719,7 @@ function AreaChecklistPainel({
   )
 }
 
-function AreaForm({
+export function DepartamentoAreaForm({
   departamentoId,
   slug,
   area,
@@ -752,7 +775,7 @@ function AreaForm({
         <button
           type="submit"
           disabled={pending}
-          className="app-action inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          className="app-action inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
         >
           {area ? 'Salvar' : 'Criar área'}
         </button>
@@ -951,7 +974,7 @@ function AdicionarPessoaBotao({
       <button
         type="submit"
         disabled={pending}
-        className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+        className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 py-1 text-[11px] font-medium text-primary-on disabled:opacity-50"
       >
         <UserPlus className="h-3 w-3" />
         Incluir

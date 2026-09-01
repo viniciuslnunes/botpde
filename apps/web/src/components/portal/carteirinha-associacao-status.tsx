@@ -39,12 +39,12 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
             className={[
               'flex items-center gap-3 rounded-xl border px-4 py-3',
               home.membro.adimplente
-                ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30'
+                ? 'alert-success'
                 : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30',
             ].join(' ')}
           >
             {home.membro.adimplente ? (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-700 dark:text-green-400" />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-success" />
             ) : (
               <AlertTriangle className="h-5 w-5 shrink-0 text-red-700 dark:text-red-400" />
             )}
@@ -53,7 +53,7 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
                 className={[
                   'text-sm font-semibold',
                   home.membro.adimplente
-                    ? 'text-green-900 dark:text-green-100'
+                    ? 'text-success'
                     : 'text-red-900 dark:text-red-100',
                 ].join(' ')}
               >
@@ -64,7 +64,7 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
                   className={[
                     'text-xs',
                     home.membro.adimplente
-                      ? 'text-green-800/80 dark:text-green-200/80'
+                      ? 'text-success'
                       : 'text-red-800/80 dark:text-red-200/80',
                   ].join(' ')}
                 >
@@ -97,7 +97,7 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
                 </p>
                 <Link
                   href={`/portal/cobrancas/${home.cobrancaAberta.id}`}
-                  className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white"
+                  className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on"
                 >
                   Pagar agora
                   <ArrowRight className="h-4 w-4" />

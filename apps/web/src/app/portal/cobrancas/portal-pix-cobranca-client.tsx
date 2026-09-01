@@ -32,7 +32,7 @@ export function PortalPixCobrancaClient({
   if (!aberta) {
     if (status === 'PAGA') {
       return (
-        <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+        <div className="flex items-center gap-2 rounded-xl border alert-success px-4 py-3 text-sm">
           <CheckCircle2 className="h-4 w-4" /> Pagamento confirmado
         </div>
       )
@@ -88,7 +88,7 @@ export function PortalPixCobrancaClient({
               })
             })
           }
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-primary-on disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Já paguei (mock)

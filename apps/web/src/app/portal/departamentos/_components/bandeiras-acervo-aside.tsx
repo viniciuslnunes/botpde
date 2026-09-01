@@ -1,116 +1,120 @@
 import Link from 'next/link'
 import { ArrowRight, Flag, Shield, ShieldAlert } from 'lucide-react'
 import { carregarDirecaoBandeiras } from '@/lib/bandeiras'
+import { listarCandidatosResponsavelPatrimonio } from '@/lib/patrimonio'
+import { acervoItemParaRow } from '@/lib/patrimonio-row'
+import { PatrimonioItensLista } from '@/components/patrimonio/patrimonio-itens-lista'
+import { DepartamentoAcervoGradeSkeleton } from './departamento-acervo-grade'
 
 /**
- * Painel de domínio do cockpit de Bandeiras: o acervo em número e o único
- * alerta que muda o dia do departamento — bandeira sem liberação em dia não
- * entra no estádio.
+ * Painel de domínio do cockpit de Bandeiras: a grade com foto é o acervo.
+ * Números e liberação de entrada ficam como contexto, não como o conteúdo.
+ *
+ * CRUD segue `flags:manage` / `patrimony:manage` (`podeGerirAcervo`) — gestor
+ * do departamento sem essa permissão vê as peças, não edita.
  */
 export async function BandeirasAcervoAside({
   tenantId,
-  nome,
   isGestor,
+  podeGerirAcervo,
   moduloHref,
   operacaoHref,
-  podeVer,
+  basePath,
 }: {
   tenantId: string
-  nome: string
   isGestor: boolean
+  podeGerirAcervo: boolean
   moduloHref: string | null
   operacaoHref: string | null
-  podeVer: boolean
+  basePath: string
 }) {
-  if (!podeVer) {
-    return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Flag className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Acervo</h2>
-        </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas não tem permissão para ver o acervo. Peça acesso às
-          bandeiras ao gestor da área ou à Presidência.
-        </p>
-      </div>
-    )
-  }
-
-  const ops = await carregarDirecaoBandeiras(tenantId)
+  const [ops, candidatos] = await Promise.all([
+    carregarDirecaoBandeiras(tenantId),
+    podeGerirAcervo ? listarCandidatosResponsavelPatrimonio(tenantId) : Promise.resolve([]),
+  ])
   const semLiberacao = ops.semVistoria + ops.vistoriaVencendo
+  const itens = ops.itens.map(acervoItemParaRow)
 
   return (
-    <div className="space-y-4">
-      <div
-        id="acervo"
-        className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
-      >
-        <div className="flex items-center gap-2">
-          <Flag className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Acervo</h2>
-        </div>
-
+    <div className="space-y-5">
+      <div id="acervo" className="scroll-mt-20 space-y-3">
         {ops.resumo.totalAtivos > 0 ? (
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[rgb(var(--foreground-muted))]">Bandeiras ativas</dt>
+          <dl className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[rgb(var(--foreground-muted))]">Ativas</dt>
               <dd className="font-semibold tabular-nums">{ops.resumo.totalAtivos}</dd>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex items-baseline gap-1.5">
               <dt className="text-[rgb(var(--foreground-muted))]">Guardadas</dt>
-              <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                {ops.resumo.disponiveis}
-              </dd>
+              <dd className="font-semibold tabular-nums text-success">{ops.resumo.disponiveis}</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[rgb(var(--foreground-muted))]">Fora / em conserto</dt>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[rgb(var(--foreground-muted))]">Fora / conserto</dt>
               <dd className="font-semibold tabular-nums">
                 {ops.resumo.emUso + ops.resumo.manutencao}
               </dd>
             </div>
           </dl>
-        ) : (
-          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma bandeira cadastrada ainda. Comece pelo bandeirão principal — categoria
-            Bandeira no inventário.
-          </p>
-        )}
-      </div>
+        ) : null}
 
-      <div
-        id="vistoria"
-        className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
-      >
-        <div className="flex items-center gap-2">
-          {semLiberacao > 0 ? (
-            <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          ) : (
-            <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          )}
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Liberação de entrada
-          </h2>
-        </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          {ops.resumo.totalAtivos === 0
-            ? 'A ficha de vistoria (medidas, mastro e autorização) aparece aqui assim que houver bandeira cadastrada.'
-            : semLiberacao > 0
-              ? `${semLiberacao} bandeira${semLiberacao === 1 ? '' : 's'} sem liberação em dia — na revista, essa peça fica na porta.`
-              : 'Todas as bandeiras ativas com vistoria registrada e dentro do prazo.'}
+        {ops.resumo.totalAtivos > 0 ? (
+          <div
+            className={
+              semLiberacao > 0
+                ? 'flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-sm'
+                : 'flex gap-2 text-sm text-[rgb(var(--foreground-muted))]'
+            }
+          >
+            {semLiberacao > 0 ? (
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            ) : (
+              <Shield className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            )}
+            <p>
+              {semLiberacao > 0
+                ? `${semLiberacao} bandeira${semLiberacao === 1 ? '' : 's'} sem liberação em dia — na revista, essa peça fica na porta.`
+                : 'Todas as bandeiras ativas com vistoria registrada e dentro do prazo.'}
+            </p>
+          </div>
+        ) : null}
+
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">
+          {podeGerirAcervo
+            ? 'A foto diferencia bandeirões, faixas e mastros parecidos. Cadastre, edite e registre a vistoria da peça.'
+            : 'A foto diferencia bandeirões, faixas e mastros parecidos. Quem gere o acervo cadastra e atualiza as peças.'}
         </p>
+
+        <PatrimonioItensLista
+          itens={itens}
+          podeGerir={podeGerirAcervo}
+          candidatos={candidatos}
+          tenantId={tenantId}
+          total={itens.length}
+          page={1}
+          pageSize={Math.max(itens.length, 1)}
+          basePath={basePath}
+          categoriaTravada="BANDEIRA"
+          emptyTitle="Nenhuma bandeira no acervo"
+          emptyDescription={
+            podeGerirAcervo
+              ? 'Cadastre bandeirões, faixas e mastros com foto — é o que diferencia peças parecidas.'
+              : 'Quem gere o acervo cadastra as peças com foto. Enquanto isso, o trapo ainda não tem ficha aqui.'
+          }
+          emptyIcon={<Flag className="mb-3 h-8 w-8 text-[rgb(var(--color-primary-fg))]" />}
+          gridClassName="grid grid-cols-2 content-start gap-3 sm:grid-cols-3"
+        />
       </div>
 
-      {moduloHref && (
+      {moduloHref ? (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
-          Abrir acervo
-          <ArrowRight className="h-4 w-4" />
+          Filtros e empréstimos
+          <ArrowRight className="h-3.5 w-3.5" />
         </Link>
-      )}
-      {isGestor && operacaoHref && (
+      ) : null}
+      {isGestor && operacaoHref ? (
         <Link
           href={operacaoHref}
           prefetch={false}
@@ -119,22 +123,16 @@ export async function BandeirasAcervoAside({
           <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
           Operação (admin)
         </Link>
-      )}
+      ) : null}
     </div>
   )
 }
 
 export function BandeirasAcervoSkeleton() {
   return (
-    <div className="animate-pulse space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="h-4 w-20 rounded bg-[rgb(var(--border))]" />
-        <div className="mt-4 space-y-2">
-          <div className="h-4 w-full rounded bg-[rgb(var(--border))]" />
-          <div className="h-4 w-full rounded bg-[rgb(var(--border))]" />
-        </div>
-      </div>
-      <div className="h-10 rounded-lg bg-[rgb(var(--border))]" />
+    <div className="space-y-5">
+      <div className="h-4 w-48 animate-pulse rounded bg-[rgb(var(--border))]" />
+      <DepartamentoAcervoGradeSkeleton />
     </div>
   )
 }

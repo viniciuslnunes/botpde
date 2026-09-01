@@ -5,6 +5,7 @@ import { db, ensureCanalDepartamento, syncMembershipFromRoles, type Prisma } fro
 import {
   assertOwnerOuSuportePlataforma,
   assertPermission,
+  assertAnyPermission,
   assertPodeDelegar,
   assertTenantOwner,
 } from '@/lib/authz'
@@ -14,6 +15,8 @@ import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { getAncestorTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { getOrCreateCanalOficial } from '@/lib/canais'
+import { persistirOfertaOnboarding } from '@/lib/planos-associacao'
+import { corDepartamentoDoTenant } from '@/lib/cor-departamento'
 import { generateInviteSlug } from '@/lib/invite-slug'
 import { getEstadoCanalRestrito, getSolicitacaoRespondivel } from '@/lib/canal-restrito'
 import { resolverTenantRaizId } from '@/lib/membros-sede'
@@ -30,6 +33,7 @@ import {
   formatNomeTorcida,
   isDepartamentoLegado,
   PERMISSIONS,
+  hasPermission,
   SalvarPeriodicidadesOnboardingSchema,
   SalvarSetorArquibancadaSchema,
   slugifyDepartamento,
@@ -448,9 +452,17 @@ export async function salvarPropagarPendenciasCadastroUnidades(formData: FormDat
 
 /** Periodicidades oferecidas no onboarding «Já sou sócio». */
 export async function salvarPeriodicidadesOnboarding(formData: FormData) {
-  const ctx = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
-  const { session, tenant } = ctx
-  await assertOwnerOuSuportePlataforma(ctx)
+  const ctx = await assertAnyPermission([
+    PERMISSIONS.SETTINGS_MANAGE,
+    PERMISSIONS.FINANCE_MANAGE,
+  ])
+  const { session, tenant, isSuperAdmin, permissoesEfetivas } = ctx
+  const podePeloFinanceiro =
+    Boolean(isSuperAdmin) ||
+    hasPermission(permissoesEfetivas ?? [], PERMISSIONS.FINANCE_MANAGE)
+  if (!podePeloFinanceiro) {
+    await assertOwnerOuSuportePlataforma(ctx)
+  }
 
   const raw = formData.getAll('periodicidades').map(String)
   const parsed = SalvarPeriodicidadesOnboardingSchema.safeParse({ periodicidades: raw })
@@ -460,10 +472,7 @@ export async function salvarPeriodicidadesOnboarding(formData: FormData) {
     )
   }
 
-  await db.tenant.update({
-    where: { id: tenant.id },
-    data: { periodicidadesOnboarding: parsed.data.periodicidades },
-  })
+  await persistirOfertaOnboarding(tenant.id, parsed.data.periodicidades)
 
   await db.auditLog.create({
     data: {
@@ -477,7 +486,10 @@ export async function salvarPeriodicidadesOnboarding(formData: FormData) {
   })
 
   revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/financeiro/planos')
   revalidatePath('/onboarding')
+  revalidatePath('/portal/carteirinha')
+  revalidatePath('/portal/cadastro/associacao')
   invalidateTenantCache(tenant.slug)
 }
 
@@ -1014,11 +1026,13 @@ export async function criarRole(formData: FormData) {
   })
   if (existing) throw new Error('Já existe um cargo com este nome')
 
+  const corFinal = await corDepartamentoDoTenant(cor, tenant)
+
   await db.role.create({
     data: {
       tenantId: tenant.id,
       nome,
-      cor,
+      cor: corFinal,
       permissions,
       permissionsExtras,
       departamentoId,
@@ -1032,7 +1046,7 @@ export async function criarRole(formData: FormData) {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'ROLE_CRIADO',
-      detalhes: { nome, cor, permissions, permissionsExtras, departamentoId, papelNoDepartamento },
+      detalhes: { nome, cor: corFinal, permissions, permissionsExtras, departamentoId, papelNoDepartamento },
     },
   })
 
@@ -1087,11 +1101,13 @@ export async function atualizarRole(roleId: string, formData: FormData) {
   const acrescentadas = [...permissions, ...permissionsExtras].filter((p) => !jaTinha.has(p))
   assertPodeDelegar(ctx, acrescentadas, 'a um cargo')
 
+  const corFinal = await corDepartamentoDoTenant(cor, tenant)
+
   await db.role.update({
     where: { id: roleId },
     data: {
       nome,
-      cor,
+      cor: corFinal,
       permissions,
       permissionsExtras,
       departamentoId,
@@ -1108,7 +1124,7 @@ export async function atualizarRole(roleId: string, formData: FormData) {
       entidadeId: roleId,
       detalhes: {
         nome,
-        cor,
+        cor: corFinal,
         permissions,
         permissionsExtras,
         departamentoId,

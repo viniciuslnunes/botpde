@@ -6,34 +6,15 @@ import { carregarPainelEventosTipo, getEventoEmbarque } from '@/lib/eventos-tipo
 
 export async function CaravanasAgendaAside({
   tenantId,
-  nome,
   isGestor,
   moduloHref,
   operacaoHref,
-  podeVer,
 }: {
   tenantId: string
-  nome: string
   isGestor: boolean
   moduloHref: string | null
   operacaoHref: string | null
-  podeVer: boolean
 }) {
-  if (!podeVer) {
-    return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Bus className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caravanas</h2>
-        </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas o acesso à agenda de caravanas exige ser membro deste
-          departamento ou ter permissão de eventos.
-        </p>
-      </div>
-    )
-  }
-
   const { proximos, totalProximos, confirmadosProximos } = await carregarPainelEventosTipo(
     tenantId,
     'CARAVANA',
@@ -78,7 +59,7 @@ export async function CaravanasAgendaAside({
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-[rgb(var(--foreground-muted))]">Confirmados</dt>
-                <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                <dd className="font-semibold tabular-nums text-success">
                   {confirmadosProximos}
                 </dd>
               </div>
@@ -151,7 +132,7 @@ export async function CaravanasAgendaAside({
       {moduloHref && (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90"
         >
           Abrir caravanas
           <ArrowRight className="h-4 w-4" />

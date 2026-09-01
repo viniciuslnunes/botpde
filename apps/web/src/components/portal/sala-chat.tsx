@@ -317,7 +317,7 @@ export function SalaChat({
           disabled={enviando || !conteudo.trim()}
           whileTap={{ scale: 0.96 }}
           transition={springSnappy}
-          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-primary-on disabled:opacity-60"
         >
           {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Enviar

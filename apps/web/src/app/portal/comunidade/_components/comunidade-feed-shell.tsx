@@ -130,6 +130,9 @@ export function ComunidadeFeedShell({
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
   const modoCanal = Boolean(renderConteudoCanal)
+  const contextoComunidadeNome = modoNacional
+    ? (clubeNacional?.apelido || clubeNacional?.nome || null)
+    : tenant.nome
   // TORCEDOR default nacional: sem `?escopo=` ainda precisa preservar CN nas subrotas.
   const sufixoEscopo = escopo === modoContexto ? '' : `?escopo=${escopo}`
 
@@ -264,75 +267,79 @@ export function ComunidadeFeedShell({
           </Suspense>
         )}
 
-        {!modoCanal && currentUser.id && (
-          <Suspense fallback={<ComposerFallback />}>
-            {modoNacional ? (
-              /* Identidade pública do não-sócio é o clube ("TIMÃO"), não o nome
-                 do tenant sintético ("… — Comunidade Nacional"). */
-              <ComunidadeNacionalComposerSection
-                tenantId={tenant.id}
-                tenantNome={clubeNacional?.apelido || clubeNacional?.nome || tenant.nome}
-                userId={currentUser.id}
-                userName={currentUser.nome}
-                userAvatar={currentUser.avatarUrl}
-                torcidaReal={torcidaReal}
-              />
-            ) : (
-              <ComunidadeComposerSection
-                tenantId={tenant.id}
-                tenantNome={tenant.nome}
-                userId={currentUser.id}
-                userName={currentUser.nome}
-                userAvatar={currentUser.avatarUrl}
-                eventoIdInicial={eventoIdInicial}
-              />
-            )}
-          </Suspense>
-        )}
-
         {!modoCanal && (
-          <>
-            <FeedLiveBanner
-              filtro={filtro}
-              escopo={escopo}
-              afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
-            />
+          <div className={currentUser.id ? 'flex min-w-0 flex-col gap-6' : undefined}>
+            {currentUser.id ? (
+              <Suspense fallback={<ComposerFallback />}>
+                {modoNacional ? (
+                  /* Identidade pública do não-sócio é o clube ("TIMÃO"), não o nome
+                     do tenant sintético ("… — Comunidade Nacional"). */
+                  <ComunidadeNacionalComposerSection
+                    tenantId={tenant.id}
+                    tenantNome={clubeNacional?.apelido || clubeNacional?.nome || tenant.nome}
+                    userId={currentUser.id}
+                    userName={currentUser.nome}
+                    userAvatar={currentUser.avatarUrl}
+                    torcidaReal={torcidaReal}
+                  />
+                ) : (
+                  <ComunidadeComposerSection
+                    tenantId={tenant.id}
+                    tenantNome={tenant.nome}
+                    userId={currentUser.id}
+                    userName={currentUser.nome}
+                    userAvatar={currentUser.avatarUrl}
+                    eventoIdInicial={eventoIdInicial}
+                  />
+                )}
+              </Suspense>
+            ) : null}
 
-            <Suspense fallback={null}>
-              <ComunidadePracaFeedCards
+            <div className="flex min-w-0 flex-col gap-4">
+              <FeedLiveBanner
+                filtro={filtro}
                 escopo={escopo}
-                ancora={
-                  modoNacional
-                    ? { tenantId: null, afiliacaoId: tenant.afiliacaoId }
-                    : { tenantId: tenant.id, afiliacaoId: tenant.afiliacaoId }
-                }
+                afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
               />
-            </Suspense>
 
-            <Suspense
-              fallback={
-                <ComunidadeFeedBootstrap
+              <Suspense fallback={null}>
+                <ComunidadePracaFeedCards
+                  escopo={escopo}
+                  ancora={
+                    modoNacional
+                      ? { tenantId: null, afiliacaoId: tenant.afiliacaoId }
+                      : { tenantId: tenant.id, afiliacaoId: tenant.afiliacaoId }
+                  }
+                />
+              </Suspense>
+
+              <Suspense
+                fallback={
+                  <ComunidadeFeedBootstrap
+                    tenantId={tenant.id}
+                    currentUser={currentUser}
+                    filtro={filtro}
+                    cursor={cursor ?? null}
+                    escopo={escopo}
+                    afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
+                    contextoComunidadeNome={contextoComunidadeNome}
+                  />
+                }
+              >
+                <ComunidadePostsSection
                   tenantId={tenant.id}
                   currentUser={currentUser}
+                  cursor={cursor}
                   filtro={filtro}
-                  cursor={cursor ?? null}
+                  conversaId={conversaId}
                   escopo={escopo}
-                  afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
+                  afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
+                  podeCompartilhar={modoContexto === 'torcida'}
+                  contextoComunidadeNome={contextoComunidadeNome}
                 />
-              }
-            >
-              <ComunidadePostsSection
-                tenantId={tenant.id}
-                currentUser={currentUser}
-                cursor={cursor}
-                filtro={filtro}
-                conversaId={conversaId}
-                escopo={escopo}
-                afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
-                podeCompartilhar={modoContexto === 'torcida'}
-              />
-            </Suspense>
-          </>
+              </Suspense>
+            </div>
+          </div>
         )}
       </main>
     </>

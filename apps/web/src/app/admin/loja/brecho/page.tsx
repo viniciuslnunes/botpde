@@ -40,13 +40,13 @@ export default async function AdminLojaBrechoPage({
       <div className="flex gap-2">
         <Link
           href="/admin/loja/brecho?filtro=pendentes"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filtro === 'pendentes' ? 'bg-[rgb(var(--primary))] text-white' : 'text-[rgb(var(--foreground-muted))]'}`}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filtro === 'pendentes' ? 'bg-[rgb(var(--primary))] text-primary-on' : 'text-[rgb(var(--foreground-muted))]'}`}
         >
           Denúncias pendentes
         </Link>
         <Link
           href="/admin/loja/brecho?filtro=todas"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filtro === 'todas' ? 'bg-[rgb(var(--primary))] text-white' : 'text-[rgb(var(--foreground-muted))]'}`}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filtro === 'todas' ? 'bg-[rgb(var(--primary))] text-primary-on' : 'text-[rgb(var(--foreground-muted))]'}`}
         >
           Todas
         </Link>

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   analisarEscudoCircularDeImageData,
+  aplicarMascaraCircularEmImageData,
   gravarCacheEscudoCircular,
   lerCacheEscudoCircular,
   limparCacheEscudoCircular,
@@ -151,6 +152,23 @@ describe('escudo-forma', () => {
       }
     }
     expect(analisarEscudoCircularDeImageData(data)).toBe(false)
+  })
+})
+
+describe('máscara circular no upload', () => {
+  it('fura os cantos opacos e preserva o disco', () => {
+    const data = canvasVazio()
+    pintarFundoBranco(data)
+    pintarCirculoOpaco(data, 31.5, 31.5, 28)
+    expect(analisarEscudoCircularDeImageData(data)).toBe(true)
+    aplicarMascaraCircularEmImageData(data, SAMPLE, SAMPLE)
+    // Canto: transparente
+    expect(data[3]).toBe(0)
+    expect(data[((SAMPLE - 1) * SAMPLE + (SAMPLE - 1)) * 4 + 3]).toBe(0)
+    // Centro do disco: opaco
+    const meio = (Math.floor(SAMPLE / 2) * SAMPLE + Math.floor(SAMPLE / 2)) * 4
+    expect(data[meio + 3]).toBe(255)
+    expect(data[meio]).toBe(20)
   })
 })
 

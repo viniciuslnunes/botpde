@@ -121,9 +121,11 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-500/15 text-stone-700 dark:text-stone-300">
               <Landmark className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-[rgb(var(--foreground))]">Patrimônio</h1>
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="space-y-3">
+              <h1 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
+                Patrimônio
+              </h1>
+              <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
                 {podeGerir
                   ? 'Inventário e custódia — audite retiradas com foto e registre dano.'
                   : 'Somente leitura — inventário da unidade.'}

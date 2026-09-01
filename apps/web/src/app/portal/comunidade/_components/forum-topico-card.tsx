@@ -75,7 +75,7 @@ export function ForumTopicoCard({
               {formatRelative(topico.criadoEm)}
             </time>
           </div>
-          {isAuthor && <ForumTopicoMenu topicoId={topico.id} escopo={escopo} />}
+          <ForumTopicoMenu topicoId={topico.id} escopo={escopo} isAutor={isAuthor} />
         </header>
 
         {topico.titulo ? (

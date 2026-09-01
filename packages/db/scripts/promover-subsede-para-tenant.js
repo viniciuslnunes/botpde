@@ -30,8 +30,8 @@ const NOVO_SLUG = 'subsede-zona-sul-teste'
 // Subsede/PDE promovida NÃO tem vice — Vice-presidente existe só no tenant
 // da Sede principal (tipo SEDE). Aqui só owner/admin/member.
 const SYSTEM_ROLE_DEFAULTS = {
-  [SYSTEM_ROLES.OWNER]: { cor: '#2563eb', ordem: 0 },
-  [SYSTEM_ROLES.ADMIN]: { cor: '#0891b2', ordem: 1 },
+  [SYSTEM_ROLES.OWNER]: { cor: '#3f3f46', ordem: 0 },
+  [SYSTEM_ROLES.ADMIN]: { cor: '#52525b', ordem: 1 },
   [SYSTEM_ROLES.MEMBER]: { cor: '#6b7280', ordem: 2 },
 }
 

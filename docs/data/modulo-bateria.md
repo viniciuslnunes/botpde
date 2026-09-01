@@ -29,5 +29,7 @@ Reusa `Evento` + `EventoRsvp` com `tipo = ENSAIO`. Presença = `checkedInAt`.
 ## RBAC
 
 - **Ver**: membro do depto `bateria` **ou** `events:create|manage` (painel)
+- **Ver instrumentos**: `patrimony:view` (a grade com foto na primeira aba do cockpit)
+- **Gerir instrumentos**: `patrimony:manage` (CRUD nos cards; membro só vê)
 - **Criar / check-in**: `events:create|manage`
 - Operação admin: `/admin/bateria` (`DEPARTAMENTO_MODULO_ADMIN_ROTA`)

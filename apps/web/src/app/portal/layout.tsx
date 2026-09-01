@@ -126,9 +126,19 @@ export default async function PortalLayout({
   const hostTenant = ctx.modo === 'torcida' ? await getTenantFromHost() : null
   const designBridgeProps =
     ctx.modo === 'torcida' && hostTenant
-      ? { corPrimaria: hostTenant.corPrimaria, design: hostTenant.design }
+      ? {
+          corPrimaria: hostTenant.corPrimaria,
+          design: hostTenant.design,
+          slug: hostTenant.slug,
+          corArquirrival: hostTenant.corArquirrival,
+        }
       : ctx.modo === 'nacional' && ctx.tenantSintetico
-        ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
+        ? {
+            corPrimaria: ctx.tenantSintetico.corPrimaria,
+            design: ctx.tenantSintetico.design,
+            slug: null as string | null,
+            corArquirrival: null as string | null,
+          }
         : null
 
   const [avatarUrl, userName, pendenciasSnap, associeSe] = await Promise.all([
@@ -171,6 +181,8 @@ export default async function PortalLayout({
         <TenantDesignBridge
           corPrimaria={designBridgeProps.corPrimaria}
           design={designBridgeProps.design}
+          slug={designBridgeProps.slug}
+          corArquirrival={designBridgeProps.corArquirrival}
         />
       ) : null}
       <NavbarBrandOverrideProvider>

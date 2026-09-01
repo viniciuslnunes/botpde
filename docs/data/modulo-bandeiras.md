@@ -84,8 +84,12 @@ não entra na cobrança: não vai a jogo.
 ## Superfícies
 
 - **Portal** — cockpit `/portal/departamentos/bandeiras` (`portalPanel:
-  'bandeiras'`): acervo em número + bloco de liberação de entrada. Áreas,
-  projetos e equipe são os universais de departamento.
+  'bandeiras'`): a primeira aba (**Acervo**) mostra a grade com foto das
+  peças — o mesmo card do admin. Membro com `flags:view` (ou
+  `patrimony:view`) vê; cadastro, edição, vistoria e exclusão só com
+  `flags:manage` / `patrimony:manage`. Números e alerta de liberação de
+  entrada ficam como contexto acima da grade. Áreas, projetos e equipe
+  são os universais de departamento.
 - **Acervo** — `/portal/patrimonio?categoria=BANDEIRA`. Quem entrou por
   `flags:*` vê a página **como Bandeiras** (título, ícone, filtro de categoria
   suprimido, categoria travada no formulário) — é o recorte dele, não um

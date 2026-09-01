@@ -150,7 +150,7 @@ export function AdminCriarCobrancaForm({
       <button
         type="submit"
         disabled={pending || membros.length === 0}
-        className="rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        className="rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on disabled:opacity-60"
       >
         {pending ? 'Criando…' : 'Criar cobrança'}
       </button>

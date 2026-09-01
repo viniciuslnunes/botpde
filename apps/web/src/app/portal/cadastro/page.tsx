@@ -262,7 +262,7 @@ export default async function CadastroPage() {
               'Descontos em produtos da loja oficial',
             ].map((item) => (
               <li key={item} className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
                 {item}
               </li>
             ))}

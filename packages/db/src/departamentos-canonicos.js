@@ -28,6 +28,7 @@ import {
 } from '../../types/src/permissions.js'
 import { isDepartamentoLegado } from '../../types/src/departamento-capabilities.js'
 import { isMembroElegivelDepartamento } from '../../types/src/departamento-eligibilidade.js'
+import { resolverCorSemRivalidade } from '../../types/src/design.js'
 import {
   ensureCanaisDepartamentosTenant,
   syncCanaisDepartamentosDoUsuario,
@@ -111,6 +112,8 @@ export const DEPARTAMENTOS_CANONICOS = [
   {
     // Mensalidades, inadimplência, prestação de contas, caixa + Bar (PDV).
     // Escopo: portal (view / operar PDV); admin financeiro e catálogo do bar = gestor.
+    // Cor canônica verde (#047857) é remapeada em torcida cuja identidade
+    // não é verde (`resolverCorSemRivalidade`) — Gaviões não pinta Palmeiras.
     nome: 'Financeiro',
     cor: '#047857',
     moduloPortal: 'financeiro',
@@ -328,6 +331,7 @@ export const DEPARTAMENTOS_CANONICOS = [
   {
     // Escola de samba — membro no portal; operação da festa = gestor.
     // Sem loja/financeiro/patrimônio/sedes: missão é eventos e comunicação.
+    // Oliva canônico (#4d7c0f) segue a mesma regra de rivalidade cromática.
     nome: 'Carnaval',
     cor: '#4d7c0f',
     moduloPortal: 'carnaval',
@@ -471,6 +475,25 @@ async function runTasks(concurrent, tasks) {
  */
 export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) {
   const concurrent = opts.concurrent === true
+  /** @type {{ slug: string, corPrimaria: string, corArquirrival: string | null, design: unknown, afiliacao: { nome: string, apelido: string | null } | null } | null} */
+  const tenantCor = await client.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      slug: true,
+      corPrimaria: true,
+      corArquirrival: true,
+      design: true,
+      afiliacao: { select: { nome: true, apelido: true } },
+    },
+  })
+  const corOpts = {
+    slug: tenantCor?.slug,
+    corPrimaria: tenantCor?.corPrimaria,
+    corArquirrival: tenantCor?.corArquirrival,
+    design: tenantCor?.design,
+    clubeNome: tenantCor?.afiliacao?.nome,
+    clubeApelido: tenantCor?.afiliacao?.apelido,
+  }
   // Remove por slug canônico legado e por nome (dados antigos com slug fora do padrão).
   const candidatosLegados = await client.departamento.findMany({
     where: { tenantId },
@@ -599,7 +622,7 @@ export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) 
           tenantId,
           nome: canonico.nome,
           slug,
-          cor: canonico.cor,
+          cor: resolverCorSemRivalidade(canonico.cor, corOpts),
           moduloPortal: canonico.moduloPortal,
           permissions,
           permissionsGestor,
@@ -607,7 +630,7 @@ export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) 
         },
         update: {
           nome: canonico.nome,
-          cor: canonico.cor,
+          cor: resolverCorSemRivalidade(canonico.cor, corOpts),
           moduloPortal: canonico.moduloPortal,
           permissions,
           permissionsGestor,
@@ -624,9 +647,9 @@ export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) 
 }
 
 const SYSTEM_ROLE_DEFAULTS = {
-  [SYSTEM_ROLES.OWNER]: { cor: '#7c3aed', ordem: 0 },
-  [SYSTEM_ROLES.VICE]: { cor: '#0ea5e9', ordem: 1 },
-  [SYSTEM_ROLES.ADMIN]: { cor: '#2563eb', ordem: 2 },
+  [SYSTEM_ROLES.OWNER]: { cor: '#3f3f46', ordem: 0 },
+  [SYSTEM_ROLES.VICE]: { cor: '#71717a', ordem: 1 },
+  [SYSTEM_ROLES.ADMIN]: { cor: '#52525b', ordem: 2 },
   [SYSTEM_ROLES.MEMBER]: { cor: '#6b7280', ordem: 99 },
 }
 

@@ -18,6 +18,8 @@ import {
 } from '@/components/patrimonio/patrimonio-item-card'
 import { PatrimonioItemEditorModal } from '@/components/patrimonio/patrimonio-item-editor-modal'
 import { PatrimonioVistoriaModal } from '@/components/patrimonio/patrimonio-vistoria-modal'
+import { MediaLightbox } from '@/components/portal/media-lightbox'
+import { resolveProdutoImagemUrl } from '@/lib/produto-imagem'
 import type { PatrimonioFormInitial, ResponsavelOption } from '@/components/patrimonio/patrimonio-item-form'
 
 export type { PatrimonioRow }
@@ -54,6 +56,7 @@ export function PatrimonioItensLista({
   emptyTitle,
   emptyDescription,
   emptyIcon,
+  gridClassName = 'grid grid-cols-2 content-start gap-3 sm:grid-cols-3 lg:grid-cols-4',
 }: {
   itens: PatrimonioRow[]
   podeGerir: boolean
@@ -68,11 +71,24 @@ export function PatrimonioItensLista({
   emptyTitle?: string
   emptyDescription?: string
   emptyIcon?: ReactNode
+  /** Classes da grade; o padrão é 2/3/4 colunas. */
+  gridClassName?: string
 }) {
   const [editing, setEditing] = useState<PatrimonioRow | 'novo' | null>(null)
   const [vistoriando, setVistoriando] = useState<PatrimonioRow | null>(null)
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const confirmAction = useConfirmAction()
   const reduceMotion = useReducedMotion()
+
+  const fotosAcervo = itens.flatMap((item) => {
+    const url = resolveProdutoImagemUrl(item.fotoPreviewUrl ?? item.fotoUrl)
+    return url ? [{ id: item.id, url, nome: item.nome }] : []
+  })
+
+  function ampliarFoto(itemId: string) {
+    const i = fotosAcervo.findIndex((f) => f.id === itemId)
+    if (i >= 0) setLightboxIdx(i)
+  }
 
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
@@ -161,7 +177,7 @@ export function PatrimonioItensLista({
           variants={reduceMotion ? undefined : staggerContainer}
           initial={reduceMotion ? undefined : 'hidden'}
           animate={reduceMotion ? undefined : 'show'}
-          className="grid grid-cols-2 content-start gap-3 sm:grid-cols-3 lg:grid-cols-4"
+          className={gridClassName}
         >
           {podeGerir ? (
             <m.button
@@ -195,6 +211,11 @@ export function PatrimonioItensLista({
                 }
                 onBaixar={() => baixar(item)}
                 onExcluir={() => excluir(item)}
+                onAmpliarFoto={
+                  resolveProdutoImagemUrl(item.fotoPreviewUrl ?? item.fotoUrl)
+                    ? () => ampliarFoto(item.id)
+                    : undefined
+                }
               />
             </m.div>
           ))}
@@ -247,6 +268,16 @@ export function PatrimonioItensLista({
           itemNome={vistoriando.nome}
           inicial={vistoriando.vistoria ?? null}
           onClose={() => setVistoriando(null)}
+        />
+      ) : null}
+
+      {lightboxIdx != null && fotosAcervo[lightboxIdx] ? (
+        <MediaLightbox
+          urls={fotosAcervo.map((f) => f.url)}
+          index={lightboxIdx}
+          caption={fotosAcervo[lightboxIdx].nome}
+          onClose={() => setLightboxIdx(null)}
+          onIndexChange={setLightboxIdx}
         />
       ) : null}
     </div>

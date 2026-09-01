@@ -56,6 +56,8 @@ export interface ConversaInboxItem {
   totalMembros: number
   /** Canal ligado a Departamento ou DepartamentoArea. */
   ehCanalDepartamento: boolean
+  departamentoSlug: string | null
+  departamentoAreaId: string | null
   /** No caso de DM, o outro participante (para nome/avatar da linha). */
   outroMembro: AutorLite | null
   ultimaMensagem: {
@@ -872,25 +874,44 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
         }),
     resolveAvatarCanalPorSede(canalSemAvatarIds),
     canalIds.length === 0
-      ? Promise.resolve([] as Array<{ canalConversaId: string | null }>)
+      ? Promise.resolve([] as Array<{ canalConversaId: string | null; slug: string }>)
       : db.departamento.findMany({
           where: { canalConversaId: { in: canalIds } },
-          select: { canalConversaId: true },
+          select: { canalConversaId: true, slug: true },
         }),
     canalIds.length === 0
-      ? Promise.resolve([] as Array<{ canalConversaId: string | null }>)
+      ? Promise.resolve(
+          [] as Array<{
+            canalConversaId: string | null
+            id: string
+            departamento: { slug: string }
+          }>,
+        )
       : db.departamentoArea.findMany({
           where: { canalConversaId: { in: canalIds } },
-          select: { canalConversaId: true },
+          select: {
+            canalConversaId: true,
+            id: true,
+            departamento: { select: { slug: true } },
+          },
         }),
   ])
 
   const canaisDepartamento = new Set<string>()
+  const slugPorCanal = new Map<string, string>()
+  const areaPorCanal = new Map<string, string>()
   for (const d of deptosCanal) {
-    if (d.canalConversaId) canaisDepartamento.add(d.canalConversaId)
+    if (d.canalConversaId) {
+      canaisDepartamento.add(d.canalConversaId)
+      slugPorCanal.set(d.canalConversaId, d.slug)
+    }
   }
   for (const a of areasCanal) {
-    if (a.canalConversaId) canaisDepartamento.add(a.canalConversaId)
+    if (a.canalConversaId) {
+      canaisDepartamento.add(a.canalConversaId)
+      slugPorCanal.set(a.canalConversaId, a.departamento.slug)
+      areaPorCanal.set(a.canalConversaId, a.id)
+    }
   }
 
   const outroPorConversa = new Map<string, AutorLite>()
@@ -941,6 +962,8 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       silenciada: row.silenciada,
       totalMembros: row.conversa._count.membros,
       ehCanalDepartamento: canaisDepartamento.has(row.conversa.id),
+      departamentoSlug: slugPorCanal.get(row.conversa.id) ?? null,
+      departamentoAreaId: areaPorCanal.get(row.conversa.id) ?? null,
       outroMembro:
         row.conversa.tipo === 'DIRETA'
           ? (outroPorConversa.get(row.conversa.id) ?? null)

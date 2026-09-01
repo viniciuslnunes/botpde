@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import {
+  PARAM_BUSCA,
   construirHrefLimparFiltros,
   filtroPorId,
   temFiltroAtivo,
@@ -63,7 +64,7 @@ export function ListagemToolbar({
   const chips = montarChips(spec, params, facetas, dinamicas)
   const filtrando = temFiltroAtivo(params)
   const ocultos = ocultosPreservados(spec, params, null, extras).filter(
-    (campo) => campo.nome !== 'q',
+    (campo) => campo.nome !== PARAM_BUSCA,
   )
 
   const compactos = (filtrosCompactos ?? []).flatMap((item) => {

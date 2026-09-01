@@ -53,10 +53,12 @@ function PatrimonioFoto({
   src,
   alt,
   categoria,
+  onAmpliar,
 }: {
   src: string | null
   alt: string
   categoria: string
+  onAmpliar?: () => void
 }) {
   const resolved = resolveProdutoImagemUrl(src)
   const [failed, setFailed] = useState(false)
@@ -74,19 +76,36 @@ function PatrimonioFoto({
     )
   }
 
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={resolved}
+      alt={onAmpliar ? '' : alt}
+      className="h-full w-full object-cover object-center"
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
+
+  if (!onAmpliar) {
+    return (
+      <div className="aspect-[4/3] w-full overflow-hidden bg-[rgb(var(--background-subtle))]">
+        {img}
+      </div>
+    )
+  }
+
   return (
-    <div className="aspect-[4/3] w-full overflow-hidden bg-[rgb(var(--background-subtle))]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={resolved}
-        alt={alt}
-        className="h-full w-full object-cover object-center"
-        referrerPolicy="no-referrer"
-        loading="lazy"
-        decoding="async"
-        onError={() => setFailed(true)}
-      />
-    </div>
+    <button
+      type="button"
+      onClick={onAmpliar}
+      aria-label={`Ampliar foto de ${alt}`}
+      className="aspect-[4/3] w-full cursor-zoom-in overflow-hidden bg-[rgb(var(--background-subtle))] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--color-primary))]"
+    >
+      {img}
+    </button>
   )
 }
 
@@ -141,6 +160,7 @@ export function PatrimonioItemCard({
   onVistoria,
   onBaixar,
   onExcluir,
+  onAmpliarFoto,
 }: {
   item: PatrimonioRow
   podeGerir: boolean
@@ -148,6 +168,7 @@ export function PatrimonioItemCard({
   onVistoria?: () => void
   onBaixar?: () => void
   onExcluir?: () => void
+  onAmpliarFoto?: () => void
 }) {
   const categoriaLabel = CATEGORIA_PATRIMONIO_LABEL[item.categoria] ?? item.categoria
   const detalhes = [
@@ -166,6 +187,7 @@ export function PatrimonioItemCard({
           src={item.fotoPreviewUrl ?? item.fotoUrl}
           alt={item.nome}
           categoria={item.categoria}
+          onAmpliar={onAmpliarFoto}
         />
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5">
           <StatusBadge dominio="patrimonio" status={item.status} />

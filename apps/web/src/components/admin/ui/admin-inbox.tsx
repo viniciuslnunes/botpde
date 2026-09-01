@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, Loader2 } from 'lucide-react'
 import type { AdminInboxItem } from '@/lib/admin-inbox'
 import {
   inboxAprovarMembro,
@@ -133,10 +133,9 @@ export function AdminInboxList({
   if (itens.length === 0) {
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center">
-        <CheckCircle2
-          className="mx-auto h-8 w-8 text-[rgb(var(--color-success-fg))]"
-          aria-hidden
-        />
+        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--color-success))] text-[rgb(var(--color-success-on))]">
+          <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+        </span>
         <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">{emptyTitle}</p>
         {emptyDescription ? (
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{emptyDescription}</p>

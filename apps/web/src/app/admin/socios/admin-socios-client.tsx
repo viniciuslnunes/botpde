@@ -20,7 +20,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { AdminPendingTabs, AdminRowActions } from '@/components/admin/ui'
+import { AdminPageHeader, AdminPendingTabs, AdminRowActions } from '@/components/admin/ui'
 import { MembroOrigemCell } from '@/components/admin/membro-origem-cell'
 import {
   emitirCarteirinha,
@@ -32,6 +32,10 @@ import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
 import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import {
+  formatCaixaAltaListagem,
+  formatTelefoneListagem,
+} from '@/lib/admin-listagem-format'
 
 export interface SocioEmitidoItem {
   id: string
@@ -239,7 +243,9 @@ export function EmitirCarteirinhaModal({
                 {selecionado.numeroAssociado
                   ? ` · nº ${selecionado.numeroAssociado}`
                   : ''}
-                {selecionado.cidade ? ` · ${selecionado.cidade}` : ''}
+                {selecionado.cidade
+                  ? ` · ${formatCaixaAltaListagem(selecionado.cidade)}`
+                  : ''}
               </p>
             )}
             <input
@@ -283,8 +289,8 @@ export function EmitirCarteirinhaModal({
                           <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
                             {[
                               m.numeroAssociado ? `nº ${m.numeroAssociado}` : null,
-                              m.cidade,
-                              m.telefone,
+                              formatCaixaAltaListagem(m.cidade),
+                              formatTelefoneListagem(m.telefone),
                             ]
                               .filter(Boolean)
                               .join(' · ')}
@@ -383,7 +389,7 @@ export function EmitirCarteirinhaModal({
               <button
                 type="submit"
                 disabled={pending || !userId}
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {pending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -500,7 +506,7 @@ function SocioActions({
             type="button"
             onClick={handleRenovar}
             className={[
-              'app-touch-target inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-green-600 px-2.5 text-xs font-medium text-white hover:bg-green-700',
+              'app-touch-target inline-flex h-8 items-center justify-center gap-1 rounded-lg btn-success px-2.5 text-xs font-medium',
               stacked ? 'min-w-0 flex-1' : '',
             ].join(' ')}
           >
@@ -552,7 +558,7 @@ function EmitirLinhaButton({
     <button
       type="button"
       onClick={() => onEmitir(membro.userId)}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90"
     >
       <Plus className="h-3.5 w-3.5" />
       Emitir
@@ -665,93 +671,88 @@ export function AdminSociosClient({
 
   return (
     <>
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Sócios</h1>
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                {contagens.emitidas} carteirinha
-                {contagens.emitidas !== 1 ? 's' : ''} emitida
-                {contagens.emitidas !== 1 ? 's' : ''}
-                {contagens.solicitacoes > 0 && (
-                  <>
-                    {' '}
-                    ·{' '}
-                    <span className="font-medium text-warning">
-                      {contagens.solicitacoes} solicitaç
-                      {contagens.solicitacoes !== 1 ? 'ões' : 'ão'}
-                    </span>
-                  </>
-                )}
-                {contagens.aguardando > 0 && (
-                  <>
-                    {' '}
-                    ·{' '}
-                    <span className="font-medium text-warning">
-                      {contagens.aguardando} aguardando emissão
-                    </span>
-                  </>
-                )}
-                {contagens.vencendo > 0 && (
-                  <>
-                    {' '}
-                    ·{' '}
-                    <span className="font-medium text-warning">
-                      {contagens.vencendo} próximo
-                      {contagens.vencendo !== 1 ? 's' : ''} de inadimplência
-                      {' '}
-                      (≤30 dias)
-                    </span>
-                  </>
-                )}
-                {contagens.vencidos > 0 && (
-                  <>
-                    {' '}
-                    ·{' '}
-                    <span className="font-medium text-danger">
-                      {contagens.vencidos} inadimplente
-                      {contagens.vencidos !== 1 ? 's' : ''}
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            {podeEmitir && !isSolicitacoes && (
-              <button
-                type="button"
-                onClick={() => abrirEmit()}
-                disabled={contagens.aguardando === 0 || elegiveisModal.length === 0}
-                title={
-                  contagens.aguardando === 0
-                    ? 'Nenhum sócio aprovado aguardando carteirinha'
-                    : undefined
-                }
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" />
-                Emitir carteirinha
-              </button>
+      <AdminPageHeader
+        title="Sócios"
+        description={
+          <span className="tabular-nums">
+            {contagens.emitidas} carteirinha
+            {contagens.emitidas !== 1 ? 's' : ''} emitida
+            {contagens.emitidas !== 1 ? 's' : ''}
+            {contagens.solicitacoes > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-warning">
+                  {contagens.solicitacoes} solicitaç
+                  {contagens.solicitacoes !== 1 ? 'ões' : 'ão'}
+                </span>
+              </>
             )}
-          </div>
-
-          <div className="mt-4">
-            <AdminPendingTabs
-              tabs={tabs.map((tab) => ({
-                id: tab.key,
-                label: tab.label,
-                count: tab.count,
-                countClass: tab.countClass,
-                href: tabHrefs[tab.key],
-              }))}
-              activeId={statusFiltro}
-              paramKey="status"
-            />
-          </div>
-
-          <div className="mt-3">{toolbar}</div>
-        </div>
-      </div>
+            {contagens.aguardando > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-warning">
+                  {contagens.aguardando} aguardando emissão
+                </span>
+              </>
+            )}
+            {contagens.vencendo > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-warning">
+                  {contagens.vencendo} próximo
+                  {contagens.vencendo !== 1 ? 's' : ''} de inadimplência
+                  {' '}
+                  (≤30 dias)
+                </span>
+              </>
+            )}
+            {contagens.vencidos > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-danger">
+                  {contagens.vencidos} inadimplente
+                  {contagens.vencidos !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
+          </span>
+        }
+        actions={
+          podeEmitir && !isSolicitacoes ? (
+            <button
+              type="button"
+              onClick={() => abrirEmit()}
+              disabled={contagens.aguardando === 0 || elegiveisModal.length === 0}
+              title={
+                contagens.aguardando === 0
+                  ? 'Nenhum sócio aprovado aguardando carteirinha'
+                  : undefined
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              Emitir carteirinha
+            </button>
+          ) : undefined
+        }
+      >
+        <AdminPendingTabs
+          tabs={tabs.map((tab) => ({
+            id: tab.key,
+            label: tab.label,
+            count: tab.count,
+            countClass: tab.countClass,
+            href: tabHrefs[tab.key],
+          }))}
+          activeId={statusFiltro}
+          paramKey="status"
+        />
+        {toolbar}
+      </AdminPageHeader>
 
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
@@ -783,7 +784,7 @@ export function AdminSociosClient({
                   temFiltroAtivo ? (
                     <Users className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
                   ) : (
-                    <CheckCircle2 className="mb-3 h-10 w-10 text-green-500" />
+                    <CheckCircle2 className="mb-3 h-10 w-10 text-success" />
                   )
                 }
                 title={
@@ -836,10 +837,10 @@ export function AdminSociosClient({
                               membro.numeroAssociado
                                 ? `nº ${membro.numeroAssociado}`
                                 : null,
-                              membro.departamentoNome,
-                              membro.sedeNome,
-                              membro.cidade,
-                              membro.telefone,
+                              formatCaixaAltaListagem(membro.departamentoNome),
+                              formatCaixaAltaListagem(membro.sedeNome),
+                              formatCaixaAltaListagem(membro.cidade),
+                              formatTelefoneListagem(membro.telefone),
                             ]
                               .filter(Boolean)
                               .join(' · ') || '—'}
@@ -865,7 +866,7 @@ export function AdminSociosClient({
                           <button
                             type="button"
                             onClick={() => abrirEmit(membro.userId)}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Emitir carteirinha
@@ -919,7 +920,10 @@ export function AdminSociosClient({
                                   {membro.nome}
                                 </p>
                                 <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                                  {[membro.discordTag, membro.telefone]
+                                  {[
+                                    membro.discordTag,
+                                    formatTelefoneListagem(membro.telefone),
+                                  ]
                                     .filter(Boolean)
                                     .join(' · ') || '—'}
                                 </p>
@@ -928,12 +932,12 @@ export function AdminSociosClient({
                           </td>
                           <td className="hidden px-4 py-3 sm:table-cell">
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                              {membro.departamentoNome ?? '—'}
+                              {formatCaixaAltaListagem(membro.departamentoNome) ?? '—'}
                             </span>
                           </td>
                           <td className="hidden px-4 py-3 md:table-cell">
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                              {membro.sedeNome ?? '—'}
+                              {formatCaixaAltaListagem(membro.sedeNome) ?? '—'}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -947,7 +951,7 @@ export function AdminSociosClient({
                           </td>
                           <td className="hidden px-4 py-3 lg:table-cell">
                             <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                              {membro.cidade ?? '—'}
+                              {formatCaixaAltaListagem(membro.cidade) ?? '—'}
                             </span>
                           </td>
                           <td className="hidden px-4 py-3 xl:table-cell">
@@ -1040,9 +1044,13 @@ export function AdminSociosClient({
                             {socio.nome}
                           </span>
                         </div>
-                        {(socio.departamentoNome || socio.email) && (
+                        {(socio.departamentoNome || socio.email || socio.detalhe?.telefone) && (
                           <p className="mt-0.5 truncate text-xs text-[rgb(var(--foreground-muted))]">
-                            {[socio.departamentoNome, socio.email]
+                            {[
+                              formatCaixaAltaListagem(socio.departamentoNome),
+                              formatTelefoneListagem(socio.detalhe?.telefone),
+                              socio.email,
+                            ]
                               .filter(Boolean)
                               .join(' · ')}
                           </p>
@@ -1081,71 +1089,81 @@ export function AdminSociosClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[rgb(var(--border))]">
-                    {socios.map((socio) => (
-                      <tr
-                        key={socio.id}
-                        className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
-                        onClick={() => abrirDetalhe(socio.detalhe)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            abrirDetalhe(socio.detalhe)
-                          }
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        aria-label={`Ver detalhes de ${socio.nome}`}
-                      >
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
-                            {socio.numeroLabel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar url={socio.avatarUrl} nome={socio.nome} />
-                            <span className="font-medium text-[rgb(var(--foreground))]">
-                              {socio.nome}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="hidden px-4 py-3 md:table-cell">
-                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                            {socio.departamentoNome ?? '—'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {socio.detalhe ? (
-                            <MembroOrigemCell membro={socio.detalhe} />
-                          ) : (
-                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td className="hidden px-4 py-3 lg:table-cell">
-                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                            {socio.email ?? '—'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ValidadeStatus socio={socio} />
-                        </td>
-                        <td
-                          className="px-4 py-3"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
+                    {socios.map((socio) => {
+                      const telefone = formatTelefoneListagem(socio.detalhe?.telefone)
+                      return (
+                        <tr
+                          key={socio.id}
+                          className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                          onClick={() => abrirDetalhe(socio.detalhe)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              abrirDetalhe(socio.detalhe)
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Ver detalhes de ${socio.nome}`}
                         >
-                          {podeEmitir ? (
-                            <SocioActions socio={socio} />
-                          ) : (
-                            <span className="block text-right text-xs text-[rgb(var(--foreground-muted))]">
-                              —
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
+                              {socio.numeroLabel}
                             </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar url={socio.avatarUrl} nome={socio.nome} />
+                              <div className="min-w-0">
+                                <span className="font-medium text-[rgb(var(--foreground))]">
+                                  {socio.nome}
+                                </span>
+                                {telefone ? (
+                                  <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                                    {telefone}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {formatCaixaAltaListagem(socio.departamentoNome) ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {socio.detalhe ? (
+                              <MembroOrigemCell membro={socio.detalhe} />
+                            ) : (
+                              <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {socio.email ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <ValidadeStatus socio={socio} />
+                          </td>
+                          <td
+                            className="px-4 py-3"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            {podeEmitir ? (
+                              <SocioActions socio={socio} />
+                            ) : (
+                              <span className="block text-right text-xs text-[rgb(var(--foreground-muted))]">
+                                —
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

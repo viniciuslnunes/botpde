@@ -30,7 +30,7 @@ export function BrechoStaffBotoes({
           <button
             type="button"
             disabled={pending}
-            className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-white"
+            className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-primary-on"
             onClick={() => {
               start(async () => {
                 const r = await runPersistAction(

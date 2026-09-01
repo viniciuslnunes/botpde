@@ -9,9 +9,15 @@
  * PNG com alpha nos cantos (ex.: Gaviões, escudo do Corinthians) → false
  * (sem máscara — a transparência já resolve o formato).
  * Badge redondo em fundo branco (Camisa 12) ou preto (logo em square) → true.
+ *
+ * Fonte da verdade no upload: `tratarFundoEscudoNoCanvas` grava PNG com os
+ * cantos já transparentes. A detecção na exibição (`useEscudoCircular`) fica
+ * como fallback do acervo antigo e de escudos de catálogo.
  */
 
 const SAMPLE = 64
+/** Raio da máscara / do critério, relativo ao menor lado (full-bleed + antialias). */
+export const ESCUDO_RAIO_FRAC = 0.52
 /** Tolerância RGB ao comparar pixel com a cor de fundo amostrada nos cantos. */
 const TOL_FUNDO = 36
 
@@ -117,7 +123,7 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
   const cx = (SAMPLE - 1) / 2
   const cy = (SAMPLE - 1) / 2
   // Raio um pouco além de 0.5*lado para badges full-bleed com antialias na borda.
-  const r2 = (SAMPLE * 0.52) ** 2
+  const r2 = (SAMPLE * ESCUDO_RAIO_FRAC) ** 2
 
   let conteudo = 0
   let conteudoDentro = 0
@@ -153,6 +159,74 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
   if (fora < 12) return false
   if (fundoFora / fora < 0.75) return false
 
+  return true
+}
+
+/** Zera o alpha fora do círculo inscrito (cantos do quadrado de fundo). */
+export function aplicarMascaraCircularEmImageData(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+): void {
+  if (width < 1 || height < 1) return
+  const cx = (width - 1) / 2
+  const cy = (height - 1) / 2
+  const r2 = (Math.min(width, height) * ESCUDO_RAIO_FRAC) ** 2
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx
+      const dy = y - cy
+      if (dx * dx + dy * dy > r2) {
+        data[(y * width + x) * 4 + 3] = 0
+      }
+    }
+  }
+}
+
+function analisarSourceAmostrado(
+  source: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+): boolean {
+  if (typeof document === 'undefined') return false
+  const sample = document.createElement('canvas')
+  sample.width = SAMPLE
+  sample.height = SAMPLE
+  const ctx = sample.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return false
+  ctx.drawImage(source, 0, 0, srcW, srcH, 0, 0, SAMPLE, SAMPLE)
+  try {
+    const { data } = ctx.getImageData(0, 0, SAMPLE, SAMPLE)
+    return analisarEscudoCircularDeImageData(data)
+  } catch {
+    return false
+  }
+}
+
+/** Amostra 64×64 — barato o bastante para rodar em todo upload de imagem. */
+export function precisaTratarFundoEscudo(
+  source: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+): boolean {
+  return analisarSourceAmostrado(source, srcW, srcH)
+}
+
+export function aplicarMascaraCircularNoCanvas(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  aplicarMascaraCircularEmImageData(imageData.data, canvas.width, canvas.height)
+  ctx.putImageData(imageData, 0, 0)
+}
+
+/**
+ * Se o canvas for badge redondo com fundo opaco assado, fura os cantos
+ * (alpha 0) e devolve true — o caller deve exportar PNG.
+ */
+export function tratarFundoEscudoNoCanvas(canvas: HTMLCanvasElement): boolean {
+  if (!analisarSourceAmostrado(canvas, canvas.width, canvas.height)) return false
+  aplicarMascaraCircularNoCanvas(canvas)
   return true
 }
 

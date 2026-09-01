@@ -123,6 +123,12 @@ export function unidadeRepeteTorcida(
   return nomesEquivalentes(unidadeNome, torcidaNome)
 }
 
+/** Primeiro token do nome é "sede" ("Sede", "Sede — Camisa 12"). */
+export function nomeUnidadeEhSede(nome: string | null | undefined): boolean {
+  const primeiro = nome?.trim() ? tokensNome(nome)[0] : undefined
+  return primeiro === 'sede'
+}
+
 /**
  * Rótulo de unidade ao lado do nome da torcida: `null` quando repete a torcida,
  * senão o nome com o tipo à frente — sem duplicar o tipo que já está no nome.

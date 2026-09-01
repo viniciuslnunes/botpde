@@ -24,6 +24,7 @@ interface ComunidadePostsAnimatedProps {
   isAuthor?: boolean
   podeModerarGrupo?: boolean
   className?: string
+  contextoComunidadeNome?: string | null
 }
 
 /** Lista de posts com stagger e empty state animado. */
@@ -40,6 +41,7 @@ export function ComunidadePostsAnimated({
   isAuthor,
   podeModerarGrupo = false,
   className,
+  contextoComunidadeNome = null,
 }: ComunidadePostsAnimatedProps) {
   const salvoSet = salvoIds
     ? salvoIds instanceof Set
@@ -76,6 +78,7 @@ export function ComunidadePostsAnimated({
             }
             isAuthor={isAuthor ?? post.autorId === currentUser.id}
             podeModerarGrupo={podeModerarGrupo}
+            contextoComunidadeNome={contextoComunidadeNome}
           />
         </MotionReveal>
       ))}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Compass, CreditCard, ListChecks, Receipt, TrendingUp, Wallet } from 'lucide-react'
+import { Compass, CreditCard, ListChecks, Plus, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
@@ -37,6 +37,7 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
       countClass: 'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]',
     },
     planos: { icon: <CreditCard className={ICONE} /> },
+    'planos-novo': { icon: <Plus className={ICONE} /> },
   })
 
   return (

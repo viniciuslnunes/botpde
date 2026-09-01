@@ -171,6 +171,39 @@ análise em `docs/data/auditoria-catalogo-clubes.md` §6.
 de existência pública da torcida — o SaaS pode ser o dossiê vivo dessa
 regularidade.
 
+## Responsabilidade da plataforma pelo conteúdo (2026-09-01)
+
+Esta seção trata do risco **do SaaS**, não da torcida. Detalhe, fontes e
+benchmark em `docs/knowledge/moderacao-plataformas.md`; política em
+`docs/data/politica-de-conteudo.md`; módulo em `docs/data/modulo-moderacao.md`.
+
+- **STF, Tema 987 (jun/2025; acórdão 06/11/2025)** — art. 19 do Marco Civil
+  declarado **parcialmente inconstitucional**. Fora dos crimes contra a honra,
+  **notificação extrajudicial** já basta para constituir a mora do provedor. E
+  há **dever de cuidado proativo** — agir sem denúncia e sem ordem judicial —
+  em sete classes, entre elas **discriminação e discurso de ódio**, que é
+  exatamente o risco deste nicho. O limiar de "risco sistêmico" que protegeria
+  plataformas pequenas **não entrou na tese**: porte atenua, não isenta, e
+  "estado da arte" é critério expresso.
+- **ECA Digital — Lei 15.211/2025**, em vigor desde **17/03/2026**. Alcança
+  serviço acessível a menores (é o nosso caso: torcida tem sócio menor).
+  Exige aferição de idade confiável (autodeclaração não basta), conta de menor
+  de 16 vinculada a responsável, remoção **e comunicação às autoridades** de
+  material de abuso sexual com **preservação de conteúdo e metadados**.
+  Multa até 10% do faturamento no Brasil ou R$ 50 mi por infração; sanções
+  administrativas a partir de **nov/2026**.
+- **Lei 14.532/2023** — injúria racial equiparada a racismo (2–5 anos). Três
+  agravantes desenham o nosso ambiente: **contexto esportivo** (+ proibição de
+  frequentar estádio por 3 anos), **duas ou mais pessoas** (+1/2) e
+  **"descontração/diversão"** (+1/3 a 1/2) — que remove a defesa do "era só
+  zoeira".
+
+→ Implicação de produto: moderação deixou de ser feature de comunidade e virou
+requisito de arquitetura. E vira **argumento de venda**: conteúdo racista
+publicado em nome da torcida pode, pela LGE art. 183 § 2º, banir a torcida
+**e seus associados** dos estádios por até 5 anos — o sistema que detecta e
+registra a remoção protege o cliente, não só a plataforma.
+
 ## Riscos e debates em aberto
 
 - **Criminalização × reconhecimento**: parte do movimento vê a LGE como

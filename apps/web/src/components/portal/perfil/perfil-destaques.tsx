@@ -155,7 +155,7 @@ export function PerfilDestaques({
           <button
             type="submit"
             disabled={pending || !titulo.trim() || selecionados.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Criar destaque

@@ -14,6 +14,10 @@ import {
   construirHrefOrdenacao,
   porPaginaDoSpec,
   proximaDir,
+  serializarQueryFormListagem,
+  snapshotContratoListagem,
+  aplicarSnapshotListagem,
+  urlTemParamContrato,
   temFiltroAtivo,
 } from '@/lib/listagem'
 import {
@@ -552,5 +556,77 @@ describe('props de UI derivadas do spec', () => {
     expect(temFiltroAtivo(parseListagemParams({ q: 'ana' }, spec))).toBe(true)
     expect(temFiltroAtivo(parseListagemParams({ status: 'PENDENTE' }, spec))).toBe(true)
     expect(temFiltroAtivo(parseListagemParams({ pagina: '3' }, spec))).toBe(false)
+  })
+})
+
+describe('serializarQueryFormListagem', () => {
+  it('omite busca vazia e só espaços — limpar o campo não deixa q= na query', () => {
+    const dados = new FormData()
+    dados.set('q', 'Annthony Cordeiro')
+    dados.set('status', 'PENDENTE')
+    expect(serializarQueryFormListagem(dados, { q: '' })).toBe('status=PENDENTE')
+    expect(serializarQueryFormListagem(dados, { q: '   ' })).toBe('status=PENDENTE')
+  })
+
+  it('usa o valor digitado no evento, não o FormData atrasado', () => {
+    const dados = new FormData()
+    dados.set('q', 'Ann')
+    expect(serializarQueryFormListagem(dados, { q: 'Anna' })).toBe('q=Anna')
+  })
+
+  it('form vazio vira query vazia — a URL nua, não ?q=', () => {
+    expect(serializarQueryFormListagem(new FormData(), { q: '' })).toBe('')
+  })
+})
+
+describe('snapshot da listagem (persistência)', () => {
+  const contrato = ['q', 'pagina', 'porPagina', 'sort', 'dir', 'status'] as const
+
+  it('não persiste busca — termo pontual não é visão da lista', () => {
+    const atuais = new URLSearchParams('q=Annthony+Cordeiro')
+    expect(snapshotContratoListagem(atuais, contrato).toString()).toBe('')
+  })
+
+  it('não persiste offset de página', () => {
+    const atuais = new URLSearchParams('pagina=4&status=PENDENTE')
+    expect(snapshotContratoListagem(atuais, contrato).toString()).toBe('status=PENDENTE')
+  })
+
+  it('guarda filtro, ordenação e tamanho de página', () => {
+    const snapshot = snapshotContratoListagem(
+      new URLSearchParams('sort=nome&dir=asc&porPagina=50&status=PENDENTE'),
+      contrato,
+    )
+    expect(snapshot.get('sort')).toBe('nome')
+    expect(snapshot.get('dir')).toBe('asc')
+    expect(snapshot.get('porPagina')).toBe('50')
+    expect(snapshot.get('status')).toBe('PENDENTE')
+    expect(snapshot.get('q')).toBeNull()
+    expect(snapshot.get('pagina')).toBeNull()
+  })
+
+  it('snapshot velho com q não reaparece na URL nua', () => {
+    const destino = aplicarSnapshotListagem(
+      new URLSearchParams(),
+      'q=Annthony+Cordeiro&status=PENDENTE',
+      contrato,
+    )
+    expect(destino.get('q')).toBeNull()
+    expect(destino.get('status')).toBe('PENDENTE')
+  })
+
+  it('snapshot só de busca não produz query a restaurar', () => {
+    const destino = aplicarSnapshotListagem(
+      new URLSearchParams(),
+      'q=Annthony+Cordeiro',
+      contrato,
+    )
+    expect(destino.toString()).toBe('')
+  })
+
+  it('URL com busca conta como contrato — não restaura por cima da procura', () => {
+    expect(urlTemParamContrato(new URLSearchParams('q=Ana'), contrato)).toBe(true)
+    expect(urlTemParamContrato(new URLSearchParams(), contrato)).toBe(false)
+    expect(urlTemParamContrato(new URLSearchParams('q='), contrato)).toBe(false)
   })
 })

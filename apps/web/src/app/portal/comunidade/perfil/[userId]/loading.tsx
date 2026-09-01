@@ -28,9 +28,11 @@ export default function PerfilComunidadeLoading() {
           <div className="skeleton-track-soft mt-2 h-3.5 w-24 rounded-full" />
           <div className="skeleton-track-soft mt-2 h-3 w-20 rounded-full" />
           <div className="skeleton-track-soft mt-3 h-5 w-28 rounded-full" />
-          <div className="mt-4 flex w-full max-w-sm items-center justify-center gap-2">
-            <div className="skeleton-track-soft h-9 w-24 rounded-full" />
-            <div className="skeleton-track-soft h-9 w-36 rounded-full" />
+          <div className="mt-4 flex w-full flex-wrap items-center justify-center gap-2">
+            <div className="skeleton-track-soft h-10 w-[7.25rem] rounded-lg" />
+            <div className="skeleton-track-soft h-10 w-[5.5rem] rounded-lg" />
+            <div className="skeleton-track-soft h-10 w-[6.5rem] rounded-lg" />
+            <div className="skeleton-track-soft h-10 w-[6.25rem] rounded-lg" />
           </div>
         </div>
       </section>

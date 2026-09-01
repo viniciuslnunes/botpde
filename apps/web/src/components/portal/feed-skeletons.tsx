@@ -50,9 +50,9 @@ interface FeedPostSkeletonProps {
 }
 
 /**
- * Placeholder de um post. Espelha a geometria do `FeedPostCard` (avatar 40px,
- * nome + @, corpo, barra de engajamento) para a troca pelo conteúdo real não
- * empurrar a lista.
+ * Placeholder de um post. Espelha a geometria do `FeedPostCard` (avatar 40px
+ * no topo, coluna de identidade, corpo, barra de engajamento) para a troca
+ * pelo conteúdo real não empurrar a lista.
  */
 export function FeedPostSkeleton({
   index = 0,
@@ -69,10 +69,11 @@ export function FeedPostSkeleton({
         className ?? '',
       ].join(' ')}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <div className="skeleton-track h-10 w-10 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="skeleton-track h-3.5 w-[42%] rounded-full" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="skeleton-track h-3.5 w-[68%] rounded-full" />
+          <div className="skeleton-track-soft h-3 w-[48%] rounded-full" />
           <div className="skeleton-track-soft h-3 w-[26%] rounded-full" />
         </div>
       </div>

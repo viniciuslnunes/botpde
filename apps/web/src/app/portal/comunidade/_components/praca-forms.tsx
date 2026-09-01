@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import {
@@ -37,7 +38,7 @@ export function CriarTopicoForm({ escopo }: { escopo: EscopoComunidade }) {
     >
       <input name="titulo" required minLength={3} maxLength={180} placeholder="Título do tópico" className={campoClass()} />
       <textarea name="corpo" required rows={8} maxLength={8000} placeholder="O que você quer discutir?" className={campoClass()} />
-      <button type="submit" disabled={pending} className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white disabled:opacity-50">
+      <button type="submit" disabled={pending} className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50">
         {pending ? 'Publicando…' : 'Publicar tópico'}
       </button>
     </form>
@@ -75,7 +76,7 @@ export function ResponderTopicoForm({
       }}
     >
       <textarea name="conteudo" required rows={4} maxLength={8000} placeholder="Deixe sua resposta" className={campoClass()} />
-      <button type="submit" disabled={pending} className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white disabled:opacity-50">
+      <button type="submit" disabled={pending} className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50">
         {pending ? 'Enviando…' : 'Responder'}
       </button>
     </form>
@@ -118,9 +119,11 @@ export function VotarPracaBotoes({
         type="button"
         disabled={pending}
         onClick={() => votar(1)}
-        className="app-touch-target rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+        aria-label="Concordo"
+        className="app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
       >
-        Gostei
+        <ChevronUp className="h-4 w-4" />
+        Concordo
       </button>
       <span className="min-w-8 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]">
         {saldo}
@@ -129,9 +132,11 @@ export function VotarPracaBotoes({
         type="button"
         disabled={pending}
         onClick={() => votar(-1)}
-        className="app-touch-target rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+        aria-label="Discordo"
+        className="app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
       >
-        Não
+        <ChevronDown className="h-4 w-4" />
+        Discordo
       </button>
     </div>
   )
@@ -170,7 +175,7 @@ export function ComentarPracaForm({
       }}
     >
       <textarea name="conteudo" required rows={3} maxLength={2000} placeholder="Comente neste card" className={campoClass()} />
-      <button type="submit" disabled={pending} className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white disabled:opacity-50">
+      <button type="submit" disabled={pending} className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50">
         {pending ? 'Enviando…' : 'Comentar'}
       </button>
     </form>
@@ -203,7 +208,7 @@ export function PublicarArtigoForm({ escopo }: { escopo: EscopoComunidade }) {
       <input name="resumo" maxLength={400} placeholder="Resumo (opcional)" className={campoClass()} />
       <textarea name="corpo" required rows={12} maxLength={20000} placeholder="Texto do artigo" className={campoClass()} />
       {erro && <p className="text-sm text-red-500">{erro}</p>}
-      <button type="submit" disabled={pending} className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white disabled:opacity-50">
+      <button type="submit" disabled={pending} className="app-action w-full rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50">
         {pending ? 'Publicando…' : 'Publicar artigo'}
       </button>
     </form>

@@ -35,6 +35,7 @@ vi.mock('@torcida/db', async (importOriginal) => {
       tenant: { findMany: tenantFindMany },
       sede: { findMany: sedeFindMany },
       saasMembro: { findMany: saasMembroFindMany },
+      planoAssociacao: { findMany: vi.fn(async () => []) },
     },
   }
 })

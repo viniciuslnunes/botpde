@@ -40,6 +40,7 @@ type ComunidadeRedeInfiniteProps = {
   initialPageInfo: PageInfo
   initialCursor: string | null
   salvoIds: string[]
+  contextoComunidadeNome?: string | null
 }
 
 export function ComunidadeRedeInfinite(props: ComunidadeRedeInfiniteProps) {
@@ -57,6 +58,7 @@ function ComunidadeRedeInfiniteView({
   initialPageInfo,
   initialCursor,
   salvoIds,
+  contextoComunidadeNome = null,
 }: ComunidadeRedeInfiniteProps) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
 
@@ -151,7 +153,7 @@ function ComunidadeRedeInfiniteView({
                 Siga outros membros ou publique algo para ver atividade aqui.{' '}
                 <Link
                   href="/portal/comunidade/busca"
-                  className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+                  className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-primary-on shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
                 >
                   Buscar membros
                 </Link>
@@ -186,6 +188,7 @@ function ComunidadeRedeInfiniteView({
                           viewerTenantId: tenantId,
                           visibilidade: post.visibilidade,
                         })}
+                        contextoComunidadeNome={contextoComunidadeNome}
                       />
                     </div>
                   </MotionReveal>

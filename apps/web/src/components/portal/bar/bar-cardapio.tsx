@@ -57,7 +57,7 @@ export function BarCardapio({
             className={[
               'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               categoriaId == null
-                ? 'bg-[rgb(var(--primary))] text-white'
+                ? 'bg-[rgb(var(--primary))] text-primary-on'
                 : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -71,7 +71,7 @@ export function BarCardapio({
               className={[
                 'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
                 categoriaId === c.id
-                  ? 'bg-[rgb(var(--primary))] text-white'
+                  ? 'bg-[rgb(var(--primary))] text-primary-on'
                   : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
               ].join(' ')}
             >

@@ -48,7 +48,7 @@ import {
 } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Bateria — Admin' }
+export const metadata: Metadata = { title: 'Baterias — Admin' }
 
 async function BateriaKpis({
   tenantId,
@@ -322,7 +322,7 @@ export default async function AdminBateriaPage({
   return (
     <>
       <AdminPageHeader
-        title="Bateria"
+        title="Baterias"
         description="Semana de ensaios — cruzamento com o jogo e instrumentos."
         icon={<Drum className="h-5 w-5" />}
         actions={

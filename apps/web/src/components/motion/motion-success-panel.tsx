@@ -27,13 +27,13 @@ export function MotionSuccessPanel({
       transition={springSnappy}
       className={
         className ??
-        'rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center dark:border-emerald-800 dark:bg-emerald-950'
+        'alert-success rounded-2xl p-8 text-center'
       }
     >
       {icon}
-      <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-200">{title}</h2>
+      <h2 className="text-xl font-bold">{title}</h2>
       {description && (
-        <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">{description}</p>
+        <p className="mt-2 text-sm opacity-90">{description}</p>
       )}
       {children}
     </m.div>

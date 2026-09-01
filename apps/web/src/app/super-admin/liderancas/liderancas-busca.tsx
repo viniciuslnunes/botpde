@@ -166,8 +166,12 @@ export function LiderancasBuscaInteligente({
           name={PARAM_BUSCA}
           value={q}
           onChange={(e) => {
-            setQ(e.target.value)
+            const next = e.target.value
+            setQ(next)
             setAberto(true)
+            if (next.trim() === '' && (params.q || raizId)) {
+              navegar('', null)
+            }
           }}
           onFocus={() => {
             if (q.trim().length >= 2) setAberto(true)

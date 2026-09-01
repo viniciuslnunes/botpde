@@ -27,7 +27,7 @@ import {
   ACTION_TOKEN_KEYS,
   ACTION_TOKEN_LABELS,
   CONTRASTE_AA,
-  CONTRASTE_AA_GRANDE,
+  WASH_ACAO,
   DEFAULT_ACTIONS,
   DEFAULT_ACTIONS_FG,
   DEFAULT_BRAND_FG,
@@ -44,10 +44,13 @@ import {
   mixHex,
   paletaDoClube,
   paletaTemContrasteOk,
+  proporCorArquirrival,
   resolveActionTextColors,
   resolveTenantDesign,
   resolverSuperficies,
+  sanearAcoesContraRivalidade,
   sanearContrasteDoDesign,
+  corArquirrivalCatalogo,
 } from '@torcida/types'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -128,8 +131,8 @@ function buildContrastChecksForMode(
     brandFg.secondary,
     s.surface,
   )
-  const primarySoftBg = mixHex(s.surface, primaryText.fill, 0.14)
-  const secondarySoftBg = mixHex(s.surface, secondaryText.fill, 0.14)
+  const primarySoftBg = mixHex(s.surface, primaryText.fill, WASH_ACAO)
+  const secondarySoftBg = mixHex(s.surface, secondaryText.fill, WASH_ACAO)
   const tema = mode === 'dark' ? 'escuro' : 'claro'
 
   const pairs: {
@@ -201,7 +204,7 @@ function buildContrastChecksForMode(
       label: 'Menu / tab ativo',
       fg: primaryText.fg,
       bg: primarySoftBg,
-      min: CONTRASTE_AA_GRANDE,
+      min: CONTRASTE_AA,
       tip: 'Texto de abas some — use Automático ou outra cor de texto.',
     },
     {
@@ -217,7 +220,7 @@ function buildContrastChecksForMode(
       label: 'Badge / link secundário',
       fg: secondaryText.fg,
       bg: secondarySoftBg,
-      min: CONTRASTE_AA_GRANDE,
+      min: CONTRASTE_AA,
       tip: 'Badge soft ou link da secundária ilegível neste tema.',
     },
   ]
@@ -236,22 +239,32 @@ function buildContrastChecksForMode(
   for (const key of ACTION_TOKEN_KEYS) {
     const fill = actions[key]
     const text = resolveActionTextColors(fill, actionsFg[key], s.surface)
+    const nome = ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()
+    const softBg = mixHex(s.surface, text.fill, WASH_ACAO)
     pairs.push(
       {
         id: `${key}-btn`,
-        label: `Botão ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
+        label: `Botão ${nome}`,
         fg: text.on,
         bg: text.fill,
         min: CONTRASTE_AA,
         tip: `Ajuste a cor ou o texto de ${ACTION_TOKEN_LABELS[key]}.`,
       },
       {
-        id: `${key}-soft`,
-        label: `Badge ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
+        id: `${key}-text`,
+        label: `Texto ${nome} no papel`,
         fg: text.fg,
-        bg: mixHex(s.surface, text.fill, 0.14),
-        min: CONTRASTE_AA_GRANDE,
-        tip: `Badge soft ilegível no tema ${tema}. Use Automático ou outra cor.`,
+        bg: s.surface,
+        min: CONTRASTE_AA,
+        tip: `KPI/status (${nome}) ilegível no cartão no tema ${tema}.`,
+      },
+      {
+        id: `${key}-soft`,
+        label: `Badge ${nome}`,
+        fg: text.fg,
+        bg: softBg,
+        min: CONTRASTE_AA,
+        tip: `Badge ${nome} (ex.: Sem gestor) ilegível no tema ${tema}.`,
       },
     )
   }
@@ -287,12 +300,12 @@ function dualThemeTextStatus(
   return (['light', 'dark'] as const).map((mode) => {
     const s = resolveSurfaces(design, mode)
     const text = resolveActionTextColors(fill, fgOverride, s.surface)
-    const softBg = mixHex(s.surface, text.fill, 0.14)
+    const softBg = mixHex(s.surface, text.fill, WASH_ACAO)
     const softRatio = contrasteRatio(text.fg, softBg)
     const btnRatio = contrasteRatio(text.on, text.fill)
     return {
       mode,
-      softOk: softRatio >= CONTRASTE_AA_GRANDE,
+      softOk: softRatio >= CONTRASTE_AA,
       btnOk: btnRatio >= CONTRASTE_AA,
       softRatio,
       btnRatio,
@@ -392,6 +405,7 @@ function ColorField({
   emptyLabel = 'Usar padrão',
   token,
   onFocusToken,
+  fieldId,
 }: {
   label: string
   value: string | null
@@ -402,6 +416,7 @@ function ColorField({
   emptyLabel?: string
   token?: TokenFocus
   onFocusToken?: (t: TokenFocus) => void
+  fieldId?: string
 }) {
   const [draft, setDraft] = useState(value ?? resolved)
 
@@ -438,6 +453,7 @@ function ColorField({
 
   return (
     <div
+      id={fieldId}
       className="space-y-1.5"
       onMouseEnter={() => token && onFocusToken?.(token)}
       onFocusCapture={() => token && onFocusToken?.(token)}
@@ -476,6 +492,7 @@ function ColorField({
           />
         </div>
         <input
+          id={fieldId ? `${fieldId}-hex` : undefined}
           type="text"
           value={draft}
           placeholder={resolved}
@@ -1007,6 +1024,31 @@ function DualThemeGridSamples({ design }: { design: TenantDesign }) {
   )
 }
 
+function copyArquirrivalIdentidade(
+  proposta: ReturnType<typeof proporCorArquirrival>,
+  catalogo: string | null,
+): string {
+  const pulados = proposta.pulados
+    .map((p) => p.rotulo)
+    .filter(Boolean)
+    .join(' e ')
+  if (proposta.mesmoAlvinegro && catalogo && proposta.rivalRotulo) {
+    return `O clássico com ${pulados} também é alvinegro — essa rivalidade não gera uma cor a isolar. O próximo arquirrival com cor distinta é o ${proposta.rivalRotulo}. Confirmam essa cor no painel, ou querem escolher outra?`
+  }
+  if (proposta.mesmoAlvinegro && !catalogo) {
+    return pulados
+      ? `O clássico com ${pulados} compartilha o preto e branco de vocês, então essa rivalidade não gera uma cor a isolar. Querem definir uma cor de arquirrival à mão?`
+      : 'Não há um arquirrival com cor distinta no catálogo. Querem definir uma cor de arquirrival à mão?'
+  }
+  if (catalogo && proposta.rivalRotulo) {
+    return `Sugerimos a cor do ${proposta.rivalRotulo} para não pintar o painel com o arquirrival. Confirmam, ou querem escolher outra?`
+  }
+  if (catalogo) {
+    return 'Sugerimos esta cor de arquirrival para não pintá-la no painel. Confirmam, ou querem escolher outra?'
+  }
+  return 'Querem definir a cor de arquirrival desta unidade?'
+}
+
 export function DesignForm({
   initialDesign,
   corPrimaria,
@@ -1017,8 +1059,14 @@ export function DesignForm({
   imagemUrls,
 }: Props) {
   const baseline = useMemo(
-    () => resolveTenantDesign(initialDesign, corPrimaria) as TenantDesign,
-    [initialDesign, corPrimaria],
+    () =>
+      resolveTenantDesign(initialDesign, corPrimaria, {
+        slug: tenantSlug,
+        clubeNome,
+        clubeApelido,
+        corArquirrival: initialDesign.brand.arquirrival,
+      }) as TenantDesign,
+    [initialDesign, corPrimaria, tenantSlug, clubeNome, clubeApelido],
   )
   const normalizedBaseline = useMemo(
     () => ({
@@ -1040,6 +1088,8 @@ export function DesignForm({
   const [extracting, setExtracting] = useState(false)
   const [nomeNovaPaleta, setNomeNovaPaleta] = useState('')
   const [mostrarSalvarPaleta, setMostrarSalvarPaleta] = useState(false)
+  const [arquirrivalPerguntaDispensada, setArquirrivalPerguntaDispensada] =
+    useState(false)
   const { resolvedTheme } = useTheme()
 
   const dirty = useMemo(
@@ -1097,6 +1147,39 @@ export function DesignForm({
     [clubeNome, clubeApelido],
   )
 
+  const propostaArquirrival = useMemo(
+    () =>
+      proporCorArquirrival({
+        slug: tenantSlug,
+        clubeNome,
+        clubeApelido,
+        corPrimaria: design.brand.primary,
+      }),
+    [tenantSlug, clubeNome, clubeApelido, design.brand.primary],
+  )
+  const catalogoArquirrival = useMemo(
+    () =>
+      corArquirrivalCatalogo({
+        slug: tenantSlug,
+        clubeNome,
+        clubeApelido,
+      }),
+    [tenantSlug, clubeNome, clubeApelido],
+  )
+  const mostrarPerguntaArquirrival =
+    section === 'identidade' &&
+    !design.brand.arquirrival &&
+    !arquirrivalPerguntaDispensada &&
+    Boolean(propostaArquirrival.clubeChave) &&
+    Boolean(catalogoArquirrival || propostaArquirrival.mesmoAlvinegro)
+
+  function focarCampoArquirrival() {
+    document
+      .getElementById('design-cor-arquirrival')
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    document.getElementById('design-cor-arquirrival-hex')?.focus()
+  }
+
   // Semente estável (baseline) + catálogo por slug: se a cor salva ainda for o
   // roxo da plataforma, “Marca da torcida” usa preto/cores curadas (Gaviões etc.).
   const paletasSugeridas = useMemo(
@@ -1104,6 +1187,9 @@ export function DesignForm({
       gerarPaletasSugeridas(normalizedBaseline.brand.primary, {
         secondary: normalizedBaseline.brand.secondary,
         slug: tenantSlug,
+        clubeNome,
+        clubeApelido,
+        corArquirrival: design.brand.arquirrival,
         clube: clubePaleta
           ? {
               primary: clubePaleta.primary,
@@ -1117,6 +1203,9 @@ export function DesignForm({
       normalizedBaseline.brand.primary,
       normalizedBaseline.brand.secondary,
       tenantSlug,
+      clubeNome,
+      clubeApelido,
+      design.brand.arquirrival,
       clubePaleta,
       extracted,
     ],
@@ -1127,12 +1216,45 @@ export function DesignForm({
     [design.customPalettes],
   )
 
-  const contrastChecks = useMemo(() => buildContrastChecks(design), [design])
+  const designUi = useMemo((): TenantDesign => {
+    return {
+      ...design,
+      actions: sanearAcoesContraRivalidade(
+        { ...DEFAULT_ACTIONS, ...design.actions },
+        {
+          slug: tenantSlug,
+          clubeNome,
+          clubeApelido,
+          corPrimaria: design.brand.primary,
+          corArquirrival: design.brand.arquirrival,
+          design,
+        },
+      ),
+    }
+  }, [design, tenantSlug, clubeNome, clubeApelido])
 
-  const surfacesResolved = resolveSurfaces(design, previewMode)
+  const contrastChecks = useMemo(() => buildContrastChecks(designUi), [designUi])
+
+  const surfacesResolved = resolveSurfaces(designUi, previewMode)
 
   function patch(partial: Partial<TenantDesign>) {
-    setDesign((d) => ({ ...d, ...partial }))
+    setDesign((d) => {
+      const next = { ...d, ...partial } as TenantDesign
+      return {
+        ...next,
+        actions: sanearAcoesContraRivalidade(
+          { ...DEFAULT_ACTIONS, ...next.actions },
+          {
+            slug: tenantSlug,
+            clubeNome,
+            clubeApelido,
+            corPrimaria: next.brand.primary,
+            corArquirrival: next.brand.arquirrival,
+            design: next,
+          },
+        ),
+      }
+    })
   }
 
   function applyPaletaCompleta(
@@ -1159,6 +1281,9 @@ export function DesignForm({
             opts.secondary !== undefined ? opts.secondary : d.brand.secondary,
           accents: clubePaleta?.accents ?? [],
           rederiveSurfaces: opts.rederiveSurfaces,
+          slug: tenantSlug,
+          clubeNome,
+          clubeApelido,
         }) as TenantDesign,
     )
   }
@@ -1193,7 +1318,7 @@ export function DesignForm({
 
   function handleSave() {
     startTransition(async () => {
-      const ok = await runPersistAction(() => salvarDesignTenant(design), {
+      const ok = await runPersistAction(() => salvarDesignTenant(designUi), {
         success: 'Design salvo. A plataforma já reflete as cores.',
       })
       if (ok) window.location.reload()
@@ -1475,10 +1600,96 @@ export function DesignForm({
                     Cor secundária: fill do botão Curtir, badge Destaque e faixa do
                     evento. O texto desses elementos é o campo acima.
                   </p>
+                  {mostrarPerguntaArquirrival ? (
+                    <div className="space-y-3 rounded-xl border border-[rgb(var(--color-warning)_/_0.4)] bg-[rgb(var(--color-warning)_/_0.08)] p-3">
+                      <div className="flex items-start gap-3">
+                        {catalogoArquirrival ? (
+                          <span
+                            className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm"
+                            style={{ backgroundColor: catalogoArquirrival }}
+                            title={catalogoArquirrival}
+                            aria-hidden
+                          />
+                        ) : (
+                          <Palette
+                            className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--color-warning-fg))]"
+                            aria-hidden
+                          />
+                        )}
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                            Cor do arquirrival
+                          </p>
+                          <p className="text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+                            {copyArquirrivalIdentidade(
+                              propostaArquirrival,
+                              catalogoArquirrival,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {catalogoArquirrival ? (
+                          <button
+                            type="button"
+                            className="app-action inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-xs font-semibold text-[rgb(var(--color-primary-on))]"
+                            onClick={() =>
+                              patch({
+                                brand: {
+                                  ...design.brand,
+                                  arquirrival: catalogoArquirrival,
+                                },
+                              })
+                            }
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                            Usar esta cor
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="app-action inline-flex items-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 text-xs font-medium text-[rgb(var(--foreground))]"
+                          onClick={focarCampoArquirrival}
+                        >
+                          {catalogoArquirrival ? 'Escolher outra' : 'Definir agora'}
+                        </button>
+                        <button
+                          type="button"
+                          className="app-action inline-flex items-center rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] underline-offset-2 hover:underline"
+                          onClick={() => setArquirrivalPerguntaDispensada(true)}
+                        >
+                          Agora não
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <ColorField
+                    label="Cor do arquirrival"
+                    fieldId="design-cor-arquirrival"
+                    value={design.brand.arquirrival ?? null}
+                    resolved={
+                      catalogoArquirrival ?? '#6b7280'
+                    }
+                    allowEmpty
+                    emptyLabel="Padrão do catálogo"
+                    onChange={(v) =>
+                      patch({
+                        brand: { ...design.brand, arquirrival: v },
+                      })
+                    }
+                    {...fieldProps}
+                  />
+                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                    Dado da torcida, não palpite de UX: essa família de hue não
+                    pinta departamentos, badges nem textos de status (aviso,
+                    informativo, sucesso) nesta unidade. Vazio usa o padrão do
+                    catálogo — clássico alvinegro (Santos × Corinthians) é
+                    pulado; entra o próximo hue distinto (Palmeiras / Mancha).
+                  </p>
                   <button
                     type="button"
                     onClick={reequilibrarAcoesDaMarca}
-                    className="text-left text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                    className="text-left text-xs font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
                   >
                     Reequilibrar claro, escuro e ações a partir da primária
                   </button>
@@ -1493,7 +1704,7 @@ export function DesignForm({
               >
                 <div className="grid gap-3">
                   {ACTION_TOKEN_KEYS.map((key) => {
-                    const fill = design.actions?.[key] ?? DEFAULT_ACTIONS[key]
+                    const fill = designUi.actions?.[key] ?? DEFAULT_ACTIONS[key]
                     const fgOverride =
                       design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key] ?? null
                     const autoText = resolveActionTextColors(
@@ -1542,7 +1753,7 @@ export function DesignForm({
                           {...fieldProps}
                         />
                         <DualThemeTextSamples
-                          design={design}
+                          design={designUi}
                           fill={fill}
                           fgOverride={fgOverride}
                         />
@@ -1764,7 +1975,7 @@ export function DesignForm({
         {/* Prévia — scroll interno; pr alinha com o respiro da esquerda / barra */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 xl:overflow-y-auto xl:pr-3">
           <DesignStudioPreview
-            design={design}
+            design={designUi}
             baselineDesign={normalizedBaseline}
             compareAtivo={compareAtivo && dirty}
             mode={previewMode}

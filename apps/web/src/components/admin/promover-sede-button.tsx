@@ -112,7 +112,7 @@ export function PromoverSedeButton({
             <button
               type="button"
               onClick={handlePromover}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]"
             >
               <Building2 className="h-3.5 w-3.5" aria-hidden />
               Criar portal próprio

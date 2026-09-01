@@ -406,6 +406,24 @@ assinalabilidade (mais raso) em vez de re-inferir o tipo completo (mais
 profundo). Ver `apps/web/src/app/admin/acessos/actions.ts` e `page.tsx` para
 o padrão (`RoleLite`, `DepartamentoLite` etc.).
 
+**Complemento medido em 2026-09-01 — o lado da escrita também está descoberto.**
+A regra acima cobre a **leitura**. Testando durante o módulo de moderação,
+injetamos de propósito um campo inexistente no `data` de um
+`db.<modelo>.create(...)` e rodamos `tsc --noEmit`: **passou limpo**. Ou seja,
+neste schema o `tsc` não é rede de segurança para payload de escrita —
+campo com nome errado, campo que não existe e valor de enum inválido passam
+pela compilação e só quebram em runtime, contra o banco.
+
+Consequências práticas:
+
+- Ao escrever `create`/`update`/`upsert` novos, **conferir campo a campo e
+  valor de enum contra `schema.prisma`** — não confiar no editor nem no CI.
+- Erro de payload só é pego por auditoria de fluxo (`audit:*`, que roda contra
+  banco real) ou por teste de integração. É o principal argumento para as
+  auditorias existirem: elas cobrem o que o `tsc` não cobre.
+- Vale em dobro logo depois de mudar `schema.prisma`, quando o
+  `prisma generate` pode não ter rodado — o código velho continua compilando.
+
 ### 5.3 Item 16 resolvido — assertPermission é o único critério de autorização do admin
 
 `assertAdmin`/`assertOwner` (nome de cargo de sistema `owner`/`admin`) foram
@@ -1227,11 +1245,14 @@ diferente. `DepartamentoArea` + `DepartamentoAreaMembro` modelam isso. Spec:
   `modulo-comunidade.md` § foco Caso A.
 - **Cockpit consome flags, não refaz RBAC.** `[slug]/_lib/contexto.ts` espelha
   `configuracoes/_lib/contexto.ts`: um loader `cache()`-ado resolve gate,
-  permissões e áreas; os blocos só leem booleanos. Blocos sem permissão
-  aparecem `blocked` com motivo em vez de sumir — invisibilidade ensina menos
-  que uma porta fechada e rotulada.
-- **Institucional × comando.** `/admin/departamentos` (visão/áreas/equipes/
-  projetos) continua `roles:manage`. Hubs de **comando** por domínio
+  permissões e áreas; os blocos só leem booleanos. Bloco sem permissão de
+  leitura some da UI (aba, KPI, painel) — quem não pode ver a fila não vê a
+  aba nem o número de pendentes; atalho admin some para quem não gere.
+- **Institucional × comando.** `/admin/departamentos` (visão / áreas / equipes /
+  projetos) continua `roles:manage`. Áreas e projetos no admin são dashboards
+  de saúde da torcida; a ficha de operar mora no portal
+  (`/portal/departamentos/[slug]/areas/[id]` e `/projetos/[id]`). Hubs de
+  **comando** por domínio
   (`/admin/caravanas`, `/admin/bateria`, `/admin/social`, `/admin/feminino`,
   `/admin/carnaval`, `/admin/diretoria` + Financeiro/Loja/…) entram no
   `ADMIN_MENU` com `departamentoSlug`; o layout filtra por gestoria
@@ -1907,6 +1928,56 @@ dá piso de nível 2 (lido ao vivo no gate). Score privado; badge de nível no
 perfil; sem ranking. Distinto do score do brechó e do `ForumScoreSaldo`.
 Doc: `docs/data/modulo-confianca.md`. Regras puras em
 `packages/types/src/confianca.js`.
+
+### 5.33 Moderação — rotular ≠ decidir; dever de cuidado é requisito (2026-09-01)
+
+Três mudanças legais posteriores ao desenho atual tornam moderação **requisito
+de arquitetura**, não feature de comunidade: **STF Tema 987** (art. 19 do MCI
+parcialmente inconstitucional — notificação extrajudicial basta, e há **dever
+de cuidado proativo** em discriminação/discurso de ódio, sem o limiar de risco
+sistêmico que protegeria plataforma pequena), **ECA Digital (Lei 15.211/2025,
+vigente 17/03/2026)** e **Lei 14.532/2023** (racismo em contexto esportivo,
+agravado quando coletivo ou "em descontração"). Ver
+`docs/knowledge/contexto-legal.md` § responsabilidade da plataforma.
+
+Decisões fechadas:
+
+1. **Rotular ≠ decidir** (modelo componível do Bluesky). Classificador e listas
+   produzem `ConteudoSinal`; quem age é a **política** — piso da plataforma,
+   que o tenant só pode **endurecer**. Classificador nunca pune sozinho em S3+.
+2. **Três ações, não uma** (Meta *remove/reduce/inform*) + liberar. `oculto`
+   deixa de ser a única resposta; entra redução de alcance e rótulo informativo.
+3. **Fila de retenção** (Twitch AutoMod): conteúdo suspeito nem publica nem
+   some — fica retido para revisão humana. É o que dá precisão sem exigir
+   modelo perfeito.
+4. **Reputação filtra antes do conteúdo** (Reddit): AND com o eixo **Confiança**
+   já existente (§5.32). Autor nível 0/1 sempre classificado; nível 2+ só na
+   suspeita. Corta custo de IA e concentra escrutínio onde mora o risco.
+5. **Devido processo obrigatório** (Santa Clara / DSA / tese do STF): autor
+   notificado com categoria e trecho, **recurso** com revisor ≠ decisor
+   (validado no servidor), relatório de transparência.
+6. **Preservar antes de remover**: S3/S4 grava `ConteudoPreservado` (snapshot +
+   hash + metadados) antes do soft-delete — o ECA Digital exige a prova, e
+   `oculto = true` não a guarda. Leitura de material preservado é **auditada**
+   (o `AuditLog` atual só registra mutação).
+7. **S4 não é decisão do tenant**: CSAM, aliciamento, autolesão, terrorismo,
+   tráfico, ato antidemocrático, ameaça crível e NCII escalam automaticamente à
+   plataforma, com exposição minimizada ao moderador local.
+8. **Classificador**: `claude-haiku-4-5` com a política inteira no system prompt
+   sob `cache_control` e saída estruturada — a política **é** o classificador, e
+   muda sem retreino. Degradação graciosa obrigatória (`isModeracaoIAConfigurada`,
+   padrão de `lib/livekit.ts`): falha de fornecedor nunca derruba publicação.
+   **Perspective API foi descartada** — Google a descontinua após dez/2026.
+   Mídia entra pelos add-ons do Cloudinary, sem mudar o pipeline de upload.
+9. **Toda superfície tem denúncia.** `AlvoModeracao` cobre as 16 superfícies de
+   UGC; alvo novo no produto exige entrada no enum. Hoje só Post, DM e brechó
+   têm caminho — o **fórum da praça**, única superfície cross-tenant (torcidas
+   rivais), não tem, e é o maior buraco.
+
+Docs: `docs/data/modulo-moderacao.md` (spec), `docs/data/politica-de-conteudo.md`
+(normativa), `docs/knowledge/moderacao-plataformas.md` (pesquisa e fontes).
+Fecha o item **P1** do gate em `docs/data/plano-criptografia-e-moderacao.md` e
+não altera a Fase A (segue sem E2EE, servidor legível — §5.23).
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

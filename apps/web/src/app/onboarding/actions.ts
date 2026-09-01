@@ -58,6 +58,7 @@ import {
   formatNomeTorcida,
   resolverPeriodicidadesOnboarding,
 } from '@torcida/types'
+import { resolverPlanoVinculo } from '@/lib/planos-associacao'
 import {
   avaliarBloqueioNovaAssociacao,
   torcidaTemLiderancaReal,
@@ -608,6 +609,8 @@ const solicitarVinculoSchema = z.object({
   periodicidadePretendida: z
     .enum(['MENSAL', 'TRIMESTRAL', 'QUADRIMENSAL', 'SEMESTRAL', 'ANUAL', 'UNICA'])
     .optional(),
+  // Plano cadastrado (quando a torcida já definiu valor/nome).
+  planoAssociacaoId: z.string().uuid().optional(),
 }).superRefine((data, ctx) => {
   if (data.tipo !== 'SOCIO') return
   const caminho = data.caminhoSocio ?? 'EXISTENTE'
@@ -1232,6 +1235,7 @@ export async function solicitarVinculo(
           : null,
       periodicidadePretendida:
         data.caminhoSocio === 'EXISTENTE' ? data.periodicidadePretendida ?? null : null,
+      planoAssociacaoId: null as string | null,
       // LGE / cadastro completo (2026-07)
       dataNascimento: dataNascimento ?? undefined,
       sexo: data.sexo,
@@ -1298,6 +1302,26 @@ export async function solicitarVinculo(
           return { errors: { sedeId: ['Portal da unidade indisponível'] } }
         }
         tenantDestino = filho
+      }
+    }
+
+    if (
+      data.tipo === 'SOCIO' &&
+      data.caminhoSocio === 'EXISTENTE' &&
+      data.periodicidadePretendida
+    ) {
+      const plano = await resolverPlanoVinculo(
+        tenantDestino.id,
+        data.periodicidadePretendida,
+        data.planoAssociacaoId,
+      )
+      dadosMembro.planoAssociacaoId = plano?.id ?? null
+      if (data.planoAssociacaoId && !plano) {
+        return {
+          errors: {
+            periodicidadePretendida: ['Este plano não está disponível nesta torcida'],
+          },
+        }
       }
     }
 

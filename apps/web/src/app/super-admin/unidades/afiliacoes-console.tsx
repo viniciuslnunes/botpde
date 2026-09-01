@@ -49,7 +49,7 @@ function Feedback({ state }: { state: SolicitacaoActionState }) {
   if (!state.message) return null
   return (
     <p
-      className={state.success ? 'text-xs text-emerald-400' : 'text-xs text-red-400'}
+      className={state.success ? 'text-xs text-success' : 'text-xs text-red-400'}
       role={state.success ? 'status' : 'alert'}
     >
       {state.message}
@@ -418,7 +418,7 @@ function PromoverForm({ sedeId }: { sedeId: string }) {
         Cancelar
       </button>
       {state.message && (
-        <span className={state.success ? 'text-xs text-emerald-400' : 'text-xs text-red-400'}>
+        <span className={state.success ? 'text-xs text-success' : 'text-xs text-red-400'}>
           {state.message}
         </span>
       )}

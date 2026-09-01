@@ -7,5 +7,9 @@ export default async function PlanosAssociacaoLegadoPage({
   searchParams: Promise<{ edit?: string }>
 }) {
   const { edit } = await searchParams
-  permanentRedirect(`/admin/financeiro/planos${edit ? `?edit=${encodeURIComponent(edit)}` : ''}`)
+  permanentRedirect(
+    edit
+      ? `/admin/financeiro/planos/novo?edit=${encodeURIComponent(edit)}`
+      : '/admin/financeiro/planos',
+  )
 }

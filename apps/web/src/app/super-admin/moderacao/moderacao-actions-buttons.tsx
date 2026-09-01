@@ -5,27 +5,47 @@ import { Check, X } from 'lucide-react'
 import { AdminRowActions } from '@/components/admin/ui'
 import { runPersistAction } from '@/lib/toast-action'
 import {
+  descartarDenunciaModeracaoSuperAdminAction,
   descartarDenunciaMensagemSuperAdminAction,
   descartarDenunciaSuperAdminAction,
+  resolverDenunciaModeracaoSuperAdminAction,
   resolverDenunciaMensagemSuperAdminAction,
   resolverDenunciaSuperAdminAction,
 } from './actions'
+
+const RESOLVER_POR_TIPO = {
+  post: resolverDenunciaSuperAdminAction,
+  mensagem: resolverDenunciaMensagemSuperAdminAction,
+  forum: resolverDenunciaModeracaoSuperAdminAction,
+} as const
+
+const DESCARTAR_POR_TIPO = {
+  post: descartarDenunciaSuperAdminAction,
+  mensagem: descartarDenunciaMensagemSuperAdminAction,
+  forum: descartarDenunciaModeracaoSuperAdminAction,
+} as const
+
+const ROTULO_POR_TIPO = {
+  post: 'o post',
+  mensagem: 'a mensagem',
+  forum: 'o conteúdo do fórum',
+} as const
 
 export function ModeracaoActionsButtons({
   denunciaId,
   tipo,
 }: {
   denunciaId: string
-  tipo: 'post' | 'mensagem'
+  tipo: 'post' | 'mensagem' | 'forum'
 }) {
   const [pending, startTransition] = useTransition()
 
-  const resolverAction = tipo === 'post' ? resolverDenunciaSuperAdminAction : resolverDenunciaMensagemSuperAdminAction
-  const descartarAction = tipo === 'post' ? descartarDenunciaSuperAdminAction : descartarDenunciaMensagemSuperAdminAction
-  const rotuloConteudo = tipo === 'post' ? 'o post' : 'a mensagem'
+  const resolverAction = RESOLVER_POR_TIPO[tipo]
+  const descartarAction = DESCARTAR_POR_TIPO[tipo]
+  const rotuloConteudo = ROTULO_POR_TIPO[tipo]
 
   function resolver() {
-    if (!window.confirm(`Resolver esta denúncia? ${rotuloConteudo === 'o post' ? 'O post' : 'A mensagem'} será removido(a) de imediato.`)) {
+    if (!window.confirm(`Resolver esta denúncia? Removemos ${rotuloConteudo} de imediato.`)) {
       return
     }
     startTransition(async () => {

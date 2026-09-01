@@ -35,6 +35,7 @@ import {
 import {
   AdminChartPeriodFilter,
   AdminExpansionPanel,
+  AdminPageHeader,
   AdminPendingTabs,
   ListagemPaginacao,
   ListagemTh,
@@ -65,6 +66,7 @@ import {
 } from '@/lib/listagem/query'
 import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { mapToAdminMembroItem } from '@/lib/admin-membro-map'
+import { formatCaixaAltaListagem } from '@/lib/admin-listagem-format'
 import { carregarResumoRecrutamento } from '@/lib/membro-recrutamento-logs'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { AdminMembrosTable } from '@/app/admin/membros/admin-membros-client'
@@ -638,13 +640,16 @@ export default async function TorcedoresPage({
   const dinamicas: OpcoesDinamicas = {
     sede: [
       { valor: 'nenhuma', label: 'Sem unidade' },
-      ...sedesOpts.map((s) => ({ valor: s.id, label: s.nome })),
+      ...sedesOpts.map((s) => ({
+        valor: s.id,
+        label: formatCaixaAltaListagem(s.nome) ?? s.nome,
+      })),
     ],
     departamento: [
       { valor: 'sem', label: 'Sem área' },
       ...departamentosOpts.map((d: { id: string; nome: string }) => ({
         valor: d.id,
-        label: d.nome,
+        label: formatCaixaAltaListagem(d.nome) ?? d.nome,
       })),
     ],
   }
@@ -797,24 +802,18 @@ export default async function TorcedoresPage({
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Cabeçalho */}
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Torcedores</h1>
-              <p className="text-sm tabular-nums text-[rgb(var(--foreground-muted))]">
-                {paginacao.total === 0
-                  ? 'Nenhum resultado'
-                  : `${paginacao.faixa.de}–${paginacao.faixa.ate} de ${paginacao.total}`}
-              </p>
-            </div>
-            <div className="shrink-0">
-              <ExportarLgeButton />
-            </div>
-          </div>
-
+    <div className="flex h-full flex-col">
+      <AdminPageHeader
+        title="Torcedores"
+        description={
+          <span className="tabular-nums">
+            {paginacao.total === 0
+              ? 'Nenhum resultado'
+              : `${paginacao.faixa.de}–${paginacao.faixa.ate} de ${paginacao.total}`}
+          </span>
+        }
+        actions={<ExportarLgeButton />}
+      >
         <AdminPendingTabs
           tabs={tabs.map((tab) => ({
             id: tab.status,
@@ -830,21 +829,17 @@ export default async function TorcedoresPage({
           activeId={statusFiltro}
           paramKey="status"
         />
-
-        <div className="mt-3">
-          <ListagemToolbar
-            spec={SPEC}
-            params={listagem}
-            paginacao={paginacao}
-            facetas={facetas}
-            dinamicas={dinamicas}
-            extras={extrasDaRota}
-            escopoChave={tenant.id}
-            filtrosCompactos={FILTROS_COMPACTOS}
-          />
-        </div>
-        </div>
-      </div>
+        <ListagemToolbar
+          spec={SPEC}
+          params={listagem}
+          paginacao={paginacao}
+          facetas={facetas}
+          dinamicas={dinamicas}
+          extras={extrasDaRota}
+          escopoChave={tenant.id}
+          filtrosCompactos={FILTROS_COMPACTOS}
+        />
+      </AdminPageHeader>
 
       {/* Tabela */}
       <div className="flex-1 overflow-auto py-4">

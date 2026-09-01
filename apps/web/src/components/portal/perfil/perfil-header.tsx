@@ -82,7 +82,7 @@ export function PerfilHeader({
               'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
               perfilPrivado
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
-                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+                : 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
             ].join(' ')}
           >
             {perfilPrivado ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
@@ -102,7 +102,7 @@ export function PerfilHeader({
         </div>
 
         {acoes && (
-          <div className="mt-4 flex w-full max-w-sm flex-wrap items-center justify-center gap-2">
+          <div className="mt-4 flex w-full flex-wrap items-center justify-center gap-2">
             {acoes}
           </div>
         )}

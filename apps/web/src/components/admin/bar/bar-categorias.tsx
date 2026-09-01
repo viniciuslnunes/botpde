@@ -88,7 +88,7 @@ export function BarCategoriasSection({ categorias }: { categorias: BarCategoriaI
         <button
           type="submit"
           disabled={pending}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Criando...' : 'Criar'}
         </button>

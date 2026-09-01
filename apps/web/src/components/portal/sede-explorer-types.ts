@@ -44,8 +44,4 @@ export const TIPO_LABEL: Record<SedeTipo, string> = {
   PONTO_ENCONTRO: 'PDE',
 }
 
-export const TIPO_CLASS: Record<SedeTipo, string> = {
-  SEDE: 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
-  SUBSEDE: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  PONTO_ENCONTRO: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-}
+export { SEDE_TIPO_BADGE_CLASS as TIPO_CLASS } from '@/lib/sede-tipo-badge'

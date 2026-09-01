@@ -64,14 +64,44 @@ neutro (`#1d4ed8`) ou tom derivado da marca — nunca emerald “de dashboard”
    o preto no cinza) e secundária branca ganha fill/anel para o botão não sumir.
 
 6. **Sucesso ≠ verde universal**  
-   Default de `actions.success` = azul. Verde só via `derivarAcoesDaMarca`
-   quando a marca/clube já carrega verde.
+   Default de `actions.success` = azul na plataforma. Verde entra quando a
+   identidade já é verde **ou** quando o arquirrival é outra família e o
+   motor recolore o azul default (Galoucura × Máfia Azul → verde da Mancha,
+   aliada). Gaviões continua sem verde: o tabu é o dado `#006437`.
+
+7. **Cor de arquirrival é dado**  
+   Cada clube tem um hex curado em `CLUBE_COR_ARQUIRRIVAL` (Gaviões/Corinthians
+   → `#006437` Palmeiras; Galoucura/Atlético-MG → `#003da5` Cruzeiro). Se o
+   primeiro clássico **compartilha o P&B** (Santos × Corinthians), essa
+   rivalidade não gera hue a isolar — `proporCorArquirrival` pula e pega o
+   próximo (Palmeiras / Mancha verde). Accent do rival alvinegro (bordo) não
+   conta. Curadoria `null` vence o walk (Cruzeiro × Galo não inventa verde
+   América). A unidade confirma ou escolhe o hex em Design › Identidade
+   (`brand.arquirrival`); vazio no JSON ainda usa o catálogo em runtime
+   (`Tenant.corArquirrival`). A UI (`resolverCorSemRivalidade` nos
+   departamentos, `sanearAcoesContraRivalidade` nos tokens `actions.*`) usa
+   esse hex. **A família do arquirrival não pinta o painel em hipótese alguma**
+   (nem `sky-*` / `blue-*` / `#2563eb` crus). Aliada (Mancha × Galoucura) pode.
 
 ## O que não fazer
 
 - Sugerir paletas “bonitas” de color-theory sem olhar afiliação.
-- Hardcodar `emerald-*` / `#059669` em CTAs de RSVP, contraste OK, ou
-  botões “positivo” no estúdio.
+- Hardcodar `emerald-*` / `green-*` / `#059669` em CTAs de RSVP, carteirinha,
+  toasts, contraste OK, ou botões “positivo”. Usar `.text-success` /
+  `.alert-success` / `.btn-success` (`actions.success`). **Tipo de unidade
+  (Sede/Subsede/PDE) também:** tokens `--color-primary` / muted / secondary,
+  nunca `bg-emerald-*` / `bg-blue-*`. CI: `pnpm --filter @torcida/web lint:rival-hues`.
+- Pintar card de departamento com a cor canônica crua (`#047857` financeiro,
+  `#4d7c0f` carnaval) sem `resolverCorSemRivalidade` — isso é verde de
+  Palmeiras na casa de Gaviões (e azul de Grêmio na casa do Inter, etc.).
+- Deixar `actions.info` / badge Aviso / `.alert` informativo no azul padrão
+  (`#2563eb`) quando o arquirrival da unidade for azul (Galoucura × Máfia Azul).
+  Tokens de ação passam por `sanearAcoesContraRivalidade`.
+- Hardcodar `sky-*` / `blue-*` / `indigo-*` / `#2563eb` em fluxo de tenant
+  (ensaio, inbox, mapa, pedido confirmado, **badge SUBSEDE**, cargo Vice).
+  Usar `--color-info` / `--color-success` / marca — o token já foi saneado
+  contra o arquirrival. Hex gravado (departamento, cargo) passa por
+  `resolverCorSemRivalidade` na leitura e na escrita.
 - Tratar personalização visual como cosmético de SaaS genérico — no nicho
   é identidade e rivalidade.
 - Expor seletor intermediário confuso (popover) antes do color picker

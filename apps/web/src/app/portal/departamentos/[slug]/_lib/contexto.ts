@@ -19,6 +19,7 @@ import {
   type AreaAcesso,
   type AreaBase,
 } from '@/lib/departamentos-portal-access'
+import { corDepartamentoDoTenant } from '@/lib/cor-departamento'
 
 export type DeptoRow = {
   id: string
@@ -228,7 +229,10 @@ export const getDepartamentoContexto = cache(async function getDepartamentoConte
   return {
     userId: session.user.id,
     tenant,
-    departamento: depto,
+    departamento: {
+      ...depto,
+      cor: await corDepartamentoDoTenant(depto.cor, tenant),
+    },
     capability: capabilityPorSlug(depto.slug),
     isSuperAdmin,
     isGestor,

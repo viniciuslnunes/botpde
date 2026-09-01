@@ -10,6 +10,8 @@ import {
   podarMencoes,
   isVideoUrl,
   linkPostComunidade,
+  linkTopicoForum,
+  linkNoticiaPortal,
 } from '../comunidade-social'
 import { detectarMencaoAtiva } from '@/components/portal/mention-picker'
 
@@ -73,5 +75,14 @@ describe('comunidade-social', () => {
 
   it('gera permalink de post', () => {
     expect(linkPostComunidade('abc-123')).toBe('/portal/comunidade/post/abc-123')
+  })
+
+  it('gera permalink do tópico no fórum e da matéria no portal de notícias', () => {
+    expect(linkTopicoForum('top-1', 'nacional')).toBe(
+      '/portal/comunidade/forum/top-1?escopo=nacional',
+    )
+    expect(linkNoticiaPortal('not-1', 'torcida')).toBe(
+      '/portal/comunidade/noticias/not-1?escopo=torcida',
+    )
   })
 })

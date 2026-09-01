@@ -83,10 +83,10 @@ export function SedeExplorerCard({
 
       <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[sede.tipo]}`}>
+          <span className={`inline-flex rounded-full px-1.5 py-0.5 portal-chip ${TIPO_CLASS[sede.tipo]}`}>
             {TIPO_LABEL[sede.tipo]}
           </span>
-          <p className="truncate text-sm font-semibold leading-snug text-[rgb(var(--foreground))]">
+          <p className="portal-display truncate text-sm leading-snug text-[rgb(var(--foreground))]">
             {sede.nome}
           </p>
           {enderecoLinha && (

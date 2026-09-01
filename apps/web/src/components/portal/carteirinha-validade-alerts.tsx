@@ -62,11 +62,11 @@ export function CarteirinhaValidadeAlerts({ validadeIso }: CarteirinhaValidadeAl
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950">
-      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+    <div className="alert-success flex items-start gap-3 rounded-xl p-4">
+      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
       <div>
-        <p className="font-semibold text-green-800 dark:text-green-200">Carteirinha ativa</p>
-        <p className="mt-0.5 text-sm text-green-700 dark:text-green-300">
+        <p className="font-semibold">Carteirinha ativa</p>
+        <p className="mt-0.5 text-sm opacity-90">
           Válida por mais {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}, até {validadeLabel}.
         </p>
       </div>

@@ -260,7 +260,7 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
         <p className="text-xs text-red-600 dark:text-red-400">{state.error}</p>
       )}
       {state.ok && state.nome && (
-        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+        <p className="text-xs font-medium text-success">
           Check-in ok: {state.nome}
           {state.aviso ? (
             <span className="mt-0.5 block font-normal text-amber-700 dark:text-amber-400">

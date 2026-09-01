@@ -34,7 +34,7 @@ export function BandeirasAcervoLista({
       categoriaTravada="BANDEIRA"
       emptyTitle="Nenhuma bandeira cadastrada"
       emptyDescription="Cadastre bandeirões, faixas e mastros com foto — é o que diferencia peças parecidas."
-      emptyIcon={<Flag className="mb-3 h-8 w-8 text-indigo-600 dark:text-indigo-300" />}
+      emptyIcon={<Flag className="mb-3 h-8 w-8 text-[rgb(var(--color-primary-fg))]" />}
     />
   )
 }

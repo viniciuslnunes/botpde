@@ -8,5 +8,5 @@ export default async function NovoTopicoPage({
 }) {
   const params = await searchParams
   const { sufixo } = await exigirContextoPraca(params.escopo)
-  redirect(`/portal/comunidade/forum${sufixo}&compose=1#feed-composer`)
+  redirect(`/portal/comunidade/forum${sufixo}&aba=novo`)
 }

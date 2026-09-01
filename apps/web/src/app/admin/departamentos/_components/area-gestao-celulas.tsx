@@ -29,58 +29,51 @@ function rotulo(m: { nome: string | null; nickname: string | null }, fallback: s
   return m.nome?.trim() || (m.nickname ? `@${m.nickname}` : null) || fallback
 }
 
-export function AreaGestaoCelulas(props: AreaGestaoProps) {
+export function AreaGestaoAcoes(props: AreaGestaoProps) {
   const [aberto, setAberto] = useState(false)
   const router = useRouter()
 
   return (
     <>
-      <td className="px-4 py-3">
-        {props.semResponsavel ? (
-          <button
-            type="button"
-            onClick={() => setAberto(true)}
-            aria-label={`Nomear responsável de ${props.areaNome}`}
-            className="app-action inline-flex items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2.5 text-xs font-medium text-[rgb(var(--color-warning-fg))] hover:opacity-90"
-          >
-            Nomear
-          </button>
-        ) : (
-          <span className="block max-w-[12rem] truncate text-sm text-[rgb(var(--foreground))]">
-            {props.responsaveis.join(', ')}
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-right">
-        <AdminRowActions
-          ariaLabel={`Ações de ${props.areaNome}`}
-          items={[
-            {
-              id: 'responsavel',
-              label: props.semResponsavel ? 'Nomear responsável' : 'Trocar responsável',
-              icon: Star,
-              onSelect: () => setAberto(true),
+      {props.semResponsavel ? (
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          aria-label={`Nomear responsável de ${props.areaNome}`}
+          className="app-action inline-flex items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2.5 text-xs font-medium text-[rgb(var(--color-warning-fg))] hover:opacity-90"
+        >
+          Nomear
+        </button>
+      ) : null}
+      <AdminRowActions
+        ariaLabel={`Ações de ${props.areaNome}`}
+        items={[
+          {
+            id: 'responsavel',
+            label: props.semResponsavel ? 'Nomear responsável' : 'Trocar responsável',
+            icon: Star,
+            onSelect: () => setAberto(true),
+          },
+          {
+            id: 'abrir',
+            label: 'Abrir ficha',
+            icon: ExternalLink,
+            onSelect: () => {
+              router.push(props.href)
             },
-            {
-              id: 'abrir',
-              label: 'Abrir no departamento',
-              icon: ExternalLink,
-              onSelect: () => {
-                router.push(props.href)
-              },
-            },
-          ]}
-        />
-      </td>
+          },
+        ]}
+      />
       {aberto ? (
-        <AreaGestaoModal
-          key={props.areaId}
-          {...props}
-          onFechar={() => setAberto(false)}
-        />
+        <AreaGestaoModal key={props.areaId} {...props} onFechar={() => setAberto(false)} />
       ) : null}
     </>
   )
+}
+
+/** @deprecated Use AreaGestaoAcoes fora de tabela. Mantido para linhas `<td>`. */
+export function AreaGestaoCelulas(props: AreaGestaoProps) {
+  return <AreaGestaoAcoes {...props} />
 }
 
 function AreaGestaoModal({
@@ -307,7 +300,7 @@ function AreaGestaoModal({
                     type="button"
                     disabled={busy}
                     onClick={() => nomear(c.id, nome)}
-                    className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 text-xs font-medium text-white disabled:opacity-50"
+                    className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 text-xs font-medium text-primary-on disabled:opacity-50"
                   >
                     <Star className="h-3 w-3" aria-hidden />
                     Nomear

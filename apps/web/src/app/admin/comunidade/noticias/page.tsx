@@ -103,7 +103,7 @@ export default async function AdminNoticiasPage() {
                 >
                   <button
                     type="submit"
-                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                    className="btn-success rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90"
                   >
                     Aprovar
                   </button>

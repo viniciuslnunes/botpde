@@ -13,6 +13,7 @@ import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissions.js'
 import { normalizeNome, chaveMatch, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
+import { corArquirrivalCatalogo } from '../../types/src/design.js'
 import { upsertDepartamentosCanonicos, upsertPerfisDepartamentoCanonicos } from '../src/departamentos-canonicos.js'
 import { prepareSeedEnv } from './lib/seed-env.js'
 
@@ -32,13 +33,13 @@ const SYSTEM_ROLE_DEFS = [
   },
   {
     nome: SYSTEM_ROLES.VICE,
-    cor: '#0ea5e9',
+    cor: '#71717a',
     ordem: 95,
     permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
   },
   {
     nome: SYSTEM_ROLES.ADMIN,
-    cor: '#3b82f6',
+    cor: '#52525b',
     ordem: 90,
     permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
   },
@@ -507,18 +508,27 @@ async function main() {
       continue
     }
 
+    const clube = tc.afiliacaoId
+      ? afiliacoes.find((a) => a.id === tc.afiliacaoId)
+      : null
+    const corArquirrival = corArquirrivalCatalogo({
+      slug,
+      clubeNome: clube?.nome,
+    })
+
     const tenant = await db.tenant.upsert({
       where: { slug },
       create: {
         slug,
         nome,
         corPrimaria: '#7c3aed',
+        corArquirrival,
         afiliacaoId: tc.afiliacaoId,
         logoUrl: tc.logoUrl ?? null,
         torcidaConhecidaId: tc.id,
         ativo: true,
       },
-      // NÃO sobrescreve nome/corPrimaria — a liderança pode ter personalizado.
+      // NÃO sobrescreve nome/corPrimaria/corArquirrival — a liderança pode ter personalizado.
       update: {
         torcidaConhecidaId: tc.id,
         logoUrl: tc.logoUrl ?? null,

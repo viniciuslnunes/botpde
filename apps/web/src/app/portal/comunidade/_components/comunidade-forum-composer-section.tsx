@@ -22,6 +22,7 @@ export async function ComunidadeForumComposerSection({
   userName,
   userAvatar,
   torcidaReal,
+  filaAprovacao = false,
 }: {
   escopo: EscopoComunidade
   tenantId: string
@@ -30,6 +31,7 @@ export async function ComunidadeForumComposerSection({
   userName: string | null
   userAvatar: string | null
   torcidaReal?: TorcidaRealComunidade | null
+  filaAprovacao?: boolean
 }) {
   const autorTenantId = escopo === 'nacional' ? (torcidaReal?.id ?? null) : tenantId
   const ctx = autorTenantId
@@ -45,12 +47,14 @@ export async function ComunidadeForumComposerSection({
       tenantId={tenantId}
       tenantNome={torcidaReal?.nome ?? tenantNome}
       forum={escopo}
+      forumFilaAprovacao={filaAprovacao}
       bloqueioPublicacao={bloqueio}
       somentePublico={escopo === 'nacional' ? false : Boolean(ctx?.somentePublico)}
       autorBadges={{
         cargoNome: ctx?.userCard.cargoNome ?? CARGO_TORCEDOR,
         departamentoNome: ctx?.userCard.departamentoNome ?? null,
         sedeNome: ctx?.userCard.sedeNome ?? null,
+        sedeTipo: ctx?.userCard.sedeTipo ?? null,
       }}
     />
   )

@@ -17,6 +17,7 @@ import type {
   OwnerOcupadoPor,
 } from '@/components/admin/access-user-panel'
 import { liderancaAtualDoTenant } from '@/lib/lideranca'
+import { comCorDepartamento } from '@/lib/cor-departamento'
 
 export interface MembroAcessoDados {
   usuario: AccessUsuario
@@ -63,13 +64,13 @@ interface DepartamentoRow {
 export async function carregarAcessoMembro(
   membroId: string,
 ): Promise<MembroAcessoResultado> {
-  let tenantId: string
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    const { tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
-    tenantId = tenant.id
+    ;({ tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE))
   } catch {
     return { ok: false, error: 'Você não tem permissão para gerenciar acessos.' }
   }
+  const tenantId = tenant.id
 
   const membro: { userId: string; fonteVerificadaEm: Date | null } | null =
     await db.saasMembro.findFirst({
@@ -147,24 +148,29 @@ export async function carregarAcessoMembro(
   // "Membro · Torcedor"; a lista de áreas oferecida na UI esconde os legados.
   const deptoById = new Map(departamentosRaw.map((d) => [d.id, d]))
 
-  const roles: AccessRoleOpt[] = rolesRaw.map((role) => {
-    const depto = role.departamentoId ? (deptoById.get(role.departamentoId) ?? null) : null
-    return {
-      id: role.id,
-      nome: role.nome,
-      cor: role.cor,
-      isSystem: role.isSystem,
-      permissions: permissionsOfRole(role, depto),
-      permissionsPacote: depto
-        ? role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
-          ? [...depto.permissions, ...depto.permissionsGestor]
-          : [...depto.permissions]
-        : [],
-      permissionsExtras: role.permissionsExtras,
-      departamentoId: role.departamentoId,
-      papelNoDepartamento: role.papelNoDepartamento,
-    }
-  })
+  const roles: AccessRoleOpt[] = (
+    await comCorDepartamento(
+      rolesRaw.map((role) => {
+        const depto = role.departamentoId ? (deptoById.get(role.departamentoId) ?? null) : null
+        return {
+          id: role.id,
+          nome: role.nome,
+          cor: role.cor,
+          isSystem: role.isSystem,
+          permissions: permissionsOfRole(role, depto),
+          permissionsPacote: depto
+            ? role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+              ? [...depto.permissions, ...depto.permissionsGestor]
+              : [...depto.permissions]
+            : [],
+          permissionsExtras: role.permissionsExtras,
+          departamentoId: role.departamentoId,
+          papelNoDepartamento: role.papelNoDepartamento,
+        }
+      }),
+      tenant,
+    )
+  )
 
   return {
     ok: true,
@@ -180,7 +186,7 @@ export async function carregarAcessoMembro(
         permissoesAdicionais: usuario.userPermissions,
       },
       roles,
-      departamentos: departamentosRaw
+      departamentos: (await comCorDepartamento(departamentosRaw, tenant))
         .filter((d) => !isDepartamentoLegado(d))
         .map((d) => ({
           id: d.id,

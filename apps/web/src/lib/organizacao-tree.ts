@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
-import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema, isDepartamentoLegado } from '@torcida/types'
+import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema, isDepartamentoLegado, resolverCorSemRivalidade } from '@torcida/types'
+import { optsCorDoTenant } from '@/lib/cor-departamento'
 
 /** Pessoa exibida no mural organizacional. */
 export interface OrgPerson {
@@ -157,6 +158,17 @@ export async function getOrganizacaoTree(tenantId: string, tenantNome: string): 
   }
 
   const deptosFiltrados = departamentosRaw.filter((d) => !isDepartamentoLegado(d))
+  const tenantCor: {
+    slug: string
+    corPrimaria: string
+    corArquirrival: string | null
+    design: unknown
+    afiliacaoId: string | null
+  } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { slug: true, corPrimaria: true, corArquirrival: true, design: true, afiliacaoId: true },
+  })
+  const corOpts = tenantCor ? await optsCorDoTenant(tenantCor) : null
 
   const branches: OrgDepartamentoBranch[] = deptosFiltrados.map((dept) => {
     const gestIds = new Set(
@@ -177,7 +189,7 @@ export async function getOrganizacaoTree(tenantId: string, tenantNome: string): 
       id: dept.id,
       nome: dept.nome,
       slug: dept.slug,
-      cor: dept.cor,
+      cor: corOpts ? resolverCorSemRivalidade(dept.cor, corOpts) : dept.cor,
       gestores: gestPeople,
       membros: memPeople,
     }

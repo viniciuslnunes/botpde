@@ -46,7 +46,7 @@ export default async function NoticiasPracaPage({
           podeArtigo ? (
             <Link
               href={`/portal/comunidade/noticias/novo${sufixo}`}
-              className="app-action inline-flex items-center rounded-xl bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-white"
+              className="app-action inline-flex items-center rounded-xl bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-primary-on"
             >
               Novo artigo
             </Link>

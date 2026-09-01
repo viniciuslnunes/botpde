@@ -21,6 +21,7 @@ import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
 import { AgendaCalendario, type AgendaCalItem } from '@/components/eventos/agenda-calendario'
 import { AgendaBusca } from '@/components/eventos/agenda-busca'
 import { ProximoEventoSpotlight } from '@/components/eventos/proximo-evento-spotlight'
+import { PortalModuloHeader } from '@/components/portal/portal-modulo-header'
 import type { Metadata } from 'next'
 import type { TipoEvento } from '@torcida/db'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
@@ -201,26 +202,23 @@ export default async function EventosPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
-            {tituloFiltro ?? 'Agenda'}
-          </h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Eventos, caravanas e ensaios da torcida
-          </p>
-        </div>
-        {podeCriar && (
-          <NovoEventoButton
-            defaultTipo={tipoFiltro ?? 'GERAL'}
-            sedes={sedes}
-            partidas={partidas}
-            projetos={projetos}
-            temAfiliacao={temAfiliacao}
-            redirectTo="/portal/eventos"
-          />
-        )}
-      </div>
+      <PortalModuloHeader
+        kicker="[ Eventos da torcida ]"
+        title={tituloFiltro ?? 'Agenda'}
+        description="Eventos, caravanas e ensaios da torcida"
+        actions={
+          podeCriar ? (
+            <NovoEventoButton
+              defaultTipo={tipoFiltro ?? 'GERAL'}
+              sedes={sedes}
+              partidas={partidas}
+              projetos={projetos}
+              temAfiliacao={temAfiliacao}
+              redirectTo="/portal/eventos"
+            />
+          ) : undefined
+        }
+      />
 
       <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.92)] p-3 backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div
@@ -232,7 +230,7 @@ export default async function EventosPage({ searchParams }: Props) {
             href={hrefFiltro({ tipo: '' })}
             prefetch={false}
             className={[
-              'rounded-lg px-3 py-1.5 font-medium transition-colors',
+              'portal-chip rounded-lg px-3 py-1.5 transition-colors',
               !tipoFiltro
                 ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                 : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -246,7 +244,7 @@ export default async function EventosPage({ searchParams }: Props) {
               href={hrefFiltro({ tipo: t })}
               prefetch={false}
               className={[
-                'rounded-lg px-3 py-1.5 font-medium transition-colors',
+                'portal-chip rounded-lg px-3 py-1.5 transition-colors',
                 tipoFiltro === t
                   ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                   : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -277,7 +275,7 @@ export default async function EventosPage({ searchParams }: Props) {
                 href={hrefFiltro({ vista: id === 'mes' ? '' : id })}
                 prefetch={false}
                 className={[
-                  'rounded-md px-3 py-1.5 font-medium transition-colors',
+                  'portal-chip rounded-md px-3 py-1.5 transition-colors',
                   vista === id
                     ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
                     : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -445,7 +443,7 @@ async function AgendaConteudo({
     <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
       <div className="space-y-5 lg:col-span-8 xl:col-span-9">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          <h2 className="portal-kicker text-[rgb(var(--foreground-muted))]">
             Próximos
           </h2>
           {cards.length > 0 && (
@@ -461,7 +459,7 @@ async function AgendaConteudo({
         />
         {passados.length > 0 && (
           <details className="group">
-            <summary className="mb-3 cursor-pointer text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            <summary className="portal-kicker mb-3 cursor-pointer text-[rgb(var(--foreground-muted))]">
               Histórico
             </summary>
             <EventosListAnimated

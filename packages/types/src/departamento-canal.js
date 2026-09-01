@@ -1,3 +1,5 @@
+import { hrefHomeDepartamento } from './departamento-capabilities.js'
+
 /**
  * Canais internos de departamento e área de atuação.
  *
@@ -100,6 +102,24 @@ export function deveListarCanalDepartamentoNaComunidade(input) {
  */
 export function nomeCanalArea(departamentoNome, areaNome) {
   return `${departamentoNome} · ${areaNome}`
+}
+
+/**
+ * Portal do departamento a partir do canal (depto ou frente).
+ * Canal da área aterrissa na ficha da frente; canal do depto, na home.
+ *
+ * @param {{
+ *   departamentoSlug?: string | null,
+ *   departamentoAreaId?: string | null,
+ * }} input
+ * @returns {string | null}
+ */
+export function hrefDepartamentoDoCanal(input) {
+  const slug = input?.departamentoSlug
+  if (!slug) return null
+  const areaId = input.departamentoAreaId
+  if (areaId) return hrefHomeDepartamento(slug, 'areas', { area: areaId })
+  return hrefHomeDepartamento(slug)
 }
 
 /**

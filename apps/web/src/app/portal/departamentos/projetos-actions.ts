@@ -37,6 +37,13 @@ export type ActionState = { ok?: boolean; error?: string }
 
 const IdSchema = z.string().min(1)
 
+function revalidateEscoposProjeto(slug: string) {
+  revalidatePath(`/portal/departamentos/${slug}`)
+  revalidatePath(`/portal/departamentos/${slug}/areas`, 'layout')
+  revalidatePath(`/portal/departamentos/${slug}/projetos`, 'layout')
+  revalidatePath('/admin/departamentos/projetos')
+}
+
 async function assertPodeGerirDepartamento(departamentoId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autorizado')
@@ -277,8 +284,7 @@ export async function abrirCampanhaDoAno(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${slugDepto || depto.slug}`)
-    revalidatePath('/admin/departamentos/projetos')
+    revalidateEscoposProjeto(slugDepto || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível abrir a campanha' }
@@ -361,8 +367,7 @@ export async function criarProjeto(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${slugDepto || depto.slug}`)
-    revalidatePath('/admin/departamentos/projetos')
+    revalidateEscoposProjeto(slugDepto || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível criar o projeto' }
@@ -446,8 +451,7 @@ export async function atualizarProjeto(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${slugDepto || depto.slug}`)
-    revalidatePath('/admin/departamentos/projetos')
+    revalidateEscoposProjeto(slugDepto || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível salvar o projeto' }
@@ -493,8 +497,7 @@ export async function atualizarStatusProjeto(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)
-    revalidatePath('/admin/departamentos/projetos')
+    revalidateEscoposProjeto(parsed.data.slug || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível mudar o status' }
@@ -542,7 +545,7 @@ export async function registrarRealizadoProjeto(
       },
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)
+    revalidateEscoposProjeto(parsed.data.slug || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível registrar' }
@@ -605,7 +608,7 @@ export async function adicionarParticipanteProjeto(
       atorId: session.user.id,
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)
+    revalidateEscoposProjeto(parsed.data.slug || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível adicionar' }
@@ -656,7 +659,7 @@ export async function removerParticipanteProjeto(
       atorId: session.user.id,
     })
 
-    revalidatePath(`/portal/departamentos/${parsed.data.slug || depto.slug}`)
+    revalidateEscoposProjeto(parsed.data.slug || depto.slug)
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível remover' }

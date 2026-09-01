@@ -177,7 +177,7 @@ export function DepartamentoProjetosBlock({
         {podeGerir && (
           <div className="mt-4 flex justify-center">
             {criando ? (
-              <ProjetoForm
+              <DepartamentoProjetoForm
                 departamentoId={departamentoId}
                 slug={slug}
                 areas={areas}
@@ -187,7 +187,7 @@ export function DepartamentoProjetosBlock({
               <button
                 type="button"
                 onClick={() => setCriando(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90"
               >
                 <Plus className="h-4 w-4" aria-hidden />
                 Novo projeto
@@ -236,7 +236,7 @@ export function DepartamentoProjetosBlock({
 
       <div className="grid gap-3 sm:grid-cols-2">
         {visiveis.map((p) => (
-          <ProjetoCard
+          <DepartamentoProjetoCard
             key={p.id}
             departamentoId={departamentoId}
             slug={slug}
@@ -256,7 +256,7 @@ export function DepartamentoProjetosBlock({
 
       {podeGerir &&
         (criando ? (
-          <ProjetoForm
+          <DepartamentoProjetoForm
             departamentoId={departamentoId}
             slug={slug}
             areas={areas}
@@ -292,7 +292,7 @@ function ChipFiltro({
       aria-pressed={ativo}
       className={
         ativo
-          ? 'rounded-full bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-medium text-white'
+          ? 'rounded-full bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-medium text-primary-on'
           : 'rounded-full border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]'
       }
     >
@@ -301,7 +301,7 @@ function ChipFiltro({
   )
 }
 
-function ProjetoCard({
+export function DepartamentoProjetoCard({
   departamentoId,
   slug,
   projeto,
@@ -334,7 +334,7 @@ function ProjetoCard({
   if (editando) {
     return (
       <div className="sm:col-span-2">
-        <ProjetoForm
+        <DepartamentoProjetoForm
           departamentoId={departamentoId}
           slug={slug}
           areas={areas}
@@ -565,7 +565,7 @@ function RealizadoForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on disabled:opacity-60"
       >
         Salvar
       </button>
@@ -580,7 +580,7 @@ function RealizadoForm({
   )
 }
 
-function ProjetoForm({
+export function DepartamentoProjetoForm({
   departamentoId,
   slug,
   areas,
@@ -781,7 +781,7 @@ function ProjetoForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on disabled:opacity-60"
         >
           {editando ? 'Salvar' : 'Criar projeto'}
         </button>
@@ -794,5 +794,37 @@ function ProjetoForm({
         </button>
       </div>
     </form>
+  )
+}
+
+export function DepartamentoProjetoCriar({
+  departamentoId,
+  slug,
+  areas,
+}: {
+  departamentoId: string
+  slug: string
+  areas: AreaOpcao[]
+}) {
+  const [criando, setCriando] = useState(false)
+  if (criando) {
+    return (
+      <DepartamentoProjetoForm
+        departamentoId={departamentoId}
+        slug={slug}
+        areas={areas}
+        onDone={() => setCriando(false)}
+      />
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setCriando(true)}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
+    >
+      <Plus className="h-4 w-4" aria-hidden />
+      Novo projeto
+    </button>
   )
 }

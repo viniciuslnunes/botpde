@@ -259,7 +259,7 @@ export function AdminMembroLgeForm({
         <button
           type="submit"
           disabled={lgePending || Boolean(desligadoEm)}
-          className="rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on disabled:opacity-60"
         >
           {lgePending ? 'Salvando…' : 'Salvar dados LGE'}
         </button>

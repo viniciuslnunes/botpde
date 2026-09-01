@@ -8,6 +8,7 @@ import { signOut } from 'next-auth/react'
 import { Lock, LogOut, Menu, Shield, UserCircle2, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
+import { AdminContextDisclosure } from '@/components/admin/admin-context-disclosure'
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
 import { AppBuildMetaSidebar } from '@/components/super-admin/app-build-meta'
 import {
@@ -49,11 +50,11 @@ function SidebarBody({
   return (
     <>
       <div className="border-b border-[rgb(var(--border))] px-4 py-4">
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
+        <p className="portal-kicker flex items-center gap-2 text-[rgb(var(--foreground-muted))]">
           <Shield className="h-3.5 w-3.5" />
           Super Admin
         </p>
-        <p className="mt-1 text-sm font-medium text-[rgb(var(--foreground))]">Torcida SaaS</p>
+        <p className="mt-1 text-sm font-semibold text-[rgb(var(--foreground))]">Torcida SaaS</p>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
@@ -158,7 +159,7 @@ function SuperAdminTopbar({
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        <Link href="/super-admin/torcidas" className="app-touch-target flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <Link href="/super-admin/torcidas" className="app-touch-target flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
             <Shield className="h-4 w-4" />
           </div>
@@ -166,7 +167,7 @@ function SuperAdminTopbar({
             <p className="truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
               Super Admin
             </p>
-            <p className="hidden text-[11px] text-[rgb(var(--foreground-muted))] sm:block">
+            <p className="portal-kicker hidden text-[rgb(var(--foreground-muted))] sm:block">
               Operação da plataforma
             </p>
           </div>
@@ -279,7 +280,7 @@ function SuperAdminSidebar({
   }, [mobileOpen])
 
   const switcher = torcidas.length > 0 && (
-    <div className="border-t border-[rgb(var(--border))] px-4 py-3">
+    <AdminContextDisclosure placement="bottom">
       <AdminSuperContextSwitchers
         clubes={clubes}
         torcidas={torcidas}
@@ -289,7 +290,7 @@ function SuperAdminSidebar({
         destino="admin"
         variant="admin"
       />
-    </div>
+    </AdminContextDisclosure>
   )
 
   const mobileDrawer =

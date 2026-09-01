@@ -76,6 +76,17 @@ export interface CanalItem {
   estado: string | null
   lat: number | null
   lng: number | null
+  /**
+   * Sócio aprovado da worktree ainda sem vínculo nesta unidade local
+   * (SUBSEDE/PDE). CTA «Esta é a minha unidade» — torcedor não recebe.
+   */
+  podeVincularUnidade: boolean
+  /** Já tem outra unidade local; CTA «Trocar para esta unidade». */
+  podeTrocarUnidade: boolean
+  /** Esta é a unidade local atual; pode desvincular (com carência/trava). */
+  podeDesvincularUnidade: boolean
+  /** ISO da data em que a trava de 30 dias libera; null se pode agir. */
+  vinculoUnidadeLiberaEm: string | null
 }
 
 /** Card leve do aside "Canais sugeridos" — espelha `SugestaoAutorAside`. */
@@ -89,6 +100,8 @@ export interface SugestaoCanalAside {
   ehCanalDepartamento?: boolean
   publica: boolean
   tenantNome: string
+  /** Sócio sem casa local: o Entrar/Solicitar pode oferecer o vínculo. */
+  podeVincularUnidade?: boolean
 }
 
 export interface MembroCanalItem {

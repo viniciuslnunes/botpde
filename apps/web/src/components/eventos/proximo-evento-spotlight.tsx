@@ -17,8 +17,8 @@ function tipoTone(tipo: string) {
   }
   if (tipo === 'ENSAIO') {
     return {
-      band: 'from-sky-500/20 via-sky-500/8 to-transparent',
-      icon: 'bg-sky-500/15 text-sky-800 ring-sky-500/30 dark:text-sky-300',
+      band: 'from-[rgb(var(--color-info)_/_0.2)] via-[rgb(var(--color-info)_/_0.08)] to-transparent',
+      icon: 'bg-[rgb(var(--color-info)_/_0.15)] text-[rgb(var(--color-info-fg))] ring-[rgb(var(--color-info)_/_0.3)]',
     }
   }
   return {
@@ -61,7 +61,7 @@ export function ProximoEventoSpotlight({
   return (
     <article className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.85)] shadow-sm backdrop-blur-sm">
       <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-2.5">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[rgb(var(--color-primary-fg))]">
+        <p className="portal-kicker text-[rgb(var(--color-primary-fg))]">
           Próximo compromisso
         </p>
         {diasLabel ? (
@@ -97,7 +97,7 @@ export function ProximoEventoSpotlight({
       )}
 
       <div className="space-y-3.5 p-4">
-        <h2 className="text-balance text-base font-semibold leading-snug text-[rgb(var(--foreground))] sm:text-lg">
+        <h2 className="portal-display text-base leading-snug text-[rgb(var(--foreground))] sm:text-lg">
           {titulo}
         </h2>
 

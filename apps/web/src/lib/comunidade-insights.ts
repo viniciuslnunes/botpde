@@ -40,7 +40,7 @@ export const resumirEngajamento = cache(async function resumirEngajamento(
         where: { post: { is: { tenantId } }, criadoEm: { gte: de, lte: ate } },
       }),
       db.comentario.count({
-        where: { post: { is: { tenantId } }, criadoEm: { gte: de, lte: ate } },
+        where: { post: { is: { tenantId } }, oculto: false, criadoEm: { gte: de, lte: ate } },
       }),
     ])
 
@@ -72,7 +72,7 @@ export const resumirEngajamento = cache(async function resumirEngajamento(
       select: { criadoEm: true },
     }),
     db.comentario.findMany({
-      where: { post: { is: { tenantId } }, criadoEm: { gte: inicio, lte: fim } },
+      where: { post: { is: { tenantId } }, oculto: false, criadoEm: { gte: inicio, lte: fim } },
       select: { criadoEm: true },
     }),
   ])

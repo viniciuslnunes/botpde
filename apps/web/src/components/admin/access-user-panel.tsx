@@ -583,7 +583,7 @@ export function AccessUserPanel({
                 className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
               />
             ) : (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-white sm:h-14 sm:w-14">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-primary-on sm:h-14 sm:w-14">
                 {initials(nomeExibicao)}
               </div>
             ))}
@@ -826,7 +826,7 @@ export function AccessUserPanel({
               type="submit"
               form={formId}
               disabled={pending || salvandoPerfil}
-              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending || salvandoPerfil ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -933,7 +933,7 @@ export function AccessUserPanel({
                 type="button"
                 disabled={salvandoPerfil || novoPerfilNome.trim().length < 2}
                 onClick={() => void handleConfirmarNovoPerfilESalvar()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on disabled:opacity-60"
               >
                 {salvandoPerfil ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1232,7 +1232,7 @@ function PerfilManagePanel({
             type="button"
             disabled={pending || nome.trim().length < 2}
             onClick={() => void salvar()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on disabled:opacity-60"
           >
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Salvar perfil
@@ -1342,7 +1342,7 @@ function DepartamentoAreasPanel({
             >
               {ativo && (
                 <div className="absolute right-2.5 top-2.5">
-                  <span className="rounded-md bg-[rgb(var(--primary))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  <span className="rounded-md bg-[rgb(var(--primary))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-on">
                     {isGestor ? 'Gestor' : 'Membro'}
                   </span>
                 </div>
@@ -1383,7 +1383,7 @@ function DepartamentoAreasPanel({
                   className={[
                     'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-40',
                     isMembro && !isGestor
-                      ? 'bg-[rgb(var(--primary))] text-white'
+                      ? 'bg-[rgb(var(--primary))] text-primary-on'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >
@@ -1398,7 +1398,7 @@ function DepartamentoAreasPanel({
                   className={[
                     'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-40',
                     isGestor
-                      ? 'bg-[rgb(var(--primary))] text-white'
+                      ? 'bg-[rgb(var(--primary))] text-primary-on'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >
@@ -1442,7 +1442,7 @@ export function AccessUserNotFound({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={onBack}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white"
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on"
       >
         <ShieldCheck className="h-4 w-4" />
         Voltar à lista

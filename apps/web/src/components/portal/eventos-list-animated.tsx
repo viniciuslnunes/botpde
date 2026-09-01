@@ -26,7 +26,7 @@ export interface EventoCardItem {
 function RsvpBadge({ status }: { status?: string }) {
   if (status === 'CONFIRMADO') {
     return (
-      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+      <span className="rounded-full bg-[rgb(var(--color-success))]/15 px-2 py-0.5 text-[10px] font-semibold text-success">
         Vai
       </span>
     )
@@ -47,7 +47,7 @@ function TipoThumbFallback({ tipo }: { tipo?: string }) {
     tipo === 'CARAVANA'
       ? 'from-amber-500/25 to-amber-500/5 text-amber-700 dark:text-amber-300'
       : tipo === 'ENSAIO'
-        ? 'from-sky-500/25 to-sky-500/5 text-sky-700 dark:text-sky-300'
+        ? 'from-[rgb(var(--color-info)_/_0.25)] to-[rgb(var(--color-info)_/_0.05)] text-[rgb(var(--color-info-fg))]'
         : 'from-[rgb(var(--color-primary)_/_0.28)] to-[rgb(var(--color-primary)_/_0.06)] text-[rgb(var(--color-primary-fg))]'
   return (
     <div
@@ -105,14 +105,14 @@ function EventoGridCard({
 
         <div className="flex flex-1 flex-col gap-2 p-3.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
+            <h3 className="portal-display line-clamp-2 text-sm leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
               {evento.titulo}
             </h3>
             {!evento.passado && <RsvpBadge status={evento.rsvpStatus} />}
           </div>
 
           <div className="mt-auto space-y-1 text-xs text-[rgb(var(--foreground-muted))]">
-            <p className="truncate font-medium tabular-nums text-[rgb(var(--foreground)_/_0.85)]">
+            <p className="truncate font-mono text-xs font-medium tabular-nums text-[rgb(var(--foreground)_/_0.85)]">
               {evento.dataLabel}
             </p>
             {evento.local && (

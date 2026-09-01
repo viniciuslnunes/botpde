@@ -27,7 +27,7 @@ export default async function LojaTenantLayout({
   const [tenant, lojas, sacolaAgg, sacolaPorTenant, pedidosCount, categorias] = await Promise.all([
     db.tenant.findFirst({
       where: { id: tenantId, ativo: true },
-      select: { id: true, nome: true, corPrimaria: true, design: true, logoUrl: true },
+      select: { id: true, nome: true, slug: true, corPrimaria: true, design: true, logoUrl: true },
     }),
     listLojasDoSocio(userId, session.user.email),
     db.saasCarrinhoItem.aggregate({
@@ -82,6 +82,7 @@ export default async function LojaTenantLayout({
       tenantId={tenant.id}
       corPrimaria={tenant.corPrimaria}
       design={tenant.design}
+      slug={tenant.slug}
     >
       <LojaChrome
         atual={{

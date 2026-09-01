@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   ArrowLeft,
+  Building2,
   ChevronDown,
   Flag,
   ImagePlus,
@@ -20,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, hrefDepartamentoDoCanal } from '@torcida/types'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { FileDropOverlay, useFileDragOver } from '@/components/media/file-drop-overlay'
@@ -690,6 +691,7 @@ export function MensagemThread({
   }
 
   const titulo = tituloConversa(conversa)
+  const hrefDepartamento = hrefDepartamentoDoCanal(conversa)
 
   return (
     // `div` estável: no embutido a lista some ao abrir — animar opacity na
@@ -722,6 +724,10 @@ export function MensagemThread({
           <ComunidadePrefetchLink href={`/portal/comunidade/perfil/${conversa.outroMembro.id}`}>
             <Avatar nome={titulo} avatarUrl={conversa.outroMembro.avatarUrl} size="sm" />
           </ComunidadePrefetchLink>
+        ) : hrefDepartamento ? (
+          <ComunidadePrefetchLink href={hrefDepartamento} aria-label="Abrir departamento">
+            <Avatar nome={titulo} avatarUrl={conversa.avatarUrl} size="sm" />
+          </ComunidadePrefetchLink>
         ) : (
           <Avatar nome={titulo} avatarUrl={conversa.avatarUrl} size="sm" />
         )}
@@ -733,13 +739,23 @@ export function MensagemThread({
             </p>
           )}
         </div>
+        {hrefDepartamento && (
+          <ComunidadePrefetchLink
+            href={hrefDepartamento}
+            aria-label="Abrir departamento"
+            title="Abrir departamento"
+            className="app-touch-target flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          >
+            <Building2 className="h-4 w-4" aria-hidden />
+          </ComunidadePrefetchLink>
+        )}
         {isConversaGrupoLike(conversa.tipo) && (
           <button
             type="button"
             onClick={() => setPainelMembros((v) => !v)}
             aria-label="Participantes do grupo"
             className={[
-              'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+              'app-touch-target flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
               painelMembros
                 ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
@@ -790,7 +806,7 @@ export function MensagemThread({
               type="button"
               disabled={processandoSolicitacao}
               onClick={() => void responderSolicitacao('aprovar')}
-              className="inline-flex flex-1 items-center justify-center rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="inline-flex flex-1 items-center justify-center rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-primary-on hover:opacity-90 disabled:opacity-60"
             >
               {processandoSolicitacao ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aprovar'}
             </button>

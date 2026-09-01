@@ -15,6 +15,7 @@ import {
 } from '@/components/portal/loja-produto-grid-animated'
 import { estoqueTotal, percentualDesconto, nomeExibicaoVendedorBrecho } from '@torcida/types'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { PortalModuloHeader } from '@/components/portal/portal-modulo-header'
 import { LojaUnidadeCard } from './_components/loja-unidade-card'
 import { BrechoHubCard } from './_components/brecho-hub-card'
 import { resolverContextoBrecho } from '@/lib/brecho-escopo'
@@ -154,37 +155,31 @@ export default async function PortalLojaListagemPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 border-b border-[rgb(var(--border))] pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[rgb(var(--foreground-muted))]">
-            [ Selecione a unidade ]
-          </p>
-          <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-[rgb(var(--foreground))] sm:text-4xl">
-            Lojas
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-[rgb(var(--foreground-muted))]">
-            Cada unidade tem catálogo e estoque próprios. Escolha a loja para comprar.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          <SacolaBadge
-            count={sacolaCount._sum.quantidade ?? 0}
-            lojasCount={sacolaLojasCount > 1 ? sacolaLojasCount : undefined}
-          />
-          <Link
-            href="/portal/loja/pedidos"
-            className="relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[rgb(var(--foreground-muted)_/_0.4)] px-3 text-sm font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))] sm:px-4"
-          >
-            <Package className="h-4 w-4 shrink-0" />
-            <span className="truncate">Pedidos</span>
-            {meusPedidos > 0 && (
-              <span className="rounded-full bg-[rgb(var(--primary))] px-1.5 py-0.5 text-xs font-bold text-[rgb(var(--color-primary-on))]">
-                {meusPedidos}
-              </span>
-            )}
-          </Link>
-        </div>
-      </div>
+      <PortalModuloHeader
+        kicker="[ Selecione a unidade ]"
+        title="Lojas"
+        description="Cada unidade tem catálogo e estoque próprios. Escolha a loja para comprar."
+        actions={
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <SacolaBadge
+              count={sacolaCount._sum.quantidade ?? 0}
+              lojasCount={sacolaLojasCount > 1 ? sacolaLojasCount : undefined}
+            />
+            <Link
+              href="/portal/loja/pedidos"
+              className="relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[rgb(var(--foreground-muted)_/_0.4)] px-3 text-sm font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))] sm:px-4"
+            >
+              <Package className="h-4 w-4 shrink-0" />
+              <span className="truncate">Pedidos</span>
+              {meusPedidos > 0 && (
+                <span className="rounded-full bg-[rgb(var(--primary))] px-1.5 py-0.5 text-xs font-bold text-[rgb(var(--color-primary-on))]">
+                  {meusPedidos}
+                </span>
+              )}
+            </Link>
+          </div>
+        }
+      />
 
       {lojas.length === 0 && cardsBrecho.length === 0 ? (
         <MotionEmptyState

@@ -419,7 +419,7 @@ export function SalaAtivaClient({
                 onClick={handleRejoinCall}
                 whileTap={{ scale: 0.96 }}
                 transition={springSnappy}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-white"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-primary-on"
               >
                 <Video className="h-4 w-4" />
                 Entrar na chamada novamente

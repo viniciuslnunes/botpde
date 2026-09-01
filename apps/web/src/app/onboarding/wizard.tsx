@@ -36,7 +36,7 @@ import {
   springGentle,
   springSnappy,
 } from '@/lib/motion-presets'
-import { isDepartamentoLegado, maskRg, maskTelefone, normalizarCpf, PERIODICIDADE_PLANO_LABEL, resolverPeriodicidadesOnboarding, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
+import { isDepartamentoLegado, maskRg, maskTelefone, montarOpcoesPlanoOnboarding, normalizarCpf, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -2144,6 +2144,7 @@ function PassoVinculo({
   const [anosSocio, setAnosSocio] = useState('')
   const [dataExpedicaoCarteirinha, setDataExpedicaoCarteirinha] = useState('')
   const [periodicidadePretendida, setPeriodicidadePretendida] = useState('')
+  const [planoAssociacaoId, setPlanoAssociacaoId] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [departamentoSedeId, setDepartamentoSedeId] = useState('')
   const [imagemProva, setImagemProva] = useState<string | undefined>()
@@ -2184,6 +2185,15 @@ function PassoVinculo({
     if (cidade) return cidade
     return regiao
   })()
+
+  const opcoesPlano = useMemo(
+    () =>
+      montarOpcoesPlanoOnboarding(
+        torcida.periodicidadesOnboarding,
+        torcida.planosAssociacao ?? [],
+      ),
+    [torcida.periodicidadesOnboarding, torcida.planosAssociacao],
+  )
 
   async function buscarEndereco(valorCep: string, opts?: { manual?: boolean }) {
     const digitos = valorCep.replace(/\D/g, '')
@@ -2427,6 +2437,7 @@ function PassoVinculo({
         anosSocio: string
         dataExpedicaoCarteirinha: string
         periodicidadePretendida: string
+        planoAssociacaoId: string
         departamentoId: string
         departamentoSedeId: string
         imagemProva?: string
@@ -2464,6 +2475,8 @@ function PassoVinculo({
         setDataExpedicaoCarteirinha(saved.dataExpedicaoCarteirinha)
       if (typeof saved.periodicidadePretendida === 'string')
         setPeriodicidadePretendida(saved.periodicidadePretendida)
+      if (typeof saved.planoAssociacaoId === 'string')
+        setPlanoAssociacaoId(saved.planoAssociacaoId)
       if (typeof saved.departamentoId === 'string') setDepartamentoId(saved.departamentoId)
       if (typeof saved.departamentoSedeId === 'string')
         setDepartamentoSedeId(saved.departamentoSedeId)
@@ -2542,6 +2555,7 @@ function PassoVinculo({
         anosSocio,
         dataExpedicaoCarteirinha,
         periodicidadePretendida,
+        planoAssociacaoId,
         departamentoId,
         departamentoSedeId,
         imagemProva,
@@ -2589,6 +2603,7 @@ function PassoVinculo({
     anosSocio,
     dataExpedicaoCarteirinha,
     periodicidadePretendida,
+    planoAssociacaoId,
     departamentoId,
     departamentoSedeId,
     imagemProva,
@@ -2778,6 +2793,10 @@ function PassoVinculo({
                   | 'ANUAL'
                   | 'UNICA'
                   | undefined) || undefined
+              : undefined,
+          planoAssociacaoId:
+            caminhoSocio === 'EXISTENTE' && planoAssociacaoId
+              ? planoAssociacaoId
               : undefined,
           caminhoSocio: caminhoSocio ?? undefined,
           imagemProva: caminhoSocio === 'EXISTENTE' ? imagemProva : undefined,
@@ -2982,7 +3001,7 @@ function PassoVinculo({
                 priority
               />
               <span
-                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
+                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-primary-on shadow-sm ring-2 ring-[rgb(var(--surface))]"
                 aria-hidden
               >
                 <BadgeCheck className="h-3.5 w-3.5" />
@@ -3046,7 +3065,7 @@ function PassoVinculo({
                 priority
               />
               <span
-                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
+                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-primary-on shadow-sm ring-2 ring-[rgb(var(--surface))]"
                 aria-hidden
               >
                 <Shield className="h-3.5 w-3.5" />
@@ -3532,22 +3551,33 @@ function PassoVinculo({
               </Campo>
               <Campo
                 name="periodicidadePretendida"
-                label="Plano (periodicidade)"
+                label="Plano"
+                hint="Ciclo da contribuição — com valor cadastrado pela torcida, o nome oficial aparece aqui."
                 obrigatorio
                 erros={errosCampo.periodicidadePretendida}
               >
                 <Select
-                  value={periodicidadePretendida}
-                  onChange={(e) => setPeriodicidadePretendida(e.target.value)}
+                  value={
+                    opcoesPlano.find((o) =>
+                      planoAssociacaoId
+                        ? o.planoAssociacaoId === planoAssociacaoId
+                        : !o.planoAssociacaoId && o.periodicidade === periodicidadePretendida,
+                    )?.chave ??
+                    opcoesPlano.find((o) => o.periodicidade === periodicidadePretendida)?.chave ??
+                    ''
+                  }
+                  onChange={(e) => {
+                    const opcao = opcoesPlano.find((o) => o.chave === e.target.value)
+                    setPeriodicidadePretendida(opcao?.periodicidade ?? '')
+                    setPlanoAssociacaoId(opcao?.planoAssociacaoId ?? '')
+                  }}
                 >
                   <option value="">Selecione</option>
-                  {resolverPeriodicidadesOnboarding(torcida.periodicidadesOnboarding).map(
-                    (p) => (
-                      <option key={p} value={p}>
-                        {PERIODICIDADE_PLANO_LABEL[p] ?? p}
-                      </option>
-                    ),
-                  )}
+                  {opcoesPlano.map((opcao) => (
+                    <option key={opcao.chave} value={opcao.chave}>
+                      {opcao.rotulo}
+                    </option>
+                  ))}
                 </Select>
               </Campo>
             </div>
@@ -3969,7 +3999,7 @@ function TabsFormularioSocio({
             onClick={() => onMudar(tab.id)}
             className={`relative flex flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors sm:px-2 ${
               ativaAgora
-                ? 'bg-[rgb(var(--color-primary))] text-white'
+                ? 'bg-[rgb(var(--color-primary))] text-primary-on'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]'
             }`}
           >
@@ -4159,7 +4189,7 @@ function BotaoPrimario({
       type="button"
       onClick={onClick}
       disabled={pending || disabled}
-      className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}
       {label}

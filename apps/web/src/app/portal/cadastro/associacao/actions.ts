@@ -24,6 +24,7 @@ import {
 } from '@/lib/pendencias-cadastro'
 import { carregarPendenciasCadastro } from '@/lib/pendencias-cadastro-server'
 import { resumirCompletudeCadastroSocio } from '@/lib/completude-cadastro-socio'
+import { resolverPlanoVinculo } from '@/lib/planos-associacao'
 import { notificarUsuario } from '@/lib/notificacoes-routing'
 import { UFS_BRASIL } from '@/lib/ufs-brasil'
 
@@ -189,6 +190,14 @@ export async function completarDadosAssociacao(
 
   if (Object.keys(errors).length > 0) return { errors }
 
+  const planoVinculo = periodicidadePretendida
+    ? await resolverPlanoVinculo(
+        tenant.id,
+        periodicidadePretendida,
+        strOpt(formData.get('planoAssociacaoId')),
+      )
+    : null
+
   const idade =
     dataNascimento != null
       ? Math.floor((Date.now() - dataNascimento.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
@@ -270,6 +279,7 @@ export async function completarDadosAssociacao(
       periodicidadePretendida: periodicidadePretendida
         ? (periodicidadePretendida as 'MENSAL' | 'TRIMESTRAL' | 'QUADRIMENSAL' | 'SEMESTRAL' | 'ANUAL' | 'UNICA')
         : null,
+      planoAssociacaoId: planoVinculo?.id ?? null,
       pendenciasCadastroDispensadas: dispensadas,
     },
   })

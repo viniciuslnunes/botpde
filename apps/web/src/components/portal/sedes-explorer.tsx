@@ -274,12 +274,12 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
               <button
                 type="button"
                 onClick={() => selecionar(null)}
-                className="-ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+                className="portal-chip -ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Voltar à lista
               </button>
-              <span className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              <span className="portal-kicker text-[rgb(var(--foreground-muted))]">
                 Detalhe
               </span>
             </div>
@@ -333,7 +333,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                       role="tab"
                       aria-selected={active}
                       onClick={() => setFiltro(f.id)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                      className={`portal-chip rounded-lg px-2.5 py-1 transition-colors ${
                         active
                           ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                           : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
@@ -354,7 +354,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                   onClick={pedirLocalizacao}
                   disabled={geoStatus === 'loading'}
                   aria-pressed={localizacao != null}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 portal-chip transition-colors disabled:opacity-60 ${
                     localizacao
                       ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                       : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.5)]'

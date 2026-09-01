@@ -4,17 +4,12 @@ import { Users, CreditCard, MapPin, Building2, ArrowRight } from 'lucide-react'
 import { getTorcidaWorktree, type TorcidaWorktreeNode } from '@/lib/hierarquia'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { sedeTipoBadgeClass } from '@/lib/sede-tipo-badge'
 
 const TIPO_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'PDE',
-}
-
-const TIPO_BADGE_CLASS: Record<string, string> = {
-  SEDE: 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]',
-  SUBSEDE: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-  PONTO_ENCONTRO: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
 }
 
 interface UnidadeResumo extends TorcidaWorktreeNode {
@@ -237,7 +232,7 @@ export async function TorcidaConsole({
                     <span
                       className={[
                         'rounded-full px-2 py-0.5 text-xs font-semibold',
-                        TIPO_BADGE_CLASS[u.tipo] ?? TIPO_BADGE_CLASS.PONTO_ENCONTRO,
+                        sedeTipoBadgeClass(u.tipo),
                       ].join(' ')}
                     >
                       {TIPO_LABEL[u.tipo] ?? u.tipo}

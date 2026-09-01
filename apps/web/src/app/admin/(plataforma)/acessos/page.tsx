@@ -10,6 +10,7 @@ import { AccessUserPanelRoute } from '@/components/admin/access-user-panel-route
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { liderancaAtualDoTenant } from '@/lib/lideranca'
+import { comCorDepartamento } from '@/lib/cor-departamento'
 import {
   construirHrefListagem,
   parseListagemParams,
@@ -183,12 +184,14 @@ export default async function AcessosPage({
   ])
 
   const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
-  const roles = rolesRaw.map((role) => ({ ...role, emUso: usoMap.get(role.id) ?? 0 }))
+  const rolesBrutos = rolesRaw.map((role) => ({ ...role, emUso: usoMap.get(role.id) ?? 0 }))
+  const roles = await comCorDepartamento(rolesBrutos, tenant)
 
+  const departamentosRawSafe = await comCorDepartamento(departamentosRaw, tenant)
   // UI de áreas esconde slugs legados (tipos de membro); o mapa completo abaixo
   // ainda resolve herança de perfis tipo "Membro · Torcedor".
-  const departamentos = departamentosRaw.filter((d) => !isDepartamentoLegado(d))
-  const deptoById = new Map(departamentosRaw.map((d) => [d.id, d]))
+  const departamentos = departamentosRawSafe.filter((d) => !isDepartamentoLegado(d))
+  const deptoById = new Map(departamentosRawSafe.map((d) => [d.id, d]))
 
   const rolesComEfetivas = roles.map((role) => {
     const depto = role.departamentoId ? (deptoById.get(role.departamentoId) ?? null) : null
@@ -317,7 +320,7 @@ export default async function AcessosPage({
     area: departamentos.map((depto) => ({ valor: depto.id, label: depto.nome })),
   }
 
-  const roleById = new Map(rolesRaw.map((r) => [r.id, r]))
+  const roleById = new Map(roles.map((r) => [r.id, r]))
   const pessoas: AccessPessoaRow[] = pessoasRaw.map((pessoa) => {
     const gestorDe = new Set(pessoa.departamentosGeridos.map((g) => g.departamentoId))
     return {
@@ -327,7 +330,7 @@ export default async function AcessosPage({
       avatarUrl: pessoa.avatarUrl,
       perfis: pessoa.userRoles
         .map((r) => roleById.get(r.roleId))
-        .filter((r): r is RoleLite => !!r)
+        .filter((r): r is NonNullable<typeof r> => r != null)
         .map((r) => ({ id: r.id, nome: r.nome, cor: r.cor, isSystem: r.isSystem })),
       areas: pessoa.userDepartamentos
         .map((d) => deptoById.get(d.departamentoId))

@@ -135,7 +135,7 @@ export function BarTurnoPainel({
               type="button"
               disabled={pending}
               onClick={abrir}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on disabled:opacity-50"
             >
               <Unlock className="h-3.5 w-3.5" />
               Abrir turno
@@ -306,7 +306,7 @@ export function BarTurnoPainel({
                 (exigeCiencia && !cienciaComandas)
               }
               onClick={fechar}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on disabled:opacity-50"
             >
               Confirmar fechamento
             </button>

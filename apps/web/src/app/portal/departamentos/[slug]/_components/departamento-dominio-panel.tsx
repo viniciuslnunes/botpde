@@ -52,17 +52,21 @@ export function DepartamentoDominioPanel({
   podeVerFinanceiro,
   podeVerPatrimonio,
   podeVerAcervoBandeiras,
+  podeGerirAcervoBandeiras,
+  podeGerirPatrimonio,
   podeVerCaravanas,
   podeVerBateria,
   podeVerPedidos,
   podeModerar,
   podeGerirFinanceiro,
   kpis,
+  temFila = false,
   totalPendentes,
   carnavalProximos,
   atalhos,
   canal,
   canaisDisponiveis,
+  acervoPage,
 }: {
   panel: string
   depto: DeptoRow
@@ -73,86 +77,105 @@ export function DepartamentoDominioPanel({
   podeVerFinanceiro: boolean
   podeVerPatrimonio: boolean
   podeVerAcervoBandeiras: boolean
+  podeGerirAcervoBandeiras: boolean
+  podeGerirPatrimonio: boolean
   podeVerCaravanas: boolean
   podeVerBateria: boolean
   podeVerPedidos: boolean
   podeModerar: boolean
   podeGerirFinanceiro: boolean
   kpis: DiretoriaKpis | null
+  /** Aba Fila existe neste cockpit — só então o painel cita pendentes. */
+  temFila?: boolean
   totalPendentes: number
   carnavalProximos: number
   atalhos: SubareaAtalho[]
   canal: DeptoRow['canalConversa']
   canaisDisponiveis: Array<{ id: string; nome: string | null }>
+  acervoPage: number
 }) {
   function renderDominio(): ReactNode {
     if (panel === 'financeiro') {
+      if (!podeVerFinanceiro) {
+        return (
+          <Link
+            href="/portal/cobrancas"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Mensalidades
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        )
+      }
       return (
         <Suspense fallback={<FinanceiroCaixaSkeleton />}>
           <FinanceiroCaixaAside
             tenantId={tenantId}
-            nome={depto.nome}
             isGestor={isGestor}
             moduloHref={moduloHref}
             operacaoHref={operacaoHref}
-            podeVerFinanceiro={podeVerFinanceiro}
           />
         </Suspense>
       )
     }
     if (panel === 'patrimonio') {
+      if (!podeVerPatrimonio) return null
       return (
         <Suspense fallback={<PatrimonioInventarioSkeleton />}>
           <PatrimonioInventarioAside
             tenantId={tenantId}
-            nome={depto.nome}
             isGestor={isGestor}
+            podeGerirAcervo={podeGerirPatrimonio}
             moduloHref={moduloHref}
             operacaoHref={operacaoHref}
-            podeVerPatrimonio={podeVerPatrimonio}
+            basePath={`/portal/departamentos/${depto.slug}`}
+            page={acervoPage}
           />
         </Suspense>
       )
     }
     if (panel === 'bandeiras') {
+      if (!podeVerAcervoBandeiras) return null
       return (
         <Suspense fallback={<BandeirasAcervoSkeleton />}>
           <BandeirasAcervoAside
             tenantId={tenantId}
-            nome={depto.nome}
             isGestor={isGestor}
+            podeGerirAcervo={podeGerirAcervoBandeiras}
             moduloHref={moduloHref}
             operacaoHref={operacaoHref}
-            podeVer={podeVerAcervoBandeiras}
+            basePath={`/portal/departamentos/${depto.slug}`}
           />
         </Suspense>
       )
     }
     if (panel === 'caravanas') {
+      if (!podeVerCaravanas) return null
       return (
         <Suspense fallback={<CaravanasAgendaSkeleton />}>
           <CaravanasAgendaAside
             tenantId={tenantId}
-            nome={depto.nome}
             isGestor={isGestor}
             moduloHref={moduloHref}
             operacaoHref={operacaoHref}
-            podeVer={podeVerCaravanas}
           />
         </Suspense>
       )
     }
     if (panel === 'bateria') {
+      if (!podeVerBateria) return null
       return (
         <Suspense fallback={<BateriaEnsaiosSkeleton />}>
           <BateriaEnsaiosAside
             tenantId={tenantId}
             departamentoId={depto.id}
-            nome={depto.nome}
             isGestor={isGestor}
+            podeVerPatrimonio={podeVerPatrimonio}
+            podeGerirAcervo={podeGerirPatrimonio}
             moduloHref={moduloHref}
             operacaoHref={operacaoHref}
-            podeVer={podeVerBateria}
+            basePath={`/portal/departamentos/${depto.slug}`}
+            page={acervoPage}
           />
         </Suspense>
       )
@@ -172,14 +195,23 @@ export function DepartamentoDominioPanel({
       )
     }
     if (panel === 'diretoria') {
+      if (!isGestor) return null
+      if (!temFila && !operacaoHref) return null
       return (
         <div className="space-y-4">
-          {isGestor && kpis ? <DepartamentoDiretoriaKpis kpis={kpis} /> : null}
-          <PainelDominio
-            isGestor={isGestor}
-            operacaoHref={operacaoHref}
-            totalPendentes={totalPendentes}
-          />
+          {temFila && kpis ? <DepartamentoDiretoriaKpis kpis={kpis} /> : null}
+          {temFila ? (
+            <PainelDominio operacaoHref={operacaoHref} totalPendentes={totalPendentes} />
+          ) : operacaoHref ? (
+            <Link
+              href={operacaoHref}
+              prefetch={false}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            >
+              <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
+              Operação completa (admin)
+            </Link>
+          ) : null}
         </div>
       )
     }
@@ -202,50 +234,55 @@ export function DepartamentoDominioPanel({
     )
   }
 
+  const dominio = renderDominio()
+  const temAtalhos = atalhos.length > 0
+  const temAside = temAtalhos || Boolean(canal) || isGestor
+  if (!dominio && !temAside) return null
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <div className="min-w-0 space-y-4">{renderDominio()}</div>
-      <aside className="space-y-4">
-        {atalhos.length > 0 && (
-          <nav
-            aria-label="Atalhos do departamento"
-            className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-          >
-            <p className="text-xs font-semibold text-[rgb(var(--foreground-muted))]">Atalhos</p>
-            <ul className="mt-2 space-y-1">
-              {atalhos.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    href={a.href}
-                    prefetch={a.href.startsWith('/admin') ? false : undefined}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    {a.label}
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-        <DepartamentoCanalBlock
-          departamentoId={depto.id}
-          slug={depto.slug}
-          isGestor={isGestor}
-          canal={canal}
-          canaisDisponiveis={canaisDisponiveis}
-        />
-      </aside>
+    <div className={dominio && temAside ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]' : undefined}>
+      {dominio ? <div className="min-w-0 space-y-4">{dominio}</div> : null}
+      {temAside ? (
+        <aside className="space-y-4">
+          {temAtalhos && (
+            <nav
+              aria-label="Atalhos do departamento"
+              className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+            >
+              <p className="text-xs font-semibold text-[rgb(var(--foreground-muted))]">Atalhos</p>
+              <ul className="mt-2 space-y-1">
+                {atalhos.map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      href={a.href}
+                      prefetch={a.href.startsWith('/admin') ? false : undefined}
+                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                    >
+                      {a.label}
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+          <DepartamentoCanalBlock
+            departamentoId={depto.id}
+            slug={depto.slug}
+            isGestor={isGestor}
+            canal={canal}
+            canaisDisponiveis={canaisDisponiveis}
+          />
+        </aside>
+      ) : null}
     </div>
   )
 }
 
 function PainelDominio({
-  isGestor,
   operacaoHref,
   totalPendentes,
 }: {
-  isGestor: boolean
   operacaoHref: string | null
   totalPendentes: number
 }) {
@@ -253,13 +290,11 @@ function PainelDominio({
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
       <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Diretoria</h2>
       <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-        {isGestor
-          ? totalPendentes > 0
-            ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila. Aprove ou reprove na aba Fila.`
-            : 'Fila de solicitações neste departamento. Quando alguém pedir ingresso, aparece na aba Fila.'
-          : 'Você é membro deste departamento. A gestão da Diretoria é feita pelos gestores.'}
+        {totalPendentes > 0
+          ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila. Aprove ou reprove na aba Fila.`
+          : 'Fila de solicitações neste departamento. Quando alguém pedir ingresso, aparece na aba Fila.'}
       </p>
-      {isGestor && operacaoHref && (
+      {operacaoHref && (
         <Link
           href={operacaoHref}
           prefetch={false}

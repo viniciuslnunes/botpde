@@ -1,7 +1,7 @@
 /**
- * Tabs internas do cockpit de um departamento (`?tab=`).
- * Mesmo contrato do detalhe admin (`/admin/eventos/[id]?tab=`): seções
- * pesadas e independentes, deep-linkáveis, teto de 6.
+ * Tabs internas do cockpit (`?tab=`): Painel / Equipe / Fila / Pedidos.
+ * Áreas e Projetos saíram para sub-rota; os ids continuam aqui para
+ * redirecionar bookmarks `?tab=areas` / `?tab=projetos`.
  */
 
 export const DEPARTAMENTO_TABS = [
@@ -23,6 +23,8 @@ export const HASH_PARA_TAB: Readonly<Record<string, DepartamentoTab>> = {
   canal: 'painel',
   caixa: 'painel',
   inventario: 'painel',
+  acervo: 'painel',
+  instrumentos: 'painel',
   agenda: 'painel',
   escala: 'painel',
   barracao: 'painel',
@@ -69,6 +71,12 @@ export function primeiroSearchParam(
   const bruto = Array.isArray(valor) ? valor[0] : valor
   const t = bruto?.trim()
   return t || undefined
+}
+
+/** Página da grade do acervo (`?page=`). Valores inválidos caem em 1. */
+export function parseAcervoPage(valor: string | undefined): number {
+  const n = Number.parseInt(valor ?? '', 10)
+  return Number.isInteger(n) && n >= 1 ? n : 1
 }
 
 /**

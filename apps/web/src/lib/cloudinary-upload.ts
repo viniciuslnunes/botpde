@@ -1,5 +1,7 @@
 'use client'
 
+import { aplicarMascaraCircularNoCanvas, precisaTratarFundoEscudo } from '@/lib/escudo-forma'
+
 /** Upload de imagem direto para o Cloudinary, com assinatura do nosso backend. */
 
 const MAX_WIDTH = 1600
@@ -115,8 +117,9 @@ async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
   const quality = purpose === 'perfil-avatar' ? AVATAR_JPEG_QUALITY : JPEG_QUALITY
   try {
     const bitmap = await createImageBitmap(file)
+    const precisaMascara = precisaTratarFundoEscudo(bitmap, bitmap.width, bitmap.height)
     const ratio = Math.min(1, maxWidth / bitmap.width)
-    if (ratio === 1) {
+    if (!precisaMascara && ratio === 1) {
       bitmap.close()
       return file
     }
@@ -125,6 +128,11 @@ async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
     const canvas = scaleToCanvas(bitmap, bitmap.width, bitmap.height, destW, destH)
     bitmap.close()
     if (!canvas) return file
+    if (precisaMascara) {
+      aplicarMascaraCircularNoCanvas(canvas)
+      const png = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'))
+      return png ?? file
+    }
     // PNG preserva transparência (ex.: foto de unidade/logo com fundo transparente).
     const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
     const blob = await new Promise<Blob | null>((res) =>
@@ -165,7 +173,11 @@ export async function uploadMediaToCloudinary(
   // Vídeo sobe sem compressão no cliente; imagem é redimensionada antes.
   const blob = isVideo ? file : await compress(file, purpose)
   const form = new FormData()
-  form.append('file', blob, file.name)
+  const uploadName =
+    !isVideo && blob.type === 'image/png' && !/\.png$/i.test(file.name)
+      ? `${file.name.replace(/\.[^.]+$/, '') || 'imagem'}.png`
+      : file.name
+  form.append('file', blob, uploadName)
   form.append('api_key', sign.apiKey)
   form.append('timestamp', String(sign.timestamp))
   form.append('folder', sign.folder)

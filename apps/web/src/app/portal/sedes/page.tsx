@@ -1,6 +1,7 @@
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { resolveTenantMinhaTorcida } from '@/lib/comunidade-contexto'
+import { PortalModuloHeader } from '@/components/portal/portal-modulo-header'
 import { SedesExplorer } from '@/components/portal/sedes-explorer'
 import type {
   SedeExplorerItem,
@@ -119,12 +120,11 @@ export default async function SedesPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Sedes</h1>
-        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Locais da torcida — explore no mapa, veja fachada, horários e como chegar
-        </p>
-      </div>
+      <PortalModuloHeader
+        kicker="[ Locais da torcida ]"
+        title="Sedes"
+        description="Explore no mapa, veja fachada, horários e como chegar"
+      />
 
       <SedesExplorer sedes={sedes} initialSelectedId={initialSelectedId} />
     </div>

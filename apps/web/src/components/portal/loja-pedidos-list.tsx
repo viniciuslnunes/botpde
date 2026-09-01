@@ -78,7 +78,7 @@ export function LojaPedidosList({ ativos, historico }: LojaPedidosListProps) {
         icon={<Package className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
         title="Nenhum pedido ainda"
         description={
-          <Link href="/portal/loja" className="mt-4 inline-block rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">
+          <Link href="/portal/loja" className="mt-4 inline-block rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-primary-on">
             Ir à loja
           </Link>
         }

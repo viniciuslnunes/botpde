@@ -308,8 +308,8 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
 }
 
 /**
- * Deep-link para uma área, projeto ou pessoa no cockpit. Se a aba não veio,
- * a query escolhe a aba correspondente (`areas` / `projetos` / `equipe`).
+ * Deep-link para uma área, projeto ou pessoa. Áreas e projetos têm rota
+ * própria; equipe/fila/pedidos continuam `?tab=` no cockpit.
  *
  * @typedef {{
  *   area?: string | null,
@@ -319,9 +319,9 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
  */
 
 /**
- * Home do departamento no portal. `tab` opcional vira `?tab=` — o painel
- * (aba inicial) omite a query para a URL ficar estável. `foco` aponta para
- * o card certo; a gestão continua no cockpit, não numa ficha paralela.
+ * Home do departamento no portal. `tab` `areas` / `projetos` vira sub-rota
+ * (`/areas`, `/projetos`); o painel omite a query. `foco.area` / `foco.projeto`
+ * abrem a ficha (`/areas/:id`, `/projetos/:id`).
  *
  * @param {string} slug
  * @param {string | null | undefined} [tab]
@@ -340,10 +340,15 @@ export function hrefHomeDepartamento(slug, tab, foco) {
     else if (pessoa) aba = 'equipe'
   }
 
+  if (aba === 'areas') {
+    return area ? `${base}/areas/${area}` : `${base}/areas`
+  }
+  if (aba === 'projetos') {
+    return projeto ? `${base}/projetos/${projeto}` : `${base}/projetos`
+  }
+
   const params = new URLSearchParams()
   if (aba) params.set('tab', aba)
-  if (area) params.set('area', area)
-  if (projeto) params.set('projeto', projeto)
   if (pessoa) params.set('pessoa', pessoa)
   const qs = params.toString()
   return qs ? `${base}?${qs}` : base

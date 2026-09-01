@@ -1,4 +1,4 @@
-import { redirect, notFound, permanentRedirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { User } from 'lucide-react'
 import { db } from '@torcida/db'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { hrefAdminPessoa } from '@/lib/perfil-admin-href'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminMembroLgeForm } from '@/app/admin/membros/admin-membro-lge-form'
@@ -118,7 +119,23 @@ export default async function TorcedorDetalhePage({ params }: Props) {
 
   if (!membro) notFound()
   if (membro.tipo === 'SOCIO') {
-    permanentRedirect('/admin/socios')
+    // 308 para `/admin/socios` sem busca cacheava a lista inteira no browser.
+    const socio: { validade: Date } | null = await db.saasSocio.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: membro.userId } },
+      select: { validade: true },
+    })
+    redirect(
+      hrefAdminPessoa({
+        membroId: membro.id,
+        userId: membro.userId,
+        superAdmin: false,
+        tipo: 'SOCIO',
+        status: membro.status,
+        nome: membro.nome,
+        desligadoEm: membro.desligadoEm,
+        temCarteirinha: Boolean(socio),
+      }) ?? '/admin/socios',
+    )
   }
 
   const unidadeOrigem: { nome: string } | null = membro.aprovadoNaUnidadeTenantId

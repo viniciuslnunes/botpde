@@ -36,6 +36,10 @@ export interface InboxItemDto {
   totalMembros: number
   /** Canal de departamento ou área — permite editar foto no painel. */
   ehCanalDepartamento: boolean
+  /** Slug do departamento dono do canal (depto ou frente). */
+  departamentoSlug: string | null
+  /** Frente dona do canal — deep-link para `/areas/:id`. */
+  departamentoAreaId: string | null
   outroMembro: AutorDto | null
   ultimaMensagem: {
     conteudo: string

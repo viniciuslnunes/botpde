@@ -9,7 +9,7 @@ const BADGE_CLASS: Record<TipoEvento, string> = {
   GERAL:
     'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.35)]',
   CARAVANA: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  ENSAIO: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+  ENSAIO: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
 }
 
 export function EventoTipoBadge({ tipo }: { tipo: TipoEvento | string }) {

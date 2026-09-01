@@ -1,100 +1,87 @@
 import Link from 'next/link'
-import { ArrowRight, Landmark, Shield } from 'lucide-react'
+import { ArrowRight, Shield } from 'lucide-react'
 import {
-  CATEGORIA_PATRIMONIO_LABEL,
-  STATUS_PATRIMONIO_LABEL,
-} from '@torcida/types'
-import { carregarPainelPatrimonio } from '@/lib/patrimonio'
+  DepartamentoAcervoGrade,
+  DepartamentoAcervoGradeSkeleton,
+} from './departamento-acervo-grade'
+import { resumirPatrimonio } from '@/lib/patrimonio'
 
+/**
+ * Painel de domínio do Patrimônio: a grade com foto é o inventário.
+ * CRUD só com `patrimony:manage` — membro com `patrimony:view` vê as peças.
+ */
 export async function PatrimonioInventarioAside({
   tenantId,
-  nome,
   isGestor,
+  podeGerirAcervo,
   moduloHref,
   operacaoHref,
-  podeVerPatrimonio,
+  basePath,
+  page,
 }: {
   tenantId: string
-  nome: string
   isGestor: boolean
+  podeGerirAcervo: boolean
   moduloHref: string | null
   operacaoHref: string | null
-  podeVerPatrimonio: boolean
+  basePath: string
+  page: number
 }) {
-  if (!podeVerPatrimonio) {
-    return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Inventário</h2>
-        </div>
-          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Você faz parte de {nome}, mas não tem permissão para ver o inventário. Peça
-            acesso ao patrimônio ao gestor ou à Presidência.
-          </p>
-      </div>
-    )
-  }
-
-  const { resumo, recentes } = await carregarPainelPatrimonio(tenantId, 5)
+  const resumo = await resumirPatrimonio(tenantId)
+  const ativos = resumo.quantidadeItens - resumo.baixados
 
   return (
-    <div className="space-y-4">
-      <div id="inventario" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-stone-600 dark:text-stone-300" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Inventário</h2>
-        </div>
-        {resumo.quantidadeItens - resumo.baixados > 0 || resumo.totalAtivos > 0 ? (
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[rgb(var(--foreground-muted))]">Ativos (qtde)</dt>
+    <div className="space-y-5">
+      <div id="inventario" className="scroll-mt-20 space-y-3">
+        {ativos > 0 || resumo.totalAtivos > 0 ? (
+          <dl className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-[rgb(var(--foreground-muted))]">Ativos</dt>
               <dd className="font-semibold tabular-nums">{resumo.totalAtivos}</dd>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex items-baseline gap-1.5">
               <dt className="text-[rgb(var(--foreground-muted))]">Disponíveis</dt>
-              <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                {resumo.disponiveis}
-              </dd>
+              <dd className="font-semibold tabular-nums text-success">{resumo.disponiveis}</dd>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex items-baseline gap-1.5">
               <dt className="text-[rgb(var(--foreground-muted))]">Em uso / manutenção</dt>
               <dd className="font-semibold tabular-nums">
                 {resumo.emUso + resumo.manutencao}
               </dd>
             </div>
           </dl>
-        ) : (
-          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Ainda sem itens ativos. Gestores cadastram o inventário no módulo Patrimônio.
-          </p>
-        )}
+        ) : null}
 
-        {recentes.length > 0 && (
-          <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
-            {recentes.map((i) => (
-              <li key={i.id} className="text-xs">
-                <p className="truncate font-medium text-[rgb(var(--foreground))]">{i.nome}</p>
-                <p className="text-[rgb(var(--foreground-muted))]">
-                  {CATEGORIA_PATRIMONIO_LABEL[i.categoria]} ·{' '}
-                  {STATUS_PATRIMONIO_LABEL[i.status]} · qtd {i.quantidade}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">
+          {podeGerirAcervo
+            ? 'A foto diferencia peças parecidas no inventário. Cadastre e atualize aqui.'
+            : 'A foto diferencia peças parecidas no inventário. Quem gere o patrimônio cadastra e atualiza as peças.'}
+        </p>
+
+        <DepartamentoAcervoGrade
+          tenantId={tenantId}
+          basePath={basePath}
+          page={page}
+          podeGerir={podeGerirAcervo}
+          emptyTitle="Inventário vazio"
+          emptyDescription={
+            podeGerirAcervo
+              ? 'Cadastre instrumentos, bandeirões e outros bens com foto.'
+              : 'Quem gere o patrimônio cadastra as peças com foto. O inventário ainda está vazio.'
+          }
+        />
       </div>
 
-      {moduloHref && (
+      {moduloHref ? (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
-          Abrir patrimônio
-          <ArrowRight className="h-4 w-4" />
+          Filtros e empréstimos
+          <ArrowRight className="h-3.5 w-3.5" />
         </Link>
-      )}
-      {isGestor && operacaoHref && (
+      ) : null}
+      {isGestor && operacaoHref ? (
         <Link
           href={operacaoHref}
           prefetch={false}
@@ -103,22 +90,16 @@ export async function PatrimonioInventarioAside({
           <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
           Operação (admin)
         </Link>
-      )}
+      ) : null}
     </div>
   )
 }
 
 export function PatrimonioInventarioSkeleton() {
   return (
-    <div className="animate-pulse space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="h-4 w-24 rounded bg-[rgb(var(--border))]" />
-        <div className="mt-4 space-y-2">
-          <div className="h-4 w-full rounded bg-[rgb(var(--border))]" />
-          <div className="h-4 w-full rounded bg-[rgb(var(--border))]" />
-        </div>
-      </div>
-      <div className="h-10 rounded-lg bg-[rgb(var(--border))]" />
+    <div className="space-y-5">
+      <div className="h-4 w-48 animate-pulse rounded bg-[rgb(var(--border))]" />
+      <DepartamentoAcervoGradeSkeleton />
     </div>
   )
 }

@@ -30,6 +30,10 @@ function canal(partial: Partial<CanalItem> & Pick<CanalItem, 'id' | 'tenantId' |
     estado: null,
     lat: null,
     lng: null,
+    podeVincularUnidade: false,
+    podeTrocarUnidade: false,
+    podeDesvincularUnidade: false,
+    vinculoUnidadeLiberaEm: null,
     ...partial,
   }
 }

@@ -41,6 +41,7 @@ import {
   type VisibilidadeCanal,
 } from './canais-shared'
 import { deveListarCanalDepartamentoNaComunidade } from '@torcida/types'
+import { flagPodeVincularUnidade } from './vinculo-unidade'
 
 /** Canal oficial representa uma unidade da torcida; seu nome é sempre visualizado em caixa alta. */
 function formatNomeCanal(nome: string | null, canalOficial: boolean): string | null {
@@ -825,6 +826,8 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
   const membershipMap = new Map(memberships.map((item) => [item.conversaId, item]))
 
   type SedeCanalLoc = {
+    id: string
+    tenantId: string | null
     canalConversaId: string | null
     tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
     cidade: string | null
@@ -859,6 +862,8 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       : db.sede.findMany({
           where: { canalConversaId: { in: canalIds } },
           select: {
+            id: true,
+            tenantId: true,
             canalConversaId: true,
             tipo: true,
             cidade: true,
@@ -935,8 +940,37 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       estado: sede?.estado ?? null,
       lat: sede?.lat ?? null,
       lng: sede?.lng ?? null,
+      podeVincularUnidade: false,
+      podeTrocarUnidade: false,
+      podeDesvincularUnidade: false,
+      vinculoUnidadeLiberaEm: null,
     })
   })
+
+  if (!leituraSuperAdmin && result.length > 0) {
+    const unidades = result.flatMap((item) => {
+      const sede = sedeMap.get(item.id)
+      if (!sede?.id || !sede.tenantId) return []
+      return [
+        {
+          conversaId: item.id,
+          sedeId: sede.id,
+          sedeTenantId: sede.tenantId,
+          tipo: sede.tipo,
+        },
+      ]
+    })
+    const flags = await flagPodeVincularUnidade({ userId, viewerTenantId, unidades })
+    for (const item of result) {
+      const f = flags.get(item.id)
+      if (!f) continue
+      item.podeVincularUnidade = f.podeVincularUnidade
+      item.podeTrocarUnidade = f.podeTrocarUnidade
+      item.podeDesvincularUnidade = f.podeDesvincularUnidade
+      item.vinculoUnidadeLiberaEm = f.vinculoUnidadeLiberaEm
+    }
+  }
+
   return result
 })
 
@@ -970,6 +1004,7 @@ export const getSugestoesCanaisParaAside = cache(async function getSugestoesCana
       ehCanalDepartamento: c.ehCanalDepartamento,
       publica: c.publica,
       tenantNome: c.tenantNome,
+      podeVincularUnidade: c.podeVincularUnidade,
     }))
 })
 
@@ -1095,6 +1130,10 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       estado: sede?.estado ?? null,
       lat: sede?.lat ?? null,
       lng: sede?.lng ?? null,
+      podeVincularUnidade: false,
+      podeTrocarUnidade: false,
+      podeDesvincularUnidade: false,
+      vinculoUnidadeLiberaEm: null,
     }
   })
 })
@@ -1139,7 +1178,7 @@ export const getCanalPorId = cache(async function getCanalPorId(
   const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId)
   if (!podeVer) return null
 
-  return projetarCanalItem(row)
+  return projetarCanalItem(row, { userId, viewerTenantId })
 })
 
 /**
@@ -1339,7 +1378,10 @@ const carregarCanalRow = cache(async function carregarCanalRow(
   })
 })
 
-async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
+async function projetarCanalItem(
+  row: CanalRow,
+  ctx?: { userId: string; viewerTenantId: string },
+): Promise<CanalItem> {
   const fallbackAvatars =
     row.canalOficial && !row.avatarUrl
       ? await resolveFallbackAvatarsCanalOficial([row.tenantId])
@@ -1348,6 +1390,8 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
   const membro = row.membros[0]
   const [sede, ehCanalDepartamento]: [
     {
+      id: string
+      tenantId: string | null
       tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
       cidade: string | null
       estado: string | null
@@ -1359,10 +1403,45 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
   ] = await Promise.all([
     db.sede.findFirst({
       where: { canalConversaId: row.id },
-      select: { tipo: true, cidade: true, estado: true, lat: true, lng: true, fotoUrl: true },
+      select: {
+        id: true,
+        tenantId: true,
+        tipo: true,
+        cidade: true,
+        estado: true,
+        lat: true,
+        lng: true,
+        fotoUrl: true,
+      },
     }),
     isConversaCanalDepartamento(row.id),
   ])
+
+  let podeVincularUnidade = false
+  let podeTrocarUnidade = false
+  let podeDesvincularUnidade = false
+  let vinculoUnidadeLiberaEm: string | null = null
+  if (ctx && sede?.id && sede.tenantId) {
+    const flags = await flagPodeVincularUnidade({
+      userId: ctx.userId,
+      viewerTenantId: ctx.viewerTenantId,
+      unidades: [
+        {
+          conversaId: row.id,
+          sedeId: sede.id,
+          sedeTenantId: sede.tenantId,
+          tipo: sede.tipo,
+        },
+      ],
+    })
+    const f = flags.get(row.id)
+    if (f) {
+      podeVincularUnidade = f.podeVincularUnidade
+      podeTrocarUnidade = f.podeTrocarUnidade
+      podeDesvincularUnidade = f.podeDesvincularUnidade
+      vinculoUnidadeLiberaEm = f.vinculoUnidadeLiberaEm
+    }
+  }
 
   return {
     id: row.id,
@@ -1388,6 +1467,10 @@ async function projetarCanalItem(row: CanalRow): Promise<CanalItem> {
     estado: sede?.estado ?? null,
     lat: sede?.lat ?? null,
     lng: sede?.lng ?? null,
+    podeVincularUnidade,
+    podeTrocarUnidade,
+    podeDesvincularUnidade,
+    vinculoUnidadeLiberaEm,
   }
 }
 
@@ -1874,6 +1957,10 @@ export async function buscarCanaisEUnidades(
       estado: null,
       lat: null,
       lng: null,
+      podeVincularUnidade: false,
+      podeTrocarUnidade: false,
+      podeDesvincularUnidade: false,
+      vinculoUnidadeLiberaEm: null,
     })
   }
 

@@ -1,3 +1,5 @@
+import { tratarFundoEscudoNoCanvas } from '@/lib/escudo-forma'
+
 /** Helpers de recorte client-side (canvas) para preview de upload. */
 
 export type CropViewport = {
@@ -149,7 +151,11 @@ export async function exportCroppedImage(opts: {
     drawnH * sy,
   )
 
-  const resolvedFormat = format ?? (hasTransparency(ctx, outW, outH) ? 'image/png' : 'image/jpeg')
+  // Badge circular com fundo assado → PNG com cantos transparentes (a exibição
+  // não precisa mais detectar). PNG com alpha (Gaviões) não entra aqui.
+  const mascarouFundo = tratarFundoEscudoNoCanvas(canvas)
+  const resolvedFormat =
+    mascarouFundo ? 'image/png' : (format ?? (hasTransparency(ctx, outW, outH) ? 'image/png' : 'image/jpeg'))
 
   if (resolvedFormat === 'image/png') {
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))

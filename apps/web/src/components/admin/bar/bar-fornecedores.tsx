@@ -116,7 +116,7 @@ function EditarFornecedorForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? 'Salvando...' : 'Salvar'}
         </button>
@@ -193,7 +193,7 @@ export function BarFornecedoresSection({ fornecedores }: { fornecedores: BarForn
           <button
             type="submit"
             disabled={pending}
-            className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Criando...' : 'Criar fornecedor'}
           </button>

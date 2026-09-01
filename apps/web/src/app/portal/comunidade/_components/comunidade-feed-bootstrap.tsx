@@ -21,6 +21,7 @@ export function ComunidadeFeedBootstrap({
   cursor = null,
   escopo,
   afiliacaoId,
+  contextoComunidadeNome = null,
 }: {
   tenantId: string
   currentUser: CurrentUser
@@ -28,6 +29,7 @@ export function ComunidadeFeedBootstrap({
   cursor?: string | null
   escopo?: EscopoComunidade
   afiliacaoId?: string
+  contextoComunidadeNome?: string | null
 }) {
   return (
     <ComunidadeFeedInfinite
@@ -41,6 +43,7 @@ export function ComunidadeFeedBootstrap({
       initialCursor={cursor}
       salvoIds={[]}
       seedFromSsr={false}
+      contextoComunidadeNome={contextoComunidadeNome}
     />
   )
 }

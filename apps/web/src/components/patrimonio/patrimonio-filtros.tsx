@@ -105,7 +105,7 @@ export function PatrimonioFiltros({
       <div className="flex flex-wrap gap-2">
         <button
           type="submit"
-          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white"
+          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on"
         >
           Filtrar
         </button>

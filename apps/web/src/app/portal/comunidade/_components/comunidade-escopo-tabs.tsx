@@ -652,7 +652,7 @@ export function ComunidadeEscopoTabs({
                 className={[
                   'flex items-center justify-center rounded-full text-xs font-bold',
                   ativoVisual
-                    ? 'bg-[rgb(var(--primary))] text-white'
+                    ? 'bg-[rgb(var(--primary))] text-primary-on'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
                 style={{

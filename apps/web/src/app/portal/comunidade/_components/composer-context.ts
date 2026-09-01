@@ -19,6 +19,7 @@ export type ComposerContext = {
     cargoNome: string | null
     departamentoNome: string | null
     sedeNome: string | null
+    sedeTipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO' | null
   }
 }
 
@@ -62,6 +63,7 @@ export const getComposerContext = cache(async function getComposerContext(
     cargoNome: badges.get(chave(userId, tenantId))?.cargoNome ?? null,
     departamentoNome: badges.get(chave(userId, tenantId))?.departamentoNome ?? null,
     sedeNome: badges.get(chave(userId, tenantId))?.sedeNome ?? null,
+    sedeTipo: badges.get(chave(userId, tenantId))?.sedeTipo ?? null,
   },
   }
 })

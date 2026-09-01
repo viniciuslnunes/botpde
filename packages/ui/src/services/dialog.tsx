@@ -140,21 +140,21 @@ const VARIANT_UI: Record<
 > = {
   default: {
     icon: Info,
-    iconWrap: 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]',
+    iconWrap: 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]',
     confirmBtn:
-      'bg-[rgb(var(--primary))] text-white hover:opacity-90 focus-visible:outline-[rgb(var(--primary))]',
+      'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-on))] hover:opacity-90 focus-visible:outline-[rgb(var(--primary))]',
   },
   destructive: {
     icon: AlertTriangle,
     iconWrap: 'bg-[rgb(var(--color-danger)_/_0.12)] text-[rgb(var(--color-danger-fg))]',
     confirmBtn:
-      'bg-[rgb(var(--color-danger))] text-white hover:opacity-90 focus-visible:outline-[rgb(var(--color-danger))]',
+      'bg-[rgb(var(--color-danger))] text-[rgb(var(--color-danger-on))] hover:opacity-90 focus-visible:outline-[rgb(var(--color-danger))]',
   },
   success: {
     icon: CheckCircle2,
     iconWrap: 'bg-[rgb(var(--color-success)_/_0.12)] text-[rgb(var(--color-success-fg))]',
     confirmBtn:
-      'bg-[rgb(var(--color-success))] text-white hover:opacity-90 focus-visible:outline-[rgb(var(--color-success))]',
+      'bg-[rgb(var(--color-success))] text-[rgb(var(--color-success-on))] hover:opacity-90 focus-visible:outline-[rgb(var(--color-success))]',
   },
 }
 

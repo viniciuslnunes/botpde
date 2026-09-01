@@ -50,7 +50,7 @@ export function CarteirinhaQrPanel({
           href={validarUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-medium text-white"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-medium text-primary-on"
         >
           Abrir validação
           <ExternalLink className="h-3.5 w-3.5" />
@@ -60,7 +60,7 @@ export function CarteirinhaQrPanel({
           onClick={() => void copy()}
           className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))]"
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? 'Copiado' : 'Copiar link'}
         </button>
       </div>

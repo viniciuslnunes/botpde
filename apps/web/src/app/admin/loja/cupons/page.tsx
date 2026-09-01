@@ -52,7 +52,7 @@ export default async function AdminCuponsPage() {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="ativo" defaultChecked /> Ativo
         </label>
-        <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar cupom</button>
+        <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-primary-on">Criar cupom</button>
       </AdminActionForm>
       </MotionReveal>
 

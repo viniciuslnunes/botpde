@@ -14,6 +14,7 @@ import type {
 } from '@/lib/onboarding'
 import { isTenantRestrito } from '@/lib/isolamento'
 import { resolverSetorArquibancada } from '@/lib/setor-arquibancada'
+import { listarPlanosOnboarding } from '@/lib/planos-associacao'
 
 /**
  * Afiliação efetiva do tenant: a própria, ou a do ancestral mais próximo
@@ -263,7 +264,7 @@ export const resolverConvite = cache(
         }
       : null
 
-    const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito, setor] = await Promise.all([
+    const [afiliacao, sedes, statsTorcida, statsClube, canalRestrito, setor, planosAssociacao] = await Promise.all([
       db.afiliacao.findUnique({
         where: { id: afiliacaoId },
         select: {
@@ -290,6 +291,7 @@ export const resolverConvite = cache(
       ]),
       isTenantRestrito(tenant.id),
       resolverSetorArquibancada(tenant.id),
+      listarPlanosOnboarding(tenant.id),
     ])
     if (!afiliacao) return null
 
@@ -337,6 +339,7 @@ export const resolverConvite = cache(
       acessivelNoHost: torcidaAcessivelNoHost(tenant.slug),
       exigirDocumentosCadastro: tenant.exigirDocumentosCadastro,
       periodicidadesOnboarding: tenant.periodicidadesOnboarding ?? [],
+      planosAssociacao,
       setor: setor
         ? {
             cardeal: setor.cardeal,

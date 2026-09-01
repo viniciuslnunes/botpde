@@ -165,7 +165,7 @@ export function BalancoLancamentosLista({
                       className={[
                         'shrink-0 self-end text-sm font-semibold tabular-nums sm:self-start',
                         item.tipo === 'RECEITA'
-                          ? 'text-emerald-700 dark:text-emerald-400'
+                          ? 'text-success'
                           : 'text-red-600 dark:text-red-400',
                       ].join(' ')}
                     >

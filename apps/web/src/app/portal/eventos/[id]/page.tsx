@@ -58,7 +58,7 @@ function FotoFallback({ tipo }: { tipo: string }) {
     tipo === 'CARAVANA'
       ? 'from-amber-500/30 to-amber-500/5 text-amber-200'
       : tipo === 'ENSAIO'
-        ? 'from-sky-500/30 to-sky-500/5 text-sky-200'
+        ? 'from-[rgb(var(--color-info)_/_0.3)] to-[rgb(var(--color-info)_/_0.05)] text-[rgb(var(--color-info-fg))]'
         : 'from-[rgb(var(--color-primary)_/_0.35)] to-[rgb(var(--color-primary)_/_0.06)] text-[rgb(var(--color-primary-fg))]'
   return (
     <div
@@ -183,7 +183,7 @@ export default async function EventoDetailPage({
     <div className="space-y-5">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+        className="portal-chip inline-flex items-center gap-1.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
       >
         <ArrowLeft className="h-4 w-4" />
         Agenda
@@ -221,7 +221,7 @@ export default async function EventoDetailPage({
                 )}
               </div>
 
-              <h1 className="text-balance text-xl font-bold leading-tight text-[rgb(var(--foreground))] sm:text-2xl">
+              <h1 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
                 {evento.titulo}
               </h1>
 
@@ -315,7 +315,7 @@ export default async function EventoDetailPage({
       {evento.descricao && (
         <EventoDetailReveal index={2}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            <h2 className="portal-kicker mb-2 text-[rgb(var(--foreground-muted))]">
               Sobre
             </h2>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-[rgb(var(--foreground))]">
@@ -352,8 +352,8 @@ export default async function EventoDetailPage({
       {confirmadosAvatar.length > 0 && (
         <EventoDetailReveal index={5}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-              <UserCheck className="h-4 w-4 text-emerald-500" />
+            <h2 className="portal-kicker mb-3 flex items-center gap-2 text-[rgb(var(--foreground))]">
+              <UserCheck className="h-4 w-4 text-success" />
               Confirmados ({confirmadosCount})
             </h2>
             <EventoConfirmadosGrid confirmados={confirmadosAvatar} />

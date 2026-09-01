@@ -1536,7 +1536,7 @@ export function BarPdv({
       <div className="flex h-full min-h-0 items-center justify-center bg-[rgb(var(--background))] p-6">
         <MotionSuccessPanel
           icon={
-            <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-success" />
           }
           title="Pago"
           description={formatarPreco(ultimoTotal)}
@@ -1668,10 +1668,10 @@ export function BarPdv({
     <div className="@container/pdv relative flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--background-subtle))]">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 shadow-sm">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[rgb(var(--foreground-muted))]">
+          <p className="portal-kicker text-[rgb(var(--foreground-muted))]">
             PDV Bar
           </p>
-          <h1 className="truncate text-sm font-bold leading-tight text-[rgb(var(--foreground))] @[48rem]/pdv:text-base">
+          <h1 className="portal-display truncate text-sm text-[rgb(var(--foreground))] @[48rem]/pdv:text-base">
             {unidadeNome}
           </h1>
         </div>

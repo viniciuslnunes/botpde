@@ -271,7 +271,7 @@ export const LISTAGEM_DEPARTAMENTO_EQUIPES: ListagemSpec = {
 
 /**
  * Projetos, campanhas e ações (`Projeto`). Como área, projeto não é RBAC —
- * a listagem é leitura consolidada; a gestão acontece no portal do gestor.
+ * a listagem é dashboard de saúde; a ficha de operar mora no portal.
  */
 export const LISTAGEM_DEPARTAMENTO_PROJETOS: ListagemSpec = {
   id: 'admin-departamento-projetos',

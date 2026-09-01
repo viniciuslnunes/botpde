@@ -216,7 +216,7 @@ export function SalaPopoutClient({
   const dockBtn = (active: boolean) =>
     `inline-flex h-10 w-10 items-center justify-center rounded-xl transition ${
       active
-        ? 'bg-[rgb(var(--color-primary))] text-white'
+        ? 'bg-[rgb(var(--color-primary))] text-primary-on'
         : 'bg-white/10 text-white hover:bg-white/18'
     }`
 

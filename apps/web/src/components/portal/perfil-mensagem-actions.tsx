@@ -7,6 +7,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Ban, Loader2, MessageCircle, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { lightboxBackdrop, lightboxContent, springGentle } from '@/lib/motion-presets'
+import { PERFIL_ACAO, PERFIL_ACAO_ICON } from './perfil/perfil-acao'
 
 interface PerfilMensagemActionsProps {
   userId: string
@@ -195,7 +196,7 @@ export function PerfilMensagemActions({
                     type="button"
                     disabled={abrindo || !mensagemPronta}
                     onClick={() => void abrirConversa(mensagemInicial.trim())}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     {abrindo ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -215,43 +216,45 @@ export function PerfilMensagemActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {podeAcionarMensagem && (
-          <button
-            type="button"
-            disabled={abrindo}
-            onClick={() => {
-              if (precisaSolicitacao) {
-                setMostrarSolicitacao(true)
-                return
-              }
-              void abrirConversa()
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {abrindo && !mostrarSolicitacao ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <MessageCircle className="h-4 w-4" />
-            )}
-            {precisaSolicitacao ? 'Solicitar conversa' : 'Mensagem'}
-          </button>
-        )}
+      {podeAcionarMensagem && (
         <button
           type="button"
-          disabled={alternando}
-          onClick={() => void alternarBloqueio()}
-          className={[
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-            bloqueado
-              ? 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]'
-              : 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30',
-          ].join(' ')}
+          disabled={abrindo}
+          onClick={() => {
+            if (precisaSolicitacao) {
+              setMostrarSolicitacao(true)
+              return
+            }
+            void abrirConversa()
+          }}
+          className={`${PERFIL_ACAO} bg-[rgb(var(--primary))] text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60`}
         >
-          {alternando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
-          {bloqueado ? 'Desbloquear' : 'Bloquear'}
+          {abrindo && !mostrarSolicitacao ? (
+            <Loader2 className={`${PERFIL_ACAO_ICON} animate-spin`} />
+          ) : (
+            <MessageCircle className={PERFIL_ACAO_ICON} />
+          )}
+          {precisaSolicitacao ? 'Solicitar conversa' : 'Mensagem'}
         </button>
-      </div>
+      )}
+      <button
+        type="button"
+        disabled={alternando}
+        onClick={() => void alternarBloqueio()}
+        className={[
+          `${PERFIL_ACAO} border transition-colors disabled:opacity-60`,
+          bloqueado
+            ? 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]'
+            : 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30',
+        ].join(' ')}
+      >
+        {alternando ? (
+          <Loader2 className={`${PERFIL_ACAO_ICON} animate-spin`} />
+        ) : (
+          <Ban className={PERFIL_ACAO_ICON} />
+        )}
+        {bloqueado ? 'Desbloquear' : 'Bloquear'}
+      </button>
       {dialog}
     </>
   )

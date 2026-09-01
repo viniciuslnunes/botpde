@@ -49,6 +49,7 @@ function postBase(over: Partial<PostSocialItem> = {}): PostSocialItem {
       nickname: null,
       avatarUrl: null,
       sedeNome: null,
+      sedeTipo: null,
       cargoNome: null,
       departamentoNome: null,
     },

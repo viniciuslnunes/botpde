@@ -148,8 +148,10 @@ function agregarPortalDepartamento(badges: PortalNavBadges, link: string | null)
   if (!slug) return
 
   increment(badges.porSlug, slug)
+  const trecho = resto.startsWith('/') ? resto.slice(1) : resto
+  const secaoPath = secaoDeTab(trecho.split('/')[1] ?? '')
   const tabParam = new URLSearchParams(query ?? '').get('tab') ?? ''
-  const secao = secaoDeTab(tabParam) ?? secaoDeTab(hashRaw ?? '')
+  const secao = secaoPath ?? secaoDeTab(tabParam) ?? secaoDeTab(hashRaw ?? '')
   if (!secao) return
   const atual = badges.porSecao[slug] ?? {}
   atual[secao] = (atual[secao] ?? 0) + 1

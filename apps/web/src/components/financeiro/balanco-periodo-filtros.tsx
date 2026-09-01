@@ -96,7 +96,7 @@ export function BalancoPeriodoFiltros({
         )}
         <button
           type="submit"
-          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white"
+          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on"
         >
           Filtrar
         </button>

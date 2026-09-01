@@ -11,7 +11,7 @@
  * PDE FIEL BAIXADA fica como unidade sob Gaviões (`seed:sedes-onboarding`),
  * não como âncora TORCIDAS_BRASIL.
  *
- * @typedef {{ slug: string, nome: string, clube: string, estado: string, corPrimaria?: string, cidade?: string, sedeId?: string }} TorcidaCurada
+ * @typedef {{ slug: string, nome: string, clube: string, estado: string, corPrimaria?: string, corArquirrival?: string, cidade?: string, sedeId?: string }} TorcidaCurada
  */
 
 /** @type {TorcidaCurada[]} */

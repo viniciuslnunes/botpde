@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { parseDataCompetencia, validarJanelaCompetencia } from './financeiro.js'
+import { formatarMoedaBRL, parseDataCompetencia, validarJanelaCompetencia } from './financeiro.js'
 
 export const PeriodicidadePlanoSchema = z.enum([
   'MENSAL',
@@ -49,6 +49,114 @@ export function resolverPeriodicidadesOnboarding(configuradas) {
   )
   if (validas.length === 0) return [...PERIODICIDADES_ONBOARDING_PADRAO]
   return /** @type {PeriodicidadePlano[]} */ (validas)
+}
+
+/**
+ * Plano ativo que o onboarding pode oferecer (nome/valor da torcida).
+ * @typedef {{
+ *   id: string,
+ *   nome: string,
+ *   valor: number,
+ *   periodicidade: string,
+ *   ativo?: boolean,
+ * }} PlanoOnboardingLite
+ */
+
+/**
+ * Opção do select «Já sou sócio»: periodicidade pura ou plano cadastrado.
+ * @typedef {{
+ *   chave: string,
+ *   planoAssociacaoId: string | null,
+ *   periodicidade: PeriodicidadePlano,
+ *   nome: string,
+ *   valor: number | null,
+ *   rotulo: string,
+ * }} OpcaoPlanoOnboarding
+ */
+
+/**
+ * Monta as opções do wizard a partir da oferta do tenant e dos planos com valor.
+ * Periodicidade sem plano cadastrado continua aparecendo (só o rótulo do ciclo).
+ * Vários planos na mesma periodicidade viram opções distintas.
+ * @param {readonly string[] | null | undefined} configuradas
+ * @param {readonly PlanoOnboardingLite[] | null | undefined} planos
+ * @returns {OpcaoPlanoOnboarding[]}
+ */
+export function montarOpcoesPlanoOnboarding(configuradas, planos) {
+  const permitidas = resolverPeriodicidadesOnboarding(configuradas)
+  const ativos = (planos ?? []).filter(
+    (p) =>
+      p.ativo !== false &&
+      PeriodicidadePlanoSchema.safeParse(p.periodicidade).success &&
+      permitidas.includes(/** @type {PeriodicidadePlano} */ (p.periodicidade)),
+  )
+  /** @type {OpcaoPlanoOnboarding[]} */
+  const out = []
+  for (const periodicidade of permitidas) {
+    const matches = ativos.filter((p) => p.periodicidade === periodicidade)
+    if (matches.length === 0) {
+      const nome = PERIODICIDADE_PLANO_LABEL[periodicidade]
+      out.push({
+        chave: `per:${periodicidade}`,
+        planoAssociacaoId: null,
+        periodicidade,
+        nome,
+        valor: null,
+        rotulo: nome,
+      })
+      continue
+    }
+    for (const plano of matches) {
+      out.push({
+        chave: `plano:${plano.id}`,
+        planoAssociacaoId: plano.id,
+        periodicidade,
+        nome: plano.nome,
+        valor: plano.valor,
+        rotulo: rotuloOpcaoPlanoOnboarding({
+          nome: plano.nome,
+          valor: plano.valor,
+          periodicidade,
+        }),
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * @param {{ nome: string, valor: number | null | undefined, periodicidade?: string }} opcao
+ * @returns {string}
+ */
+export function rotuloOpcaoPlanoOnboarding(opcao) {
+  const ciclo =
+    opcao.periodicidade && PERIODICIDADE_PLANO_LABEL[opcao.periodicidade]
+      ? PERIODICIDADE_PLANO_LABEL[opcao.periodicidade]
+      : null
+  const base =
+    ciclo && opcao.nome.trim() !== ciclo ? `${opcao.nome} (${ciclo})` : opcao.nome
+  if (opcao.valor == null) return base
+  return `${base} · ${formatarMoedaBRL(opcao.valor)}`
+}
+
+/**
+ * Escolhe o plano a gravar no vínculo: id pedido (se ainda ativo na periodicidade)
+ * ou o único plano ativo daquele ciclo. Ambíguo → null (fica só a periodicidade).
+ * @param {readonly PlanoOnboardingLite[]} planos
+ * @param {string} periodicidade
+ * @param {string | null | undefined} planoIdPreferido
+ * @returns {PlanoOnboardingLite | null}
+ */
+export function escolherPlanoParaPeriodicidade(planos, periodicidade, planoIdPreferido) {
+  const candidatos = (planos ?? []).filter(
+    (p) => p.ativo !== false && p.periodicidade === periodicidade,
+  )
+  if (planoIdPreferido) {
+    const hit = candidatos.find((p) => p.id === planoIdPreferido)
+    if (hit) return hit
+  }
+  if (candidatos.length === 1) return candidatos[0] ?? null
+  return null
 }
 
 /**

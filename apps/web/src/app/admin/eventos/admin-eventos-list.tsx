@@ -159,7 +159,7 @@ function AdminEventoCard({
               </span>
             ) : null}
             {evento.partidaLabel ? (
-              <span className="rounded bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-500/25 dark:text-emerald-300">
+              <span className="rounded bg-[rgb(var(--color-success)_/_0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-success-fg))] ring-1 ring-inset ring-[rgb(var(--color-success)_/_0.25)]">
                 {evento.partidaLabel}
               </span>
             ) : null}

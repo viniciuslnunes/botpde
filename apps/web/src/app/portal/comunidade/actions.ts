@@ -58,6 +58,7 @@ import {
   getCanalSeMembroAtivo,
   assertElegibilidadeMembroCanal,
   inscreverCanal,
+  vincularMembroCanaisAposAprovacao,
   podePublicarNoCanal,
   podeGerenciarPedidosCanal,
   podeVerCanal,
@@ -67,6 +68,7 @@ import {
   listCandidatosMembroCanal,
   listPedidosCanal,
 } from '@/lib/canais'
+import { vincularSocioAUnidadeDoCanal, desvincularSocioDaUnidadeDoCanal } from '@/lib/vinculo-unidade'
 import type {
   CandidatoMembroCanalItem,
   MembroCanalItem,
@@ -228,6 +230,7 @@ async function previewDoPost(opts: {
       avatarUrl: opts.autorAvatar,
       nickname: user?.nickname ?? null,
       sedeNome: badge?.sedeNome ?? null,
+      sedeTipo: badge?.sedeTipo ?? null,
       cargoNome,
       departamentoNome,
     },
@@ -552,6 +555,8 @@ export interface PublicarPostState {
   preview?: PostPublicadoPreview
   /** Fórum: id do tópico recém-publicado (redirect no composer). */
   topicoId?: string
+  /** Fórum: tópico entrou na fila de aprovação. */
+  pendente?: boolean
 }
 
 export async function publicarPost(
@@ -1307,7 +1312,8 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     criadoEm: Date
     autor: { id: string; nome: string | null; avatarUrl: string | null }
   }> = await db.comentario.findMany({
-    where: { postId: parsed.data },
+    // Comentário ocultado pela moderação some da thread, como o post oculto.
+    where: { postId: parsed.data, oculto: false },
     orderBy: { criadoEm: 'asc' },
     take: 100,
     include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
@@ -3152,6 +3158,68 @@ export async function entrarCanal(conversaId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade/canais')
   revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+}
+
+/**
+ * Sócio aprovado da torcida reconhece a unidade do canal oficial (SUBSEDE/PDE)
+ * como a que convive — além do vínculo na Sede. Torcedor não. Inscreve no
+ * canal da unidade depois do vínculo.
+ */
+export async function vincularUnidadePeloCanal(conversaId: string): Promise<{ nomeUnidade: string }> {
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  await assertNaoOperador()
+
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+
+  const resultado = await vincularSocioAUnidadeDoCanal({
+    conversaId: parsed.data.conversaId,
+    userId: session.user.id,
+    viewerTenantId: tenant.id,
+  })
+
+  try {
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: resultado.tenantUnidadeId,
+      userId: session.user.id,
+      sedeId: resultado.sedeId,
+      fallbackCriadoPorId: session.user.id,
+      tipo: 'SOCIO',
+    })
+  } catch (err) {
+    console.warn(
+      '[vincularUnidadePeloCanal] inscrição no canal da unidade:',
+      err instanceof Error ? err.message : err,
+    )
+  }
+
+  revalidatePath('/portal/comunidade/canais')
+  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+  revalidatePath('/portal/mensagens')
+  revalidatePath('/portal/comunidade')
+  return { nomeUnidade: resultado.nomeUnidade }
+}
+
+export async function desvincularUnidadePeloCanal(conversaId: string): Promise<{ nomeUnidade: string }> {
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  await assertNaoOperador()
+
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+
+  const resultado = await desvincularSocioDaUnidadeDoCanal({
+    conversaId: parsed.data.conversaId,
+    userId: session.user.id,
+    viewerTenantId: tenant.id,
+  })
+
+  revalidatePath('/portal/comunidade/canais')
+  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+  revalidatePath('/portal/mensagens')
+  revalidatePath('/portal/comunidade')
+  return { nomeUnidade: resultado.nomeUnidade }
 }
 
 /**

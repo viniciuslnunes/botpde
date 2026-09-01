@@ -16,17 +16,25 @@ export function LojaTenantThemeScope({
   tenantId,
   corPrimaria,
   design: designRaw,
+  slug,
+  corArquirrival,
   children,
 }: {
   tenantId: string
   corPrimaria: string
   design?: unknown
+  slug?: string | null
+  corArquirrival?: string | null
   children: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const design = useMemo(
-    () => resolveTenantDesign(designRaw ?? null, corPrimaria) as TenantDesign,
-    [designRaw, corPrimaria],
+    () =>
+      resolveTenantDesign(designRaw ?? null, corPrimaria, {
+        slug,
+        corArquirrival,
+      }) as TenantDesign,
+    [designRaw, corPrimaria, slug, corArquirrival],
   )
   const { resolvedTheme } = useTheme()
   const criticalCss = useMemo(

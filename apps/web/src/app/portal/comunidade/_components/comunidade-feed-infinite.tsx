@@ -57,6 +57,7 @@ type ComunidadeFeedInfiniteProps = {
   salvoIds: string[]
   seedFromSsr?: boolean
   podeCompartilhar?: boolean
+  contextoComunidadeNome?: string | null
 }
 
 function filtroAceitaPublicacao(
@@ -89,6 +90,7 @@ function ComunidadeFeedInfiniteView({
   salvoIds,
   seedFromSsr = true,
   podeCompartilhar = true,
+  contextoComunidadeNome = null,
 }: ComunidadeFeedInfiniteProps) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
   const isNacional = escopo === 'nacional'
@@ -279,6 +281,7 @@ function ComunidadeFeedInfiniteView({
                           currentUser={currentUser}
                           salvo={salvoSet.has(post.id)}
                           podeCompartilhar={podeCompartilhar}
+                          contextoComunidadeNome={contextoComunidadeNome}
                         />
                       </div>
                     </OptimisticHighlight>

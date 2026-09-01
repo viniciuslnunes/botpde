@@ -25,7 +25,7 @@ export type EmbarqueRow = {
 
 const TOM_PAGAMENTO: Record<string, string> = {
   neutral: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-  success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  success: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
   warning: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300',
   danger: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
 }
@@ -192,7 +192,7 @@ export function ListaEmbarque({
 
       {confirmadosVisiveis.length > 0 && (
         <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-success">
             <UserCheck className="h-3.5 w-3.5" />
             Confirmados
             {mostrarPagamento && filtro !== 'todos'
@@ -218,7 +218,7 @@ export function ListaEmbarque({
                     checkedInAt={r.checkedInAt}
                   />
                 ) : r.checkedInAt ? (
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <span className="text-xs font-medium text-success">
                     Check-in ok
                   </span>
                 ) : (

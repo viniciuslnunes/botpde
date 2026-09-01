@@ -12,43 +12,15 @@ import { sincronizarCobrancasVencidas } from '@/lib/cobrancas'
 
 export async function FinanceiroCaixaAside({
   tenantId,
-  nome,
   isGestor,
   moduloHref,
   operacaoHref,
-  podeVerFinanceiro,
 }: {
   tenantId: string
-  nome: string
   isGestor: boolean
   moduloHref: string | null
   operacaoHref: string | null
-  podeVerFinanceiro: boolean
 }) {
-  if (!podeVerFinanceiro) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caixa</h2>
-          </div>
-          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Você faz parte de {nome}, mas não tem permissão para ver o livro-caixa. Peça
-            acesso ao caixa ao gestor ou à Presidência.
-          </p>
-        </div>
-        <Link
-          href="/portal/cobrancas"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-        >
-          Mensalidades
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    )
-  }
-
   await sincronizarCobrancasVencidas(tenantId)
 
   type PlanoLite = { id: string; nome: string; valor: { toNumber(): number } | number }
@@ -79,14 +51,14 @@ export async function FinanceiroCaixaAside({
     <div className="space-y-4">
       <div id="caixa" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <Wallet className="h-4 w-4 text-success" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caixa</h2>
         </div>
         {resumo.quantidade > 0 ? (
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-[rgb(var(--foreground-muted))]">Receitas</dt>
-              <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+              <dd className="font-semibold tabular-nums text-success">
                 {formatarMoedaBRL(resumo.totalReceitas)}
               </dd>
             </div>
@@ -102,7 +74,7 @@ export async function FinanceiroCaixaAside({
                 className={[
                   'font-bold tabular-nums',
                   resumo.saldo >= 0
-                    ? 'text-emerald-700 dark:text-emerald-400'
+                    ? 'text-success'
                     : 'text-red-600 dark:text-red-400',
                 ].join(' ')}
               >
@@ -131,7 +103,7 @@ export async function FinanceiroCaixaAside({
                   className={[
                     'shrink-0 font-semibold tabular-nums',
                     l.tipo === 'RECEITA'
-                      ? 'text-emerald-700 dark:text-emerald-400'
+                      ? 'text-success'
                       : 'text-red-600 dark:text-red-400',
                   ].join(' ')}
                 >
@@ -193,7 +165,7 @@ export async function FinanceiroCaixaAside({
       {moduloHref && (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90"
         >
           Abrir financeiro
           <ArrowRight className="h-4 w-4" />

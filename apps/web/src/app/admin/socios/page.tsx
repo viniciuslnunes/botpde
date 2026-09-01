@@ -10,6 +10,7 @@ import {
   membroDetalheSelect,
   type MembroDetalheRow,
 } from '@/lib/admin-membro-map'
+import { formatCaixaAltaListagem } from '@/lib/admin-listagem-format'
 import { getAreasEfetivadasPorUser } from '@/lib/get-areas-efetivadas'
 import { carregarResumoRecrutamento } from '@/lib/membro-recrutamento-logs'
 import {
@@ -250,7 +251,10 @@ export default async function SociosPage({
   const dinamicas: OpcoesDinamicas = {
     sede: [
       { valor: 'nenhuma', label: 'Sem unidade' },
-      ...sedesOpts.map((s) => ({ valor: s.id, label: s.nome })),
+      ...sedesOpts.map((s) => ({
+        valor: s.id,
+        label: formatCaixaAltaListagem(s.nome) ?? s.nome,
+      })),
     ],
   }
 

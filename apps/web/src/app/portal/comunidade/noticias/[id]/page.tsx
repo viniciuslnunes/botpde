@@ -6,6 +6,7 @@ import {
   ComentarPracaForm,
   VotarPracaBotoes,
 } from '../../_components/praca-forms'
+import { PracaDenunciarBotao } from '../../_components/praca-denuncia-modal'
 import { exigirContextoPraca } from '../../_lib/praca-page'
 import {
   listarComentariosPraca,
@@ -24,7 +25,7 @@ export default async function NoticiaDetalhePage({
   searchParams: Promise<{ escopo?: string }>
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams])
-  const { escopo, ancora, sufixo } = await exigirContextoPraca(sp.escopo)
+  const { session, escopo, ancora, sufixo } = await exigirContextoPraca(sp.escopo)
   const item = await resolverNoticiaOuArtigo(id, escopo, ancora)
   if (!item) notFound()
 
@@ -73,7 +74,7 @@ export default async function NoticiaDetalhePage({
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="app-action inline-flex items-center rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-white"
+            className="app-action inline-flex items-center rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on"
           >
             Ler na fonte
           </a>
@@ -110,6 +111,11 @@ export default async function NoticiaDetalhePage({
                 <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
                   {c.conteudo}
                 </p>
+                {c.autorId !== session.user.id ? (
+                  <div className="mt-2">
+                    <PracaDenunciarBotao escopo={escopo} alvoTipo="PRACA_COMENTARIO" alvoId={c.id} />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -5,7 +5,7 @@ export function ReciboPrintButton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="no-print mt-6 w-full rounded-lg bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-white"
+      className="no-print mt-6 w-full rounded-lg bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-primary-on"
     >
       Imprimir recibo
     </button>

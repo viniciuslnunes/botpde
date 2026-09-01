@@ -251,7 +251,7 @@ function ActiveScreenShareBanner({
       {sharers.map((sharer) => (
         <div key={sharer.userId} className="meet-room-screen-banner__row">
           <span className="meet-room-screen-banner__label">
-            <MonitorUp className="h-4 w-4 shrink-0 text-sky-400" />
+            <MonitorUp className="h-4 w-4 shrink-0 text-[rgb(var(--color-info-fg))]" />
             <strong>{sharer.userName}</strong> está compartilhando a tela
           </span>
           <button
@@ -461,7 +461,7 @@ function MeetControls({
                   <button
                     type="button"
                     onClick={() => void responderSolicitacao(request, true)}
-                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                    className="btn-success rounded-lg px-3 py-1 text-xs font-semibold"
                   >
                     Permitir
                   </button>

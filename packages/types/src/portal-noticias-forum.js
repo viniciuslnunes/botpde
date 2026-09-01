@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CODIGOS_DENUNCIA_UI } from './moderacao.js'
 
 /** @typedef {'nacional' | 'torcida' | 'unidade'} EscopoComunidade */
 
@@ -145,9 +146,155 @@ export function inicioJanelaSinaisPraca(agora = new Date()) {
   return new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000)
 }
 
+/**
+ * Lower bound de Wilson (z≈1.96). 1 voto positivo não ganha de 48–2.
+ * @param {number} ups
+ * @param {number} downs
+ * @param {number} [z]
+ */
+export function wilsonLowerBound(ups, downs, z = 1.96) {
+  const n = Number(ups) + Number(downs)
+  if (!(n > 0)) return 0
+  const phat = Number(ups) / n
+  const z2 = z * z
+  const denom = 1 + z2 / n
+  const centre = phat + z2 / (2 * n)
+  const spread = z * Math.sqrt((phat * (1 - phat) + z2 / (4 * n)) / n)
+  return (centre - spread) / denom
+}
+
+/**
+ * Score "em alta" do tópico: recência (72h), Wilson da aprovação,
+ * volume de respostas e voto líquido (negativo pesa 2×), mídia, pin.
+ * Pendente/rejeitado não devem entrar no ranking público — filtre antes.
+ *
+ * @param {{
+ *   gostei: number
+ *   naoGostei: number
+ *   respostasCount: number
+ *   criadoEm: Date | string
+ *   midiaUrls?: string[]
+ *   fixado?: boolean
+ * }} t
+ * @param {Date} [agora]
+ */
+export function scoreHotTopico(t, agora = new Date()) {
+  const criado = t.criadoEm instanceof Date ? t.criadoEm : new Date(t.criadoEm)
+  const ageHours = Math.max(0, (agora.getTime() - criado.getTime()) / 3_600_000)
+  const freshness = Math.max(0, 72 - ageHours) * 1.5
+  const totalVotos = t.gostei + t.naoGostei
+  const quality = wilsonLowerBound(t.gostei, t.naoGostei)
+  const wilson = quality * 40
+  const liquido = t.gostei - t.naoGostei * 2
+  const replyWeight = totalVotos === 0 ? 1 : Math.max(0.15, quality)
+  const volume = Math.max(0, liquido) * 1.25 + t.respostasCount * 2.25 * replyWeight
+  const mediaBoost = (t.midiaUrls?.length ?? 0) > 0 ? 2 : 0
+  const pinBoost = t.fixado ? 12 : 0
+  return freshness + wilson + volume + mediaBoost + pinBoost
+}
+
+/**
+ * @param {string} [status]
+ */
+export function prioridadeStatusListagem(status) {
+  if (status === 'PENDENTE') return 0
+  if (status === 'VISIVEL') return 1
+  if (status === 'REJEITADO') return 2
+  return 3
+}
+
+/**
+ * @template {{
+ *   status?: string
+ *   fixado?: boolean
+ *   gostei: number
+ *   naoGostei: number
+ *   respostasCount: number
+ *   criadoEm: Date | string
+ *   atualizadoEm?: Date | string
+ *   midiaUrls?: string[]
+ * }} T
+ * @param {T[]} topicos
+ * @param {Date} [agora]
+ * @returns {T[]}
+ */
+export function rankTopicosHot(topicos, agora = new Date()) {
+  return [...topicos].sort((a, b) => {
+    const sa = prioridadeStatusListagem(a.status)
+    const sb = prioridadeStatusListagem(b.status)
+    if (sa !== sb) return sa - sb
+    if (Boolean(a.fixado) !== Boolean(b.fixado)) return a.fixado ? -1 : 1
+    const diff = scoreHotTopico(b, agora) - scoreHotTopico(a, agora)
+    if (diff !== 0) return diff
+    const ta = a.atualizadoEm instanceof Date ? a.atualizadoEm : new Date(a.atualizadoEm ?? a.criadoEm)
+    const tb = b.atualizadoEm instanceof Date ? b.atualizadoEm : new Date(b.atualizadoEm ?? b.criadoEm)
+    return tb.getTime() - ta.getTime()
+  })
+}
+
+/**
+ * Snippet do corpo para a lista compacta (pula a linha do título).
+ * @param {string} titulo
+ * @param {string} corpo
+ * @param {number} [max]
+ */
+export function resumoDeCorpoForum(titulo, corpo, max = 140) {
+  const raw = String(corpo ?? '').trim()
+  if (!raw) return null
+  const lines = raw.split(/\r?\n/)
+  const primeira = (lines[0] ?? '').trim()
+  const rest =
+    titulo && primeira === String(titulo).trim() ? lines.slice(1).join('\n').trim() : raw
+  const compact = rest.replace(/\s+/g, ' ').trim()
+  if (!compact) return null
+  return compact.length <= max ? compact : `${compact.slice(0, Math.max(1, max - 1))}…`
+}
+
+/**
+ * @param {string} status
+ * @param {{ autorId: string, userId?: string | null, podeModerar?: boolean }} viewer
+ */
+export function podeVerStatusTopico(status, viewer) {
+  if (status === 'VISIVEL') return true
+  const ehAutor = Boolean(viewer.userId && viewer.userId === viewer.autorId)
+  if (status === 'PENDENTE') return Boolean(viewer.podeModerar || ehAutor)
+  if (status === 'REJEITADO') return Boolean(viewer.podeModerar || ehAutor)
+  return false
+}
+
+/**
+ * Listagem do fórum: público só vê VISIVEL; autor vê os próprios pendentes/rejeitados;
+ * moderação vê a fila.
+ *
+ * @param {EscopoComunidade} escopo
+ * @param {{ tenantId: string | null, afiliacaoId: string | null }} ancora
+ * @param {{ userId?: string | null, podeModerar?: boolean }} [opts]
+ * @returns {{
+ *   OR: Record<string, unknown>[],
+ *   escopo?: string,
+ *   tenantId?: string,
+ *   afiliacaoId?: string,
+ *   id?: { in: string[] },
+ * }}
+ */
+export function whereTopicosNaListagem(escopo, ancora, opts = {}) {
+  const publico = wherePracaNoEscopo(escopo, ancora).topicos
+  const { status: _status, ...escopoWhere } = publico
+  const or = /** @type {Record<string, unknown>[]} */ ([{ status: 'VISIVEL' }])
+  if (opts.userId) {
+    or.push({ status: 'PENDENTE', autorId: opts.userId })
+    or.push({ status: 'REJEITADO', autorId: opts.userId })
+  }
+  if (opts.podeModerar) {
+    or.push({ status: 'PENDENTE' })
+  }
+  return { ...escopoWhere, OR: or }
+}
+
 export function parseOrdemTopico(valor) {
-  if (valor === 'populares' || valor === 'acessados') return valor
-  return 'recentes'
+  if (valor === 'populares') return 'em_alta'
+  if (valor === 'em_alta' || valor === 'acessados' || valor === 'recentes') return valor
+  return 'em_alta'
 }
 
 export function parseJanelaRanking(valor) {
@@ -155,9 +302,40 @@ export function parseJanelaRanking(valor) {
   return 'geral'
 }
 
+/**
+ * Abas do fórum. `compose=1` (URL antiga / `/forum/novo`) cai em `novo`.
+ * @param {string | undefined} aba
+ * @param {string | undefined} [compose]
+ * @returns {'topicos' | 'novo' | 'ranking'}
+ */
+export function parseForumAba(aba, compose) {
+  if (aba === 'novo' || compose === '1' || compose === 'true') return 'novo'
+  if (aba === 'ranking') return 'ranking'
+  return 'topicos'
+}
+
 export const moderarTopicoSchema = z.object({
   topicoId: z.string().min(1),
-  acao: z.enum(['fixar', 'ocultar']),
+  acao: z.enum(['fixar', 'ocultar', 'aprovar', 'rejeitar']),
+  motivo: z.string().trim().max(500).optional(),
+})
+
+export const moderarRespostaSchema = z.object({
+  respostaId: z.string().min(1),
+  acao: z.enum(['rejeitar', 'restaurar']),
+  motivo: z.string().trim().max(500).optional(),
+})
+
+/**
+ * Denúncia na praça (tópico, resposta ou comentário). A categoria vem da lista
+ * curta que a pessoa vê; gravidade e SLA são derivados no servidor a partir
+ * dela — o cliente nunca envia gravidade.
+ */
+export const denunciarPracaSchema = z.object({
+  alvoTipo: z.enum(['FORUM_TOPICO', 'FORUM_RESPOSTA', 'PRACA_COMENTARIO']),
+  alvoId: z.string().min(1),
+  categoria: z.enum(/** @type {[string, ...string[]]} */ ([...CODIGOS_DENUNCIA_UI])),
+  motivo: z.string().trim().max(500).optional(),
 })
 
 export const criarTopicoSchema = z.object({

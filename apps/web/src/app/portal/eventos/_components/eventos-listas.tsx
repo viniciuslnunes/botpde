@@ -93,7 +93,7 @@ export async function EventosProximosSection() {
 
   return (
     <div>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+      <h2 className="portal-kicker mb-3 text-[rgb(var(--foreground-muted))]">
         Próximos eventos
       </h2>
       <EventosListAnimated eventos={itens} />
@@ -129,7 +129,7 @@ export async function EventosPassadosSection() {
 
   return (
     <div>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+      <h2 className="portal-kicker mb-3 text-[rgb(var(--foreground-muted))]">
         Histórico
       </h2>
       <EventosListAnimated

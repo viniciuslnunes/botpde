@@ -1,22 +1,28 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { CARTEIRINHA_SECAO_PARAM } from '@/lib/carteirinha-tabs'
 
 /**
- * Modal «Atualizar cadastro` e a rota antiga chegam com `?secao=cadastro`.
- * Rola até a ficha sem depender do hash (redirect do App Router descarta `#`).
+ * Bookmarks `#cadastro` viram `?secao=cadastro` (a aba da ficha).
+ * O modal de pendência e `/portal/cadastro/associacao` já chegam com a query.
  */
 export function CarteirinhaCadastroAnchor() {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const focar = searchParams.get('secao') === 'cadastro'
 
   useEffect(() => {
-    const porHash = typeof window !== 'undefined' && window.location.hash === '#cadastro'
-    if (!focar && !porHash) return
-    const el = document.getElementById('cadastro')
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [focar])
+    if (window.location.hash !== '#cadastro') return
+    if (searchParams.get(CARTEIRINHA_SECAO_PARAM) === 'cadastro') {
+      window.history.replaceState(null, '', `${pathname}${window.location.search}`)
+      return
+    }
+    const params = new URLSearchParams(searchParams.toString())
+    params.set(CARTEIRINHA_SECAO_PARAM, 'cadastro')
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [pathname, router, searchParams])
 
   return null
 }

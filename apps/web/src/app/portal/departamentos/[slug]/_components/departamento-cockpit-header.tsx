@@ -37,7 +37,7 @@ export function DepartamentoCockpitHeader({
     <div className="space-y-3">
       <Link
         href="/portal/departamentos"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className="portal-chip inline-flex items-center gap-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Departamentos
@@ -53,10 +53,12 @@ export function DepartamentoCockpitHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{nome}</h1>
+              <h1 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
+                {nome}
+              </h1>
               {papel}
             </div>
-            <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
+            <p className="portal-kicker mt-1.5 text-[rgb(var(--foreground-muted))]">
               {moduloLabel}
               {totalPendentes > 0
                 ? ` · ${totalPendentes} pendente${totalPendentes === 1 ? '' : 's'} na fila`

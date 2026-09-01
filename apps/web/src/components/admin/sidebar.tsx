@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { groupAdminMenuBySecao } from '@torcida/types'
 import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
+import { AdminContextDisclosure } from '@/components/admin/admin-context-disclosure'
 import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -168,7 +169,7 @@ function NavSections({
       {groups.map((group) => (
         <div key={group.id}>
           {group.label ? (
-            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
+            <p className="portal-kicker mb-1.5 px-3 text-[rgb(var(--foreground-muted))]">
               {group.label}
             </p>
           ) : null}
@@ -212,7 +213,7 @@ function SidebarBody({
   return (
     <>
       {isSuperAdmin && torcidas.length > 0 && (
-        <div className="border-b border-[rgb(var(--border))] px-4 py-3">
+        <AdminContextDisclosure>
           <AdminSuperContextSwitchers
             clubes={clubes}
             torcidas={torcidas}
@@ -221,22 +222,21 @@ function SidebarBody({
             tenantAtualId={tenantId}
             variant="admin"
           />
-        </div>
+        </AdminContextDisclosure>
       )}
 
       {!isSuperAdmin && vinculos.length > 1 && (
-        <div className="border-b border-[rgb(var(--border))] px-4 py-3">
-          <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Torcida ativa
-          </p>
+        <AdminContextDisclosure title="Torcida ativa">
           <TorcidaContextSwitcher torcidas={vinculos} atualSlug={tenantSlug} destino="admin" />
-        </div>
+        </AdminContextDisclosure>
       )}
 
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Menu administrativo">
         <NavSections items={items} badges={badges} pathname={pathname} onNavigate={onNavigate} />
       </nav>
 
+      {/* Desktop: Super Admin e portal já estão no menu do usuário da top bar.
+          No drawer mobile (< lg) o dropdown some — estes atalhos ficam aqui. */}
       <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
         <ThemeToggle variant="row" />
         {isSuperAdmin && (
@@ -253,25 +253,6 @@ function SidebarBody({
         <Link
           href="/portal/comunidade"
           onClick={onNavigate}
-          className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-        >
-          Voltar ao portal
-        </Link>
-      </div>
-
-      <div className="hidden space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:block">
-        {isSuperAdmin && (
-          <Link
-            href="/super-admin"
-            prefetch={false}
-            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-          >
-            <Shield className="h-4 w-4" />
-            Área Super Admin
-          </Link>
-        )}
-        <Link
-          href="/portal/comunidade"
           className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
         >
           Voltar ao portal

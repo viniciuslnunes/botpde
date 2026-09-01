@@ -42,7 +42,7 @@ export function AdminDetailHeader({
     <div className="space-y-3">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className="portal-chip inline-flex items-center gap-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         {backLabel}
@@ -56,20 +56,24 @@ export function AdminDetailHeader({
               {icon}
             </div>
           ) : null}
-          <div className="min-w-0">
-            {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-                {eyebrow}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{title}</h1>
-              {badges}
+            <div className="min-w-0 space-y-3">
+              {eyebrow ? (
+                <p className="portal-kicker text-[rgb(var(--color-primary-fg))]">
+                  {eyebrow}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
+                  {title}
+                </h1>
+                {badges}
+              </div>
+              {description ? (
+                <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                  {description}
+                </p>
+              ) : null}
             </div>
-            {description ? (
-              <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{description}</p>
-            ) : null}
-          </div>
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

@@ -176,7 +176,7 @@ export function DepartamentoFluxoPrefs({
                             className={[
                               'app-touch-target rounded-md px-2 text-[11px] font-medium',
                               on
-                                ? 'bg-[rgb(var(--primary))] text-white'
+                                ? 'bg-[rgb(var(--primary))] text-primary-on'
                                 : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                             ].join(' ')}
                           >

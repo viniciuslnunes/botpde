@@ -207,7 +207,7 @@ export function LojaFiltros({
         type="submit"
         whileTap={{ scale: 0.98 }}
         transition={springSnappy}
-        className="w-full rounded-xl border-2 border-[rgb(var(--primary))] bg-[rgb(var(--primary))] py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        className="w-full rounded-xl border-2 border-[rgb(var(--primary))] bg-[rgb(var(--primary))] py-2.5 text-sm font-semibold text-primary-on hover:opacity-90"
       >
         Aplicar filtros
       </m.button>

@@ -502,7 +502,8 @@ export async function getAtividadeDoAutor(
     }>,
   ] = await Promise.all([
     db.comentario.findMany({
-      where: { autorId },
+      // Comentário ocultado pela moderação não volta pela atividade do perfil.
+      where: { autorId, oculto: false },
       orderBy: { criadoEm: 'desc' },
       take: 40,
       include: {

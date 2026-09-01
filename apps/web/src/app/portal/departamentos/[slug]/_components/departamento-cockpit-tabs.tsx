@@ -1,29 +1,36 @@
 'use client'
 
+import { usePathname, useSearchParams } from 'next/navigation'
 import { AdminTabs, type AdminTabItem } from '@/components/admin/ui'
 import { useNavbarSnapshot } from '@/lib/use-navbar-context'
 
 const CLASSE_PENDENCIA_NOTIF =
   'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]'
 
+function abaAtiva(pathname: string, slug: string, tabQuery: string | null): string {
+  const base = `/portal/departamentos/${slug}`
+  if (pathname === `${base}/areas` || pathname.startsWith(`${base}/areas/`)) return 'areas'
+  if (pathname === `${base}/projetos` || pathname.startsWith(`${base}/projetos/`)) return 'projetos'
+  if (tabQuery === 'equipe' || tabQuery === 'fila' || tabQuery === 'pedidos') return tabQuery
+  return 'painel'
+}
+
 /**
- * Tabs do cockpit com overlay das não-lidas do departamento (áreas / projetos /
- * equipe / pedidos / fila). Contagem SSR permanece; se houver notificação
- * pendente, o badge pinta de alerta e usa o maior dos dois.
+ * Tabs do cockpit: Áreas e Projetos são rotas; Equipe/Fila/Pedidos continuam
+ * `?tab=` na home. Overlay das não-lidas pinta o badge quando há pendência.
  */
 export function DepartamentoCockpitTabs({
   tabs,
   slug,
-  basePath,
-  activeId,
 }: {
   tabs: AdminTabItem[]
   slug: string
-  basePath: string
-  activeId: string
 }) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { navBadges } = useNavbarSnapshot()
   const secoes = navBadges.porSecao[slug]
+  const activeId = abaAtiva(pathname, slug, searchParams.get('tab'))
 
   const tabsComPendencia = tabs.map((tab) => {
     const live =
@@ -43,5 +50,5 @@ export function DepartamentoCockpitTabs({
     }
   })
 
-  return <AdminTabs tabs={tabsComPendencia} basePath={basePath} activeId={activeId} paramKey="tab" />
+  return <AdminTabs tabs={tabsComPendencia} activeId={activeId} paramKey="tab" />
 }

@@ -45,7 +45,7 @@ export default async function GrupoConvitePage({
           <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">{message}</p>
           <Link
             href="/portal/comunidade/grupos"
-            className="mt-4 inline-flex rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-4 inline-flex rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on"
           >
             Ver grupos
           </Link>

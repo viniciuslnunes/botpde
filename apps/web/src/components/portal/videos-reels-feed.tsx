@@ -9,7 +9,7 @@ import { Avatar } from './avatar'
 import { PostConteudoRich } from './post-conteudo-rich'
 import { VideosReelActions } from './videos-reel-actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { formatAutorUnidadeBadge } from '@/lib/autor-badges-format'
+import { CARGO_TORCEDOR, formatAutorUnidadeBadge } from '@/lib/autor-badges-format'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { lightboxBackdrop, springGentle, springSnappy } from '@/lib/motion-presets'
 import { resolveVideoPoster, resolveVideoSrc } from '@/lib/videos'
@@ -233,7 +233,12 @@ export function VideosReelsFeed({
         const isActive = idx === activeIdx
         const poster = resolveVideoPoster(post)
         const tenantLabel = post.tenant.nome
-        const sedeLabel = formatAutorUnidadeBadge(post.autor.sedeNome, tenantLabel)
+        const sedeLabel =
+          post.autor.cargoNome === CARGO_TORCEDOR
+            ? null
+            : formatAutorUnidadeBadge(post.autor.sedeNome, tenantLabel, {
+                tipo: post.autor.sedeTipo,
+              })
 
         return (
           <section

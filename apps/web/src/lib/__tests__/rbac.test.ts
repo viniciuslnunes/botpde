@@ -321,13 +321,13 @@ describe('departamento capabilities', () => {
     expect(hrefHomeDepartamento('financeiro')).toBe('/portal/departamentos/financeiro')
     expect(hrefHomeDepartamento('financeiro', 'painel')).toBe('/portal/departamentos/financeiro')
     expect(hrefHomeDepartamento('financeiro', 'projetos')).toBe(
-      '/portal/departamentos/financeiro?tab=projetos',
+      '/portal/departamentos/financeiro/projetos',
     )
     expect(hrefHomeDepartamento('social-e-eventos', 'areas', { area: 'area-1' })).toBe(
-      '/portal/departamentos/social-e-eventos?tab=areas&area=area-1',
+      '/portal/departamentos/social-e-eventos/areas/area-1',
     )
     expect(hrefHomeDepartamento('social-e-eventos', undefined, { projeto: 'proj-1' })).toBe(
-      '/portal/departamentos/social-e-eventos?tab=projetos&projeto=proj-1',
+      '/portal/departamentos/social-e-eventos/projetos/proj-1',
     )
     expect(hrefHomeDepartamento('bateria', undefined, { pessoa: 'user-1' })).toBe(
       '/portal/departamentos/bateria?tab=equipe&pessoa=user-1',

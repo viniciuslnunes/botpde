@@ -85,6 +85,8 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
    **Proibido** `text-[rgb(var(--primary))]` ou fill crua em texto/ícone —
    com marca preta some no escuro; âmbar/amarelo some no claro
    (ex.: resumo de sócios, “Ver todas”, “Diretoria”).
+   **Proibido** `text-white` em botão de marca — identidade branca (Santos)
+   some o rótulo; usar `.btn-primary` / `*-on`.
 
 ## Sugestões de cor
 
@@ -108,20 +110,32 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
    mais longa** (nunca `sport` dentro de “Sport Club Corinthians”).
 4. **Escudo/logo** — `extrairPaletaDeImagem`; verdes fora de contexto
    filtrados.
-5. **Superfícies derivadas** — `derivarSuperficiesDaMarca` + `completarSuperficies`
+5. **Cor de departamento e de ação** — `Departamento.cor` (hub, cockpit, admin)
+   passa por `resolverCorSemRivalidade`. Os tokens `actions.*` (badge Aviso,
+   faixa Informativo, sucesso) passam por `sanearAcoesContraRivalidade` em
+   `resolveTenantDesign` e no CSS. A família proibida vem **só** do dado
+   `Tenant.corArquirrival` / `brand.arquirrival` (não há piso universal de
+   verde: Galoucura pode usar verde da Mancha; Gaviões não, porque o tabu é
+   `#006437`). Clássico alvinegro × alvinegro não gera tabu do primeiro
+   rival — o walk pega o próximo hue (`proporCorArquirrival`; Santos →
+   Palmeiras). Azul e teal leem como a mesma casa. **Todo tom da família**
+   (emerald-100 até green-700, sky/blue) é tabu — não só o hex curado.
+   Badge Sede/Subsede/PDE usa tokens (`SEDE_TIPO_BADGE_CLASS`); CI
+   `lint:rival-hues`. Seed grava o hex nas âncoras.
+6. **Superfícies derivadas** — `derivarSuperficiesDaMarca` + `completarSuperficies`
    preenchem **todos** os tokens (fundo, texto, borda) nos dois temas.
    Claro: papel alto-L (pastel do hue; **branco puro se P&B** — não misturar o
    hex escuro no cinza, que sujava o muted). Escuro: zinc + sombra cromática.
    Texto principal e secundário fecham WCAG AA (4.5:1) contra todas as
    superfícies. `aplicarPaletaAoDesign` / `aplicarMarcaAoDesign` reaplicam
    ações + superfícies + texto automático.
-6. **Fill vs tema** — a identidade gravada (`brand.primary` / `secondary`) não
+7. **Fill vs tema** — a identidade gravada (`brand.primary` / `secondary`) não
    muda; `resolverFillDaMarca` empurra L quando branco some no claro ou preto
    some no escuro, e o CSS desenha um anel (`--color-*-ring`) se ainda faltar
    3:1 (WCAG 1.4.11). `textoSobreFill` escolhe branco/preto pelo ratio real
    (âmbar pede preto). `resolveActionTextColors` fecha 4.5:1 no botão e no
    link, 3:1 no badge soft, **por tema**.
-7. **Antes/depois** na prévia.
+8. **Antes/depois** na prévia.
 
 ## UX do estúdio (`/admin/design`)
 
@@ -135,7 +149,10 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 - Aba **Identidade**: cor primária/secundária + **texto da marca** (menus/tabs;
   vazio = automático — clareia P&B no escuro). **Mudar a primária recalcula
   superfícies e ações** dos dois temas. Paletas sugeridas mostram selo
-  “Claro+escuro” quando o card já fecha AA.
+  “Claro+escuro” quando o card já fecha AA. Se o JSON ainda não confirmou
+  `brand.arquirrival`, um callout pergunta se a unidade quer usar a cor
+  proposta (clássico alvinegro é pulado; entra o próximo hue distinto) ou
+  definir outra — o catálogo continua valendo no runtime até confirmar.
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
   Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
   Texto manual só vale onde o contraste fecha (botão sólido vs badge soft);
@@ -146,12 +163,12 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
   fica só no rodapé (`StickyPersistBar`). A prévia usa o mesmo `resolverFillDaMarca`
   / `resolverSuperficies` do runtime.
 - Contraste WCAG no rodapé avalia **claro e escuro juntos** (marca, ações,
-  superfícies e grade) com o fill efetivo de cada tema. Falhas oferecem
-  **Corrigir contraste nos dois temas** (`sanearContrasteDoDesign`: mantém
+  superfícies, **texto e badge de status** — warning/danger/info/success —
+  e grade). Badge/KPI usam piso **4.5:1** (texto 10–14px), não o 3:1 de
+  texto grande: o “Contraste OK” antigo passava o “Sem gestor” e o aviso
   fundos, saneia texto/borda, zera overrides de fg). Identidade/Ações: amostras
   soft+botão nos dois temas. **Superfícies**: campos **Claro** e **Escuro**
-  lado a lado + amostra visual dual. **Fundo**: linha/base automáticas herdam
-  por tema; amostra da grade nos dois modos. Alertas usam token info (não emerald).
+  lado a lado. Alertas usam token info (não emerald).
 - **Agenda / Eventos** — badges e CTAs de marca usam `--color-primary-fg` /
   `--color-primary-on` (nunca `--primary` cru como texto). Com identidade P&B,
   `EventoTipoBadge` GERAL e “Próximo compromisso” permanecem legíveis no escuro.
@@ -168,7 +185,8 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 
 | Peça | Onde |
 |------|------|
-| Schema + paletas + contraste | `packages/types/src/design.js` |
+| Schema + paletas + contraste + rivalidade de hue | `packages/types/src/design.js` |
+| Cor de departamento no request | `apps/web/src/lib/cor-departamento.ts` |
 | Testes de contraste / clube | `apps/web/src/lib/__tests__/design.test.ts` |
 | CSS vars / `applyTenantDesign` | `packages/ui/src/services/theme.tsx` |
 | Badge | `packages/ui/src/components/badge.tsx` |

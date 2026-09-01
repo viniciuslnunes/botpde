@@ -184,7 +184,7 @@ function AdicionarAreaSelect({
         <button
           type="submit"
           disabled={pending}
-          className="app-action rounded-full bg-[rgb(var(--primary))] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+          className="app-action rounded-full bg-[rgb(var(--primary))] px-2 py-0.5 text-[10px] font-medium text-primary-on disabled:opacity-50"
         >
           OK
         </button>
@@ -291,7 +291,7 @@ export function DepartamentoEquipe({
             className={[
               'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
               filtroAreaId === null
-                ? 'bg-[rgb(var(--primary))] text-white'
+                ? 'bg-[rgb(var(--primary))] text-primary-on'
                 : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -305,7 +305,7 @@ export function DepartamentoEquipe({
               className={[
                 'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
                 filtroAreaId === a.id
-                  ? 'bg-[rgb(var(--primary))] text-white'
+                  ? 'bg-[rgb(var(--primary))] text-primary-on'
                   : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
@@ -532,7 +532,7 @@ function AdicionarMembroForm({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   Incluir

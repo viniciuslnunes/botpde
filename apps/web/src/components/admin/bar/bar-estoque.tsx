@@ -80,7 +80,7 @@ export function RegistrarCompraBarForm({
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
         >
           + Registrar compra
         </button>
@@ -213,7 +213,7 @@ export function RegistrarCompraBarForm({
                 type="submit"
                 form={formId}
                 disabled={pending}
-                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
               >
                 {pending ? 'Registrando...' : 'Registrar compra'}
               </button>
@@ -278,7 +278,7 @@ function AjusteEstoqueRow({ produto, onClose }: { produto: BarProdutoSerializado
               if (ok) onClose()
             })
           }
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Ajustando...' : 'Ajustar'}
         </button>

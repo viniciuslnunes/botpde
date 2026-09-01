@@ -1,5 +1,5 @@
 import type { TipoNotificacao } from '@torcida/db'
-import { hrefHomeDepartamento, PERMISSIONS } from '@torcida/types'
+import { hrefHomeDepartamento, labelCategoriaViolacao, PERMISSIONS } from '@torcida/types'
 import {
   criarNotificacoesEmLote,
   criarNotificacoesEmLoteSePendentes,
@@ -393,6 +393,43 @@ export async function notificarDenunciaMensagem(params: {
   return notificarDenunciaAdmins([PERMISSIONS.MESSAGES_MODERATE, PERMISSIONS.COMMUNITY_MODERATE], {
     ...params,
     titulo: 'Nova denúncia de mensagem',
+  })
+}
+
+/**
+ * Corpo da notificação de denúncia do fórum/praça.
+ *
+ * A reconciliação de leitura amarra a notificação à denúncia por
+ * `(tipo, atorId, corpo)` — a notificação não guarda o id. Então este texto
+ * precisa ser **determinístico** a partir do que fica gravado na denúncia
+ * (categoria + complemento), e truncado nos mesmos 140 do fan-out.
+ */
+export function corpoDenunciaModeracao(categoria: string, motivo: string | null): string {
+  const label = labelCategoriaViolacao(categoria)
+  const complemento = motivo?.trim()
+  return (complemento ? `${label} — ${complemento}` : label).slice(0, 140)
+}
+
+/**
+ * Denúncia no fórum/praça — moderadores de comunidade do tenant que responde
+ * pelo canal. Escopo CLUBE não tem tenant: a fila é da plataforma e aqui não há
+ * quem notificar (retorna 0 em vez de quebrar).
+ */
+export async function notificarDenunciaModeracao(params: {
+  tenantId: string | null
+  categoria: string
+  motivo: string | null
+  denuncianteUserId: string
+  escalado: boolean
+}): Promise<number> {
+  if (!params.tenantId) return 0
+  return notificarDenunciaAdmins([PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE], {
+    tenantId: params.tenantId,
+    motivo: corpoDenunciaModeracao(params.categoria, params.motivo),
+    denuncianteUserId: params.denuncianteUserId,
+    titulo: params.escalado
+      ? 'Denúncia crítica no fórum — em análise da plataforma'
+      : 'Nova denúncia no fórum',
   })
 }
 

@@ -25,6 +25,7 @@ import { CanalRestritoUnidade } from '@/components/admin/canal-restrito-unidade'
 import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/(estrutura)/sedes/actions'
 import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
+import { SEDE_TIPO_BADGE_CLASS } from '@/lib/sede-tipo-badge'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { toast } from 'sonner'
 
@@ -119,13 +120,7 @@ const TIPO_LABEL: Record<AdminSedeListItem['tipo'], string> = {
   PONTO_ENCONTRO: 'PDE',
 }
 
-const TIPO_CLASS: Record<AdminSedeListItem['tipo'], string> = {
-  SEDE: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  SUBSEDE: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  // Evita “verde de dashboard” fora do contexto de identidade (ex.: Gaviões/Corinthians).
-  // Mantém o tipo visível, mas sem emerald/emerald.
-  PONTO_ENCONTRO: 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]',
-}
+const TIPO_CLASS = SEDE_TIPO_BADGE_CLASS
 
 type SedeLocalNode = AdminSedeListItem & { kind: 'local'; filhos: TreeNode[] }
 type SedeExternoNode = {
@@ -749,7 +744,7 @@ export function AdminSedesManager({
             <button
               type="button"
               onClick={() => setCriando(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-3.5 py-2 text-sm font-medium text-primary-on hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
               Adicionar local
@@ -843,7 +838,7 @@ export function AdminSedesManager({
                 onClick={() => setFiltro(f.id)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                   active
-                    ? 'bg-[rgb(var(--color-primary))] text-white'
+                    ? 'bg-[rgb(var(--color-primary))] text-primary-on'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
                 }`}
               >

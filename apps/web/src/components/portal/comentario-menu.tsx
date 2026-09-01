@@ -162,7 +162,7 @@ export function ComentarioMenu({
               disabled={pending || !texto.trim()}
               whileTap={{ scale: 0.96 }}
               transition={springSnappy}
-              className="rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-60"
+              className="rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-primary-on disabled:opacity-60"
             >
               Salvar
             </m.button>

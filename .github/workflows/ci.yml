@@ -93,3 +93,6 @@ jobs:
       # Só análise estática: não precisa de app de pé nem de banco.
       - name: Lint mobile (safe-area + unidades de viewport)
         run: pnpm --filter @torcida/web lint:mobile
+
+      - name: Lint rival hues (sem emerald/sky crus no tenant)
+        run: pnpm --filter @torcida/web lint:rival-hues

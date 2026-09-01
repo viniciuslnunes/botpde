@@ -45,8 +45,8 @@ export function RsvpInline({
           className={[
             'inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-60',
             status === 'CONFIRMADO'
-              ? 'bg-emerald-600 text-white'
-              : 'border border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+              ? 'btn-success'
+              : 'btn-success-soft',
           ].join(' ')}
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}

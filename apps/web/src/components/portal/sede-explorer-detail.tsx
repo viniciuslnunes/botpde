@@ -85,17 +85,17 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-4 pt-14">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[sede.tipo]}`}>
+            <span className={`rounded-full px-2 py-0.5 portal-chip ${TIPO_CLASS[sede.tipo]}`}>
               {TIPO_LABEL[sede.tipo]}
             </span>
             {distanciaLabel && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary))] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary))] px-2 py-0.5 text-[10px] font-semibold text-primary-on shadow-sm">
                 <Navigation className="h-2.5 w-2.5" aria-hidden />
                 {distanciaLabel}
               </span>
             )}
           </div>
-          <h2 className="mt-1.5 text-balance text-lg font-bold text-white sm:text-xl">{sede.nome}</h2>
+          <h2 className="portal-display mt-1.5 text-lg text-white sm:text-xl">{sede.nome}</h2>
           {sede.sedePai && (
             <p className="mt-0.5 text-xs text-white/80">
               Pertence a{' '}
@@ -118,7 +118,7 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-medium text-primary-on transition-opacity hover:opacity-90"
             >
               <Navigation className="h-3.5 w-3.5" />
               Como chegar
@@ -173,7 +173,7 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
 
         {sede.filhos.length > 0 && (
           <div className="border-t border-[rgb(var(--border))] pt-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            <h3 className="portal-kicker mb-2 text-[rgb(var(--foreground-muted))]">
               Locais vinculados ({sede.filhos.length})
             </h3>
             <ul className="space-y-1.5">
@@ -184,10 +184,10 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
                     onClick={() => onSelectFilho(filho.id)}
                     className="flex w-full items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-left text-sm transition-colors hover:border-[rgb(var(--color-primary))]/45"
                   >
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[filho.tipo]}`}>
+                    <span className={`rounded-full px-1.5 py-0.5 portal-chip ${TIPO_CLASS[filho.tipo]}`}>
                       {TIPO_LABEL[filho.tipo]}
                     </span>
-                    <span className="min-w-0 truncate font-medium text-[rgb(var(--foreground))]">{filho.nome}</span>
+                    <span className="portal-display min-w-0 truncate text-sm text-[rgb(var(--foreground))]">{filho.nome}</span>
                     {filho.cidade && (
                       <span className="ml-auto shrink-0 text-[11px] text-[rgb(var(--foreground-muted))]">
                         {filho.cidade}
@@ -202,7 +202,7 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
 
         {sede.eventos.length > 0 && (
           <div className="border-t border-[rgb(var(--border))] pt-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            <h3 className="portal-kicker mb-2 text-[rgb(var(--foreground-muted))]">
               Próximos eventos aqui
             </h3>
             <ul className="space-y-1.5">

@@ -21,6 +21,7 @@ import {
   type DeptoHubBase,
   type DeptoHubItem,
 } from '@/lib/departamentos-portal-access'
+import { comCorDepartamento } from '@/lib/cor-departamento'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { ArrowRight, Briefcase, Eye, Layers, LayoutGrid, Settings2 } from 'lucide-react'
@@ -131,14 +132,14 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
+              <h2 className="portal-display min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
                 {depto.nome}
               </h2>
               <span className="shrink-0" title={explicacaoPapel(depto)}>
                 {papelBadge}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{areaLabel}</p>
+            <p className="portal-chip mt-0.5 text-[rgb(var(--foreground-muted))]">{areaLabel}</p>
           </div>
         </div>
 
@@ -176,8 +177,8 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
             <span
               className={
                 depto.kpi.alerta
-                  ? 'text-lg font-bold leading-none text-[rgb(var(--color-danger-fg))]'
-                  : 'text-lg font-bold leading-none text-[rgb(var(--foreground))]'
+                  ? 'font-mono text-lg font-bold leading-none tabular-nums text-[rgb(var(--color-danger-fg))]'
+                  : 'font-mono text-lg font-bold leading-none tabular-nums text-[rgb(var(--foreground))]'
               }
             >
               {depto.kpi.valor}
@@ -189,7 +190,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
         <div className="mt-auto flex flex-col gap-2 pt-4">
           <Link
             href={homeHref}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))]"
+            className="btn-primary inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))]"
           >
             Abrir departamento
             <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
@@ -265,8 +266,9 @@ async function carregarKpisHub(input: {
     proximoEnsaio,
     proximaCaravana,
   ]: [number, number, number, number, number, EventoData, EventoData] = await Promise.all([
+    // Fila de admissão: só quem aprova. O bypass de SA não abre a aba no cockpit.
     quando(
-      slugsVisiveis.has('diretoria') && pode(PERMISSIONS.MEMBERS_VIEW),
+      slugsVisiveis.has('diretoria') && hasPermission(permissoes, PERMISSIONS.MEMBERS_APPROVE),
       () => db.saasMembro.count({ where: { tenantId, status: 'PENDENTE' } }),
       0,
     ),
@@ -438,7 +440,10 @@ export async function DepartamentosSection() {
     getUserPermissionsInTenant(session.user.id, tenant.id),
   ])
 
-  const todosTenant = todosRaw.filter((d) => !isDepartamentoLegado(d))
+  const todosTenant = await comCorDepartamento(
+    todosRaw.filter((d) => !isDepartamentoLegado(d)),
+    tenant,
+  )
   const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
   // Edição de cor = roles:manage real (dual-hat SA) ou gestor da área — não o bypass.
   const podeGerirCoresGlobal = hasPermission(effective, PERMISSIONS.ROLES_MANAGE)
@@ -526,14 +531,14 @@ export async function DepartamentosSection() {
       {temSecoes ? (
         <>
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            <h2 className="portal-kicker text-[rgb(var(--foreground-muted))]">
               Meus departamentos
             </h2>
             <DeptoHubGrid items={meusDepartamentos} />
           </section>
           <section className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              <h2 className="portal-kicker text-[rgb(var(--foreground-muted))]">
                 Demais departamentos
               </h2>
               <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">

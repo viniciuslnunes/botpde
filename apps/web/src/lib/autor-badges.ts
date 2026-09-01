@@ -24,13 +24,14 @@ import {
   parseNumeroAssociado,
 } from './autor-badges-format'
 
+type TipoSede = 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+
 export interface AutorBadge {
   sedeNome: string | null
+  sedeTipo: TipoSede | null
   cargoNome: string | null
   departamentoNome: string | null
 }
-
-type TipoSede = 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
 
 type RoleBadgeLite = {
   nome: string
@@ -303,6 +304,7 @@ async function carregarBadgesPorAutorTenant(
 
     map.set(k, {
       sedeNome: membro?.sede?.nome ?? null,
+      sedeTipo: membro?.sede?.tipo ?? null,
       cargoNome,
       departamentoNome,
     })
@@ -492,6 +494,7 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
         ? {
             ...p.autor,
             sedeNome: null,
+            sedeTipo: null,
             cargoNome: CARGO_TORCEDOR,
             departamentoNome: null,
           }
@@ -499,6 +502,7 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
           ? {
               ...p.autor,
               sedeNome: b.sedeNome,
+              sedeTipo: b.sedeTipo,
               cargoNome: b.cargoNome,
               departamentoNome: b.departamentoNome,
             }

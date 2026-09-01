@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import { ArrowRight, ClipboardList, Music2, Shield } from 'lucide-react'
+import { ArrowRight, ClipboardList, Drum, Music2, Shield } from 'lucide-react'
 import { db } from '@torcida/db'
 import { carregarPainelEventosTipo, getEventoEmbarque, listarEventosPorTipo } from '@/lib/eventos-tipo'
+import { DepartamentoAcervoGrade, DepartamentoAcervoGradeSkeleton } from './departamento-acervo-grade'
 
 type EscalaLite = {
   id: string
@@ -71,35 +72,24 @@ async function carregarEscalasJogo(
 export async function BateriaEnsaiosAside({
   tenantId,
   departamentoId,
-  nome,
   isGestor,
+  podeVerPatrimonio,
+  podeGerirAcervo,
   moduloHref,
   operacaoHref,
-  podeVer,
+  basePath,
+  page,
 }: {
   tenantId: string
   departamentoId: string
-  nome: string
   isGestor: boolean
+  podeVerPatrimonio: boolean
+  podeGerirAcervo: boolean
   moduloHref: string | null
   operacaoHref: string | null
-  podeVer: boolean
+  basePath: string
+  page: number
 }) {
-  if (!podeVer) {
-    return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Music2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Ensaios</h2>
-        </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas o acesso aos ensaios exige ser membro deste departamento ou ter
-          permissão de eventos.
-        </p>
-      </div>
-    )
-  }
-
   const [{ proximos, totalProximos, confirmadosProximos }, recentes, escalas] = await Promise.all([
     carregarPainelEventosTipo(tenantId, 'ENSAIO', 5),
     listarEventosPorTipo(tenantId, 'ENSAIO', { futuros: false, limite: 1 }),
@@ -125,6 +115,33 @@ export async function BateriaEnsaiosAside({
 
   return (
     <div className="space-y-4">
+      {podeVerPatrimonio ? (
+        <div id="instrumentos" className="scroll-mt-20 space-y-3">
+          <div className="flex items-center gap-2">
+            <Drum className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Instrumentos</h2>
+          </div>
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            {podeGerirAcervo
+              ? 'A foto diferencia surdos, caixas e repiques parecidos. Cadastre e atualize o acervo da bateria.'
+              : 'A foto diferencia surdos, caixas e repiques parecidos. Quem gere o patrimônio cadastra e atualiza as peças.'}
+          </p>
+          <DepartamentoAcervoGrade
+            tenantId={tenantId}
+            basePath={basePath}
+            page={page}
+            podeGerir={podeGerirAcervo}
+            categoriaTravada="INSTRUMENTO"
+            emptyTitle="Nenhum instrumento cadastrado"
+            emptyDescription={
+              podeGerirAcervo
+                ? 'Cadastre surdos, caixas e outros com foto.'
+                : 'Quem gere o patrimônio cadastra os instrumentos com foto. O acervo da bateria ainda está vazio.'
+            }
+          />
+        </div>
+      ) : null}
+
       <div id="ensaios" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
           <Music2 className="h-4 w-4 text-rose-600 dark:text-rose-400" />
@@ -139,7 +156,7 @@ export async function BateriaEnsaiosAside({
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-[rgb(var(--foreground-muted))]">Confirmados</dt>
-                <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                <dd className="font-semibold tabular-nums text-success">
                   {confirmadosProximos}
                 </dd>
               </div>
@@ -224,22 +241,24 @@ export async function BateriaEnsaiosAside({
         </Link>
       </div>
 
-      {moduloHref && (
+      {moduloHref ? (
         <Link
           href={moduloHref}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
-          Abrir bateria
-          <ArrowRight className="h-4 w-4" />
+          Abrir ensaios na agenda
+          <ArrowRight className="h-3.5 w-3.5" />
         </Link>
-      )}
-      <Link
-        href="/portal/patrimonio"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-      >
-        Patrimônio do departamento
-        <ArrowRight className="h-4 w-4" />
-      </Link>
+      ) : null}
+      {podeVerPatrimonio ? (
+        <Link
+          href="/portal/patrimonio?categoria=INSTRUMENTO"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+        >
+          Filtros e empréstimos
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : null}
       {isGestor && operacaoHref && (
         <Link
           href={operacaoHref}
@@ -256,10 +275,9 @@ export async function BateriaEnsaiosAside({
 
 export function BateriaEnsaiosSkeleton() {
   return (
-    <div className="animate-pulse space-y-4">
-      <div className="h-40 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-      <div className="h-40 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-      <div className="h-10 rounded-lg bg-[rgb(var(--border))]" />
+    <div className="space-y-4">
+      <DepartamentoAcervoGradeSkeleton />
+      <div className="h-40 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
     </div>
   )
 }

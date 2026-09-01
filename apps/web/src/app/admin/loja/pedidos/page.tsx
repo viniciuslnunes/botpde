@@ -198,7 +198,7 @@ export default async function AdminPedidosPage({
     [
       'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
       ativa
-        ? 'bg-[rgb(var(--primary))] text-white'
+        ? 'bg-[rgb(var(--primary))] text-primary-on'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
     ].join(' ')
 

@@ -371,7 +371,7 @@ function BarLinha({ v }: { v: BarVendaUnidadeItem }) {
         className={[
           'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
           paga
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+            ? 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]'
             : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
         ].join(' ')}
       >
@@ -399,7 +399,7 @@ function MembroLinha({ m }: { m: MembroUnidadeItem }) {
         className={[
           'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
           aprovado
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+            ? 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]'
             : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
         ].join(' ')}
       >

@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import { canOptimizeImageUrl, durableImageUrl } from '@/lib/optimizable-image'
-import { LogoImage } from '@/components/media/logo-image'
 
 const SIZES = {
   xs: 'h-7 w-7 text-[10px]',
@@ -34,9 +33,9 @@ function inicial(nome: string | null): string {
 }
 
 /**
- * Avatar da comunidade: foto circular quando existe, senão a inicial.
- * Logos (`fit="contain"`) passam por `LogoImage` — mesma detecção reativa
- * de badge circular com fundo opaco assado em todo o sistema.
+ * Avatar da comunidade: chip sempre circular (foto, logo ou inicial).
+ * `fit` só escolhe cover vs contain — o recorte do fundo opaco assado é o
+ * `overflow-hidden rounded-full` do chip, não a detecção de `LogoImage`.
  */
 export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' }: AvatarProps) {
   const sizeClass = `inline-flex shrink-0 items-center justify-center font-semibold ${SIZES[size]}`
@@ -45,12 +44,35 @@ export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' 
 
   if (fit === 'contain' && src) {
     return (
-      <LogoImage
-        src={src}
-        alt={nome ?? 'Membro'}
-        size={px}
-        className={[sizeClass, 'object-contain', className ?? ''].join(' ')}
-      />
+      <span
+        className={[
+          sizeClass,
+          'relative overflow-hidden rounded-full bg-[rgb(var(--background-subtle))]',
+          className ?? '',
+        ].join(' ')}
+      >
+        {canOptimizeImageUrl(src) ? (
+          <Image
+            src={src}
+            alt={nome ?? 'Membro'}
+            fill
+            sizes={`${px}px`}
+            quality={90}
+            className="object-contain"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- host fora do otimizador
+          <img
+            src={src}
+            alt={nome ?? 'Membro'}
+            width={px}
+            height={px}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        )}
+      </span>
     )
   }
 

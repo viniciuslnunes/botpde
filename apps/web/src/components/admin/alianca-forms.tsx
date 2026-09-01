@@ -145,15 +145,15 @@ function statusLabel(status: AliancaListItem['status']): string {
 }
 
 function statusClass(status: AliancaListItem['status']): string {
-  if (status === 'ATIVA') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+  if (status === 'ATIVA') return 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]'
   if (status === 'PENDENTE') return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
   if (status === 'ENCERRADA') return 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-  return 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+  return 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]'
 }
 
 function CoIrmaBadge() {
   return (
-    <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+    <span className="rounded-full bg-[rgb(var(--foreground)_/_0.08)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--foreground-muted))]">
       Co-irmã
     </span>
   )
@@ -393,7 +393,7 @@ export function AliancaForms({
                 )
               }
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 btn-success rounded-lg px-3.5 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               Aceitar
@@ -474,7 +474,7 @@ export function AliancaForms({
             'rounded-xl border px-4 py-3 text-sm',
             erro
               ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
+              : 'border-[rgb(var(--color-success)_/_0.32)] bg-[rgb(var(--color-success)_/_0.12)] text-[rgb(var(--color-success-fg))]',
           ].join(' ')}
         >
           {erro ?? sucesso}

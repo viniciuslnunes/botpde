@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { UserCog } from 'lucide-react'
+import { PERFIL_ACAO, PERFIL_ACAO_ICON } from './perfil-acao'
 
 export function PerfilAdminLink({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="app-action inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+      className={`${PERFIL_ACAO} border border-[rgb(var(--border))] text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]`}
     >
-      <UserCog className="h-4 w-4" />
+      <UserCog className={PERFIL_ACAO_ICON} />
       Ver no admin
     </Link>
   )

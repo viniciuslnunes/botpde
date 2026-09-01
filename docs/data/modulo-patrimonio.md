@@ -52,7 +52,9 @@ Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-d
 ## Superfícies
 
 - Portal: `/portal/patrimonio`
-- Home: `/portal/departamentos/patrimonio`
+- Home: `/portal/departamentos/patrimonio` — a primeira aba (**Inventário**)
+  mostra a grade com foto. Membro com `patrimony:view` vê; CRUD só com
+  `patrimony:manage`. Filtros e empréstimos continuam em `/portal/patrimonio`.
 - Admin: `/admin/patrimonio` — `AdminTabs` (`?tab=`): **Acervo** (default, cards
   com `fotoUrl`), Em uso agora, Precisa de você, **Histórico** (baixas e
   exclusões permanentes: quem / quando, via `AuditLog`); edição/exclusão no

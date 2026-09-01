@@ -9,16 +9,30 @@ export type TenantDesignBridgeProps = {
   corPrimaria: string
   /** JSON bruto do banco ou já normalizado. */
   design?: unknown
+  slug?: string | null
+  corArquirrival?: string | null
+  clubeNome?: string | null
 }
 
 /**
  * Aplica o tema visual do tenant sobre o ThemeProvider raiz.
  * CSS crítico no SSR + sync client com claro/escuro.
  */
-export function TenantDesignBridge({ corPrimaria, design: designRaw }: TenantDesignBridgeProps) {
+export function TenantDesignBridge({
+  corPrimaria,
+  design: designRaw,
+  slug,
+  corArquirrival,
+  clubeNome,
+}: TenantDesignBridgeProps) {
   const design = useMemo(
-    () => resolveTenantDesign(designRaw ?? null, corPrimaria) as TenantDesign,
-    [designRaw, corPrimaria],
+    () =>
+      resolveTenantDesign(designRaw ?? null, corPrimaria, {
+        slug,
+        corArquirrival,
+        clubeNome,
+      }) as TenantDesign,
+    [designRaw, corPrimaria, slug, corArquirrival, clubeNome],
   )
 
   const { resolvedTheme } = useTheme()

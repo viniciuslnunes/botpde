@@ -100,7 +100,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
   },
   {
     id: 'bateria',
-    label: 'Bateria',
+    label: 'Baterias',
     href: '/admin/bateria',
     // Patrimônio na página é bloco extra; menu não usa patrimony:view sozinho
     // (membro Bateria tem view e não deve entrar no admin só por isso).
@@ -203,7 +203,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     ],
     secao: 'operacao',
   },
-  // Lançamentos, evolução, cobranças e planos são tabs de `/admin/financeiro`.
+  // Lançamentos, evolução, cobranças, planos e novo plano são tabs de `/admin/financeiro`.
   // Home do módulo = Direção (inbox). `/admin/cobrancas` e
   // `/admin/planos-associacao` seguem como redirect: há notificações gravadas
   // apontando para a URL antiga.
@@ -484,6 +484,12 @@ export const ADMIN_MODULOS = ([
       { id: 'evolucao', label: 'Evolução', href: '/admin/financeiro/evolucao', permissao: null },
       { id: 'cobrancas', label: 'Cobranças', href: '/admin/financeiro/cobrancas', permissao: null },
       { id: 'planos', label: 'Planos de sócio', href: '/admin/financeiro/planos', permissao: null },
+      {
+        id: 'planos-novo',
+        label: 'Novo plano',
+        href: '/admin/financeiro/planos/novo',
+        permissao: PERMISSIONS.FINANCE_MANAGE,
+      },
     ],
   },
   // Estrutura e Plataforma são montados em **route group**

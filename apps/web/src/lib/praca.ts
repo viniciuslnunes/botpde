@@ -22,6 +22,10 @@ import {
   SINAIS_BARATOS_PRACA,
   TETO_SINAIS_BARATOS_SEMANA,
   LIMIAR_RANKING_PRACA,
+  whereTopicosNaListagem,
+  rankTopicosHot,
+  podeVerStatusTopico,
+  prioridadeStatusListagem,
 } from '@torcida/types'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import type { ContextoComunidadePortal } from '@/lib/comunidade-contexto'
@@ -56,15 +60,23 @@ export type ArtigoPortalItem = {
   autorNome: string | null
 }
 
+export type ForumTopicoStatus = 'PENDENTE' | 'VISIVEL' | 'REJEITADO' | 'OCULTO' | 'REMOVIDO'
+
 export type ForumTopicoItem = {
   id: string
   titulo: string
+  corpo: string
+  midiaUrls: string[]
   visitas: number
   respostasCount: number
   gostei: number
   naoGostei: number
   fixado: boolean
+  status: ForumTopicoStatus
+  rejeitadoMotivo: string | null
+  criadoEm: Date
   atualizadoEm: Date
+  autorId: string
   autorNome: string | null
 }
 
@@ -114,54 +126,84 @@ export async function listarArtigosPortalDoTenant(tenantId: string): Promise<Art
 type TopicoRow = {
   id: string
   titulo: string
+  corpo: string
+  midiaUrls: string[]
   visitas: number
   respostasCount: number
   gostei: number
   naoGostei: number
   fixado: boolean
+  status: ForumTopicoStatus
+  rejeitadoMotivo: string | null
+  criadoEm: Date
   atualizadoEm: Date
+  autorId: string
   autor: { nome: string | null }
 }
 
 export async function listarTopicos(
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
-  ordem: 'recentes' | 'populares' | 'acessados' = 'recentes',
+  ordem: 'em_alta' | 'recentes' | 'acessados' = 'em_alta',
+  opts: { userId?: string | null; podeModerar?: boolean } = {},
 ): Promise<ForumTopicoItem[]> {
-  const where = wherePracaNoEscopo(escopo, ancora).topicos
+  const where = whereTopicosNaListagem(escopo, ancora, {
+    userId: opts.userId ?? undefined,
+    podeModerar: opts.podeModerar,
+  })
   const orderBy =
-    ordem === 'populares'
-      ? ([{ fixado: 'desc' }, { gostei: 'desc' }, { respostasCount: 'desc' }] as const)
-      : ordem === 'acessados'
-        ? ([{ fixado: 'desc' }, { visitas: 'desc' }] as const)
-        : ([{ fixado: 'desc' }, { atualizadoEm: 'desc' }] as const)
+    ordem === 'acessados'
+      ? ([{ fixado: 'desc' }, { visitas: 'desc' }] as const)
+      : ([{ fixado: 'desc' }, { atualizadoEm: 'desc' }] as const)
   const rows: TopicoRow[] = await db.forumTopico.findMany({
     where,
     orderBy: [...orderBy],
-    take: 50,
+    take: 80,
     select: {
       id: true,
       titulo: true,
+      corpo: true,
+      midiaUrls: true,
       visitas: true,
       respostasCount: true,
       gostei: true,
       naoGostei: true,
       fixado: true,
+      status: true,
+      rejeitadoMotivo: true,
+      criadoEm: true,
       atualizadoEm: true,
+      autorId: true,
       autor: { select: { nome: true } },
     },
   })
-  return rows.map((t) => ({
+  const mapped = rows.map((t) => ({
     id: t.id,
     titulo: t.titulo,
+    corpo: t.corpo,
+    midiaUrls: t.midiaUrls,
     visitas: t.visitas,
     respostasCount: t.respostasCount,
     gostei: t.gostei,
     naoGostei: t.naoGostei,
     fixado: t.fixado,
+    status: t.status,
+    rejeitadoMotivo: t.rejeitadoMotivo,
+    criadoEm: t.criadoEm,
     atualizadoEm: t.atualizadoEm,
+    autorId: t.autorId,
     autorNome: t.autor.nome,
   }))
+  const ranked =
+    ordem === 'em_alta'
+      ? rankTopicosHot(mapped)
+      : [...mapped].sort((a, b) => {
+          const sa = prioridadeStatusListagem(a.status)
+          const sb = prioridadeStatusListagem(b.status)
+          if (sa !== sb) return sa - sb
+          return 0
+        })
+  return ranked.slice(0, 50)
 }
 
 export type TopicoParaFeed = {
@@ -541,14 +583,12 @@ export type ForumRespostaItem = {
   id: string
   conteudo: string
   criadoEm: Date
+  autorId: string
   autorNome: string | null
+  oculto: boolean
 }
 
 export type ForumTopicoDetalhe = ForumTopicoItem & {
-  corpo: string
-  midiaUrls: string[]
-  criadoEm: Date
-  autorId: string
   autorAvatarUrl: string | null
   autorNickname: string | null
   respostas: ForumRespostaItem[]
@@ -558,6 +598,7 @@ export async function getTopicoDetalhe(
   id: string,
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
+  viewer: { userId: string; podeModerar: boolean },
 ): Promise<ForumTopicoDetalhe | null> {
   const t: {
     id: string
@@ -569,15 +610,23 @@ export async function getTopicoDetalhe(
     gostei: number
     naoGostei: number
     fixado: boolean
+    status: ForumTopicoStatus
+    rejeitadoMotivo: string | null
     criadoEm: Date
     atualizadoEm: Date
     autorId: string
     escopo: 'CLUBE' | 'TORCIDA'
     tenantId: string | null
     afiliacaoId: string | null
-    status: string
     autor: { nome: string | null; nickname: string | null; avatarUrl: string | null }
-    respostas: { id: string; conteudo: string; criadoEm: Date; autor: { nome: string | null } }[]
+    respostas: {
+      id: string
+      conteudo: string
+      criadoEm: Date
+      oculto: boolean
+      autorId: string
+      autor: { nome: string | null }
+    }[]
   } | null = await db.forumTopico.findUnique({
     where: { id },
     select: {
@@ -590,29 +639,41 @@ export async function getTopicoDetalhe(
       gostei: true,
       naoGostei: true,
       fixado: true,
+      status: true,
+      rejeitadoMotivo: true,
       criadoEm: true,
       atualizadoEm: true,
       autorId: true,
       escopo: true,
       tenantId: true,
       afiliacaoId: true,
-      status: true,
       autor: { select: { nome: true, nickname: true, avatarUrl: true } },
       respostas: {
-        where: { oculto: false, parentId: null },
+        where: viewer.podeModerar ? { parentId: null } : { oculto: false, parentId: null },
         orderBy: { criadoEm: 'asc' },
         take: 80,
         select: {
           id: true,
           conteudo: true,
           criadoEm: true,
+          oculto: true,
+          autorId: true,
           autor: { select: { nome: true } },
         },
       },
     },
   })
-  if (!t || t.status !== 'VISIVEL') return null
+  if (!t) return null
   if (!podeVerTopicoNoEscopo(escopo, ancora, t)) return null
+  if (
+    !podeVerStatusTopico(t.status, {
+      autorId: t.autorId,
+      userId: viewer.userId,
+      podeModerar: viewer.podeModerar,
+    })
+  ) {
+    return null
+  }
   return {
     id: t.id,
     titulo: t.titulo,
@@ -623,6 +684,8 @@ export async function getTopicoDetalhe(
     gostei: t.gostei,
     naoGostei: t.naoGostei,
     fixado: t.fixado,
+    status: t.status,
+    rejeitadoMotivo: t.rejeitadoMotivo,
     criadoEm: t.criadoEm,
     atualizadoEm: t.atualizadoEm,
     autorNome: t.autor.nome,
@@ -633,7 +696,9 @@ export async function getTopicoDetalhe(
       id: r.id,
       conteudo: r.conteudo,
       criadoEm: r.criadoEm,
+      autorId: r.autorId,
       autorNome: r.autor.nome,
+      oculto: r.oculto,
     })),
   }
 }
@@ -642,6 +707,7 @@ export type PracaComentarioItem = {
   id: string
   conteudo: string
   criadoEm: Date
+  autorId: string
   autorNome: string | null
 }
 
@@ -649,17 +715,29 @@ export async function listarComentariosPraca(
   alvoTipo: 'ARTIGO' | 'NOTICIA',
   alvoId: string,
 ): Promise<PracaComentarioItem[]> {
-  const rows: { id: string; conteudo: string; criadoEm: Date; autor: { nome: string | null } }[] =
-    await db.pracaComentario.findMany({
-      where: { alvoTipo, alvoId, oculto: false },
-      orderBy: { criadoEm: 'asc' },
-      take: 40,
-      select: { id: true, conteudo: true, criadoEm: true, autor: { select: { nome: true } } },
-    })
+  const rows: {
+    id: string
+    conteudo: string
+    criadoEm: Date
+    autorId: string
+    autor: { nome: string | null }
+  }[] = await db.pracaComentario.findMany({
+    where: { alvoTipo, alvoId, oculto: false },
+    orderBy: { criadoEm: 'asc' },
+    take: 40,
+    select: {
+      id: true,
+      conteudo: true,
+      criadoEm: true,
+      autorId: true,
+      autor: { select: { nome: true } },
+    },
+  })
   return rows.map((c) => ({
     id: c.id,
     conteudo: c.conteudo,
     criadoEm: c.criadoEm,
+    autorId: c.autorId,
     autorNome: c.autor.nome,
   }))
 }
@@ -793,12 +871,31 @@ export async function assertTetoSinaisPraca(userId: string, ancora: AncoraPraca)
   }
 }
 
+export function tenantModeracaoPraca(
+  ancora: AncoraPraca,
+  ctx: ContextoComunidadePortal,
+): string | null {
+  if (ancora.tenantId) return ancora.tenantId
+  return ctx.torcidaReal?.id ?? (ctx.modo === 'torcida' ? ctx.tenant.id : null)
+}
+
 export async function podeModerarPraca(userId: string, tenantId: string | null): Promise<boolean> {
   if (!tenantId) return false
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
   return hasPermission(
     calculateEffectivePermissions(rolePermissions, overrides),
     PERMISSIONS.COMMUNITY_MODERATE,
+  )
+}
+
+/** Moderação ou Comunicação publicam na hora; o resto entra na fila. */
+export async function podeAprovarPracaNaHora(userId: string, tenantId: string | null): Promise<boolean> {
+  if (!tenantId) return false
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
+  const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
+  return (
+    hasPermission(efetivas, PERMISSIONS.COMMUNITY_MODERATE) ||
+    hasPermission(efetivas, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
   )
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parseAcervoPage,
   parseDepartamentoTab,
   primeiroSearchParam,
   resolverTabDeHash,
@@ -27,11 +28,13 @@ describe('parseDepartamentoTab', () => {
 
   it('mapeia âncoras antigas usadas em links já gravados', () => {
     expect(parseDepartamentoTab('dominio', todas)).toBe('painel')
+    expect(parseDepartamentoTab('acervo', todas)).toBe('painel')
+    expect(parseDepartamentoTab('instrumentos', todas)).toBe('painel')
     expect(parseDepartamentoTab('pedidos-area', todas)).toBe('pedidos')
     expect(parseDepartamentoTab('gestao', todas)).toBe('equipe')
   })
 
-  it('não entrega fila/pedidos quando a aba não existe naquele cockpit', () => {
+  it('não entrega fila/pedidos quando a aba não existe naquele cockpit (sem permissão ou fora do domínio)', () => {
     expect(parseDepartamentoTab('fila', semExtras)).toBe('painel')
     expect(parseDepartamentoTab('pedidos', semExtras)).toBe('painel')
     expect(parseDepartamentoTab('areas', semExtras)).toBe('areas')
@@ -60,11 +63,24 @@ describe('primeiroSearchParam', () => {
   })
 })
 
+describe('parseAcervoPage', () => {
+  it('aceita inteiro ≥ 1 e rejeita o resto', () => {
+    expect(parseAcervoPage('2')).toBe(2)
+    expect(parseAcervoPage('1')).toBe(1)
+    expect(parseAcervoPage(undefined)).toBe(1)
+    expect(parseAcervoPage('0')).toBe(1)
+    expect(parseAcervoPage('-3')).toBe(1)
+    expect(parseAcervoPage('abc')).toBe(1)
+  })
+})
+
 describe('resolverTabDeHash', () => {
   it('converte hash legado para aba', () => {
     expect(resolverTabDeHash('#areas')).toBe('areas')
     expect(resolverTabDeHash('projetos')).toBe('projetos')
     expect(resolverTabDeHash('#pedidos-area')).toBe('pedidos')
+    expect(resolverTabDeHash('#acervo')).toBe('painel')
+    expect(resolverTabDeHash('#instrumentos')).toBe('painel')
     expect(resolverTabDeHash('#')).toBeNull()
     expect(resolverTabDeHash('#inexistente')).toBeNull()
   })

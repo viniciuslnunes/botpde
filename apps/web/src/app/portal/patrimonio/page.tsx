@@ -96,7 +96,7 @@ export default async function PortalPatrimonioPage({ searchParams }: Props) {
             <div
               className={
                 soBandeiras
-                  ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                  ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                   : 'flex h-10 w-10 items-center justify-center rounded-xl bg-stone-500/15 text-stone-700 dark:text-stone-300'
               }
             >

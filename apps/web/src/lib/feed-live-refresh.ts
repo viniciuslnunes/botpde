@@ -22,6 +22,7 @@ export interface PostPublicadoAutorPreview {
   avatarUrl: string | null
   nickname?: string | null
   sedeNome?: string | null
+  sedeTipo?: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO' | null
   cargoNome?: string | null
   departamentoNome?: string | null
 }
@@ -91,6 +92,7 @@ export function criarPreviewOtimista(opts: {
       avatarUrl: opts.autor.avatarUrl,
       nickname: opts.autor.nickname ?? null,
       sedeNome: opts.autor.sedeNome ?? null,
+      sedeTipo: opts.autor.sedeTipo ?? null,
       cargoNome: opts.autor.cargoNome ?? null,
       departamentoNome: opts.autor.departamentoNome ?? null,
     },
@@ -122,6 +124,7 @@ export function previewParaPostSocial(preview: PostPublicadoPreview): PostSocial
       nickname: preview.autor.nickname ?? null,
       avatarUrl: preview.autor.avatarUrl,
       sedeNome: preview.autor.sedeNome ?? null,
+      sedeTipo: preview.autor.sedeTipo ?? null,
       cargoNome: preview.autor.cargoNome ?? null,
       departamentoNome: preview.autor.departamentoNome ?? null,
     },

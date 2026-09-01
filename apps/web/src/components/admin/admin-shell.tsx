@@ -42,6 +42,7 @@ interface AdminShellProps {
   tenantLogoUrl: string | null
   /** JSON de tema visual (Tenant.design). */
   tenantDesign?: unknown
+  tenantCorArquirrival?: string | null
   userName: string | null
   userAvatar: string | null
   items: AdminMenuItem[]
@@ -127,7 +128,7 @@ function AdminTopbar({
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        <Link href="/admin" className="app-touch-target flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <Link href="/admin" className="app-touch-target flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
           {tenantLogoUrl ? (
             <LogoMiniatura
               src={tenantLogoUrl}
@@ -147,7 +148,7 @@ function AdminTopbar({
             <p className="truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
               {tenantNome}
             </p>
-            <p className="hidden text-[11px] text-[rgb(var(--foreground-muted))] sm:block">
+            <p className="portal-kicker hidden text-[rgb(var(--foreground-muted))] sm:block">
               Administração
             </p>
           </div>
@@ -257,6 +258,7 @@ export function AdminShell({
   tenantId,
   tenantLogoUrl,
   tenantDesign,
+  tenantCorArquirrival = null,
   userName,
   userAvatar,
   items,
@@ -288,7 +290,12 @@ export function AdminShell({
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <TenantDesignBridge corPrimaria={tenantCor} design={tenantDesign} />
+      <TenantDesignBridge
+        corPrimaria={tenantCor}
+        design={tenantDesign}
+        slug={tenantSlug}
+        corArquirrival={tenantCorArquirrival}
+      />
       {!immersivePdv && (
         <AdminTopbar
           tenantNome={tenantNome}

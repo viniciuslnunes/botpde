@@ -3,7 +3,7 @@
  * Não importar `@torcida/db` / `./feed` aqui (quebra o bundle do browser).
  */
 
-import { formatUnidadeLabel } from './torcida-labels'
+import { formatUnidadeLabel, nomeUnidadeEhSede, nomesEquivalentes } from './torcida-labels'
 
 /**
  * Pill de quem ainda não é sócio de torcida real — a identidade pública dele é
@@ -59,16 +59,36 @@ export function formatCargoComNumeroSocio(
 }
 
 /**
- * Unidade do autor (`SaasMembro.sede`) só acrescenta informação quando difere
- * da torcida do post: unidade promovida a tenant próprio (Caso B) tem o mesmo
- * nome do tenant, e a Sede raiz costuma ser "Sede — <Torcida>". Regra única em
- * `unidadeRepeteTorcida` — compare sempre com o nome da torcida do post, mesmo
- * quando o badge de torcida está oculto (na própria torcida a repetição é a
- * mesma).
+ * Unidade ao lado do nome no feed. Subsede/PDE que identifica um lugar próprio
+ * entra com o nome; cadastrado direto na torcida (Sede raiz, ou sem unidade)
+ * vira "Sede". Unidade promovida a tenant próprio (Caso B — nome = tenant,
+ * tipo SUBSEDE/PDE) continua oculta: não é a Sede da torcida.
  */
 export function formatAutorUnidadeBadge(
   sedeNome: string | null | undefined,
   torcidaNome: string | null | undefined,
+  opts?: { tipo?: string | null },
 ): string | null {
-  return formatUnidadeLabel({ nome: sedeNome, torcidaNome })
+  const label = formatUnidadeLabel({ nome: sedeNome, tipo: opts?.tipo, torcidaNome })
+  if (label) return label
+  if (opts?.tipo === 'SUBSEDE' || opts?.tipo === 'PONTO_ENCONTRO') return null
+  if (opts?.tipo === 'SEDE' || nomeUnidadeEhSede(sedeNome) || !sedeNome?.trim()) {
+    return 'Sede'
+  }
+  return null
+}
+
+/**
+ * Segunda linha do card no feed misto (CN, rede, outra torcida): o nome da
+ * torcida em texto. Some quando o nome é o da comunidade já aberta
+ * (ex.: TIMÃO no feed do clube).
+ */
+export function formatTorcidaNoFeed(
+  tenantNome: string | null | undefined,
+  contextoNome?: string | null,
+): string | null {
+  const nome = tenantNome?.trim() || null
+  if (!nome) return null
+  if (contextoNome && nomesEquivalentes(nome, contextoNome)) return null
+  return nome
 }

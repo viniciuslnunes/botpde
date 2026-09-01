@@ -346,7 +346,7 @@ export function PatrimonioItemForm({
         <button
           type="submit"
           disabled={pending || (isEdit && !isDirty)}
-          className="app-action rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="app-action rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? 'Salvando…' : isEdit ? 'Salvar' : 'Cadastrar'}
         </button>

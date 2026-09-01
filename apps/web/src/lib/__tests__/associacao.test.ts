@@ -23,6 +23,8 @@ import {
   normalizarTelefone,
   PERIODICIDADES_ONBOARDING_PADRAO,
   resolverPeriodicidadesOnboarding,
+  montarOpcoesPlanoOnboarding,
+  escolherPlanoParaPeriodicidade,
   SalvarPeriodicidadesOnboardingSchema,
   validarCpfDigitos,
   validarRg,
@@ -111,6 +113,34 @@ describe('associacao — validade da carteirinha', () => {
       'MENSAL',
       'ANUAL',
     ])
+  })
+
+  it('montarOpcoesPlanoOnboarding usa rótulo do ciclo quando não há plano cadastrado', () => {
+    const opcoes = montarOpcoesPlanoOnboarding([], [])
+    expect(opcoes.map((o) => o.chave)).toEqual(['per:QUADRIMENSAL', 'per:ANUAL'])
+    expect(opcoes[0]?.planoAssociacaoId).toBeNull()
+    expect(opcoes[0]?.rotulo).toBe('Quadrimensal')
+  })
+
+  it('montarOpcoesPlanoOnboarding enriquece a oferta com nome e valor do plano', () => {
+    const opcoes = montarOpcoesPlanoOnboarding(['ANUAL'], [
+      { id: 'p-1', nome: 'Sócio Fiel', valor: 120, periodicidade: 'ANUAL', ativo: true },
+    ])
+    expect(opcoes).toHaveLength(1)
+    expect(opcoes[0]?.chave).toBe('plano:p-1')
+    expect(opcoes[0]?.planoAssociacaoId).toBe('p-1')
+    expect(opcoes[0]?.rotulo).toContain('Sócio Fiel')
+    expect(opcoes[0]?.rotulo).toContain('R$')
+  })
+
+  it('escolherPlanoParaPeriodicidade não chuta quando há dois planos no mesmo ciclo', () => {
+    const planos = [
+      { id: 'a', nome: 'A', valor: 10, periodicidade: 'MENSAL', ativo: true },
+      { id: 'b', nome: 'B', valor: 20, periodicidade: 'MENSAL', ativo: true },
+    ]
+    expect(escolherPlanoParaPeriodicidade(planos, 'MENSAL', null)).toBeNull()
+    expect(escolherPlanoParaPeriodicidade(planos, 'MENSAL', 'b')?.id).toBe('b')
+    expect(escolherPlanoParaPeriodicidade(planos, 'ANUAL', 'b')).toBeNull()
   })
 
   it('SalvarPeriodicidadesOnboardingSchema exige ao menos uma', () => {

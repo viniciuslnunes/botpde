@@ -715,7 +715,7 @@ function PostMidiaEditor({ ctx }: { ctx: PostEditContextValue }) {
             disabled={!ctx.podeSalvar}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3.5 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3.5 py-1.5 text-xs font-semibold text-primary-on transition-opacity disabled:opacity-60"
           >
             {ctx.pending || ctx.enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {ctx.enviando ? 'Enviando anexos…' : ctx.pending ? 'Salvando…' : 'Salvar'}

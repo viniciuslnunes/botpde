@@ -218,7 +218,7 @@ export function CriarProdutoBarForm({ categorias }: { categorias: BarCategoriaOp
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
         >
           + Novo produto
         </button>
@@ -259,7 +259,7 @@ export function CriarProdutoBarForm({ categorias }: { categorias: BarCategoriaOp
                 type="submit"
                 form={formId}
                 disabled={pending}
-                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
               >
                 {pending ? 'Salvando...' : 'Criar produto'}
               </button>
@@ -308,7 +308,7 @@ export function EditarProdutoBarForm({
           type="submit"
           form={formId}
           disabled={pending}
-          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Salvando...' : 'Salvar alterações'}
         </button>

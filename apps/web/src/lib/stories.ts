@@ -51,7 +51,8 @@ export const getMomentosStoryDoAutor = cache(async function getMomentosStoryDoAu
     criadoEm: Date
     expiraEm: Date
   }> = await db.momentoStory.findMany({
-    where: { userId, tenantId, expiraEm: { gt: agora } },
+    // Story ocultado pela moderação some do player, mesmo para o próprio autor.
+    where: { userId, tenantId, oculto: false, expiraEm: { gt: agora } },
     orderBy: { criadoEm: 'asc' },
     select: {
       id: true,
@@ -92,6 +93,7 @@ export const getStoryRings = cache(async function getStoryRings(
       }> = await db.momentoStory.findMany({
         where: {
           tenantId: { in: visibleTenantIds },
+          oculto: false,
           expiraEm: { gt: agora },
         },
         orderBy: { criadoEm: 'asc' },

@@ -53,7 +53,7 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
             <ArrowLeft className="h-4 w-4" /> Loja
           </Link>
           <div>
-            <h1 className="text-xl font-bold">{produto.nome}</h1>
+            <h1 className="portal-display text-xl">{produto.nome}</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">{produto.ativo ? '● Ativo' : '● Inativo'}</p>
           </div>
         </div>

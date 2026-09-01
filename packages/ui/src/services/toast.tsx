@@ -101,7 +101,7 @@ export function ToastProvider() {
     <Toaster
       theme={theme}
       position={position}
-      richColors
+      richColors={false}
       closeButton
       expand={!isMobile}
       visibleToasts={isMobile ? 2 : 4}
@@ -133,7 +133,7 @@ export function ToastProvider() {
             'torcida-toast font-sans !bg-[rgb(var(--surface))] !text-[rgb(var(--foreground))] !border-[rgb(var(--border))]',
           title: 'torcida-toast-title',
           description: 'torcida-toast-description !text-[rgb(var(--foreground-muted))]',
-          actionButton: '!bg-[rgb(var(--primary))] !text-white',
+          actionButton: '!bg-[rgb(var(--primary))] !text-[rgb(var(--color-primary-on))]',
           cancelButton:
             '!bg-[rgb(var(--background-subtle))] !text-[rgb(var(--foreground-muted))]',
           closeButton: 'torcida-toast-close',

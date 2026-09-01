@@ -78,7 +78,7 @@ export default async function PortalFinanceiroPage({ searchParams }: Props) {
       <MotionReveal>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgb(var(--color-success)_/_0.15)] text-[rgb(var(--color-success-fg))]">
               <Wallet className="h-5 w-5" />
             </div>
             <div>

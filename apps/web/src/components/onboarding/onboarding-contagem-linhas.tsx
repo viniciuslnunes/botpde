@@ -11,9 +11,9 @@ export function ContagemComOnline({ total, online }: { total: number; online: nu
       <span className="text-[rgb(var(--foreground-muted))]" aria-hidden>
         ·
       </span>
-      <span className="inline-flex items-center gap-1 text-emerald-500">
+      <span className="inline-flex items-center gap-1 text-success">
         <span
-          className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_6px_rgb(16_185_129_/_0.55)]"
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[rgb(var(--color-success))] shadow-[0_0_6px_rgb(16_185_129_/_0.55)]"
           aria-hidden
         />
         <span>{formatContagem(online)} online</span>

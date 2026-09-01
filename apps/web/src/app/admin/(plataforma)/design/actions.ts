@@ -7,6 +7,7 @@ import {
   PERMISSIONS,
   TenantDesignSchema,
   resolveTenantDesign,
+  corArquirrivalCatalogo,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
@@ -23,14 +24,32 @@ export async function salvarDesignTenant(designRaw: unknown) {
 
   // Vitrine (`design.loja`) é editada só em `/admin/loja/vitrine` — não zerar
   // capa/banner ao salvar o estúdio de design.
-  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria)
-  const design = { ...parsed.data, loja: atual.loja }
+  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria, {
+    corArquirrival: tenant.corArquirrival,
+    slug: tenant.slug,
+  })
+  const design = resolveTenantDesign(
+    { ...parsed.data, loja: atual.loja },
+    parsed.data.brand.primary,
+    {
+      corArquirrival: parsed.data.brand.arquirrival,
+      slug: tenant.slug,
+    },
+  )
   const corPrimaria = design.brand.primary
+  // Campo vazio no estúdio = ainda não confirmou. O catálogo continua no
+  // runtime (coluna); não gravar null e apagar o tabu da unidade.
+  const corArquirrival =
+    design.brand.arquirrival ??
+    corArquirrivalCatalogo({ slug: tenant.slug }) ??
+    tenant.corArquirrival ??
+    null
 
   await db.tenant.update({
     where: { id: tenant.id },
     data: {
       corPrimaria,
+      corArquirrival,
       design: design as unknown as Prisma.InputJsonValue,
     },
   })
@@ -43,6 +62,7 @@ export async function salvarDesignTenant(designRaw: unknown) {
       detalhes: {
         primary: corPrimaria,
         secondary: design.brand.secondary,
+        arquirrival: design.brand.arquirrival,
         gridEnabled: design.grid.enabled,
         gridSize: design.grid.sizePx,
       },
@@ -70,10 +90,14 @@ export async function salvarDesignTenant(designRaw: unknown) {
 export async function restaurarDesignPadrao() {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
-  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria)
+  const atual = resolveTenantDesign(tenant.design, tenant.corPrimaria, {
+    corArquirrival: tenant.corArquirrival,
+    slug: tenant.slug,
+  })
+  const padraoRival = corArquirrivalCatalogo({ slug: tenant.slug })
   const design = {
     ...DEFAULT_TENANT_DESIGN,
-    brand: { primary: '#7c3aed', secondary: null },
+    brand: { primary: '#7c3aed', secondary: null, arquirrival: padraoRival },
     loja: atual.loja,
   }
 
@@ -81,6 +105,7 @@ export async function restaurarDesignPadrao() {
     where: { id: tenant.id },
     data: {
       corPrimaria: design.brand.primary,
+      corArquirrival: padraoRival,
       design: design as unknown as Prisma.InputJsonValue,
     },
   })
@@ -109,5 +134,5 @@ export async function restaurarDesignPadrao() {
     excetoUserId: session.user.id,
   })
 
-  return { ok: true as const, design: resolveTenantDesign(design, design.brand.primary) }
+  return { ok: true as const, design: resolveTenantDesign(design, design.brand.primary, { corArquirrival: padraoRival, slug: tenant.slug }) }
 }

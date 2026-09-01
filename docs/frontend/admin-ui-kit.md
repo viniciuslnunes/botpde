@@ -17,7 +17,7 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 
 | Componente | Uso | Notas |
 |---|---|---|
-| `AdminPageHeader` | Header de toda page admin (título, descrição, `icon`, `actions`, `backHref`) | Server-safe; full-bleed com `app-container` |
+| `AdminPageHeader` | Header de toda page admin (título, descrição, `icon`, `actions`, `backHref`, `children` para tabs/toolbar) | Server-safe; full-bleed com `app-container`. Ritmo: título↔descrição 12px; título↔chrome 20px; peças do chrome 12px. Tabs/toolbar entram em `children` — nunca colados no `h1`. |
 | `StatCard` | Indicador (label, `value` já formatado, `icon`, `href`, `badge`, `tone`, `delta`, `sparkline`, `compact`) | Client; anima como filho de `KpiGrid`; `delta` renderiza `TrendDelta` |
 | `KpiGrid` | Grid responsivo de `StatCard` com `staggerContainer`/`staggerItem` | Client |
 | `StatusBadge` | Badge de status por domínio (`membro`, `cobranca`, `pedido`, `rsvp`, `patrimonio`) | Server-safe; compõe `Badge` de `@torcida/ui`; labels centralizados |
@@ -109,7 +109,7 @@ rota de badge órfã).
 | `admin/bar` | Balcão · Vendas (+ estornos) · Fiado · Produtos · Estoque (+ fornecedores) · Desempenho | 7 → 2 (Bar + PDV) |
 | `admin/loja` | Catálogo · Pedidos · Categorias · Cupons · Desempenho | 2 → 1 |
 | `admin/comunidade` | Visão geral · Comunicados · Mural · Moderação · Notícias | 5 → 1 |
-| `admin/financeiro` | Lançamentos · Evolução · Cobranças · Planos de sócio | 3 → 1 |
+| `admin/financeiro` | Direção · Lançamentos · Evolução · Cobranças · Planos de sócio · Novo plano | 3 → 1 |
 | `admin/(estrutura)` | Visão geral · Unidades · Hierarquia · Solicitações | 4 → 1 |
 | `admin/(plataforma)` | Geral · Transparência · Integrações · Identidade · Acessos · Auditoria | 4 → 1 |
 | `admin/eventos` | Lista · Semana · Mês · Histórico · Comparecimento (`?vista=`) | 1 |
@@ -292,7 +292,9 @@ página), `ListagemVazia`, `ListagemPersistencia`.
   cliente, e o filtro funciona sem JS.
 - **URL é a verdade; `localStorage` é conveniência.** `ListagemPersistencia`
   restaura a última visão apenas quando a URL está limpa, uma vez por mount —
-  link compartilhado nunca é sobrescrito pelo estado de quem abre.
+  link compartilhado nunca é sobrescrito pelo estado de quem abre. Busca (`q`)
+  e página não entram no snapshot: procurar um nome é consulta pontual, não
+  visão da lista (voltar em Torcedores não pode reabrir `?q=Fulano`).
 - **Faceta ignora o próprio filtro**: o número ao lado de "Sócio" é quantos
   apareceriam se a opção fosse marcada, não quantos há no resultado atual.
   Facetas vêm de `groupBy`; caminho de relação não é facetável (o popover

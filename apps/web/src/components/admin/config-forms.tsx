@@ -102,7 +102,7 @@ export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar alterações
@@ -784,6 +784,7 @@ export function PeriodicidadesOnboardingForm({
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
         Opções de plano exibidas no onboarding para quem já é sócio (expedição +
         periodicidade). Sem seleção salva, o sistema usa quadrimensal e anual.
+        Valor, nome e vínculo do sócio editam-se em Financeiro → Planos de sócio.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {todas.map((p) => {
@@ -812,7 +813,7 @@ export function PeriodicidadesOnboardingForm({
         type="button"
         disabled={pending || !dirty || selecionadas.length === 0}
         onClick={salvar}
-        className="rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        className="rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-primary-on disabled:opacity-50"
       >
         {pending ? 'Salvando…' : 'Salvar periodicidades'}
       </button>
@@ -926,7 +927,7 @@ export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar afiliação
@@ -1090,7 +1091,7 @@ export function CanalOficialForm({
         <button
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar canal oficial
@@ -1555,7 +1556,7 @@ function RoleForm({
   function itemClass(key: string): string {
     const base = 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors'
     if (isEdit && added.includes(key)) {
-      return `${base} border-green-400 bg-green-50 text-[rgb(var(--foreground))] dark:border-green-700 dark:bg-green-950`
+      return `${base} border-[rgb(var(--color-success)_/_0.55)] bg-[rgb(var(--color-success)_/_0.12)] text-[rgb(var(--foreground))] dark:border-[rgb(var(--color-success)_/_0.45)]`
     }
     if (isEdit && removed.includes(key)) {
       return `${base} border-red-300 bg-red-50 text-[rgb(var(--foreground-muted))] dark:border-red-800 dark:bg-red-950`
@@ -1669,7 +1670,7 @@ function RoleForm({
                 <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                   {group.label}
                   {changes.added > 0 && (
-                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900 dark:text-green-300">
+                    <span className="rounded-full bg-[rgb(var(--color-success)_/_0.14)] px-1.5 py-0.5 text-[10px] font-bold text-[rgb(var(--color-success-fg))]">
                       +{changes.added}
                     </span>
                   )}
@@ -1767,7 +1768,7 @@ function RoleForm({
           type="submit"
           form={formId}
           disabled={pending || (!departamentoId && selected.size === 0) || isSystem}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           {initialNome ? 'Salvar' : 'Criar cargo'}
@@ -2247,7 +2248,7 @@ function DepartamentoForm({
           type="submit"
           form={formId}
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           {isEdit ? 'Salvar' : 'Criar departamento'}

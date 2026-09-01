@@ -38,7 +38,7 @@ export default async function AdminCategoriasPage() {
           <h2 className="text-sm font-semibold">Nova categoria</h2>
           <input name="nome" required placeholder="Nome" className="w-full rounded-lg border px-3 py-2 text-sm" />
           <input name="ordem" type="number" defaultValue={categorias.length + 1} className="w-24 rounded-lg border px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar</button>
+          <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-primary-on">Criar</button>
         </AdminActionForm>
       </MotionReveal>
 

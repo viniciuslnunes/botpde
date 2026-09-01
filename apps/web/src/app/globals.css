@@ -150,6 +150,37 @@ body {
   overflow-x: hidden;
 }
 
+/* Tipografia dos módulos do canal (Loja, Memórias, Agenda, Sedes,
+   Departamentos, Carteirinha). Comunidade fica de fora — continua no
+   sans do produto. Corpo do texto permanece no stack do body; kicker,
+   chip e display são o vocabulário que a Loja consolidou. */
+.portal-kicker {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.portal-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.portal-display {
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  text-wrap: balance;
+  /* Leading 0.95 corta o espaço abaixo do cap-height; sem isto o próximo
+     elemento (contagem, tabs, descrição) cola no título. */
+  padding-block-end: 0.2em;
+}
+
 /* ── Cursor de ação (pointer) ───────────────────────────────────
    Tailwind v4 não define pointer em button (* já fixa default, não auto).
    Unlayered + !important para vencer utilitários em @layer e o * acima.
@@ -393,10 +424,15 @@ button,
 /* ── Utilitários com cor primária do tenant ──────────────────── */
 .bg-primary {
   background-color: rgb(var(--color-primary));
+  color: rgb(var(--color-primary-on));
 }
 /* Texto/ícone de marca — sempre legível (P&B no escuro). Nunca a fill crua. */
 .text-primary {
   color: rgb(var(--color-primary-fg));
+}
+/* Texto SOBRE a fill sólida (botão). Branco hardcoded some em identidade P&B. */
+.text-primary-on {
+  color: rgb(var(--color-primary-on));
 }
 /* Status como TEXTO (kpi, resumo) — nunca a fill crua (âmbar some no claro). */
 .text-success {
@@ -421,6 +457,32 @@ button,
   background-color: rgb(var(--color-primary));
   color: rgb(var(--color-primary-on));
   box-shadow: inset 0 0 0 1px rgb(var(--color-primary-ring) / var(--color-primary-ring-a, 0));
+}
+/*
+  Fill sólida via classe arbitrária do Tailwind (`bg-[rgb(var(--primary))]`
+  + `text-white`). `text-white` vence o token e some em marca branca
+  (Santos, Ceará…). Seletor `~=` casa o token inteiro, não o wash
+  `bg-[rgb(var(--primary)_/_0.14)]` (esse continua com *-fg).
+*/
+[class~="bg-[rgb(var(--primary))]"],
+[class~="bg-[rgb(var(--color-primary))]"] {
+  color: rgb(var(--color-primary-on));
+}
+[class~="bg-[rgb(var(--secondary))]"],
+[class~="bg-[rgb(var(--color-secondary))]"] {
+  color: rgb(var(--color-secondary-on));
+}
+[class~="bg-[rgb(var(--color-danger))]"] {
+  color: rgb(var(--color-danger-on));
+}
+[class~="bg-[rgb(var(--color-success))]"] {
+  color: rgb(var(--color-success-on));
+}
+[class~="bg-[rgb(var(--color-warning))]"] {
+  color: rgb(var(--color-warning-on));
+}
+[class~="bg-[rgb(var(--color-info))]"] {
+  color: rgb(var(--color-info-on));
 }
 .btn-primary:hover {
   filter: brightness(0.92);
@@ -518,6 +580,15 @@ button,
 }
 .btn-success-soft:hover {
   background-color: rgb(var(--color-success) / 0.16);
+}
+/*
+  Banner/status positivo. NUNCA emerald/green hardcoded: verde só entra
+  se a identidade da torcida/clube já for verde (`actions.success`).
+*/
+.alert-success {
+  border: 1px solid rgb(var(--color-success) / 0.32);
+  background-color: rgb(var(--color-success) / 0.12);
+  color: rgb(var(--color-success-fg));
 }
 
 @keyframes nav-progress {
@@ -891,6 +962,19 @@ html[data-grid='off'] .app-shell-bg {
   box-shadow:
     0 4px 6px -1px rgb(0 0 0 / 0.08),
     0 10px 24px -8px rgb(0 0 0 / 0.12) !important;
+}
+/* richColors do Sonner pinta sucesso de verde. Ícone segue o token da marca. */
+.torcida-toast-success [data-icon] {
+  color: rgb(var(--color-success-fg));
+}
+.torcida-toast-error [data-icon] {
+  color: rgb(var(--color-danger-fg));
+}
+.torcida-toast-warning [data-icon] {
+  color: rgb(var(--color-warning-fg));
+}
+.torcida-toast-info [data-icon] {
+  color: rgb(var(--color-info-fg));
 }
 
 @media (max-width: 639px) {

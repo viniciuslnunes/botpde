@@ -24,7 +24,7 @@ export function CheckInButton({
 
   if (checkedInAt) {
     return (
-      <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+      <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--color-success)_/_0.14)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-success-fg))]">
         <CheckCircle2 className="h-3 w-3" />
         Check-in {formatarHora(checkedInAt)}
       </span>

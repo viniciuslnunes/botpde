@@ -53,6 +53,12 @@ function filterPeople(people: OrgPerson[], needle: string): OrgPerson[] {
   return people.filter((p) => personMatches(p, needle))
 }
 
+function borderDoAccent(accent?: string): string | undefined {
+  if (!accent) return undefined
+  if (/^#[0-9a-fA-F]{6}$/i.test(accent)) return `${accent}66`
+  return accent
+}
+
 function PersonNode({
   person,
   roleLabel,
@@ -77,7 +83,7 @@ function PersonNode({
           ? 'border-[rgb(var(--primary))] ring-2 ring-[rgb(var(--primary)_/_0.25)]'
           : 'border-[rgb(var(--border))]',
       ].join(' ')}
-      style={accent && !highlighted ? { borderColor: `${accent}66` } : undefined}
+      style={accent && !highlighted ? { borderColor: borderDoAccent(accent) } : undefined}
     >
       {person.avatarUrl ? (
         <AvatarFoto
@@ -460,7 +466,7 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
         </p>
         <Link
           href="/admin/acessos?secao=pessoas"
-          className="mt-5 inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="mt-5 inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90"
         >
           Ir para Controle de acesso
         </Link>
@@ -546,7 +552,7 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
             </button>
             <Link
               href="/admin/acessos?secao=pessoas"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-2 text-xs font-medium text-primary-on transition-opacity hover:opacity-90"
             >
               <KeyRound className="h-3.5 w-3.5" />
               Acessos
@@ -576,7 +582,7 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
           <PeopleRow
             people={tree.presidentes}
             roleLabel={tree.rotuloPresidente}
-            accent="#f59e0b"
+            accent="rgb(var(--color-warning))"
             emptyLabel={`Nenhum ${tree.rotuloPresidente.toLowerCase()} atribuído`}
             needle={needle}
           />
@@ -591,7 +597,7 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
           <PeopleRow
             people={tree.vices}
             roleLabel={tree.rotuloVice}
-            accent="#0ea5e9"
+            accent="rgb(var(--color-info))"
             emptyLabel={`Nenhum ${tree.rotuloVice.toLowerCase()} atribuído`}
             needle={needle}
           />

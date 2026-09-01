@@ -30,12 +30,12 @@ export default async function ValidarCarteirinhaPage({ searchParams }: Props) {
         className={[
           'rounded-2xl border p-6 text-center',
           result.ok
-            ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40'
+            ? 'alert-success'
             : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40',
         ].join(' ')}
       >
         {result.ok ? (
-          <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-green-600 dark:text-green-400" />
+          <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-success" />
         ) : (
           <XCircle className="mx-auto mb-3 h-12 w-12 text-red-600 dark:text-red-400" />
         )}

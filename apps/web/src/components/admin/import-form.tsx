@@ -95,7 +95,7 @@ export function ImportForm() {
         <button
           type="submit"
           disabled={pending}
-          className="flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {pending ? 'Importando…' : 'Importar'}
@@ -110,13 +110,13 @@ export function ImportForm() {
       )}
 
       {resultado?.success && (
-        <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-xs dark:border-green-900 dark:bg-green-950">
-          <span className="flex items-center gap-1.5 font-medium text-green-800 dark:text-green-300">
+        <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border alert-success px-4 py-3 text-xs">
+          <span className="flex items-center gap-1.5 font-medium text-success">
             <CheckCircle2 className="h-4 w-4" /> Importação concluída
           </span>
-          <span className="text-green-700 dark:text-green-400">{resultado.importados} importados</span>
-          <span className="text-green-700 dark:text-green-400">{resultado.duplicados} duplicados</span>
-          <span className="text-green-700 dark:text-green-400">{resultado.erros} erros</span>
+          <span className="text-success">{resultado.importados} importados</span>
+          <span className="text-success">{resultado.duplicados} duplicados</span>
+          <span className="text-success">{resultado.erros} erros</span>
         </div>
       )}
     </div>

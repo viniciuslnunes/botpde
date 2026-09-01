@@ -65,7 +65,7 @@ export function PerfilForm({
       }}
     >
       {state.success && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+        <div className="flex items-center gap-2 rounded-xl border alert-success p-4 text-sm font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           Perfil atualizado com sucesso!
         </div>

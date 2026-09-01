@@ -5,8 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { resolverTabDeHash } from '../_lib/tabs'
 
 /**
- * Bookmarks e links antigos (`#areas`, `#projetos`, `#equipe`…) viram `?tab=`.
- * Roda uma vez no cliente; se a URL já tem `tab`, o hash perde.
+ * Bookmarks e links antigos (`#areas`, `#projetos`) viram sub-rota;
+ * `#equipe` / `#fila` / `#pedidos` viram `?tab=`.
  */
 export function DepartamentoHashRedirect() {
   const router = useRouter()
@@ -17,8 +17,8 @@ export function DepartamentoHashRedirect() {
     const hash = window.location.hash
     const tab = resolverTabDeHash(hash)
     if (!tab) return
-    if (searchParams.get('tab') === tab) {
-      history.replaceState(null, '', `${pathname}${window.location.search}`)
+    if (tab === 'areas' || tab === 'projetos') {
+      router.replace(`${pathname}/${tab}`, { scroll: false })
       return
     }
     const params = new URLSearchParams(searchParams.toString())

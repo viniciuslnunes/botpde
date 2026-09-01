@@ -5,7 +5,8 @@ import { m } from 'motion/react'
 import { Radio, Users } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
-import { entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
+import { CONFIRMA_VINCULO_AO_PEDIR_CANAL } from '@torcida/types/associe-se'
+import { entrarCanal, pedirEntradaCanal, vincularUnidadePeloCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
@@ -58,6 +59,27 @@ export function CanaisSugeridosAside({
         toast.error(e instanceof Error ? e.message : 'Não foi possível enviar o pedido.')
       }
     })
+  }
+
+  function vincularEEntrar(id: string) {
+    startTransition(async () => {
+      try {
+        const { nomeUnidade } = await vincularUnidadePeloCanal(id)
+        toast.success(`Você está vinculado a ${nomeUnidade}.`)
+        setCanais((prev) => prev.filter((c) => c.id !== id))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível vincular-se à unidade.')
+      }
+    })
+  }
+
+  function acaoCanal(canal: CanalEstado) {
+    if (canal.podeVincularUnidade && window.confirm(CONFIRMA_VINCULO_AO_PEDIR_CANAL)) {
+      vincularEEntrar(canal.id)
+      return
+    }
+    if (canal.publica) entrar(canal.id)
+    else pedir(canal.id)
   }
 
   return (
@@ -118,7 +140,7 @@ export function CanaisSugeridosAside({
                 <m.button
                   type="button"
                   disabled={pending}
-                  onClick={() => entrar(canal.id)}
+                  onClick={() => acaoCanal(canal)}
                   whileTap={{ scale: 0.94 }}
                   transition={springSnappy}
                   className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-2.5 py-1 text-[10px] font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
@@ -129,7 +151,7 @@ export function CanaisSugeridosAside({
                 <m.button
                   type="button"
                   disabled={pending}
-                  onClick={() => pedir(canal.id)}
+                  onClick={() => acaoCanal(canal)}
                   whileTap={{ scale: 0.94 }}
                   transition={springSnappy}
                   className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-[10px] font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"

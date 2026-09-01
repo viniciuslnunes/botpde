@@ -1,7 +1,8 @@
 import { db, type Prisma } from '@torcida/db'
 import Link from 'next/link'
-import { PERMISSIONS, hrefHomeDepartamento } from '@torcida/types'
+import { PERMISSIONS, hrefHomeDepartamento, resolverCorSemRivalidade } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
+import { optsCorDoTenant } from '@/lib/cor-departamento'
 import {
   ListagemPaginacao,
   ListagemTh,
@@ -83,6 +84,18 @@ export default async function DepartamentoEquipesPage({
     db.departamentoAreaMembro.count({ where }),
   ])
 
+  const corOpts = await optsCorDoTenant(tenant)
+  const vinculosUi = vinculos.map((v) => ({
+    ...v,
+    area: {
+      ...v.area,
+      departamento: {
+        ...v.area.departamento,
+        cor: resolverCorSemRivalidade(v.area.departamento.cor, corOpts),
+      },
+    },
+  }))
+
   const paginacao = resumirPaginacao(total, listagem)
 
   const facetas: ListagemFacetas = await carregarFacetas(
@@ -116,7 +129,7 @@ export default async function DepartamentoEquipesPage({
         Quem atua em cada área. Nomeie responsável ou remova daqui; o departamento continua o lugar da equipe completa.
       </p>
 
-      {vinculos.length === 0 ? (
+      {vinculosUi.length === 0 ? (
         <ListagemVazia
           spec={SPEC}
           params={listagem}
@@ -152,7 +165,7 @@ export default async function DepartamentoEquipesPage({
             </tr>
           </thead>
           <tbody>
-            {vinculos.map((v) => (
+            {vinculosUi.map((v) => (
               <tr key={`${v.areaId}-${v.userId}`} className="border-t border-[rgb(var(--border))]">
                 <td className="px-4 py-3">
                   <Link

@@ -23,8 +23,8 @@ import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '@torcida/types'
 export type PromoverState = { success?: boolean; message?: string }
 
 const ROLES = [
-  { nome: SYSTEM_ROLES.OWNER, cor: '#2563eb', ordem: 0 },
-  { nome: SYSTEM_ROLES.ADMIN, cor: '#0891b2', ordem: 1 },
+  { nome: SYSTEM_ROLES.OWNER, cor: '#3f3f46', ordem: 0 },
+  { nome: SYSTEM_ROLES.ADMIN, cor: '#52525b', ordem: 1 },
   { nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 2 },
 ] as const
 

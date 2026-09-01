@@ -11,6 +11,7 @@ import {
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
+import { AdminPageHeader } from '@/components/admin/ui'
 import { parseAliancaTabId } from '@/lib/alianca-tabs'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS } from '@torcida/types'
@@ -138,17 +139,11 @@ export default async function AdminAliancasPage({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container flex items-center gap-3">
-          <Handshake className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-          <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Alianças</h1>
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Aliança formal só entre times distintos. Co-irmãs e PDEs herdam o vínculo da sede.
-            </p>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Alianças"
+        description="Aliança formal só entre times distintos. Co-irmãs e PDEs herdam o vínculo da sede."
+        icon={<Handshake className="h-5 w-5" />}
+      />
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container">

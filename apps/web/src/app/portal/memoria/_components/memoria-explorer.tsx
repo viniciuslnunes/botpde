@@ -167,10 +167,10 @@ export function MemoriaExplorer({
         <header className="mb-4 flex min-w-0 items-center gap-3">
           <MarcaMemoria src={logoUrl} alt={tenantNome} />
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[rgb(var(--color-primary-fg))]">
+            <p className="portal-kicker text-[rgb(var(--color-primary-fg))]">
               Memórias
             </p>
-            <h1 className="mt-0.5 truncate text-lg font-black uppercase tracking-tight text-[rgb(var(--foreground))]">
+            <h1 className="portal-display mt-0.5 truncate text-lg text-[rgb(var(--foreground))]">
               {tenantNome}
             </h1>
           </div>

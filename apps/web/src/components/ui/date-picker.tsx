@@ -369,7 +369,7 @@ export function DatePicker({
                           ? 'cursor-not-allowed text-[rgb(var(--foreground-muted))] opacity-35'
                           : 'hover:bg-[rgb(var(--background-subtle))]',
                         isSelected
-                          ? 'bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary))]'
+                          ? 'bg-[rgb(var(--color-primary))] text-primary-on hover:bg-[rgb(var(--color-primary))]'
                           : 'text-[rgb(var(--foreground))]',
                         isToday && !isSelected
                           ? 'ring-1 ring-inset ring-[rgb(var(--color-primary))]'
