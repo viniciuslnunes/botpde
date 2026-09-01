@@ -1536,17 +1536,36 @@ export async function getPostPorId(
     },
     include: postInclude(viewerId),
   })) as PostRaw | null
-  if (!raw) return null
-  const post = projetarPost(raw)
-  const ok = await podeVerPost(viewerId, {
-    autorId: post.autorId,
-    tenantId: post.tenantId,
-    visibilidade: post.visibilidade,
-    oculto: false,
-    tipo: post.tipo,
-    comunicadoOrigemId: post.comunicadoOrigemId,
-  })
-  return ok ? (await finalizarPosts([post]))[0] ?? null : null
+  if (raw) {
+    const post = projetarPost(raw)
+    const ok = await podeVerPost(viewerId, {
+      autorId: post.autorId,
+      tenantId: post.tenantId,
+      visibilidade: post.visibilidade,
+      oculto: false,
+      tipo: post.tipo,
+      comunicadoOrigemId: post.comunicadoOrigemId,
+    })
+    if (ok) return (await finalizarPosts([post]))[0] ?? null
+    // Sócio com perfil privado: o feed/permalink escondem de quem não segue.
+    // Quem está na fila de denúncias precisa ver o original.
+    const { podeLerPermalinkComoModerador } = await import('@/lib/feed-permalink')
+    if (await podeLerPermalinkComoModerador(viewerId, post.tenantId)) {
+      return (await finalizarPosts([post]))[0] ?? null
+    }
+    return null
+  }
+
+  // Oculto ou fora do alcance do tenant ativo (operador em outra torcida):
+  // só a fila de moderação / plataforma lê o original. Rival continua 404.
+  const candidato: PostRaw | null = (await db.post.findFirst({
+    where: { id: postId },
+    include: postInclude(viewerId),
+  })) as PostRaw | null
+  if (!candidato) return null
+  const { podeLerPermalinkComoModerador } = await import('@/lib/feed-permalink')
+  if (!(await podeLerPermalinkComoModerador(viewerId, candidato.tenantId))) return null
+  return (await finalizarPosts([projetarPost(candidato)]))[0] ?? null
 }
 
 export const getPostsDaRede = cache(async function getPostsDaRede(

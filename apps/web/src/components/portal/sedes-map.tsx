@@ -22,6 +22,8 @@ type Props = {
   onSelect: (id: string) => void
   /** Posição do usuário — pin na cor da marca (nunca azul de mapa genérico). */
   userLocation?: { lat: number; lng: number } | null
+  /** Sem borda/raio — o painel com abas já desenha o chrome. */
+  embedded?: boolean
   className?: string
 }
 
@@ -72,6 +74,7 @@ export function SedesMap({
   selectedId,
   onSelect,
   userLocation = null,
+  embedded = false,
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -269,10 +272,14 @@ export function SedesMap({
     }
   }, [mapReady, userLocation])
 
+  const chrome = embedded ? '' : 'rounded-xl border border-[rgb(var(--border))]'
+
   if (!configured || loadFailed) {
     return (
       <div
-        className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] ${className ?? ''}`}
+        className={`flex flex-col items-center justify-center gap-2 bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] ${
+          embedded ? '' : 'rounded-xl border border-dashed border-[rgb(var(--border))]'
+        } ${className ?? ''}`}
       >
         <MapPin className="h-6 w-6 opacity-50" />
         <p className="px-4 text-center text-sm">
@@ -290,10 +297,12 @@ export function SedesMap({
         ref={containerRef}
         role="application"
         aria-label="Mapa das sedes"
-        className="h-full w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
+        className={`h-full w-full overflow-hidden bg-[rgb(var(--background-subtle))] ${chrome}`}
       />
       {(mapLoading || withCoords.length === 0) && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[rgb(var(--background-subtle))]/90 text-[rgb(var(--foreground-muted))]">
+        <div
+          className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[rgb(var(--background-subtle))]/90 text-[rgb(var(--foreground-muted))] ${embedded ? '' : 'rounded-xl'}`}
+        >
           <MapPin className={`h-6 w-6 opacity-50 ${mapLoading ? 'animate-pulse' : ''}`} />
           <p className="px-4 text-center text-sm">
             {mapLoading

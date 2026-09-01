@@ -1,5 +1,5 @@
 {
- "descricao": "Correções de clube que as fontes automáticas não resolvem — nome corrompido, UF errada, cidade ausente e linha duplicada. Cada entrada tem fonte e é aplicada por `repair:clubes-curados`.",
+ "descricao": "Correções de clube que as fontes automáticas não resolvem — nome corrompido, UF errada, cidade ausente, linha duplicada e a entidade certa no Wikidata quando o homônimo não se resolve sozinho. Cada entrada tem fonte; `correcoes`/`merges` são aplicados por `repair:clubes-curados` e `wikidata` é lido por `seed:ficha-clubes`.",
  "geradoEm": "2026-08-27",
  "comoUsar": "TORCIDA_ENV=local pnpm --filter @torcida/db repair:clubes-curados -- --dry-run",
  "correcoes": [
@@ -76,6 +76,50 @@
    "fonte": "Luziânia é município de Goiás; o DF só tem Brasília",
    "confianca": "alta",
    "motivo": "A cidade gravada era literalmente \"GO\"."
+  }
+ ],
+ "wikidata": [
+  {
+   "alvo": { "nome": "América-MG", "uf": "MG" },
+   "qid": "Q338285",
+   "fonte": "Wikidata Q338285 (América Futebol Clube, 1912-04-30, Estádio Raimundo Sampaio/Independência, Belo Horizonte)",
+   "confianca": "alta",
+   "motivo": "O único casamento por nome era Q65227142 — o verbete do time FEMININO do América Mineiro (2015, sem estádio). O verbete do clube chama-se \"América Futebol Clube\", que a chave canônica não liga a \"América-MG\"."
+  },
+  {
+   "alvo": { "nome": "Clube Náutico Capiberibe", "uf": "PE" },
+   "qid": "Q73971",
+   "fonte": "Wikidata Q73971 (Clube Náutico Capibaribe, 1901, Estádio Eládio de Barros Carvalho/Aflitos, site nautico-pe.com.br)",
+   "confianca": "alta",
+   "motivo": "O nome no catálogo tem \"Capiberibe\" e o do Wikidata \"Capibaribe\" — uma letra separa as duas chaves e o clube ficava sem ficha nenhuma."
+  },
+  {
+   "alvo": { "nome": "Retrô", "uf": "PE" },
+   "qid": "Q65164985",
+   "fonte": "Wikidata Q65164985 (Retrô Futebol Clube Brasil, Camaragibe, site retrofcbrasil.com.br)",
+   "confianca": "alta",
+   "motivo": "O verbete é \"Retrô Futebol Clube Brasil\"; o sufixo \"Brasil\" faz a chave canônica não bater com \"Retrô\"."
+  },
+  {
+   "alvo": { "nome": "Lagarto Futebol Clube", "uf": "SE" },
+   "qid": "Q6471925",
+   "fonte": "Wikidata Q6471925 (fundado em 2009, Estádio Paulo Barreto de Menezes, site lagartofc.com.br) — Q10315575 (Lagarto Esporte Clube) é verbete sem fundação, estádio ou site",
+   "confianca": "alta",
+   "motivo": "Dois clubes de Lagarto/SE com a mesma chave canônica; nenhum sinal estrutural (modalidade, extinção, cidade) separa."
+  },
+  {
+   "alvo": { "nome": "Resende", "uf": "RJ" },
+   "qid": "Q3933354",
+   "fonte": "Wikidata Q3933354 (Resende Futebol Clube, 1909, site resendefc.com.br) — Q10275208 (Esporte Clube Resende) não tem fundação nem site",
+   "confianca": "alta",
+   "motivo": "Homônimo na mesma cidade, os dois apontando o Estádio do Trabalhador."
+  },
+  {
+   "alvo": { "nome": "Icasa", "uf": "CE" },
+   "qid": "Q1028545",
+   "fonte": "Wikidata Q1028545 (ADRC Icasa, 1963-05-01, Série B, site icasafc.com) — Q10299719 é verbete duplicado do mesmo clube",
+   "confianca": "alta",
+   "motivo": "Duas entidades para o mesmo clube de Juazeiro do Norte; a curadoria fixa a que tem a ficha completa."
   }
  ],
  "merges": [

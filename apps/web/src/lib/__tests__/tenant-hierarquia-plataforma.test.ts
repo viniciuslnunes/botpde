@@ -16,6 +16,7 @@ import {
   filtrarTenantsRaiz,
   listarTorcidasDoClube,
   paraTenantRaiz,
+  WHERE_TENANT_E_TORCIDA,
 } from '@/lib/tenant-hierarquia-plataforma'
 
 describe('filtrarTenantsRaiz', () => {
@@ -69,6 +70,14 @@ describe('listarTorcidasDoClube', () => {
         where: { afiliacaoId: 'corinthians', ativo: true, sintetico: false },
       }),
     )
+  })
+
+  it('WHERE_TENANT_E_TORCIDA exige ativo — quem lista o clube não pode afrouxar', () => {
+    // O card "Uso do clube" e a aba Métricas montam a query com esta constante.
+    // Se ela deixar de exigir `ativo`, o tenant suspenso volta para a lista sob
+    // um KPI que não o conta — foi assim que a "FIEL CUBATÃO" (erro de registro)
+    // apareceu como sétima torcida do Corinthians num KPI de 6.
+    expect(WHERE_TENANT_E_TORCIDA).toEqual({ ativo: true, sintetico: false })
   })
 
   it('devolve vazio quando o clube não tem torcida na plataforma', async () => {

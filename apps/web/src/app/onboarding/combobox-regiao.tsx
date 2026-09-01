@@ -242,7 +242,7 @@ export function ComboboxRegiao({
           ref={listRef}
           id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+          className="app-scrollbar-fina absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
         >
           {precisaMaisLetras ? (
             <li className="px-3 py-2 text-sm text-[rgb(var(--foreground-muted))]" role="presentation">

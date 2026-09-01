@@ -163,7 +163,7 @@ export function NotificationBell({
                   Nenhuma notificação ainda.
                 </p>
               ) : (
-                <div className="max-h-80 overflow-auto py-1">
+                <div className="app-scrollbar-fina max-h-80 overflow-auto py-1">
                   {items.map((item) => (
                     <Link
                       key={item.id}

@@ -113,9 +113,23 @@ suspenso (Corinthians exibia 10 na CN e 7 no super-admin; são 6 — a "FIEL
 CUBATÃO" é erro de registro, arquivada). **Nunca** derivar a contagem de
 `getTenantIdsPorAfiliacao().length`: aquele conjunto é o *escopo do feed*
 nacional, e sintético + Caso B publicam ali sem serem torcidas — a CN conta por
-`contarTorcidasDoClubeNaCN` (mesma fonte + corte R5). Listagem admin segue
-mostrando a torcida arquivada com o selo **Suspensa**; só o KPI a exclui.
+`contarTorcidasDoClubeNaCN` (mesma fonte + corte R5).
 Invariante em `lib/__tests__/tenant-hierarquia-plataforma.test.ts`.
+
+**Listar é contar (2026-09-01):** a versão de 2026-08-12 deixou a torcida
+arquivada **na lista**, com o selo "Suspensa", e tirou só do KPI. Na prática o
+card "Uso do clube" ficou com **7 nomes sob um KPI de 6** e a "FIEL CUBATÃO"
+seguia parecendo a sétima torcida do Corinthians — o selo não desfazia a
+impressão. Agora as duas superfícies do clube (card do detalhe e aba Métricas)
+partem do **mesmo conjunto**: `WHERE_TENANT_E_TORCIDA` (`ativo` + `sintetico`)
+exportado de `lib/tenant-hierarquia-plataforma.ts`, mais o corte de raiz. Tenant
+suspenso não é torcida do clube: **não conta, não aparece e não soma
+sócios/posts** ao clube (o `where` das contagens de membro é o mesmo). O selo
+"Suspensa" saiu do nível da torcida; **unidade** inativa continua com o selo,
+porque unidade desativada é estado normal de operação. Torcida suspensa segue
+fora do switcher de `/super-admin/torcidas` (já era `ativo: true`): se o caso é
+erro de registro, o caminho é `db:excluir-torcida-erro -- --slug=<slug>`
+(dry-run por padrão), não arquivar e conviver.
 
 A fila de **unidades** (subsede/PDE) ficou em `/super-admin/unidades` — o menu
 não chama mais as duas coisas de "Afiliações".

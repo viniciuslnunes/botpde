@@ -90,8 +90,34 @@ de imprensa secundária.
 - **Licença CC0** — pode versionar no repo sem atrito.
 - **Operação:** a query que sobe a cadeia `P131*` até a UF estoura o timeout de
   60s do endpoint (HTTP 504); a versão que funciona pede só a cidade e resolve
-  a UF localmente contra a malha do IBGE. Query, metadados e resultado:
+  a UF localmente contra a malha do IBGE. Coletor: `coleta:wikidata-clubes`;
+  query, metadados e resultado em
   `packages/db/src/data/wikidata-clubes-br.json`.
+
+**Três armadilhas medidas em 2026-09-01** (todas custaram ficha errada em
+produção — ver `docs/data/auditoria-catalogo-clubes.md` §5.1):
+
+1. **O clube tem várias entidades com o MESMO rótulo.** Time feminino, time B,
+   futsal, beach soccer e o clube extinto que antecedeu o atual são verbetes
+   separados, todos rotulados "Sport Club Corinthians Paulista" ou "Clube de
+   Regatas do Flamengo". Casar por nome pega o que vier primeiro. Discriminar
+   por **P31** só resolve parte (o feminino do Corinthians está tipado como
+   `Q476028`, clube de futebol, igual ao principal); o resto sai da
+   **descrição** em pt/en ("clube brasileiro de futebol feminino"). Excluir por
+   P31 exige cuidado: "clube de remo" e "rugby union club" aparecem **na mesma
+   entidade** do clube de futebol (Sportivo Sergipe rema), então esses tipos não
+   servem de filtro.
+2. **`P576` (extinção) é o desempate que ninguém lembra.** Grêmio Esportivo
+   Novorizontino foi extinto em 1999 e Cascavel EC em 2001; os clubes que jogam
+   hoje com esse nome são outros verbetes. Sem olhar P576 a ficha fica com a
+   fundação do clube morto.
+3. **`P17` (país) não é confiável e `P1083` (capacidade) não é única.** O ABC de
+   Natal tem `P17 = Campeonato Brasileiro Série C` — filtrar só por
+   `P17 = Q155` apaga o clube da coleta inteira (a saída é aceitar também
+   `P159/P17 = Q155`, sede em município brasileiro). E o mesmo estádio tem
+   várias capacidades sem ranking: o Morumbi declara **120.000** (recorde de
+   1977), 71.200 e 67.052 — pegar a maior gravou o recorde histórico como
+   lotação.
 
 ### Ogol
 
@@ -223,12 +249,12 @@ marcados como `MUNICIPAL` ou `ESTADUAL`.
 | Datafolha | ~anual | trocar percentuais, datas e recalcular absolutos em `torcedores-pesquisa-datafolha.js` |
 | IBOPE Repucom | mensal | fluxo já descrito em `docs/data/torcedores-estimados.md` |
 | FPF torcidas | quando a federação republicar | `curl` com user-agent de navegador + `seed:torcidas-registro` |
-| Wikidata | sob demanda | reexecutar a SPARQL documentada no JSON + `seed:ficha-clubes` |
+| Wikidata | sob demanda | `coleta:wikidata-clubes` + `seed:ficha-clubes -- --corrigir-ficha` |
 | Cores do escudo | quando entrarem escudos novos | `coleta:cores-escudos` + `seed:ficha-clubes` |
 
 Medição do estado a qualquer momento: `audit:catalogo-clubes` (sai com código 1
-se achar rivalidade interestadual isolando ou homônimo novo). Invariantes puros:
-`test:catalogo-clubes`.
+se achar rivalidade interestadual isolando, homônimo novo ou ficha ancorada na
+entidade errada do Wikidata). Invariantes puros: `test:catalogo-clubes`.
 
 Agentes: `research-dominio` (novas fontes), `data-model` (campos novos),
 `aliancas-torcidas` (rivalidade), `implementation` (seeds),

@@ -120,7 +120,7 @@ export function AppModalBody({
   className?: string
 }) {
   return (
-    <div className={['min-h-0 flex-1 overflow-y-auto', className ?? ''].join(' ')}>
+    <div className={['app-scrollbar-fina min-h-0 flex-1 overflow-y-auto', className ?? ''].join(' ')}>
       {children}
     </div>
   )

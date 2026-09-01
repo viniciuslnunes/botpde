@@ -134,7 +134,7 @@ export function SearchableSelect({
         <div
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-xl"
+          className="app-scrollbar-fina absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-xl"
         >
           {filtered.itens.length === 0 ? (
             <p className="px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">{emptyText}</p>

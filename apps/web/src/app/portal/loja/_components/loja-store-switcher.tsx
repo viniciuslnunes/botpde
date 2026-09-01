@@ -105,7 +105,7 @@ export function LojaStoreSwitcher({
               Trocar loja
             </p>
           </div>
-          <ul role="listbox" aria-label="Lojas disponíveis" className="max-h-72 overflow-y-auto p-1.5">
+          <ul role="listbox" aria-label="Lojas disponíveis" className="app-scrollbar-fina max-h-72 overflow-y-auto p-1.5">
             {lojas.map((loja) => {
               const active = loja.tenantId === atual.tenantId
               return (

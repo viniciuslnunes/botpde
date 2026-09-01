@@ -65,7 +65,9 @@ pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canô
 pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
 pnpm --filter @torcida/db seed:torcedores-estimados  # tier PESQUISA (Datafolha×IBGE) > IBOPE > limite
 pnpm --filter @torcida/db seed:clubes-rnc            # Ranking Nacional de Clubes da CBF: cria os ausentes + grava posição
+pnpm --filter @torcida/db coleta:wikidata-clubes     # regenera wikidata-clubes-br.json (tipos, descrição, extinção)
 pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-cidades  # fundação, estádio, cores, site, ids externos
+pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-ficha    # reancora quem está no QID errado do Wikidata
 pnpm --filter @torcida/db repair:clubes-curados      # correções e fusões curadas (nome quebrado, UF errada, duplicata)
 pnpm --filter @torcida/db seed:rivalidades-clubes    # rivalidade que ISOLA (municipal/estadual; interestadual é só contexto)
 pnpm --filter @torcida/db seed:torcidas-registro -- --importar-ausentes  # registro na federação (FPF) + ano de fundação
@@ -213,6 +215,18 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   `[role=button]`/`[role=tab]`/`summary` (seguro porque `min-height` não se
   aplica a elemento inline); escape explícito: `.app-sem-piso-toque`.
   `.app-inset-x` cobre o recorte lateral do notch em barra que atravessa a tela.
+- **Barras de rolagem (2026-09-01):** tratamento global em `globals.css`
+  (seção `── Barras de rolagem`), reativo à marca do tenant. Duas armadilhas
+  medidas: (1) as duas APIs são **mutuamente exclusivas no Chromium** —
+  `scrollbar-color` ou `scrollbar-width` num elemento **desliga** o
+  `::-webkit-scrollbar` dele; nunca declarar as duas, e nunca reintroduzir
+  `scrollbar-width: thin` num container (o `thin` do Firefox já herda do
+  `<html>`); (2) a cor é `--color-primary-fg`, **não** `--color-primary` —
+  mesma regra dos badges, senão marca preta some no escuro. Variantes prontas:
+  `.app-scrollbar-none` (trilho de abas, feed com snap), `-fina` (popover,
+  chat), `-idle` (aparece no hover), `-neutra`, `-sobre-escuro` (superfície
+  preta nos dois temas), `-gutter`. Guia e tabela de medições:
+  `docs/frontend/scrollbars.md`; decisão: `ARCHITECTURE.md` §5.34.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
@@ -420,6 +434,15 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   id externo; `chaveCanonicaClube` resolve alias em ciclo. Avaliação das
   fontes: `docs/knowledge/fontes-dados-clubes.md`; medição e antes/depois:
   `docs/data/auditoria-catalogo-clubes.md`; decisões: `ARCHITECTURE.md` §5.29.
+  **E o homônimo também está DENTRO da fonte (2026-09-01):** o Wikidata tem uma
+  entidade separada para o time **feminino**, o time B, o futsal e o clube
+  **extinto**, todas com o mesmo rótulo do clube — a ficha do Corinthians em
+  `/super-admin/clubes` era a do time feminino (1997, Alfredo Schürig). Nunca
+  casar clube com Wikidata por nome direto: usar `criarResolvedorWikidata`
+  (`scripts/lib/catalogo-clubes.js`), que desempata por modalidade (P31 +
+  descrição), extinção (P576) e cidade, e **não escolhe** sem evidência — quem
+  sobra vira curadoria no bloco `wikidata` de `clubes-correcoes-curadas.json`.
+  `audit:catalogo-clubes` §7 é o gate. Ver §5.29.1.
 - **Rivalidade tem escopo (2026-08-27):** `EscopoRivalidade` =
   `MUNICIPAL | ESTADUAL | INTERESTADUAL`, e **só os dois primeiros isolam**
   (`ESCOPOS_RIVALIDADE_ISOLANTE` em `@torcida/types`, aplicado em

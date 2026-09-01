@@ -207,6 +207,15 @@ export const STREET_VIEW_DEFAULTS = {
   fov: 80,
 } as const
 
+/**
+ * Street View JS usa zoom, não FOV. Relação da Google: `fov = 180 / 2^zoom`.
+ * O framing salvo no admin é FOV (Static API); o panorama do portal converte.
+ */
+export function streetViewFovToZoom(fov: number): number {
+  const clamped = Math.min(120, Math.max(10, fov))
+  return Math.log2(180 / clamped)
+}
+
 export type SedeLocationImageInput = {
   endereco?: string | null
   cidade?: string | null
@@ -319,7 +328,7 @@ export function getGoogleMapsMapId(): string {
 /** Subconjunto tipado do Maps JS API usado pelo portal Sedes. */
 export type GoogleMapsNamespace = {
   maps: {
-    importLibrary: (name: 'maps' | 'marker') => Promise<Record<string, unknown>>
+    importLibrary: (name: 'maps' | 'marker' | 'streetView') => Promise<Record<string, unknown>>
     Map: new (
       el: HTMLElement,
       opts?: {
@@ -394,6 +403,45 @@ export type GoogleLatLngBounds = {
   isEmpty: () => boolean
 }
 
+export type GoogleStreetViewPov = {
+  heading: number
+  pitch: number
+}
+
+export type GoogleStreetViewPanorama = {
+  setPosition: (latLng: { lat: number; lng: number }) => void
+  setPov: (pov: GoogleStreetViewPov) => void
+  setZoom: (zoom: number) => void
+  setVisible: (visible: boolean) => void
+}
+
+export type GoogleMapsStreetViewLibrary = {
+  StreetViewPanorama: new (
+    el: HTMLElement,
+    opts?: {
+      position?: { lat: number; lng: number }
+      pov?: GoogleStreetViewPov
+      zoom?: number
+      visible?: boolean
+      addressControl?: boolean
+      fullscreenControl?: boolean
+      linksControl?: boolean
+      panControl?: boolean
+      zoomControl?: boolean
+      enableCloseButton?: boolean
+      motionTracking?: boolean
+      motionTrackingControl?: boolean
+    },
+  ) => GoogleStreetViewPanorama
+  StreetViewService: new () => {
+    getPanorama: (request: {
+      location: { lat: number; lng: number }
+      radius?: number
+      source?: 'default' | 'outdoor'
+    }) => Promise<{ data: unknown }>
+  }
+}
+
 declare global {
   var google: GoogleMapsNamespace | undefined
 }
@@ -401,6 +449,13 @@ declare global {
 let mapsBootstrapInstalled = false
 let mapsReadyPromise: Promise<GoogleMapsNamespace> | null = null
 let markerLibraryPromise: Promise<GoogleMapsMarkerLibrary> | null = null
+let streetViewLibraryPromise: Promise<GoogleMapsStreetViewLibrary> | null = null
+
+function resetMapsLibraryPromises() {
+  mapsReadyPromise = null
+  markerLibraryPromise = null
+  streetViewLibraryPromise = null
+}
 
 type BootstrapMaps = {
   importLibrary?: GoogleMapsNamespace['maps']['importLibrary']
@@ -500,8 +555,7 @@ export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
     await g.maps.importLibrary('maps')
     return g
   })().catch((err: unknown) => {
-    mapsReadyPromise = null
-    markerLibraryPromise = null
+    resetMapsLibraryPromises()
     throw err
   })
 
@@ -535,8 +589,7 @@ export async function loadGoogleMapsMarkerLibrary(): Promise<{
       .importLibrary('maps')
       .then(() => g)
       .catch((err: unknown) => {
-        mapsReadyPromise = null
-        markerLibraryPromise = null
+        resetMapsLibraryPromises()
         throw err
       })
   }
@@ -562,6 +615,56 @@ export async function loadGoogleMapsMarkerLibrary(): Promise<{
     throw new Error('google.maps.Map indisponível')
   }
   return { g, marker, Map: g.maps.Map }
+}
+
+/** Biblioteca `streetView` (panorama interativo + cobertura). */
+export async function loadGoogleMapsStreetViewLibrary(): Promise<{
+  g: GoogleMapsNamespace
+  streetView: GoogleMapsStreetViewLibrary
+}> {
+  if (typeof window === 'undefined') {
+    throw new Error('Maps JS só no client')
+  }
+
+  const key = getGoogleMapsApiKey()
+  if (!key) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente')
+  }
+
+  installGoogleMapsBootstrap(key)
+  const g = window.google
+  if (!g?.maps?.importLibrary) {
+    throw new Error('Google Maps falhou ao carregar')
+  }
+
+  if (!mapsReadyPromise) {
+    mapsReadyPromise = g.maps
+      .importLibrary('maps')
+      .then(() => g)
+      .catch((err: unknown) => {
+        resetMapsLibraryPromises()
+        throw err
+      })
+  }
+
+  if (!streetViewLibraryPromise) {
+    streetViewLibraryPromise = g.maps
+      .importLibrary('streetView')
+      .then((lib) => {
+        const streetView = lib as unknown as GoogleMapsStreetViewLibrary
+        if (!streetView.StreetViewPanorama || !streetView.StreetViewService) {
+          throw new Error('Biblioteca streetView incompleta')
+        }
+        return streetView
+      })
+      .catch((err: unknown) => {
+        streetViewLibraryPromise = null
+        throw err
+      })
+  }
+
+  const [, streetView] = await Promise.all([mapsReadyPromise, streetViewLibraryPromise])
+  return { g, streetView }
 }
 
 type GeocodeAddressComponent = {

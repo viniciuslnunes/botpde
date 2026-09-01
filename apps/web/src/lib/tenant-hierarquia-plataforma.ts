@@ -43,12 +43,24 @@ export function filtrarTenantsRaiz(
 }
 
 /**
+ * As duas condições de coluna que um tenant precisa cumprir para ser torcida —
+ * a terceira (ser raiz) não cabe num `where` e sai de `filtrarTenantsRaiz`.
+ *
+ * Existe como constante para que **contar** e **listar** nunca divirjam: o card
+ * "Uso do clube" do super-admin chegou a mostrar 7 nomes sob um KPI de 6 porque
+ * a página remontou o filtro à mão e deixou passar o tenant suspenso
+ * ("FIEL CUBATÃO", erro de registro do Corinthians).
+ */
+export const WHERE_TENANT_E_TORCIDA = { ativo: true, sintetico: false } as const
+
+/**
  * Torcidas do clube na plataforma — **fonte única** de "quantas torcidas há".
  *
  * Uma torcida é um tenant que, ao mesmo tempo:
  * - é **raiz** (portal de unidade Caso B é unidade de uma torcida, não torcida);
  * - **não** é sintético (o container da Comunidade Nacional não é torcida);
- * - está **ativo** (tenant suspenso/erro de registro não conta).
+ * - está **ativo** (tenant suspenso/erro de registro não é torcida do clube —
+ *   não conta no KPI **e não aparece na lista**).
  *
  * Nunca contar `tenant.findMany({ afiliacaoId })` cru: o resultado infla com
  * unidades promovidas, com o container da CN e com tenants suspensos.
@@ -58,7 +70,7 @@ export const listarTorcidasDoClube = cache(async function listarTorcidasDoClube(
 ): Promise<string[]> {
   const [tenants, maePorFilho]: [{ id: string }[], Map<string, string>] = await Promise.all([
     db.tenant.findMany({
-      where: { afiliacaoId, ativo: true, sintetico: false },
+      where: { afiliacaoId, ...WHERE_TENANT_E_TORCIDA },
       select: { id: true },
       orderBy: { nome: 'asc' },
     }),

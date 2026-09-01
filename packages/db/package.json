@@ -91,6 +91,7 @@
     "coleta:cores-escudos": "node --use-system-ca scripts/coleta-cores-escudos.js",
     "seed:clubes-rnc": "node scripts/seed-clubes-rnc.js",
     "audit:catalogo-clubes": "node scripts/audit-catalogo-clubes.js",
+    "coleta:wikidata-clubes": "node --use-system-ca scripts/coleta-wikidata-clubes.js",
     "seed:ficha-clubes": "node scripts/seed-ficha-clubes.js",
     "repair:clubes-curados": "node scripts/repair-clubes-curados.js",
     "seed:rivalidades-clubes": "node scripts/seed-rivalidades-clubes.js",

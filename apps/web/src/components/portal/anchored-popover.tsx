@@ -201,7 +201,7 @@ export function AnchoredPopover({
   return createPortal(
     <div
       ref={portalRef}
-      className={['min-w-0', className].filter(Boolean).join(' ')}
+      className={['app-scrollbar-fina min-w-0', className].filter(Boolean).join(' ')}
       data-anchored-popover=""
       style={{
         position: 'fixed',

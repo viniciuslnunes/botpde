@@ -99,7 +99,7 @@ export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={springSnappy}
-              className="grid max-h-48 grid-cols-8 gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain"
+              className="app-scrollbar-fina grid max-h-48 grid-cols-8 gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
               {active.emojis.map((emoji, i) => (
                 <m.button

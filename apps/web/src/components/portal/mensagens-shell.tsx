@@ -203,7 +203,7 @@ export function MensagensShell({
         <div
           className={[
             'min-h-0 flex-1 overflow-y-auto',
-            embedded ? 'app-scrollbar-none' : '',
+            embedded ? 'app-scrollbar-none' : 'app-scrollbar-fina',
           ].join(' ')}
         >
           {carregando ? (
@@ -677,7 +677,7 @@ function NovaConversaModal({
               )}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
+            <div className="app-scrollbar-fina min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
               {buscando && resultadosVisiveis.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
                   Buscando…

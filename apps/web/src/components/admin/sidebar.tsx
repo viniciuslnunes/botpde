@@ -231,7 +231,7 @@ function SidebarBody({
         </AdminContextDisclosure>
       )}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Menu administrativo">
+      <nav className="app-scrollbar-fina app-scrollbar-idle flex-1 overflow-y-auto px-3 py-4" aria-label="Menu administrativo">
         <NavSections items={items} badges={badges} pathname={pathname} onNavigate={onNavigate} />
       </nav>
 

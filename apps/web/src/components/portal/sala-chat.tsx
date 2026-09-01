@@ -72,7 +72,7 @@ export function SalaChat({
   currentUserId,
   isHost,
   initialMensagens,
-  listClassName = 'max-h-80 space-y-3 overflow-y-auto pr-1',
+  listClassName = 'app-scrollbar-fina max-h-80 space-y-3 overflow-y-auto pr-1',
   className,
   glass = false,
 }: SalaChatProps) {

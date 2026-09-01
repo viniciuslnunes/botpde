@@ -193,7 +193,7 @@ export function VideosReelsFeed({
     <div
       ref={containerRef}
       className={[
-        'snap-y snap-mandatory overflow-y-auto overscroll-y-contain',
+        'app-scrollbar-none snap-y snap-mandatory overflow-y-auto overscroll-y-contain',
         fullscreen
           ? 'fixed inset-0 z-50 bg-black'
           : 'h-[min(78dvh,720px)] rounded-2xl bg-black',

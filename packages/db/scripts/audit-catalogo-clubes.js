@@ -12,10 +12,13 @@
  *  4. rivalidades gravadas x dataset curado (e rivalidade interestadual, que
  *     não deveria existir);
  *  5. torcidas paulistas x registro da Federação Paulista;
- *  6. homônimos que a chave nome+UF não separa.
+ *  6. homônimos que a chave nome+UF não separa;
+ *  7. procedência da ficha: o QID gravado ainda é a entidade que o resolvedor
+ *     escolhe (ficha do time feminino / do clube extinto não passa em silêncio).
  *
  * Só leitura — nunca escreve. Sai com código 1 se achar problema estrutural
- * (rivalidade interestadual gravada ou homônimo novo), para poder virar gate.
+ * (rivalidade interestadual gravada, homônimo novo ou ficha ancorada na
+ * entidade errada), para poder virar gate.
  */
 import { PrismaClient } from '@prisma/client'
 import { prepareSeedEnv } from './lib/seed-env.js'
@@ -27,6 +30,8 @@ import {
   validadorCidade,
   melhorCandidato,
   agruparPorUf,
+  criarResolvedorWikidata,
+  lerCuradoriaWikidata,
 } from './lib/catalogo-clubes.js'
 import { RIVALIDADES_CLUBES } from '../src/data/rivalidades-clubes.js'
 
@@ -186,7 +191,50 @@ async function main() {
     }
   }
 
-  const problemas = interestaduaisIsolando.length + colisoes.size
+  // 7. Procedência da ficha do Wikidata ────────────────────────────────────
+  // Mede se o QID gravado é o que o resolvedor escolhe HOJE. Sem isto, uma ficha
+  // ancorada na entidade errada (o time feminino, o clube extinto) passa por
+  // "ficha preenchida" na seção 2 e ninguém percebe — foi o que aconteceu com o
+  // Corinthians entre 2026-08-27 e 2026-09-01.
+  const { resolver } = criarResolvedorWikidata(
+    lerDataset('wikidata-clubes-br.json'),
+    validadorCidade(carregarMunicipios()),
+    lerCuradoriaWikidata(lerDataset('clubes-correcoes-curadas.json')),
+  )
+  const desancorados = []
+  const semDesempate = []
+  for (const clube of afiliacoes) {
+    const { clube: escolhido, motivo, candidatos } = resolver(clube)
+    if (motivo === 'ambiguo' || motivo === 'curado-qid-ausente') {
+      semDesempate.push(
+        `${clube.nome}/${clube.estado}${motivo === 'ambiguo' ? `: ${candidatos.map((c) => c.qid).join(' ou ')}` : ': QID curado fora do dataset'}`,
+      )
+      continue
+    }
+    if (escolhido && clube.wikidataQid && clube.wikidataQid !== escolhido.qid) {
+      desancorados.push(`${clube.nome}/${clube.estado}: ${clube.wikidataQid} ≠ ${escolhido.qid}`)
+    }
+  }
+  const top50 = afiliacoes.filter((a) => a.rncPosicao != null && a.rncPosicao <= 50)
+  bloco('7. Ficha do Wikidata: entidade certa', {
+    'QID gravado ≠ resolvido hoje': desancorados.length,
+    'homônimo sem desempate (fica sem ficha)': semDesempate.length,
+    'top 50 do RNC com QID': `${top50.filter((a) => a.wikidataQid).length}/${top50.length}`,
+    'top 50 do RNC com estádio': `${top50.filter((a) => a.estadio).length}/${top50.length}`,
+  })
+  if (!JSON_OUT) {
+    for (const linha of desancorados.slice(0, 15)) console.log(`   → ${linha}`)
+    for (const linha of semDesempate.slice(0, 15)) console.log(`   ? ${linha}`)
+    if (desancorados.length > 0) {
+      console.log('   → corrija com seed:ficha-clubes -- --corrigir-ficha')
+    }
+    if (semDesempate.length > 0) {
+      console.log('   ? escolha o QID em src/data/clubes-correcoes-curadas.json (bloco "wikidata")')
+    }
+  }
+
+  const problemas =
+    interestaduaisIsolando.length + colisoes.size + desancorados.length + semDesempate.length
   if (JSON_OUT) {
     console.log(
       JSON.stringify(
@@ -202,6 +250,8 @@ async function main() {
           rivalidadesInterestaduaisContexto: interestaduaisContexto.length,
           torcidasRegistradas: registradas,
           homonimos: colisoes.size,
+          fichaDesancorada: desancorados.length,
+          fichaSemDesempate: semDesempate.length,
         },
         null,
         2,
@@ -210,7 +260,7 @@ async function main() {
   } else {
     console.log(
       `\n${problemas === 0 ? '✓' : '⚠'} ${problemas} problema(s) estrutural(is)` +
-        ' (rivalidade interestadual isolando + homônimo).',
+        ' (rivalidade interestadual isolando + homônimo + ficha ancorada na entidade errada).',
     )
   }
   if (problemas > 0) process.exitCode = 1

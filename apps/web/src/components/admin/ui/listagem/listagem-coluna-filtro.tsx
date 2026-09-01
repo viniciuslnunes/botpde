@@ -168,7 +168,7 @@ export function ListagemColunaFiltro({
         </div>
 
         {tipo === 'enum' ? (
-          <div className="max-h-72 overflow-y-auto py-1">
+          <div className="app-scrollbar-fina max-h-72 overflow-y-auto py-1">
             {opcoes.length === 0 ? (
               <p className="px-3 py-3 text-xs text-[rgb(var(--foreground-muted))]">
                 Nenhuma opção disponível.

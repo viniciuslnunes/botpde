@@ -1,31 +1,25 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react'
-import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ArrowLeft, Crosshair, Loader2, Search, X } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { SedeExplorerCard } from '@/components/portal/sede-explorer-card'
 import { SedeExplorerDetail } from '@/components/portal/sede-explorer-detail'
+import { SedesMapPanel } from '@/components/portal/sedes-map-panel'
 import {
   TIPO_LABEL,
   type SedeExplorerItem,
   type SedeTipo,
 } from '@/components/portal/sede-explorer-types'
 import { enrichSedesComCoordenadas, isGoogleMapsConfigured } from '@/lib/google-maps'
+import { resolverSedeStreetView } from '@/lib/sedes-street-view'
 import {
   distanciaKm,
   formatarDistanciaKm,
   normalizarTexto,
   type LocalizacaoOnboarding,
 } from '@/lib/onboarding-unidade'
-
-const SedesMap = dynamic(() => import('@/components/portal/sedes-map').then((m) => m.SedesMap), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[14rem] w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:h-[18rem] lg:h-[22rem]" />
-  ),
-})
 
 type FiltroTipo = 'TODAS' | SedeTipo
 
@@ -247,6 +241,19 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   )
 
   const selected = selectedId ? (sedes.find((s) => s.id === selectedId) ?? null) : null
+  const streetViewAlvo = resolverSedeStreetView(selected, filtradas)
+  const streetViewSede =
+    streetViewAlvo?.lat != null && streetViewAlvo.lng != null
+      ? {
+          id: streetViewAlvo.id,
+          nome: streetViewAlvo.nome,
+          lat: streetViewAlvo.lat,
+          lng: streetViewAlvo.lng,
+          streetViewHeading: streetViewAlvo.streetViewHeading,
+          streetViewPitch: streetViewAlvo.streetViewPitch,
+          streetViewFov: streetViewAlvo.streetViewFov,
+        }
+      : null
   const selectedDist = selected && localizacao ? distanciaKm(localizacao, selected) : null
   const buscaPendente = busca !== buscaDeferred
   const maisProximaDist =
@@ -441,12 +448,13 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
       </section>
 
       <section className="order-1 min-w-0 lg:order-2">
-        <SedesMap
+        <SedesMapPanel
           sedes={mapPoints}
           selectedId={selectedId}
           onSelect={selecionar}
           userLocation={localizacao}
-          className="h-[16rem] w-full sm:h-[20rem] lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]"
+          streetViewSede={streetViewSede}
+          className="h-[18rem] w-full sm:h-[22rem] lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]"
         />
       </section>
     </div>

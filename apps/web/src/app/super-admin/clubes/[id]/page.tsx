@@ -2,11 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
-import { Badge } from '@torcida/ui'
 import { labelAcaoAuditoria } from '@/lib/audit-labels'
 import {
   carregarMapaPortalMae,
   filtrarTenantsRaiz,
+  WHERE_TENANT_E_TORCIDA,
 } from '@/lib/tenant-hierarquia-plataforma'
 import { ClubeForm, type ClubeFormValores } from '../_components/clube-form'
 import { ClubeRivais, type RivalOpcao } from '../_components/clube-rivais'
@@ -28,7 +28,6 @@ type TorcidaVinculada = {
   id: string
   nome: string
   slug: string
-  ativo: boolean
 }
 
 type HistoricoRow = {
@@ -102,8 +101,8 @@ export default async function ClubeDadosPage({
       take: 40,
     }),
     db.tenant.findMany({
-      where: { afiliacaoId: id, sintetico: false },
-      select: { id: true, nome: true, slug: true, ativo: true },
+      where: { afiliacaoId: id, ...WHERE_TENANT_E_TORCIDA },
+      select: { id: true, nome: true, slug: true },
       orderBy: { nome: 'asc' },
       take: 80,
     }),
@@ -121,10 +120,11 @@ export default async function ClubeDadosPage({
     maePorFilho,
   )
   const raizSet = new Set(raizIds)
-  // A lista mostra também a torcida suspensa (com o selo "Suspensa"), mas o KPI
-  // conta só quem está no ar — tenant inativo é erro de registro/baixa, não torcida.
-  const raizesAtivas = tenantsRaw.filter((t) => raizSet.has(t.id) && t.ativo)
-  const torcidas = tenantsRaw.filter((t) => raizSet.has(t.id)).slice(0, 25)
+  // KPI e lista saem do MESMO conjunto (`WHERE_TENANT_E_TORCIDA` + raiz). Tenant
+  // suspenso não é torcida do clube: não conta e não aparece — antes contava 6 e
+  // listava 7, com a suspensa levando um selo que a fazia parecer torcida.
+  const raizes = tenantsRaw.filter((t) => raizSet.has(t.id))
+  const torcidas = raizes.slice(0, 25)
 
   const rivais: RivalOpcao[] = rivalidades.map((r) =>
     r.afiliacaoA.id === id
@@ -150,7 +150,8 @@ export default async function ClubeDadosPage({
   // Ficha vinda dos seeds de catálogo (CBF, Wikidata, Ogol, escudo). Não entra
   // no formulário: é dado de fonte externa, com procedência, e a edição manual
   // dele viraria divergência silenciosa no próximo seed.
-  const ficha: { label: string; valor: string }[] = [
+  type LinhaFicha = { label: string; valor: string; href?: string }
+  const ficha: LinhaFicha[] = [
     clube.fundacaoAno ? { label: 'Fundação', valor: String(clube.fundacaoAno) } : null,
     clube.estadio
       ? {
@@ -166,16 +167,30 @@ export default async function ClubeDadosPage({
           valor: `${clube.rncPosicao}º · ${(clube.rncPontos ?? 0).toLocaleString('pt-BR')} pts`,
         }
       : null,
-    clube.wikidataQid ? { label: 'Wikidata', valor: clube.wikidataQid } : null,
-    clube.ogolId ? { label: 'Ogol', valor: clube.ogolId } : null,
-  ].filter((item): item is { label: string; valor: string } => item !== null)
+    // Link, não só o código: a ficha inteira é derivada desta entidade, e um
+    // homônimo (time feminino, clube extinto) só se descobre abrindo o verbete.
+    clube.wikidataQid
+      ? {
+          label: 'Wikidata',
+          valor: clube.wikidataQid,
+          href: `https://www.wikidata.org/wiki/${clube.wikidataQid}`,
+        }
+      : null,
+    clube.ogolId
+      ? {
+          label: 'Ogol',
+          valor: clube.ogolId,
+          href: `https://www.ogol.com.br/equipe/${clube.ogolId}`,
+        }
+      : null,
+  ].filter((item): item is LinhaFicha => item !== null)
 
   const cores = [clube.corPrimaria, clube.corSecundaria, clube.corAcento].filter(
     (cor): cor is string => Boolean(cor),
   )
 
   const uso = [
-    { label: 'Torcidas na plataforma', valor: raizesAtivas.length },
+    { label: 'Torcidas na plataforma', valor: raizes.length },
     { label: 'Torcedores globais', valor: clube._count.torcedores },
     { label: 'Partidas', valor: clube._count.partidas },
     { label: 'Notícias', valor: clube._count.noticias },
@@ -210,9 +225,8 @@ export default async function ClubeDadosPage({
           {torcidas.length > 0 ? (
             <ul className="mt-4 space-y-1 border-t border-[rgb(var(--border))] pt-3">
               {torcidas.map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate text-[rgb(var(--foreground))]">{t.nome}</span>
-                  {!t.ativo ? <Badge variant="neutral">Suspensa</Badge> : null}
+                <li key={t.id} className="truncate text-sm text-[rgb(var(--foreground))]">
+                  {t.nome}
                 </li>
               ))}
             </ul>
@@ -238,7 +252,18 @@ export default async function ClubeDadosPage({
                   <div key={item.label} className="flex items-baseline justify-between gap-3">
                     <dt className="text-sm text-[rgb(var(--foreground-muted))]">{item.label}</dt>
                     <dd className="text-right text-sm font-medium text-[rgb(var(--foreground))]">
-                      {item.valor}
+                      {item.href ? (
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="app-touch-line text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
+                        >
+                          {item.valor}
+                        </a>
+                      ) : (
+                        item.valor
+                      )}
                     </dd>
                   </div>
                 ))}

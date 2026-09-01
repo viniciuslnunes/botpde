@@ -14,7 +14,6 @@ export type TorcidaVinculadaView = {
   id: string
   nome: string
   slug: string
-  ativo: boolean
   membros: number
   posts: number
   unidadesCount: number
@@ -117,7 +116,6 @@ function TorcidaLinha({ torcida }: { torcida: TorcidaVinculadaView }) {
             </span>{' '}
             posts
           </span>
-          {!torcida.ativo ? <Badge variant="neutral">Suspensa</Badge> : null}
         </div>
       </div>
 

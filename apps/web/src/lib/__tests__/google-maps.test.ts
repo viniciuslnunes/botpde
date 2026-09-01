@@ -9,6 +9,7 @@ import {
   isGoogleMapsShortUrl,
   isGoogleMapsUrl,
   parseCoordsFromGoogleMapsUrl,
+  streetViewFovToZoom,
   resolveSedeLocationImage,
   reverseGeocodeEndereco,
 } from '@/lib/google-maps'
@@ -70,6 +71,14 @@ describe('google-maps', () => {
     expect(url).toContain('heading=90')
     expect(url).toContain('pitch=5')
     expect(url).toContain('fov=70')
+  })
+
+  it('converte FOV do admin no zoom do panorama JS', () => {
+    expect(streetViewFovToZoom(90)).toBe(1)
+    expect(streetViewFovToZoom(45)).toBe(2)
+    expect(streetViewFovToZoom(80)).toBeCloseTo(Math.log2(180 / 80))
+    expect(streetViewFovToZoom(5)).toBe(streetViewFovToZoom(10))
+    expect(streetViewFovToZoom(200)).toBe(streetViewFovToZoom(120))
   })
 
   it('resolveSedeLocationImage retorna null sem coords', () => {

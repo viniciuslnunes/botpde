@@ -1882,6 +1882,51 @@ Aplicação por seeds idempotentes (`seed:clubes-rnc`, `seed:ficha-clubes`,
 medição contínua por `audit:catalogo-clubes` e invariantes puros em
 `test:catalogo-clubes`.
 
+#### 5.29.1 A ficha do clube é de UMA entidade — qual (2026-09-01)
+
+A decisão 3 acima ("nome + UF não é chave") valia para o casamento **entre
+catálogos**. Faltava aplicá-la à ficha: `seed:ficha-clubes` montava seu próprio
+índice `nome|UF → primeiro do arquivo` e o Wikidata tem uma entidade **separada**
+para o time feminino, o time B, o futsal e o clube extinto, **todas com o mesmo
+rótulo do clube**. Resultado medido em `/super-admin/clubes`: a ficha do
+**Corinthians** era a do time feminino (fundação **1997**, Estádio Alfredo
+Schürig, 13.969 lugares, em vez de 1910 / Neo Química Arena / 47.252); a do
+Flamengo, a do time feminino na Gávea; a do São Paulo, um verbete vazio; a da
+Ferroviária, o time feminino de 2001. **8 clubes ancorados na entidade errada,
+3 deles no top 10 do RNC** — e nenhuma auditoria via, porque a seção "ficha
+preenchida" só contava campo não nulo, nunca de qual entidade ele veio.
+
+**Decisões:**
+
+1. **Desempatar só com evidência, e sem evidência não escolher.**
+   `criarResolvedorWikidata` (`scripts/lib/catalogo-clubes.js`) é a regra única,
+   usada pelo seed e pela auditoria: curadoria explícita → modalidade (P31 +
+   descrição: feminino, futsal, beach soccer — filtro **duro**, vale mesmo com
+   candidato único) → clube ativo (P576 = extinto perde para o sucessor) →
+   mesma cidade da `Afiliacao`. Sem desempate, o clube fica **sem ficha** e
+   entra no relatório. Palpite (mais antigo, maior capacidade) escolheria o
+   clube errado em quase todos esses casos.
+2. **O dataset precisa carregar o discriminador.** `coleta:wikidata-clubes`
+   (novo, versionado — o arquivo antes não tinha coletor) traz `tipos` (P31),
+   `descricao` e `dissolucao` (P576). Também corrige duas armadilhas da fonte:
+   o `P17` de alguns verbetes aponta a **competição** em vez do país (o ABC
+   sumia da coleta inteira), e o mesmo estádio tem várias capacidades sem
+   ranking — o Morumbi vinha com **120.000**, o recorde de 1977.
+3. **Curadoria de QID onde o sinal não existe** — bloco `wikidata` em
+   `clubes-correcoes-curadas.json`, com fonte e confiança como o resto do
+   arquivo. Resolve também o **falso negativo**: Náutico ("Capiberibe" ×
+   "Capibaribe"), Retrô ("Retrô Futebol Clube Brasil"), América-MG (cujo único
+   casamento por nome era o verbete do time feminino).
+4. **Realinhar o que já está gravado.** `seed:ficha-clubes -- --corrigir-ficha`
+   reescreve os campos que são do Wikidata quando divergem do dataset — é a
+   única operação não aditiva do seed, e é segura porque esses campos não são
+   editáveis no admin. Fundação só é reescrita quando a **entidade** muda: com
+   a entidade certa, o ano pode ter vindo do Ogol ou da curadoria.
+5. **Vira gate.** `audit:catalogo-clubes` §7 compara o QID gravado com o que o
+   resolvedor escolhe hoje e sai com código 1 se divergir ou se sobrar homônimo
+   sem desempate. Na ficha do super-admin o QID virou **link** para o verbete:
+   entidade errada só se descobre abrindo.
+
 ### 5.30 Memória — linha do tempo (2026-08-30)
 
 Superfície `/portal/memoria`: o eixo é o **dia civil** (fuso SP), não o feed.
@@ -1978,6 +2023,44 @@ Docs: `docs/data/modulo-moderacao.md` (spec), `docs/data/politica-de-conteudo.md
 (normativa), `docs/knowledge/moderacao-plataformas.md` (pesquisa e fontes).
 Fecha o item **P1** do gate em `docs/data/plano-criptografia-e-moderacao.md` e
 não altera a Fase A (segue sem E2EE, servidor legível — §5.23).
+
+### 5.34 Barras de rolagem — uma API por motor, cor pela marca (2026-09-01)
+
+O sistema não tinha nenhum tratamento de scrollbar: ~60 containers com
+`overflow-y-auto` herdavam a barra nativa, que no Windows é um bloco cinza de
+15px indiferente à identidade do tenant. Três decisões, todas medidas em
+Chromium headed antes de escrever a regra:
+
+1. **Uma API por motor, nunca as duas.** As duas APIs são mutuamente exclusivas
+   no Chromium: com `scrollbar-color` declarado, `::-webkit-scrollbar{width:6px}`
+   é ignorado e a barra volta aos 15px nativos; com `scrollbar-width: thin` ela
+   trava em 10px e a largura do pseudo também não vale. Declarar as duas "para
+   cobrir todo mundo" é o erro clássico — desliga em silêncio a que desenha
+   melhor. Firefox fica com `scrollbar-width`/`scrollbar-color` sob
+   `@supports (-moz-appearance: none) or (-moz-orient: inline)` (as duas
+   medidas como falsas no Chromium); Chromium e Safari ficam com
+   `::-webkit-scrollbar*`, único caminho com raio, inset, `:hover` e `:active`.
+   Corolário: `scrollbar-width: thin` num container específico **desliga** o
+   desenho ali — as duas declarações do `meet-room.css` foram removidas.
+2. **A cor é `--color-primary-fg`, não `--color-primary`.** Mesmo motivo dos
+   badges (§ módulo Design): `-fg` é a marca já corrigida pelo bridge para ser
+   legível **sobre a superfície**, recalculada por tema — com a cor crua, marca
+   preta sumiria no escuro e marca branca no claro. Assim a barra segue o
+   `/admin/design` nos dois temas sem uma linha de JS. Superfície escura nos
+   **dois** temas (palco do Meet) é a exceção: token fixo claro, porque ali o
+   `-fg` foi calculado contra a superfície do app, não contra o preto do palco.
+3. **`scrollbar-gutter: stable` no `<html>`.** São 10+ lugares travando
+   `body{overflow:hidden}` (AppModal, lightbox, stories, reels, sidebar mobile)
+   e nenhum compensava a largura da barra: medido, o conteúdo saltava de 785px
+   para 800px a cada abertura de modal. A calha reservada corrige todos de uma
+   vez e é no-op onde a barra é overlay (toque, macOS).
+
+Custo: zero JS, zero bundle, zero biblioteca de scroll customizado — pintura do
+compositor, e no-op inteiro no alvo mobile-first. Anatomia (trilho de 12px com
+polegar pintado de 6px pelo par `border transparente` + `background-clip`, para
+o alvo de arrasto não encolher junto com o desenho), variantes
+(`fina`/`idle`/`neutra`/`sobre-escuro`/`none`/`gutter`) e a tabela de medições:
+`docs/frontend/scrollbars.md`.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

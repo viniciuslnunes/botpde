@@ -6,6 +6,7 @@
  *   TORCIDA_ENV=local pnpm --filter @torcida/db seed:ficha-clubes
  *   TORCIDA_ENV=local pnpm --filter @torcida/db seed:ficha-clubes -- --dry-run
  *   TORCIDA_ENV=local pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-cidades
+ *   TORCIDA_ENV=local pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-ficha
  *
  * Precedência das fontes, por campo:
  * - fundação/estádio/site/QID → Wikidata; fundação cai para o Ogol se faltar;
@@ -16,8 +17,16 @@
  *   apenas quando a cidade atual não é município da UF (malha do IBGE) E as
  *   fontes externas concordam entre si. Divergência vira relatório, não escrita.
  *
+ * Qual entidade do Wikidata é o clube: `criarResolvedorWikidata`
+ * (`lib/catalogo-clubes.js`). Nome+UF não separa homônimo, e o time feminino, o
+ * time B e o clube extinto têm o MESMO rótulo do principal — o índice ingênuo
+ * pegava o primeiro do arquivo e a ficha do Corinthians virava a do time
+ * feminino (achado de 2026-09-01). Sem desempate por evidência, o clube fica
+ * SEM ficha e entra no relatório: palpite não é fonte.
+ *
  * Nada aqui é irreversível: todos os campos são aditivos e o script só escreve
- * o que está vazio, exceto cidade sob a flag acima.
+ * o que está vazio, exceto cidade sob `--corrigir-cidades` e a ficha do Wikidata
+ * sob `--corrigir-ficha` (que reescreve só quem está ancorado no QID errado).
  */
 import { PrismaClient } from '@prisma/client'
 // `@torcida/db` não depende de `@torcida/types` no package.json; script de seed
@@ -32,12 +41,15 @@ import {
   validadorCidade,
   melhorCandidato,
   agruparPorUf,
+  criarResolvedorWikidata,
+  lerCuradoriaWikidata,
 } from './lib/catalogo-clubes.js'
 
 prepareSeedEnv({ scriptLabel: 'seed:ficha-clubes' })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const CORRIGIR_CIDADES = process.argv.includes('--corrigir-cidades')
+const CORRIGIR_FICHA = process.argv.includes('--corrigir-ficha')
 const db = new PrismaClient()
 
 /**
@@ -70,10 +82,10 @@ function paletaCurada(nome, apelido) {
 }
 
 async function main() {
-  const wikidata = lerDataset('wikidata-clubes-br.json')
   const ogolBruto = lerDataset('ogol-clubes-brasil.json')
   const cores = lerDataset('cores-escudos.json')
-  const { valida: cidadeValida } = validadorCidade(carregarMunicipios())
+  const cidades = validadorCidade(carregarMunicipios())
+  const { valida: cidadeValida } = cidades
 
   const afiliacoes = await db.afiliacao.findMany({
     select: {
@@ -84,24 +96,14 @@ async function main() {
     },
   })
 
-  // Índices das fontes por UF (a UF do Wikidata sai da cidade, via IBGE).
-  const municipios = carregarMunicipios()
-  const ufsPorCidade = new Map()
-  for (const [uf, lista] of Object.entries(municipios)) {
-    for (const nome of lista) {
-      const k = normalizeNome(nome)
-      if (!ufsPorCidade.has(k)) ufsPorCidade.set(k, new Set())
-      ufsPorCidade.get(k).add(uf)
-    }
-  }
-  /** @type {Map<string, object>} */
-  const idxWikidata = new Map()
-  for (const w of wikidata.clubes ?? []) {
-    for (const uf of ufsPorCidade.get(normalizeNome(w.cidade ?? '')) ?? []) {
-      const chave = chaveIndice(w.nome, uf)
-      if (!idxWikidata.has(chave)) idxWikidata.set(chave, w)
-    }
-  }
+  // Wikidata passa pelo resolvedor: nome+UF não separa homônimo, e o clube
+  // principal, o time feminino e o clube extinto compartilham o mesmo rótulo.
+  const { resolver } = criarResolvedorWikidata(
+    lerDataset('wikidata-clubes-br.json'),
+    cidades,
+    lerCuradoriaWikidata(lerDataset('clubes-correcoes-curadas.json')),
+  )
+
   /** @type {Map<string, object>} */
   const idxOgol = new Map()
   for (const o of ogolBruto.clubes ?? []) {
@@ -119,12 +121,22 @@ async function main() {
   const contagem = {
     fundacao: 0, estadio: 0, capacidade: 0, coordenada: 0, site: 0,
     coresCuradas: 0, coresEscudo: 0, qid: 0, ogol: 0, cidadeCorrigida: 0,
+    fichaReancorada: 0,
   }
   const cidadesParaRevisar = []
+  const ambiguos = []
+  const reancorados = []
 
   for (const clube of afiliacoes) {
     const chave = chaveIndice(clube.nome, clube.estado)
-    const w = idxWikidata.get(chave)
+    const { clube: w, motivo, candidatos } = resolver(clube)
+    if (motivo === 'ambiguo') {
+      ambiguos.push(
+        `${clube.nome}/${clube.estado}: ${candidatos.map((x) => `${x.qid} (${x.nome})`).join(' ou ')}`,
+      )
+    } else if (motivo === 'curado-qid-ausente') {
+      ambiguos.push(`${clube.nome}/${clube.estado}: QID curado não existe no dataset do Wikidata`)
+    }
     const o = idxOgol.get(chave)
     const c =
       idxCores.get(chave) ??
@@ -140,6 +152,47 @@ async function main() {
     const dados = {}
 
     const ano = anoDe(w?.fundacao) ?? anoDe(o?.fundacao)
+
+    // Realinhamento da ficha do Wikidata. Preencher só o vazio não resolve dois
+    // casos: a ficha ancorada em OUTRA entidade (time feminino, clube extinto,
+    // homônimo de outra cidade) e o valor que mudou na fonte (o Morumbi estava
+    // gravado com 120.000 — o recorde de 1977, não a lotação). Fica atrás de
+    // flag porque sobrescrever é a única operação não aditiva do script; é
+    // seguro porque esses campos não são editáveis no admin, vêm sempre da
+    // fonte externa.
+    if (w) {
+      const trocouEntidade = Boolean(clube.wikidataQid && clube.wikidataQid !== w.qid)
+      const desejado = {
+        wikidataQid: w.qid,
+        // Fundação só é realinhada quando a ENTIDADE muda: aí o ano gravado era
+        // de outro clube. Com a entidade certa, o ano pode ter vindo do Ogol ou
+        // da curadoria (que às vezes é melhor que o Wikidata — Duque de Caxias),
+        // e sobrescrever seria trocar uma fonte boa por outra sem ganho.
+        fundacaoAno: trocouEntidade ? (ano ?? clube.fundacaoAno) : clube.fundacaoAno,
+        estadio: w.estadio ?? null,
+        estadioCapacidade: w.capacidade ? Math.round(w.capacidade) : null,
+        estadioLat: w.estadioLat ?? null,
+        estadioLng: w.estadioLng ?? null,
+        siteOficial: w.site ? w.site.slice(0, 300) : clube.siteOficial,
+      }
+      const divergentes = Object.entries(desejado).filter(
+        ([campo, valor]) => String(clube[campo] ?? '') !== String(valor ?? ''),
+      )
+      if (divergentes.length > 0 && clube.wikidataQid) {
+        reancorados.push(
+          trocouEntidade
+            ? `${clube.nome}/${clube.estado}: ${clube.wikidataQid} → ${w.qid} (${w.nome}, ${motivo})`
+            : `${clube.nome}/${clube.estado}: ${divergentes
+                .map(([campo, valor]) => `${campo} "${clube[campo] ?? ''}" → "${valor ?? ''}"`)
+                .join(', ')}`,
+        )
+        if (CORRIGIR_FICHA) {
+          for (const [campo, valor] of divergentes) dados[campo] = valor
+          contagem.fichaReancorada += 1
+        }
+      }
+    }
+
     if (ano && !clube.fundacaoAno) { dados.fundacaoAno = ano; contagem.fundacao += 1 }
 
     if (w?.estadio && !clube.estadio) { dados.estadio = w.estadio; contagem.estadio += 1 }
@@ -205,6 +258,20 @@ async function main() {
   } else if (cidadesParaRevisar.length > 0) {
     console.log(`\n⚠ ${cidadesParaRevisar.length} cidades exigem decisão humana:`)
     for (const linha of cidadesParaRevisar) console.log(`   ${linha}`)
+  }
+
+  if (reancorados.length > 0) {
+    const acao = CORRIGIR_FICHA ? 'reancorados' : 'ancorados no QID errado'
+    console.log(`\n⚠ ${reancorados.length} clubes ${acao}:`)
+    for (const linha of reancorados) console.log(`   ${linha}`)
+    if (!CORRIGIR_FICHA) {
+      console.log('   → rode com --corrigir-ficha para reescrever a ficha desses clubes')
+    }
+  }
+  if (ambiguos.length > 0) {
+    console.log(`\n⚠ ${ambiguos.length} clubes SEM ficha do Wikidata por homônimo não resolvido:`)
+    for (const linha of ambiguos) console.log(`   ${linha}`)
+    console.log('   → escolha o QID em src/data/clubes-correcoes-curadas.json (bloco "wikidata")')
   }
   if (DRY_RUN) console.log('\n(dry-run — nada gravado)')
 }

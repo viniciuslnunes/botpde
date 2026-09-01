@@ -8,6 +8,7 @@ import { bucketPorMes, ultimosMesesSP, type SerieTemporal } from '@/lib/admin-in
 import {
   carregarMapaPortalMae,
   filtrarTenantsRaiz,
+  WHERE_TENANT_E_TORCIDA,
 } from '@/lib/tenant-hierarquia-plataforma'
 import { labelTipoUnidade } from '@/lib/torcida-labels'
 
@@ -284,7 +285,6 @@ export type MetricasClube = {
     id: string
     nome: string
     slug: string
-    ativo: boolean
     membros: number
     posts: number
     /** Unidades (Caso A no worktree + portais Caso B filhos) — para o chevron. */
@@ -347,7 +347,11 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
   clubeId: string,
 ): Promise<MetricasClube | null> {
   const tenantDoClube = { afiliacaoId: clubeId } as const
-  const torcidaReal = { afiliacaoId: clubeId, sintetico: false } as const
+  // Torcida do clube = as duas condições da fonte única. Sem `ativo: true` o
+  // tenant suspenso (erro de registro) entrava na lista E somava sócios/posts
+  // ao clube. Portal Caso B continua entrando: a gente filtra raiz depois, e
+  // membro de unidade promovida é gente do clube.
+  const torcidaReal = { afiliacaoId: clubeId, ...WHERE_TENANT_E_TORCIDA } as const
 
   const [clube, tenantsDoClube, socios, torcedoresMembro, torcedoresPerfil, publicacoes, maePorFilho]: [
     {
@@ -398,7 +402,6 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
         id: true,
         nome: true,
         slug: true,
-        ativo: true,
         _count: { select: { membros: true, posts: true } },
       },
       orderBy: { nome: 'asc' },
@@ -422,10 +425,10 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
     maePorFilho,
   )
   const raizSet = new Set(raizIds)
-  const raizesTodas = tenantsDoClube.filter((t) => raizSet.has(t.id))
-  // KPI "torcidas" conta só raiz ativa: suspensa segue na lista, com o selo.
-  const raizesAtivas = raizesTodas.filter((t) => t.ativo)
-  const raizes = raizesTodas.slice(0, 40)
+  // KPI e lista saem do MESMO conjunto — o `where` já aplicou
+  // `WHERE_TENANT_E_TORCIDA`, então tenant suspenso não chega aqui.
+  const raizesAtivas = tenantsDoClube.filter((t) => raizSet.has(t.id))
+  const raizes = raizesAtivas.slice(0, 40)
   const unidadesPorRaiz = await contarUnidadesPorRaiz(
     raizes.map((t) => t.id),
     maePorFilho,
@@ -435,7 +438,6 @@ export const carregarMetricasClube = cache(async function carregarMetricasClube(
     id: t.id,
     nome: t.nome,
     slug: t.slug,
-    ativo: t.ativo,
     membros: t._count.membros,
     posts: t._count.posts,
     unidadesCount: unidadesPorRaiz.get(t.id) ?? 0,

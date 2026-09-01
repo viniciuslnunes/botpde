@@ -230,8 +230,8 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     ? 'w-full rounded-lg border border-zinc-700 bg-zinc-800 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-60'
     : 'w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary))] disabled:opacity-60'
   const listClass = isSuper
-    ? 'absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-lg'
-    : 'absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg'
+    ? 'app-scrollbar-fina app-scrollbar-sobre-escuro absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-lg'
+    : 'app-scrollbar-fina absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg'
   const itemIdle = isSuper
     ? 'text-zinc-200 hover:bg-zinc-800'
     : 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'

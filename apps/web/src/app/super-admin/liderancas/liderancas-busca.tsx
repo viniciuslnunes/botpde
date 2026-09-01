@@ -218,7 +218,7 @@ export function LiderancasBuscaInteligente({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+          className="app-scrollbar-fina absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
         >
           {carregandoSugestoes && sugestoes.length === 0 ? (
             <li className="px-3 py-2 text-sm text-[rgb(var(--foreground-muted))]">Buscando…</li>

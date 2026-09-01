@@ -57,7 +57,7 @@ function SidebarBody({
         <p className="mt-1 text-sm font-semibold text-[rgb(var(--foreground))]">Torcida SaaS</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4">
+      <div className="app-scrollbar-fina app-scrollbar-idle flex-1 overflow-y-auto py-4">
         <SuperAdminNav onNavigate={onNavigate} badges={badges} />
       </div>
 

@@ -155,6 +155,51 @@ duplicadas do mesmo clube.
 Sobra **1 caso para decisão humana**: `Rio Branco VN/ES` (147º no RNC) é
 parecido demais com `Rio Branco Atlético Clube` para criar automaticamente.
 
+### 5.1 O homônimo estava DENTRO da fonte, não só entre catálogos (2026-09-01)
+
+A regra acima cobria o casamento **catálogo × catálogo**. O que passou foi o
+homônimo **dentro do Wikidata**: ele tem uma entidade separada para o time
+feminino, o time B, o futsal e o clube extinto, **com o mesmo rótulo do clube**.
+`seed:ficha-clubes` montava um índice próprio `nome|UF → primeiro do arquivo` e
+pegava o que viesse antes.
+
+O achado saiu da tela: a **Ficha do clube** em `/super-admin/clubes/<id>` do
+Corinthians mostrava fundação **1997**, Estádio Alfredo Schürig, 13.969 lugares
+— a ficha do time feminino. Medindo o catálogo inteiro:
+
+| Clube | RNC | QID gravado (errado) | O que a ficha mostrava | QID certo |
+|---|---|---|---|---|
+| Flamengo | 1º | `Q27044292` (time feminino) | Estádio da Gávea, 4.000 | `Q17479` (Maracanã, 78.838) |
+| Corinthians | 2º | `Q28681033` (time feminino) | 1997, Alfredo Schürig, 13.969 | `Q35933` (1910, Neo Química, 47.252) |
+| São Paulo | 5º | `Q65164134` (time feminino) | sem estádio, site do feminino | `Q38568` (Morumbi) |
+| Grêmio Novorizontino | 32º | `Q4115694` (extinto em 1999) | 1973 | `Q10292312` (clube ativo) |
+| Ferroviária | 54º | `Q20684086` (time feminino) | 2001 | `Q4810263` (1950) |
+| Cascavel | 72º | `Q5048252` (extinto em 2001) | 1979 | `Q5510503` (FC Cascavel, 2008) |
+| Portuguesa (Santos) | 121º | `Q204675` (Portuguesa de Desportos) | Canindé | `Q2584065` (Ulrico Mursa) |
+| Democrata (Gov. Valadares) | 170º | `Q3022181` (Democrata SL) | Arena do Jacaré | `Q2667613` (José Mammoud Abbas) |
+
+**Aplicado:**
+
+- `criarResolvedorWikidata` como regra única (seed + auditoria): curadoria →
+  modalidade (filtro duro por P31/descrição) → clube ativo (P576) → cidade.
+  Sem desempate o clube fica **sem ficha** e entra no relatório;
+- `coleta:wikidata-clubes` (coletor novo, o dataset não tinha um) traz `tipos`,
+  `descricao` e `dissolucao`, e corrige duas armadilhas da fonte: o `P17` do
+  **ABC/RN** aponta a Série C em vez do país (sumia da coleta inteira), e o
+  mesmo estádio tem várias capacidades sem ranking — o **Morumbi** vinha com
+  **120.000**, o recorde de 1977, em vez de 67.052;
+- curadoria de QID (bloco `wikidata` em `clubes-correcoes-curadas.json`) para
+  os 6 casos sem sinal, incluindo os **falsos negativos**: Náutico
+  (`Capiberibe` × `Capibaribe`), Retrô (`Retrô Futebol Clube Brasil`) e
+  América-MG, cujo único casamento por nome era o verbete do time feminino;
+- `seed:ficha-clubes -- --corrigir-ficha` para reescrever o que já estava
+  gravado (preencher vazio não resolve ficha ancorada na entidade errada);
+- `audit:catalogo-clubes` §7 vira gate: QID gravado ≠ resolvido hoje → exit 1.
+
+Resultado: **26 colisões brutas → 0 sem desempate** (7 por modalidade, 4 por
+extinção, 12 por cidade, 6 por curadoria) e **50/50 do top 50 do RNC com a
+entidade certa** (49 com estádio — o Retrô não tem P115 no Wikidata).
+
 ## 6. Torcidas: metade das paulistas não constava do registro da federação
 
 A FPF publica a *Relação de Torcidas Cadastradas* — 135 torcidas com nome, clube
@@ -198,6 +243,9 @@ pnpm --filter @torcida/db schema:deploy
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db seed:clubes-rnc
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db db:repair-series-afiliacoes
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-cidades
+# --corrigir-ficha reancora quem está no QID errado (§5.1). Rode com --dry-run
+# antes: é a única operação não aditiva do seed.
+TORCIDA_ENV=<alvo> pnpm --filter @torcida/db seed:ficha-clubes -- --corrigir-ficha
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db repair:clubes-curados
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db seed:rivalidades-clubes
 TORCIDA_ENV=<alvo> pnpm --filter @torcida/db seed:torcidas-registro -- --importar-ausentes

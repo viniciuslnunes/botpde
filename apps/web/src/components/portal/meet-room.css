@@ -25,7 +25,15 @@
   --lk-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* O palco e as tiras do Meet sao pretos no tema claro tambem, entao o
+   polegar tingido pela marca (calculado contra a superficie do app) ficaria
+   invisivel aqui. Tokens fixos claros, como em `.app-scrollbar-sobre-escuro`. */
 .meet-room-root {
+  --scrollbar-thumb: rgb(250 250 250 / 0.26);
+  --scrollbar-thumb-hover: rgb(250 250 250 / 0.45);
+  --scrollbar-thumb-active: rgb(250 250 250 / 0.62);
+  --scrollbar-size: 8px;
+  --scrollbar-inset: 2px;
   display: flex;
   flex-direction: column;
   min-height: min(72vh, 760px);
@@ -194,7 +202,6 @@
 
 .meet-room-stage:has(.meet-room-grid) {
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .meet-room-stage-actions {
@@ -466,7 +473,6 @@
   flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
 }
 
 .meet-room-bottom-strip {

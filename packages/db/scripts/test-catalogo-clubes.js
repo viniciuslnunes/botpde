@@ -20,7 +20,9 @@ import { consolidarCores, publicIdDaUrl } from './lib/cores-escudo.js'
 import {
   anoFundacaoTorcida,
   chaveTorcida,
+  criarResolvedorWikidata,
   distanciaEdicao,
+  lerCuradoriaWikidata,
   melhorCandidato,
   validadorCidade,
 } from './lib/catalogo-clubes.js'
@@ -172,10 +174,112 @@ ok('lista da FPF tem os 135 registros com clube e cidade', () => {
 
 ok('correções curadas declaram fonte e confiança', () => {
   const curadas = lerJson('clubes-correcoes-curadas.json')
-  for (const item of [...curadas.correcoes, ...curadas.merges]) {
+  for (const item of [...curadas.correcoes, ...curadas.merges, ...curadas.wikidata]) {
     assert.ok(item.fonte, `sem fonte: ${JSON.stringify(item.alvo ?? item.origem)}`)
     assert.ok(['alta', 'media'].includes(item.confianca), 'confiança inválida')
   }
+})
+
+ok('QID curado existe no dataset do Wikidata', () => {
+  const curadas = lerJson('clubes-correcoes-curadas.json')
+  const porQid = new Set(lerJson('wikidata-clubes-br.json').clubes.map((c) => c.qid))
+  for (const item of curadas.wikidata) {
+    assert.ok(/^Q\d+$/.test(item.qid), `QID malformado: ${item.qid}`)
+    assert.ok(porQid.has(item.qid), `QID curado fora do dataset: ${item.qid}`)
+  }
+})
+
+// --- resolvedor Wikidata: o homônimo do time feminino ------------------------
+ok('resolvedor não entrega a entidade do time feminino como ficha do clube', () => {
+  const cidades = { ufsDaCidade: (cidade) => (cidade === 'São Paulo' ? ['SP'] : []) }
+  const dataset = {
+    clubes: [
+      // Ordem de propósito: o verbete do time feminino vem primeiro, como no
+      // arquivo real — era exatamente isso que o índice ingênuo escolhia.
+      {
+        qid: 'Q28681033',
+        nome: 'Sport Club Corinthians Paulista',
+        descricao: 'clube brasileiro de futebol feminino',
+        tipos: ['Q476028'],
+        fundacao: '1997-01-01',
+        cidade: 'São Paulo',
+        estadio: 'Estádio Alfredo Schürig',
+      },
+      {
+        qid: 'Q35933',
+        nome: 'Sport Club Corinthians Paulista',
+        descricao: 'clube esportivo do estado de São Paulo, Brasil',
+        tipos: ['Q476028'],
+        fundacao: '1910-01-01',
+        cidade: 'São Paulo',
+        estadio: 'Neo Química Arena',
+      },
+    ],
+  }
+  const { resolver } = criarResolvedorWikidata(dataset, cidades)
+  const alvo = { nome: 'Corinthians', estado: 'SP', cidade: 'São Paulo' }
+  assert.equal(resolver(alvo).clube.qid, 'Q35933')
+
+  // Quando o feminino é o ÚNICO casamento, o clube fica sem ficha — nunca com a
+  // ficha errada (caso do América-MG).
+  const soFeminino = criarResolvedorWikidata({ clubes: [dataset.clubes[0]] }, cidades)
+  assert.equal(soFeminino.resolver(alvo).clube, null)
+  assert.equal(soFeminino.resolver(alvo).motivo, 'so-outra-modalidade')
+
+  // E a curadoria vence tudo, inclusive um homônimo que nenhum sinal separa.
+  const curado = criarResolvedorWikidata(
+    dataset,
+    cidades,
+    lerCuradoriaWikidata({ wikidata: [{ alvo: { nome: 'Corinthians', uf: 'SP' }, qid: 'Q35933' }] }),
+  )
+  assert.equal(curado.resolver(alvo).motivo, 'curado')
+})
+
+ok('clube extinto perde para o sucessor com o mesmo nome', () => {
+  const cidades = { ufsDaCidade: (cidade) => (cidade === 'Novo Horizonte' ? ['SP'] : []) }
+  const dataset = {
+    clubes: [
+      {
+        qid: 'Q4115694',
+        nome: 'Grêmio Esportivo Novorizontino',
+        tipos: ['Q476028'],
+        fundacao: '1973-01-01',
+        dissolucao: '1999-01-01',
+        cidade: 'Novo Horizonte',
+      },
+      {
+        qid: 'Q10292312',
+        nome: 'Grêmio Novorizontino',
+        tipos: ['Q476028'],
+        fundacao: '2001-01-01',
+        dissolucao: null,
+        cidade: 'Novo Horizonte',
+      },
+    ],
+  }
+  const { resolver } = criarResolvedorWikidata(dataset, cidades)
+  const escolha = resolver({
+    nome: 'Grêmio Novorizontino',
+    estado: 'SP',
+    cidade: 'Novo Horizonte',
+  })
+  assert.equal(escolha.clube.qid, 'Q10292312')
+  assert.equal(escolha.motivo, 'ativo')
+})
+
+ok('homônimo sem desempate não vira palpite', () => {
+  const cidades = { ufsDaCidade: (cidade) => (cidade === 'Lagarto' ? ['SE'] : []) }
+  const dataset = {
+    clubes: [
+      { qid: 'Q10315575', nome: 'Lagarto Esporte Clube', tipos: ['Q476028'], cidade: 'Lagarto' },
+      { qid: 'Q6471925', nome: 'Lagarto Futebol Clube', tipos: ['Q476028'], cidade: 'Lagarto' },
+    ],
+  }
+  const { resolver } = criarResolvedorWikidata(dataset, cidades)
+  const escolha = resolver({ nome: 'Lagarto Futebol Clube', estado: 'SE', cidade: 'Lagarto' })
+  assert.equal(escolha.clube, null)
+  assert.equal(escolha.motivo, 'ambiguo')
+  assert.equal(escolha.candidatos.length, 2)
 })
 
 console.log(

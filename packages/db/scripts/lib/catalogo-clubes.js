@@ -201,6 +201,142 @@ export function lerDataset(arquivo) {
   return JSON.parse(readFileSync(resolve(MONOREPO_ROOT, 'packages/db/src/data', arquivo), 'utf8'))
 }
 
+// ── Wikidata: qual entidade é o clube ─────────────────────────────────────
+
+/**
+ * P31 que NÃO é o time principal masculino do clube. O Wikidata modela cada
+ * um desses como entidade separada, com o MESMO rótulo do clube — é a origem do
+ * achado de 2026-09-01 (a ficha do Corinthians era a do time feminino).
+ */
+const TIPOS_NAO_PRINCIPAIS = new Set([
+  'Q51481377', // women's association football club
+  'Q28140340', // equipa de futebol feminino
+  'Q116953048', // beach soccer club
+  'Q98767736', // fictional sports club
+])
+// Só entram aqui os P31 que marcam uma entidade SEPARADA do time principal.
+// "clube de remo" (Q7372078) e "rugby union club" (Q43009164) não servem: o
+// Sportivo Sergipe é um clube de futebol que TAMBÉM rema, e a mesma entidade
+// carrega os dois tipos — excluí-la apagaria a ficha do clube certo.
+
+/**
+ * O que o P31 não tipa, a descrição livre quase sempre diz. Casa na DESCRIÇÃO,
+ * nunca no nome do clube — "Clube do Remo" e "Sport Club Corinthians Paulista"
+ * são nomes legítimos do time principal.
+ */
+const DESCRICAO_NAO_PRINCIPAL =
+  /(feminin|women|futsal|beach soccer|futebol de areia|sub[\s-]?\d|juvenil|youth|reserve team|e[\s-]?sports|fictional|rugby|voleibol|basquete)/i
+
+/** @param {{ tipos?: string[], descricao?: string | null }} w */
+function ehTimePrincipal(w) {
+  if ((w.tipos ?? []).some((t) => TIPOS_NAO_PRINCIPAIS.has(t))) return false
+  return !(w.descricao && DESCRICAO_NAO_PRINCIPAL.test(w.descricao))
+}
+
+/**
+ * Aplica um filtro só quando ele DESEMPATA: se sobrar zero, o filtro não sabia
+ * nada de útil sobre esses candidatos e a lista original continua valendo.
+ * @template T
+ * @param {T[]} lista
+ * @param {(item: T) => boolean} filtro
+ * @returns {T[]}
+ */
+function afunilar(lista, filtro) {
+  const filtrada = lista.filter(filtro)
+  return filtrada.length > 0 ? filtrada : lista
+}
+
+/**
+ * Resolvedor `Afiliacao` → entidade do Wikidata.
+ *
+ * Existe porque nome+UF NÃO é chave (ver topo do arquivo) e o índice ingênuo
+ * escolhia o primeiro homônimo do arquivo — foi assim que a ficha do Corinthians
+ * virou a do time feminino (fundação 1997, Estádio Alfredo Schürig) e a do
+ * Flamengo virou a do time feminino na Gávea. A regra aqui é: **desempatar só
+ * com evidência do próprio dataset e, sem evidência, não escolher.**
+ *
+ * Ordem: curadoria explícita → candidato único → modalidade (P31/descrição:
+ * feminino, futsal, beach…) → clube ativo (P576 = extinto perde para o
+ * sucessor) → mesma cidade da `Afiliacao`. Sem desempate, devolve
+ * `motivo: 'ambiguo'` com os candidatos, para virar relatório em vez de palpite.
+ *
+ * @param {{ clubes: Array<Record<string, any>> }} dataset `wikidata-clubes-br.json`
+ * @param {{ ufsDaCidade: (cidade: string) => string[] }} cidades `validadorCidade(...)`
+ * @param {Map<string, string>} [curados] chave `chaveIndice(nome, uf)` ou `nome|uf` → QID
+ */
+export function criarResolvedorWikidata(dataset, cidades, curados = new Map()) {
+  const porQid = new Map((dataset.clubes ?? []).map((w) => [w.qid, w]))
+  /** @type {Map<string, Array<Record<string, any>>>} */
+  const porChave = new Map()
+  for (const w of dataset.clubes ?? []) {
+    // A UF do Wikidata sai da cidade da sede, via malha do IBGE.
+    for (const uf of cidades.ufsDaCidade(w.cidade ?? '')) {
+      const chave = chaveIndice(w.nome, uf)
+      if (!porChave.has(chave)) porChave.set(chave, [])
+      const lista = porChave.get(chave)
+      if (!lista.some((x) => x.qid === w.qid)) lista.push(w)
+    }
+  }
+
+  /**
+   * @param {{ nome: string, estado?: string | null, cidade?: string | null }} afiliacao
+   * @returns {{ clube: Record<string, any> | null, motivo: string, candidatos: Array<Record<string, any>> }}
+   */
+  function resolver(afiliacao) {
+    const uf = String(afiliacao.estado ?? '').toUpperCase()
+    const qidCurado =
+      curados.get(`${afiliacao.nome.toLowerCase()}|${uf}`) ??
+      curados.get(chaveIndice(afiliacao.nome, uf))
+    if (qidCurado) {
+      const clube = porQid.get(qidCurado) ?? null
+      return { clube, motivo: clube ? 'curado' : 'curado-qid-ausente', candidatos: [] }
+    }
+
+    const candidatos = porChave.get(chaveIndice(afiliacao.nome, uf)) ?? []
+    if (candidatos.length === 0) return { clube: null, motivo: 'sem-fonte', candidatos }
+
+    // Modalidade é filtro DURO, não desempate: entidade de time feminino, futsal
+    // ou beach soccer não é ficha do clube masculino nem quando é a única
+    // candidata — foi o caso do América-MG, cujo único casamento por nome era o
+    // verbete do time feminino (2015, sem estádio).
+    let lista = candidatos.filter(ehTimePrincipal)
+    if (lista.length === 0) return { clube: null, motivo: 'so-outra-modalidade', candidatos }
+    if (lista.length === 1) {
+      return { clube: lista[0], motivo: candidatos.length === 1 ? 'unico' : 'modalidade', candidatos }
+    }
+
+    lista = afunilar(lista, (w) => !w.dissolucao)
+    if (lista.length === 1) return { clube: lista[0], motivo: 'ativo', candidatos }
+
+    const cidadeAfiliacao = normalizeNome(afiliacao.cidade ?? '')
+    if (cidadeAfiliacao) {
+      lista = afunilar(lista, (w) => normalizeNome(w.cidade ?? '') === cidadeAfiliacao)
+      if (lista.length === 1) return { clube: lista[0], motivo: 'cidade', candidatos }
+    }
+
+    return { clube: null, motivo: 'ambiguo', candidatos: lista }
+  }
+
+  return { resolver, porQid }
+}
+
+/**
+ * Lê a curadoria de QID de `clubes-correcoes-curadas.json` (`wikidata[]`) como
+ * mapa aceito por `criarResolvedorWikidata`.
+ * @param {{ wikidata?: Array<{ alvo: { nome: string, uf: string }, qid: string }> }} dataset
+ * @returns {Map<string, string>}
+ */
+export function lerCuradoriaWikidata(dataset) {
+  /** @type {Map<string, string>} */
+  const mapa = new Map()
+  for (const item of dataset.wikidata ?? []) {
+    const uf = String(item.alvo.uf ?? '').toUpperCase()
+    mapa.set(`${item.alvo.nome.toLowerCase()}|${uf}`, item.qid)
+    mapa.set(chaveIndice(item.alvo.nome, uf), item.qid)
+  }
+  return mapa
+}
+
 // ── Torcidas: fundação e casamento de nome ─────────────────────────────────
 
 /**

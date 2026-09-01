@@ -658,15 +658,42 @@ Aproveitou-se que `ModeracaoDenuncia.alvoId` **não tem FK**: dá para exercitar
 o caminho de escrita dos 16 tipos sem fabricar fixture em 16 tabelas. É
 deliberado — `alvoId` é polimórfico por desenho.
 
-### 12.1 O que a auditoria ainda não cobre
+### 12.1 A3–A9 concluídas (2026-09-01)
 
-A3–A9 da §8.2 continuam em aberto e dependem de fixture real por superfície:
-ocultar-oculta-de-verdade (A3), alvo sem ocultação não finge (A4), aviso ao
-denunciante em escopo CLUBE (A5), isolamento por tenant (A6), auto-denúncia e
-limite (A7), ordenação da fila (A8), ponto de entrada por superfície (A9).
-**A3 e A6 são as mais importantes das que faltam** — a primeira porque acabamos
-de adicionar `oculto` a duas tabelas, a segunda porque vazamento cross-tenant é
-a falha mais grave possível neste produto.
+**`audit:moderacao` — 19/19 passando.** A suíte cobre A1–A9 da §8.2:
+
+| Invariante | O que passou a ser provado |
+|---|---|
+| **A3** | `acaoOcultar` aplicado → `carregar()` reporta `ocultado: true`, em **8 superfícies** (POST, COMENTARIO, FORUM_TOPICO, FORUM_RESPOSTA, STORY, MEMORIA_FATO, MENSAGEM, BRECHO_ANUNCIO). Teste extra prova que comentário oculto **sai da thread** — não basta o campo mudar |
+| **A4** | `operacaoOcultarAlvo` é `null` **exatamente** onde `alvoSoEscala` é `true`, e o conjunto que só escala é o declarado: BRECHO_LOJA, CANAL, COMUNICADO, EVENTO, GRUPO, PERFIL |
+| **A5** | Aviso usa o tenant da denúncia; sem tenant cai no **sintético da CN** (verificado `sintetico: true`); sem tenant e sem afiliação devolve `null` em vez de inventar destino |
+| **A6** | Denúncia do tenant A **não** aparece na fila de B; denúncia sem tenant não entra em fila de tenant nenhum e aparece só na plataforma |
+| **A7** | `carregar()` expõe `autorId` — sem isso o gate de auto-denúncia não teria como existir. **Cobertura parcial**, ver limitação abaixo |
+| **A8** | Ordenação: gravidade manda; empate resolve por SLA mais apertado; depois idade |
+| **A9** | Registro exaustivo (16), todo alvo com label e `carregar`; conjunto de superfícies com ponto de entrada é declarado e conferido |
+
+**A lista de A3 é fixa de propósito.** Se o seed local perder uma superfície, o
+teste falha alto em vez de "passar" tendo provado menos — teste que passa por
+ter pulado fixture é falsa segurança.
+
+Reversão verificada em duas rodadas seguidas: contagem de conteúdo oculto
+**estável** e 0 denúncias residuais. A auditoria muta linhas reais de seed e
+restaura; é idempotente.
+
+### 12.2 Limitações declaradas
+
+- **PRACA_COMENTARIO e SALA não são provadas em A3** — não há fixture no seed
+  local (`pracaComentario` tem 0 linhas). São as 2 restantes das 10 superfícies
+  com ocultação.
+- **A7 é parcial.** O gate de auto-denúncia e o rate-limit vivem dentro da
+  Server Action, que exige simulação de sessão (padrão de
+  `notificacoes.audit.ts`). Hoje se prova o **pré-requisito** (o alvo carrega
+  `autorId`), não a recusa ponta a ponta.
+- **A9 confere a lista declarada, não a UI.** A metade do registro é garantida
+  em compilação; a do ponto de entrada é uma lista que precisa ser atualizada
+  **no mesmo PR** que adiciona a UI — é o ponto onde a cobertura pode driftar.
+- Estado atual da cobertura de entrada: **3 de 16** superfícies
+  (FORUM_TOPICO, FORUM_RESPOSTA, PRACA_COMENTARIO). R4 fecha o resto.
 
 ## Histórico
 
@@ -676,3 +703,4 @@ a falha mais grave possível neste produto.
 | 2026-09-01 | Recorte 1 implementado (fórum da praça) — §9. Taxonomia e enums plantados para as fases seguintes |
 | 2026-09-01 | Recorte 2 — núcleo generalizado para 16 superfícies, D1 fechado, registro exaustivo por tipo — §10 |
 | 2026-09-01 | R3 — schema aplicado no banco local, `audit:moderacao` criado, A1 e A2 provadas (6/6) — §12 |
+| 2026-09-01 | R3 completo — A3–A9 concluídas, `audit:moderacao` 19/19; limitações declaradas em §12.2 |

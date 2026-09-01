@@ -92,7 +92,7 @@ export function AppFormDrawer({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div data-drawer-body className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div data-drawer-body className="app-scrollbar-fina min-h-0 flex-1 overflow-y-auto p-4">
           {children}
         </div>
       </div>
