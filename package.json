@@ -1,6 +1,6 @@
 {
   "name": "torcida-saas",
-  "version": "1.819.822",
+  "version": "1.821.824",
   "private": true,
   "scripts": {
     "build": "turbo build",
