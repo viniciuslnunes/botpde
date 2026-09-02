@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { ReceiptText } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, ReceiptText, X } from 'lucide-react'
 import {
   METODO_PAGAMENTO_BAR_LABEL,
   METODO_PAGAMENTO_QUITACAO_FIADO_BAR,
@@ -13,6 +13,7 @@ import {
 } from '@/app/admin/bar/comanda-actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useActionStateToast } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
 
 export type BarComandaListItem = {
   id: string
@@ -132,14 +133,16 @@ function QuitarComandaForm({
       >
         {pending ? 'Quitando...' : 'Confirmar quitação'}
       </button>
-      <button
+      <AppButton
+        variant="none"
+        icon={ArrowLeft}
         type="button"
         disabled={pending}
         onClick={onClose}
         className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
       >
         Voltar
-      </button>
+      </AppButton>
       {state.error && (
         <p className="w-full text-xs text-[rgb(var(--color-danger-fg))]">{state.error}</p>
       )}
@@ -186,14 +189,16 @@ function CancelarDebitoForm({
       >
         {pending ? 'Cancelando...' : 'Cancelar débito'}
       </button>
-      <button
+      <AppButton
+        variant="none"
+        icon={ArrowLeft}
         type="button"
         disabled={pending}
         onClick={onClose}
         className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
       >
         Voltar
-      </button>
+      </AppButton>
       {state.error && (
         <p className="w-full text-xs text-[rgb(var(--color-danger-fg))]">{state.error}</p>
       )}
@@ -245,20 +250,24 @@ function ComandaRow({
           <StatusComandaBadge status={comanda.status} label={comanda.statusLabel} />
           {podeAgir && acao === null && (
             <>
-              <button
+              <AppButton
+                variant="none"
+                icon={BadgeCheck}
                 type="button"
                 onClick={() => setAcao('quitar')}
                 className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))]"
               >
                 Registrar quitação
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setAcao('cancelar')}
                 className="rounded-lg border border-[rgb(var(--color-danger)_/_0.35)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.08)]"
               >
                 Cancelar débito
-              </button>
+              </AppButton>
             </>
           )}
         </div>

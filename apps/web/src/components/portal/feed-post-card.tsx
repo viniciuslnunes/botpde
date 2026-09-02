@@ -89,7 +89,7 @@ export function FeedPostCard({
     )
 
   return (
-    <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <article className="@container card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4">
       <PostEditProvider
         postId={post.id}
         conteudo={post.conteudo}
@@ -102,7 +102,7 @@ export function FeedPostCard({
             : undefined
         }
       >
-      <header className="flex items-start gap-3">
+      <header className="flex items-start gap-2.5">
         <ComunidadePrefetchLink href={headerHref} className="shrink-0">
           <Avatar
             nome={headerNome}
@@ -112,10 +112,10 @@ export function FeedPostCard({
           />
         </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 w-full flex-col gap-1">
+          <div className="flex min-w-0 w-full flex-col leading-tight">
             <ComunidadePrefetchLink
               href={headerHref}
-              className="block truncate text-sm font-semibold leading-snug text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
+              className="app-sem-piso-toque block truncate text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
             >
               {headerNome}
               {unidadeBadge ? (
@@ -126,26 +126,26 @@ export function FeedPostCard({
               ) : null}
             </ComunidadePrefetchLink>
             {torcidaLinha ? (
-              <span className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+              <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
                 {torcidaLinha}
               </span>
             ) : null}
             {cargoBadge && (
-              <span className="text-[11px] font-medium leading-snug text-[rgb(var(--foreground-muted))]">
+              <span className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
                 {cargoBadge}
               </span>
             )}
             {!isComunicadoOficial && post.autor.nickname && (
               <ComunidadePrefetchLink
                 href={`/portal/comunidade/perfil/${post.autor.id}`}
-                className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+                className="app-sem-piso-toque block truncate text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
                 @{post.autor.nickname}
               </ComunidadePrefetchLink>
             )}
             <ComunidadePrefetchLink
               href={permalink}
-              className="block text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+              className="app-sem-piso-toque block text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
               <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
                 {formatRelative(post.criadoEm)}
@@ -154,7 +154,7 @@ export function FeedPostCard({
             {post.grupo && (
               <ComunidadePrefetchLink
                 href={`/portal/comunidade/grupos/${post.grupo.id}`}
-                className="block truncate text-xs leading-snug text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+                className="app-sem-piso-toque block truncate text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
                 em {post.grupo.nome ?? 'grupo'}
               </ComunidadePrefetchLink>
@@ -179,21 +179,22 @@ export function FeedPostCard({
         )}
       </header>
 
+      <div className="mt-5 space-y-2.5">
       {post.titulo && (
         <ComunidadePrefetchLink href={permalink}>
-          <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">{post.titulo}</h3>
+          <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">{post.titulo}</h3>
         </ComunidadePrefetchLink>
       )}
 
       {post.postOrigemId && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
           <Repeat2 className="h-3.5 w-3.5" />
           Compartilhou uma publicação
         </p>
       )}
 
       {post.comunicadoOrigemId && !post.postOrigemId && post.tipo === 'MEMBRO' && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
           <Megaphone className="h-3.5 w-3.5" />
           Compartilhou um comunicado oficial
         </p>
@@ -203,17 +204,17 @@ export function FeedPostCard({
         <>
           {mediaBlock}
           {post.comunicadoOrigem.titulo ? (
-            <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">
               {post.comunicadoOrigem.titulo}
             </h3>
           ) : null}
           <ExpandableText
             text={post.comunicadoOrigem.corpo}
             lines={8}
-            className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+            className="whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
           />
           {post.comunicadoOrigem.autorNome ? (
-            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
               {post.comunicadoOrigem.autorNome}
             </p>
           ) : null}
@@ -225,7 +226,7 @@ export function FeedPostCard({
               <ExpandableText
                 conteudo={conteudoVisivel}
                 lines={8}
-                className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+                className="whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
               />
             ) : null}
           </PostEditableTexto>
@@ -251,6 +252,7 @@ export function FeedPostCard({
           )}
         </>
       )}
+      </div>
 
       {forum ? (
         <ForumFeedEngagement

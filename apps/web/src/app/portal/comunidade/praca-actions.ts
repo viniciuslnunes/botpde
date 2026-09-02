@@ -15,9 +15,16 @@ import {
   votarPracaSchema,
   comentarPracaSchema,
   publicarArtigoSchema,
+  publicarArtigoComposerSchema,
+  publicarArtigoHistoriaSchema,
+  flattenArtigoBlocos,
+  parseArtigoBlocos,
   podeVerArtigoNoEscopo,
   podeVerTopicoNoEscopo,
   wherePracaNoEscopo,
+  canalElegivelParaNoticia,
+  resumoDeCorpoForum,
+  ARTIGO_RESUMO_MAX,
   moderarTopicoSchema,
   moderarRespostaSchema,
   denunciarPracaSchema,
@@ -32,6 +39,8 @@ import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comu
 import {
   ancoraPraca,
   aplicarDeltaVotoTopico,
+  aplicarDeltaVotoArtigo,
+  aplicarDeltaVotoComentario,
   registrarScorePraca,
   PESOS_PRACA,
   assertTetoSinaisPraca,
@@ -39,6 +48,7 @@ import {
   podeAprovarPracaNaHora,
   tenantModeracaoPraca,
   listarRespostasTopico,
+  resolverCanalElegivelNoticia,
 } from '@/lib/praca'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import {
@@ -84,6 +94,145 @@ function parseMidiasForum(raw: FormDataEntryValue | null): unknown {
     return JSON.parse(raw)
   } catch {
     return []
+  }
+}
+
+export type ArtigoComposerState = {
+  errors?: Record<string, string[]>
+  message?: string
+  success?: boolean
+  token?: string
+  artigoId?: string
+}
+
+async function persistirArtigo(opts: {
+  userId: string
+  tenantId: string
+  titulo: string
+  corpo: string
+  resumo?: string
+  midiaUrls: string[]
+  blocos?: ReturnType<typeof parseArtigoBlocos>
+}): Promise<{ id: string } | { error: string }> {
+  const canal = await resolverCanalElegivelNoticia(opts.tenantId)
+  if (!canal || !canalElegivelParaNoticia({ ...canal, tipo: 'CANAL' })) {
+    return {
+      error:
+        'Para publicar notícia o canal precisa ser o oficial da torcida/unidade ou um portal verificado.',
+    }
+  }
+  const ehOficial = await assertArtigoNoTenant(opts.userId, opts.tenantId)
+  const capaUrl = opts.midiaUrls.find((u) => !u.includes('/video/')) ?? opts.midiaUrls[0] ?? null
+  const resumo =
+    opts.resumo ?? resumoDeCorpoForum(opts.titulo, opts.corpo, ARTIGO_RESUMO_MAX) ?? undefined
+  const artigo = await db.artigoPortal.create({
+    data: {
+      tenantId: opts.tenantId,
+      autorId: opts.userId,
+      conversaId: canal.id,
+      titulo: opts.titulo,
+      resumo,
+      corpo: opts.corpo,
+      ...(capaUrl ? { capaUrl } : {}),
+      midiaUrls: opts.midiaUrls,
+      ...(opts.blocos && opts.blocos.length > 0 ? { blocos: opts.blocos } : {}),
+      origem: ehOficial ? 'OFICIAL' : 'VERIFICADA',
+      status: 'PUBLICADO',
+      publicadoEm: new Date(),
+    },
+  })
+  await db.auditLog.create({
+    data: {
+      tenantId: opts.tenantId,
+      atorId: opts.userId,
+      acao: 'ARTIGO_PUBLICADO',
+      entidade: 'ArtigoPortal',
+      entidadeId: artigo.id,
+      detalhes: { origem: artigo.origem, conversaId: canal.id },
+    },
+  })
+  revalidatePath('/portal/comunidade/noticias')
+  revalidatePath('/portal/comunidade')
+  return { id: artigo.id }
+}
+
+export async function publicarArtigoComposerAction(
+  _prev: ArtigoComposerState,
+  formData: FormData,
+): Promise<ArtigoComposerState> {
+  const parsed = publicarArtigoComposerSchema.safeParse({
+    titulo: formData.get('titulo'),
+    corpo: formData.get('conteudo'),
+    midias: parseMidiasForum(formData.get('midias')),
+  })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    if (escopo === 'nacional') {
+      return { message: 'Artigo oficial é da torcida/unidade, não do clube.' }
+    }
+    if (!ancora.tenantId) return { message: 'Canal sem tenant.' }
+
+    const r = await persistirArtigo({
+      userId: session.user.id,
+      tenantId: ancora.tenantId,
+      titulo: parsed.data.titulo,
+      corpo: parsed.data.corpo,
+      midiaUrls: parsed.data.midias ?? [],
+    })
+    if ('error' in r) return { message: r.error }
+    return { success: true, token: crypto.randomUUID(), artigoId: r.id }
+  } catch (e) {
+    return { message: e instanceof Error ? e.message : 'Não foi possível publicar a notícia.' }
+  }
+}
+
+export async function publicarArtigoHistoriaAction(
+  _prev: ArtigoComposerState,
+  formData: FormData,
+): Promise<ArtigoComposerState> {
+  let blocosRaw: unknown = []
+  const raw = formData.get('blocos')
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      blocosRaw = JSON.parse(raw)
+    } catch {
+      return { message: 'Blocos da notícia inválidos.' }
+    }
+  }
+  const parsed = publicarArtigoHistoriaSchema.safeParse({
+    titulo: formData.get('titulo'),
+    resumo: formData.get('resumo') || undefined,
+    blocos: parseArtigoBlocos(blocosRaw),
+  })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    if (escopo === 'nacional') {
+      return { message: 'Artigo oficial é da torcida/unidade, não do clube.' }
+    }
+    if (!ancora.tenantId) return { message: 'Canal sem tenant.' }
+
+    const flat = flattenArtigoBlocos(parsed.data.blocos)
+    const r = await persistirArtigo({
+      userId: session.user.id,
+      tenantId: ancora.tenantId,
+      titulo: parsed.data.titulo,
+      corpo: flat.corpo,
+      resumo: parsed.data.resumo || flat.resumo || undefined,
+      midiaUrls: flat.midiaUrls,
+      blocos: parsed.data.blocos,
+    })
+    if ('error' in r) return { message: r.error }
+    return { success: true, token: crypto.randomUUID(), artigoId: r.id }
+  } catch (e) {
+    return { message: e instanceof Error ? e.message : 'Não foi possível publicar a notícia.' }
   }
 }
 
@@ -582,6 +731,26 @@ export async function votarPracaAction(formData: FormData): Promise<{ ok: true }
     if (parsed.data.alvoTipo === 'NOTICIA' && escopo !== 'nacional') {
       return { error: 'Notícia de imprensa só no portal do clube.' }
     }
+    if (parsed.data.alvoTipo === 'COMENTARIO') {
+      const comentario = await db.pracaComentario.findUnique({
+        where: { id: parsed.data.alvoId },
+        select: { id: true, alvoTipo: true, alvoId: true, oculto: true },
+      })
+      if (!comentario || comentario.oculto) return { error: 'Comentário não encontrado.' }
+      if (comentario.alvoTipo === 'ARTIGO') {
+        const artigo = await db.artigoPortal.findUnique({
+          where: { id: comentario.alvoId },
+          select: { tenantId: true, status: true },
+        })
+        if (!artigo || artigo.status !== 'PUBLICADO') return { error: 'Artigo não encontrado.' }
+        if (!podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+          return { error: 'Comentário fora deste canal.' }
+        }
+      }
+      if (comentario.alvoTipo === 'NOTICIA' && escopo !== 'nacional') {
+        return { error: 'Comentário fora deste canal.' }
+      }
+    }
 
     const anterior: { valor: number } | null = await db.pracaVoto.findUnique({
       where: {
@@ -593,6 +762,32 @@ export async function votarPracaAction(formData: FormData): Promise<{ ok: true }
       },
       select: { valor: true },
     })
+
+    if (parsed.data.valor === 0) {
+      if (!anterior) return { ok: true }
+      await db.pracaVoto.delete({
+        where: {
+          userId_alvoTipo_alvoId: {
+            userId: session.user.id,
+            alvoTipo: parsed.data.alvoTipo,
+            alvoId: parsed.data.alvoId,
+          },
+        },
+      })
+      if (parsed.data.alvoTipo === 'TOPICO') {
+        await aplicarDeltaVotoTopico(parsed.data.alvoId, 0, anterior.valor)
+      }
+      if (parsed.data.alvoTipo === 'ARTIGO') {
+        await aplicarDeltaVotoArtigo(parsed.data.alvoId, 0, anterior.valor)
+      }
+      if (parsed.data.alvoTipo === 'COMENTARIO') {
+        await aplicarDeltaVotoComentario(parsed.data.alvoId, 0, anterior.valor)
+      }
+      revalidatePath('/portal/comunidade')
+      revalidatePath('/portal/comunidade/noticias')
+      revalidatePath(`/portal/comunidade/forum/${parsed.data.alvoId}`)
+      return { ok: true }
+    }
 
     if (!anterior) await assertTetoSinaisPraca(session.user.id, ancora)
 
@@ -612,6 +807,14 @@ export async function votarPracaAction(formData: FormData): Promise<{ ok: true }
       },
       update: { valor: parsed.data.valor },
     })
+
+    if (parsed.data.alvoTipo === 'ARTIGO') {
+      await aplicarDeltaVotoArtigo(parsed.data.alvoId, parsed.data.valor, anterior?.valor ?? null)
+    }
+
+    if (parsed.data.alvoTipo === 'COMENTARIO') {
+      await aplicarDeltaVotoComentario(parsed.data.alvoId, parsed.data.valor, anterior?.valor ?? null)
+    }
 
     if (parsed.data.alvoTipo === 'TOPICO') {
       await aplicarDeltaVotoTopico(parsed.data.alvoId, parsed.data.valor, anterior?.valor ?? null)
@@ -657,6 +860,7 @@ export async function votarPracaAction(formData: FormData): Promise<{ ok: true }
     }
 
     revalidatePath('/portal/comunidade')
+    revalidatePath('/portal/comunidade/noticias')
     revalidatePath(`/portal/comunidade/forum/${parsed.data.alvoId}`)
     return { ok: true }
   } catch (e) {
@@ -665,10 +869,12 @@ export async function votarPracaAction(formData: FormData): Promise<{ ok: true }
 }
 
 export async function comentarPracaAction(formData: FormData): Promise<{ ok: true } | { error: string }> {
+  const parentRaw = formData.get('parentId')
   const parsed = comentarPracaSchema.safeParse({
     alvoTipo: formData.get('alvoTipo'),
     alvoId: formData.get('alvoId'),
     conteudo: formData.get('conteudo'),
+    parentId: typeof parentRaw === 'string' && parentRaw.trim() ? parentRaw : undefined,
   })
   if (!parsed.success) return { error: 'Comentário vazio.' }
 
@@ -687,11 +893,24 @@ export async function comentarPracaAction(formData: FormData): Promise<{ ok: tru
       return { error: 'Comentário de imprensa só no portal do clube.' }
     }
 
+    if (parsed.data.parentId) {
+      const pai = await db.pracaComentario.findUnique({
+        where: { id: parsed.data.parentId },
+        select: { alvoTipo: true, alvoId: true, parentId: true, oculto: true },
+      })
+      if (!pai || pai.oculto) return { error: 'Comentário não encontrado.' }
+      if (pai.alvoTipo !== parsed.data.alvoTipo || pai.alvoId !== parsed.data.alvoId) {
+        return { error: 'Resposta fora deste card.' }
+      }
+      if (pai.parentId) return { error: 'Só é possível responder comentários de primeiro nível.' }
+    }
+
     await db.pracaComentario.create({
       data: {
         autorId: session.user.id,
         alvoTipo: parsed.data.alvoTipo,
         alvoId: parsed.data.alvoId,
+        parentId: parsed.data.parentId ?? null,
         conteudo: parsed.data.conteudo,
       },
     })
@@ -716,32 +935,16 @@ export async function publicarArtigoAction(formData: FormData): Promise<{ ok: tr
     if (escopo === 'nacional') return { error: 'Artigo oficial é da torcida/unidade, não do clube.' }
     if (!ancora.tenantId) return { error: 'Canal sem tenant.' }
 
-    const ehOficial = await assertArtigoNoTenant(session.user.id, ancora.tenantId)
-    const artigo = await db.artigoPortal.create({
-      data: {
-        tenantId: ancora.tenantId,
-        autorId: session.user.id,
-        titulo: parsed.data.titulo,
-        resumo: parsed.data.resumo,
-        corpo: parsed.data.corpo,
-        capaUrl: parsed.data.capaUrl,
-        origem: ehOficial ? 'OFICIAL' : 'VERIFICADA',
-        status: 'PUBLICADO',
-        publicadoEm: new Date(),
-      },
+    const r = await persistirArtigo({
+      userId: session.user.id,
+      tenantId: ancora.tenantId,
+      titulo: parsed.data.titulo,
+      corpo: parsed.data.corpo,
+      resumo: parsed.data.resumo,
+      midiaUrls: parsed.data.capaUrl ? [parsed.data.capaUrl] : [],
     })
-    await db.auditLog.create({
-      data: {
-        tenantId: ancora.tenantId,
-        atorId: session.user.id,
-        acao: 'ARTIGO_PUBLICADO',
-        entidade: 'ArtigoPortal',
-        entidadeId: artigo.id,
-        detalhes: { origem: artigo.origem },
-      },
-    })
-    revalidatePath('/portal/comunidade/noticias')
-    return { ok: true, id: artigo.id }
+    if ('error' in r) return { error: r.error }
+    return { ok: true, id: r.id }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível publicar.' }
   }
@@ -1116,6 +1319,102 @@ export async function registrarVisitaTopicoAction(
   } catch {
     /* visita é best-effort */
   }
+}
+
+export async function registrarVisitaNoticiaAction(formData: FormData): Promise<void> {
+  const alvoTipo = String(formData.get('alvoTipo') ?? '')
+  const alvoId = String(formData.get('alvoId') ?? '')
+  if (!alvoId || (alvoTipo !== 'ARTIGO' && alvoTipo !== 'NOTICIA')) return
+  try {
+    const { escopo, ancora } = await contextoEscopo(String(formData.get('escopo') ?? ''))
+    if (alvoTipo === 'NOTICIA') {
+      if (escopo !== 'nacional' || !ancora.afiliacaoId) return
+      const n: { id: string; afiliacaoId: string; status: string } | null = await db.noticia.findUnique({
+        where: { id: alvoId },
+        select: { id: true, afiliacaoId: true, status: true },
+      })
+      if (!n || n.status !== 'APROVADA' || n.afiliacaoId !== ancora.afiliacaoId) return
+      await db.noticia.update({ where: { id: n.id }, data: { visitas: { increment: 1 } } })
+      return
+    }
+    const a: { id: string; tenantId: string; status: string } | null = await db.artigoPortal.findUnique({
+      where: { id: alvoId },
+      select: { id: true, tenantId: true, status: true },
+    })
+    if (!a || a.status !== 'PUBLICADO') return
+    if (!podeVerArtigoNoEscopo(escopo, ancora, a.tenantId)) return
+    await db.artigoPortal.update({ where: { id: a.id }, data: { visitas: { increment: 1 } } })
+  } catch {
+    /* visita é best-effort */
+  }
+}
+
+async function assertGerirArtigo(
+  userId: string,
+  artigo: { autorId: string; tenantId: string },
+): Promise<void> {
+  if (artigo.autorId === userId) return
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, artigo.tenantId)
+  const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
+  if (!hasPermission(efetivas, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)) {
+    throw new ExpectedError('Sem permissão para gerir esta notícia.')
+  }
+}
+
+export async function alternarFixadoArtigo(artigoId: string, escopoParam: string): Promise<void> {
+  const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+  const artigo: { id: string; autorId: string; tenantId: string; fixado: boolean; status: string } | null =
+    await db.artigoPortal.findUnique({
+      where: { id: artigoId },
+      select: { id: true, autorId: true, tenantId: true, fixado: true, status: true },
+    })
+  if (!artigo || artigo.status !== 'PUBLICADO') throw new ExpectedError('Notícia não encontrada.')
+  if (!podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+    throw new ExpectedError('Notícia fora deste canal.')
+  }
+  await assertGerirArtigo(session.user.id, artigo)
+  await db.artigoPortal.update({
+    where: { id: artigo.id },
+    data: { fixado: !artigo.fixado },
+  })
+  await db.auditLog.create({
+    data: {
+      tenantId: artigo.tenantId,
+      atorId: session.user.id,
+      acao: artigo.fixado ? 'ARTIGO_DESAFIXADO' : 'ARTIGO_FIXADO',
+      entidade: 'ArtigoPortal',
+      entidadeId: artigo.id,
+    },
+  })
+  revalidatePath('/portal/comunidade/noticias')
+}
+
+export async function excluirArtigo(artigoId: string, escopoParam: string): Promise<void> {
+  const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+  const artigo: { id: string; autorId: string; tenantId: string; status: string } | null =
+    await db.artigoPortal.findUnique({
+      where: { id: artigoId },
+      select: { id: true, autorId: true, tenantId: true, status: true },
+    })
+  if (!artigo || artigo.status !== 'PUBLICADO') throw new ExpectedError('Notícia não encontrada.')
+  if (!podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+    throw new ExpectedError('Notícia fora deste canal.')
+  }
+  await assertGerirArtigo(session.user.id, artigo)
+  await db.artigoPortal.update({
+    where: { id: artigo.id },
+    data: { status: 'OCULTO' },
+  })
+  await db.auditLog.create({
+    data: {
+      tenantId: artigo.tenantId,
+      atorId: session.user.id,
+      acao: 'ARTIGO_OCULTO',
+      entidade: 'ArtigoPortal',
+      entidadeId: artigo.id,
+    },
+  })
+  revalidatePath('/portal/comunidade/noticias')
 }
 
 export { wherePracaNoEscopo }

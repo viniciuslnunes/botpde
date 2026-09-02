@@ -14,6 +14,7 @@ import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { ImageUploadField } from '@/components/media/image-upload-field'
+import { AppButton } from '@/components/ui/button'
 
 function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
   const [imagemUrl, setImagemUrl] = useState(initial?.imagemUrl ?? '')
@@ -131,7 +132,9 @@ function EditarPostForm({ post, onCancel }: { post: Post; onCancel: () => void }
       <PostFields state={state} initial={post} />
       <div className="flex gap-2">
         <SubmitButton label="Salvar" icon={<MessageSquarePlus className="h-4 w-4" />} />
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={() => {
             void confirmDiscard().then((ok) => {
@@ -139,9 +142,8 @@ function EditarPostForm({ post, onCancel }: { post: Post; onCancel: () => void }
             })
           }}
           className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <X className="h-3.5 w-3.5" /> Cancelar
-        </button>
+        > Cancelar
+        </AppButton>
       </div>
     </form>
   )

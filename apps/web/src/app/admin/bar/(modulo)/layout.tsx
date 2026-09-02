@@ -8,7 +8,7 @@ import { assertAnyPermission } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { getTurnoAbertoBar, resolveUnidadeBar } from '@/lib/bar'
 import type { BarUnidadeLite } from '@/lib/bar'
-import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 function rotuloTipo(tipo: BarUnidadeLite['tipo']): string {
   if (tipo === 'SEDE') return 'Sede'
@@ -80,10 +80,14 @@ export default async function BarModuloLayout({ children }: { children: ReactNod
             {turno ? 'Abrir PDV' : 'PDV (turno fechado)'}
           </Link>
         }
-      />
+      >
+        <AdminModuleTabBar tabs={tabs} />
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <AdminModuleTabs tabs={tabs}>{children}</AdminModuleTabs>
+        <AdminModuleTabs tabs={tabs} chrome="panel">
+          {children}
+        </AdminModuleTabs>
       </div>
     </>
   )

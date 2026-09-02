@@ -8,6 +8,8 @@ import {
   congelarLojaBrechoAction,
   resolverDenunciaBrechoAction,
 } from './actions'
+import { AppButton } from '@/components/ui/button'
+import { Headset, ShieldCheck, X } from 'lucide-react'
 
 export function BrechoStaffBotoes({
   denunciaId,
@@ -27,10 +29,12 @@ export function BrechoStaffBotoes({
     <div className="flex flex-wrap gap-2">
       {denunciaId ? (
         <>
-          <button
+          <AppButton
+            variant="primary"
+            icon={Headset}
             type="button"
             disabled={pending}
-            className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-primary-on"
+            className="rounded-lg px-3 text-sm font-semibold"
             onClick={() => {
               start(async () => {
                 const r = await runPersistAction(
@@ -45,8 +49,10 @@ export function BrechoStaffBotoes({
             }}
           >
             Atender
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="none"
+            icon={ShieldCheck}
             type="button"
             disabled={pending}
             className="app-action rounded-lg border border-[rgb(var(--border))] px-3 text-sm"
@@ -61,8 +67,10 @@ export function BrechoStaffBotoes({
             }}
           >
             Procedente
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             disabled={pending}
             className="app-action rounded-lg border border-[rgb(var(--border))] px-3 text-sm"
@@ -77,7 +85,7 @@ export function BrechoStaffBotoes({
             }}
           >
             Descartar
-          </button>
+          </AppButton>
         </>
       ) : null}
       {conversaId ? (

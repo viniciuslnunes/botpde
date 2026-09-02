@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { FileSearch, ImageOff, X } from 'lucide-react'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
+import { AppButton } from '@/components/ui/button'
 
 /**
  * Visualização do comprovante de vínculo do sócio (dado RESTRITO — renderizado
@@ -26,14 +27,15 @@ export function ComprovanteLightbox({
 
   return (
     <>
-      <button
+      <AppButton
+        variant="none"
+        icon={FileSearch}
         type="button"
         onClick={() => setAberto(true)}
         className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.1)]"
       >
-        <FileSearch className="h-3.5 w-3.5" />
         Ver comprovante
-      </button>
+      </AppButton>
 
       <AppModal
         open={aberto}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export type LojaNavCategoria = {
   slug: string
@@ -31,9 +32,10 @@ export function LojaChromeNav({
   ]
 
   return (
-    <nav
+    <ScrollRail
+      as="nav"
       aria-label="Categorias da loja"
-      className="app-scrollbar-none -mx-1 flex gap-1 overflow-x-auto border-t border-[rgb(var(--border)_/_0.55)] px-1 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="-mx-1 flex gap-1 border-t border-[rgb(var(--border)_/_0.55)] px-1 pt-2"
     >
       {chips.map((chip) => (
         <Link
@@ -49,6 +51,6 @@ export function LojaChromeNav({
           [ {chip.nome} ]
         </Link>
       ))}
-    </nav>
+    </ScrollRail>
   )
 }

@@ -4,19 +4,7 @@ import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import type { AliancaTabId } from '@/lib/alianca-tabs'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Check,
-  Handshake,
-  History,
-  Inbox,
-  Loader2,
-  Search,
-  Send,
-  Sparkles,
-  Users,
-  XCircle,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Check, CircleSlash, Handshake, Search, X, XCircle } from 'lucide-react'
 import {
   aceitarAlianca,
   cancelarProposta,
@@ -40,8 +28,8 @@ import { formatDateTimeShort } from '@/lib/format-datetime'
 import { LogoImage } from '@/components/media/logo-image'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
-import { lookupTabBadge } from '@/lib/notificacoes-menu-badges'
-import { useAdminNavbarSnapshot } from '@/lib/use-admin-navbar-context'
+import { adminTabIds } from '@/components/admin/ui/admin-tab-ids'
+import { AppButton } from '@/components/ui/button'
 
 interface TenantOption {
   id: string
@@ -65,8 +53,8 @@ interface AliancaFormsProps {
   tenants: TenantOption[]
   /** Subsede/PDE: só herda a visão das ATIVAs da sede — nunca gerencia. */
   readOnly?: boolean
-  /** Tab vinda de `?tab=` (sino / deep-link). */
-  initialTab?: AliancaTabId | null
+  /** Tab ativa resolvida no servidor (`?tab=` ou padrão da fila). */
+  activeTab: AliancaTabId
 }
 
 // Definição movida para `@/lib/alianca-tabs` (módulo SEM `'use client'`):
@@ -182,10 +170,9 @@ export function AliancaForms({
   recomendacoes,
   tenants,
   readOnly = false,
-  initialTab = null,
+  activeTab,
 }: AliancaFormsProps) {
   const router = useRouter()
-  const { tabBadges } = useAdminNavbarSnapshot()
   const [pending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
@@ -236,53 +223,8 @@ export function AliancaForms({
     ? recomendacoes.filter((r: RecomendacaoAliancaListItemProp) => r.tipo === 'CO_IRMA')
     : recomendacoes
 
-  const defaultTab: TabId = (() => {
-    if (readOnly) return 'ativas'
-    if (pendentesRecebidas.length > 0) return 'recebidas'
-    if (recomendacoes.length > 0) return 'recomendacoes'
-    if (ativas.length > 0) return 'ativas'
-    if (pendentesEnviadas.length > 0) return 'enviadas'
-    return 'propor'
-  })()
-
-  const [tab, setTab] = useState<TabId>(initialTab ?? defaultTab)
-
   function irParaTab(next: TabId): void {
-    setTab(next)
     router.replace(`/admin/aliancas?tab=${next}`, { scroll: false })
-  }
-
-  const tabs: Array<{ id: TabId; label: string; count: number; icon: LucideIcon; highlight?: boolean }> = readOnly
-    ? [
-        {
-          id: 'recomendacoes',
-          label: 'Co-irmãs',
-          count: recomendacoesVisiveis.length,
-          icon: Sparkles,
-        },
-        { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
-      ]
-    : [
-        {
-          id: 'recomendacoes',
-          label: 'Recomendações',
-          count: recomendacoes.length,
-          icon: Sparkles,
-          highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
-        },
-        {
-          id: 'recebidas',
-          label: 'Recebidas',
-          count: pendentesRecebidas.length,
-          icon: Inbox,
-          highlight: pendentesRecebidas.length > 0,
-        },
-        { id: 'enviadas', label: 'Enviadas', count: pendentesEnviadas.length, icon: Send },
-        { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
-        { id: 'propor', label: 'Propor', count: 0, icon: Handshake },
-      ]
-  if (!readOnly && encerradas.length > 0) {
-    tabs.push({ id: 'historico', label: 'Histórico', count: encerradas.length, icon: History })
   }
 
   function mostrarErro(error: unknown, fallback: string): void {
@@ -380,7 +322,10 @@ export function AliancaForms({
 
         {options?.showAcceptReject && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
+            <AppButton
+              variant="success"
+              icon={Check}
+              loading={pending}
               type="button"
               onClick={() =>
                 confirmAndRun(
@@ -393,12 +338,13 @@ export function AliancaForms({
                 )
               }
               disabled={pending}
-              className="inline-flex items-center gap-1.5 btn-success rounded-lg px-3.5 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium"
             >
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               Aceitar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
+              variant="none"
+              icon={XCircle}
               type="button"
               onClick={() =>
                 confirmAndRun(
@@ -413,15 +359,16 @@ export function AliancaForms({
               disabled={pending}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
             >
-              <XCircle className="h-3.5 w-3.5" />
               Rejeitar
-            </button>
+            </AppButton>
           </div>
         )}
 
         {options?.showCancel && (
           <div className="mt-3">
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={() =>
                 confirmAndRun(
@@ -437,13 +384,15 @@ export function AliancaForms({
               className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
             >
               Cancelar proposta
-            </button>
+            </AppButton>
           </div>
         )}
 
         {!readOnly && item.status === 'ATIVA' && (
           <div className="mt-3">
-            <button
+            <AppButton
+              variant="none"
+              icon={CircleSlash}
               type="button"
               onClick={() =>
                 confirmAndRun(
@@ -459,12 +408,14 @@ export function AliancaForms({
               className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
             >
               Encerrar aliança
-            </button>
+            </AppButton>
           </div>
         )}
       </div>
     )
   }
+
+  const { tabId, panelId } = adminTabIds('tab', activeTab)
 
   return (
     <div className="space-y-5">
@@ -481,58 +432,8 @@ export function AliancaForms({
         </div>
       )}
 
-      <nav aria-label="Seções de alianças">
-        <div
-          role="tablist"
-          className="app-scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
-        >
-          {tabs.map((item) => {
-            const active = tab === item.id
-            const Icon = item.icon
-            const live = lookupTabBadge(tabBadges, `/admin/aliancas?tab=${item.id}`)
-            const count = Math.max(item.count, live)
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => irParaTab(item.id)}
-                className={[
-                  'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                    : item.highlight || live > 0
-                      ? 'font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
-                      : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-                ].join(' ')}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-                {item.id !== 'propor' ? (
-                  <span
-                    className={[
-                      'rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
-                      live > 0
-                        ? 'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]'
-                        : active
-                          ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                          : item.highlight
-                            ? 'bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]'
-                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                    ].join(' ')}
-                  >
-                    {count}
-                  </span>
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
-      </nav>
-
-      <div role="tabpanel" className="min-h-[12rem]">
-        {tab === 'recomendacoes' && (
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="min-h-[12rem]">
+        {activeTab === 'recomendacoes' && (
           <div className="space-y-3">
             {readOnly && (
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
@@ -582,7 +483,10 @@ export function AliancaForms({
                     ) : null}
                     {item.tipo === 'CO_IRMA' ? null : item.podePropor ? (
                       <div className="mt-3">
-                        <button
+                        <AppButton
+                          variant="primary"
+                          icon={Handshake}
+                          loading={pending}
                           type="button"
                           disabled={
                             pending ||
@@ -594,15 +498,10 @@ export function AliancaForms({
                               `Proposta enviada para ${item.tenantSugeridoNome}`,
                             )
                           }
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-60"
+                          className="gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium"
                         >
-                          {pending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Handshake className="h-3.5 w-3.5" />
-                          )}
                           Propor aliança
-                        </button>
+                        </AppButton>
                       </div>
                     ) : item.confianca === 'ALTA' && !item.tenantSugeridoId ? (
                       <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
@@ -611,14 +510,16 @@ export function AliancaForms({
                       </p>
                     ) : item.tenantSugeridoId && !blockedTenantIds.has(item.tenantSugeridoId) ? (
                       <div className="mt-3">
-                        <button
+                        <AppButton
+                          variant="none"
+                          icon={Handshake}
                           type="button"
                           disabled={pending}
                           onClick={() => proporManualFromRec(item)}
                           className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-60"
                         >
                           Propor mesmo assim
-                        </button>
+                        </AppButton>
                       </div>
                     ) : item.confianca !== 'ALTA' ? (
                       <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
@@ -632,7 +533,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {tab === 'recebidas' && (
+        {activeTab === 'recebidas' && (
           <div className="space-y-3">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               Propostas enviadas por outras torcidas aguardando sua aprovação.
@@ -649,7 +550,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {tab === 'enviadas' && (
+        {activeTab === 'enviadas' && (
           <div className="space-y-3">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               Propostas que você enviou e ainda aguardam resposta.
@@ -666,7 +567,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {tab === 'ativas' && (
+        {activeTab === 'ativas' && (
           <div className="space-y-3">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               {readOnly
@@ -694,7 +595,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {tab === 'historico' && (
+        {activeTab === 'historico' && (
           <div className="space-y-3">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               Alianças encerradas, rejeitadas ou canceladas.
@@ -709,7 +610,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {tab === 'propor' && (
+        {activeTab === 'propor' && (
           <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
             <div>
               <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
@@ -769,7 +670,10 @@ export function AliancaForms({
                 </div>
               )}
 
-              <button
+              <AppButton
+                variant="primary"
+                icon={Handshake}
+                loading={pending}
                 type="button"
                 disabled={pending || !selectedTenantId}
                 onClick={() => {
@@ -781,11 +685,10 @@ export function AliancaForms({
                     irParaTab('enviadas')
                   }, 'Proposta enviada com sucesso')
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="gap-2 rounded-lg px-4 py-2 text-sm font-medium"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
                 Enviar proposta
-              </button>
+              </AppButton>
             </div>
           </div>
         )}

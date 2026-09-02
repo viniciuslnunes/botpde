@@ -9,6 +9,7 @@ import {
   Minus,
 } from 'lucide-react'
 import { PERMISSION_GROUPS, applyPermissionCascade } from '@torcida/types'
+import { AppButton } from '@/components/ui/button'
 
 export type PermissaoOrigem = 'via perfil' | 'extra' | 'revogada' | null
 
@@ -172,22 +173,24 @@ export function AccessPermissionWorktree({
           {totais.on}/{totais.all} permissões ativas
         </p>
         <div className="flex items-center gap-1">
-          <button
+          <AppButton
+            variant="none"
+            icon={ChevronsUpDown}
             type="button"
             onClick={expandAll}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
           >
-            <ChevronsUpDown className="h-3 w-3" aria-hidden />
             Expandir
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="none"
+            icon={ChevronsDownUp}
             type="button"
             onClick={collapseAll}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
           >
-            <ChevronsDownUp className="h-3 w-3" aria-hidden />
             Recolher
-          </button>
+          </AppButton>
         </div>
       </div>
 

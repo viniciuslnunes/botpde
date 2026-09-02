@@ -13,6 +13,8 @@ export type MemoriaFatoAdminItem = {
   visibilidade: 'PUBLICO' | 'TENANT'
   autorNome: string
   criadoEmLabel: string
+  vinculoEvento: string | null
+  vinculoPost: string | null
 }
 
 export function MemoriaFilaClient({ fatos }: { fatos: MemoriaFatoAdminItem[] }) {
@@ -48,6 +50,13 @@ export function MemoriaFilaClient({ fatos }: { fatos: MemoriaFatoAdminItem[] }) 
             <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
               {f.autorNome} · {f.criadoEmLabel} · {f.visibilidade === 'PUBLICO' ? 'Público' : 'Unidade'}
             </p>
+            {(f.vinculoEvento || f.vinculoPost) && (
+              <p className="mt-1 text-xs text-[rgb(var(--color-info-fg))]">
+                {f.vinculoEvento && <>Evento: {f.vinculoEvento}</>}
+                {f.vinculoEvento && f.vinculoPost && ' · '}
+                {f.vinculoPost && <>Post: {f.vinculoPost}</>}
+              </p>
+            )}
           </td>
           <td className="px-3 py-3">
             <label className="sr-only" htmlFor={`motivo-${f.id}`}>

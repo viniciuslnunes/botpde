@@ -21,23 +21,7 @@ import {
   type SedeState,
 } from '@/app/admin/(estrutura)/sedes/actions'
 import { resolverCoordsDeLinkMaps } from '@/lib/maps-actions'
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Crosshair,
-  Image as ImageIcon,
-  Link2,
-  Loader2,
-  MapPin,
-  MoreVertical,
-  Power,
-  PowerOff,
-  Search,
-  Settings2,
-  Shield,
-  Trash2,
-} from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Crosshair, Image as ImageIcon, Link2, Loader2, MapPin, MoreVertical, Power, PowerOff, Search, Settings2, Shield, Trash2, X } from 'lucide-react'
 import { m } from 'motion/react'
 import { FieldError, Input, Select, Textarea, toast } from '@torcida/ui'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
@@ -62,6 +46,7 @@ import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { springSnappy } from '@/lib/motion-presets'
+import { AppButton } from '@/components/ui/button'
 
 const SedeMapPicker = dynamic(
   () => import('@/components/admin/sede-map-picker').then((m) => m.SedeMapPicker),
@@ -841,7 +826,10 @@ function SedeLocalizacaoFields({
           </p>
         </div>
         {mapsConfigured && (
-          <button
+          <AppButton
+            variant="none"
+            icon={Crosshair}
+            loading={geoStatus === 'loading'}
             type="button"
             onClick={() => {
               pinManualRef.current = false
@@ -852,13 +840,8 @@ function SedeLocalizacaoFields({
             title={pinManual ? 'Recalcular a partir do endereço (substitui o ajuste manual do pin)' : undefined}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
           >
-            {geoStatus === 'loading' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Crosshair className="h-3.5 w-3.5" />
-            )}
             Geocodificar endereço
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -944,19 +927,17 @@ function SedeLocalizacaoFields({
                   placeholder="https://maps.app.goo.gl/… ou maps.google.com/…"
                 />
               </div>
-              <button
+              <AppButton
+                variant="none"
+                icon={Link2}
+                loading={linkStatus === 'loading'}
                 type="button"
                 onClick={() => void aplicarLinkMaps()}
                 disabled={linkStatus === 'loading' || !mapsLink.trim()}
                 className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
               >
-                {linkStatus === 'loading' ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Link2 className="h-3.5 w-3.5" />
-                )}
                 Aplicar link
-              </button>
+              </AppButton>
             </div>
 
             {mapsConfigured && (
@@ -979,19 +960,17 @@ function SedeLocalizacaoFields({
                     placeholder="Ex: PDE Cubatão, SP"
                   />
                 </div>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Search}
+                  loading={searchStatus === 'loading'}
                   type="button"
                   onClick={() => void buscarNoMapa()}
                   disabled={searchStatus === 'loading' || !mapSearch.trim()}
                   className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
                 >
-                  {searchStatus === 'loading' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Search className="h-3.5 w-3.5" />
-                  )}
                   Buscar
-                </button>
+                </AppButton>
               </div>
             )}
 
@@ -1109,15 +1088,16 @@ function SedeLocalizacaoFields({
                           ? 'Pin no lugar certo? Confirme para ajustar a fachada.'
                           : 'Clique ou arraste o pin para marcar o local.'}
                       </p>
-                      <button
+                      <AppButton
+                        variant="primary"
+                        icon={Check}
                         type="button"
                         disabled={!hasCoords}
                         onClick={confirmarLocalizacaoNoMapa}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="shrink-0 gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <Check className="h-3.5 w-3.5" aria-hidden />
                         Confirmar localização
-                      </button>
+                      </AppButton>
                     </div>
                   </div>
                 ) : (
@@ -1201,22 +1181,24 @@ function SedeLocalizacaoFields({
                       <FieldError errors={state.errors?.streetViewFov} />
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
-                      <button
+                      <AppButton
+                        variant="none"
+                        icon={ChevronLeft}
                         type="button"
                         onClick={() => setMapPanelTab('mapa')}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50"
                       >
-                        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
                         Voltar ao mapa
-                      </button>
-                      <button
+                      </AppButton>
+                      <AppButton
+                        variant="primary"
+                        icon={Check}
                         type="button"
                         onClick={salvarFormularioLocalizacao}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90"
+                        className="gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
                       >
-                        <Check className="h-3.5 w-3.5" aria-hidden />
                         Salvar alterações
-                      </button>
+                      </AppButton>
                     </div>
                   </div>
                 )}
@@ -1731,13 +1713,15 @@ export function CriarSedeForm({
         hint="Preencha as etapas e confirme a criação."
       >
         {onCancel && (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Cancelar
-          </button>
+          </AppButton>
         )}
         <button
           type="submit"
@@ -1953,15 +1937,16 @@ export function SedeAcoesMenu({
             </button>
 
             {podeMostrarExcluir && (
-              <button
+              <AppButton
+                variant="none"
+                icon={Trash2}
                 type="button"
                 role="menuitem"
                 onClick={abrirExcluir}
                 className="app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-red-600 hover:bg-[rgb(var(--background-subtle))] dark:text-red-400"
               >
-                <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Excluir
-              </button>
+              </AppButton>
             )}
 
             {!podeMostrarExcluir && bloqueioExcluir ? (
@@ -2030,14 +2015,16 @@ export function SedeAcoesMenu({
             </div>
 
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 disabled={pending}
                 onClick={() => setExcluirAberto(false)}
                 className="rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50 sm:py-2"
               >
                 Cancelar
-              </button>
+              </AppButton>
               <button
                 type="button"
                 disabled={pending || !destinoSedeId}

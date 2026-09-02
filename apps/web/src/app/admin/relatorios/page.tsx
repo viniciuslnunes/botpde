@@ -115,9 +115,14 @@ export default async function RelatoriosPage({ searchParams }: Props) {
         icon={<BarChart3 className="h-5 w-5" />}
         title="Relatórios"
         description="Inteligência administrativa da torcida — indicadores por período."
-      />
-
-      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
+      >
+        <AdminTabs
+          tabs={tabs}
+          basePath={BASE_PATH}
+          activeId={tab}
+          paramKey={PARAM_TAB}
+          extraParams={{ periodo: periodo === PERIODO_PADRAO ? undefined : periodo }}
+        />
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período dos relatórios">
           {PERIODOS.map((p) => {
             const ativo = p === periodo
@@ -130,10 +135,10 @@ export default async function RelatoriosPage({ searchParams }: Props) {
                 })}
                 aria-current={ativo ? 'page' : undefined}
                 className={[
-                  'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                   ativo
                     ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                    : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                    : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
                 {PERIODO_LABEL[p]}
@@ -141,15 +146,9 @@ export default async function RelatoriosPage({ searchParams }: Props) {
             )
           })}
         </div>
+      </AdminPageHeader>
 
-        <AdminTabs
-          tabs={tabs}
-          basePath={BASE_PATH}
-          activeId={tab}
-          paramKey={PARAM_TAB}
-          extraParams={{ periodo: periodo === PERIODO_PADRAO ? undefined : periodo }}
-        />
-
+      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
         <div id={panelId} role="tabpanel" aria-labelledby={tabId}>
           <Suspense fallback={<SectionSkeleton />}>
             <RelatorioAtivo tab={tab} tenantId={tenant.id} periodo={periodo} />

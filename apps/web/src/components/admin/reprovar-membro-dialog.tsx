@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { AlertTriangle, X, XCircle } from 'lucide-react'
 import {
   CATEGORIAS_REPROVACAO,
   MOTIVO_REPROVACAO_MAX,
@@ -12,6 +12,7 @@ import {
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { runPersistAction } from '@/lib/toast-action'
 import type { ReprovarMembroInput } from '@/app/admin/membros/actions'
+import { AppButton } from '@/components/ui/button'
 
 type PontoCatalogo = {
   id: string
@@ -310,24 +311,27 @@ export function ReprovarMembroDialog({
             </AppModalBody>
 
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={onFechar}
                 disabled={enviando}
                 className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
               >
                 Cancelar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="danger-soft"
+                icon={XCircle}
+                loading={enviando}
                 type="button"
                 onClick={() => void handleConfirmar()}
-                disabled={enviando}
                 aria-disabled={!podeEnviar}
-                className="btn-danger-soft app-action inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-60"
+                className="rounded-lg px-3.5 py-2 text-sm"
               >
-                {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
                 Reprovar cadastro
-              </button>
+              </AppButton>
             </div>
     </AppModal>
   )

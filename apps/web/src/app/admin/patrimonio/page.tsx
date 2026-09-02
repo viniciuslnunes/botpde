@@ -22,8 +22,7 @@ import { PatrimonioAuditoriaTimeline } from '@/components/patrimonio/patrimonio-
 import { PatrimonioResumoCards } from '@/components/patrimonio/patrimonio-resumo-cards'
 import { PatrimonioFiltros } from '@/components/patrimonio/patrimonio-filtros'
 import { MarcarDanoEmprestimoForm } from '@/components/patrimonio/marcar-dano-emprestimo-form'
-import { AdminInboxList, AdminPendingTabs, adminTabIds, type AdminTabItem } from '@/components/admin/ui'
-import { MotionReveal } from '@/components/motion/motion-reveal'
+import { AdminInboxList, AdminPageHeader, AdminPendingTabs, adminTabIds, type AdminTabItem } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Patrimônio — Admin' }
@@ -114,46 +113,47 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-      <MotionReveal>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-500/15 text-stone-700 dark:text-stone-300">
-              <Landmark className="h-5 w-5" />
-            </div>
-            <div className="space-y-3">
-              <h1 className="portal-display text-xl text-[rgb(var(--foreground))] sm:text-2xl">
-                Patrimônio
-              </h1>
-              <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-                {podeGerir
-                  ? 'Inventário e custódia — audite retiradas com foto e registre dano.'
-                  : 'Somente leitura — inventário da unidade.'}
-              </p>
-            </div>
-          </div>
+    <div className="flex min-h-full flex-col">
+      <AdminPageHeader
+        title="Patrimônio"
+        description={
+          podeGerir
+            ? 'Inventário e custódia — audite retiradas com foto e registre dano.'
+            : 'Somente leitura — inventário da unidade.'
+        }
+        icon={<Landmark className="h-5 w-5" />}
+        actions={
           <Link
             href="/portal/patrimonio"
             className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver no portal
           </Link>
-        </div>
-      </MotionReveal>
+        }
+      >
+        <AdminPendingTabs
+          tabs={tabs}
+          basePath="/admin/patrimonio"
+          activeId={tab}
+          paramKey="tab"
+          extraParams={{
+            categoria: values.categoria,
+            status: values.status,
+            q: values.q,
+            incluirBaixados: values.incluirBaixados ? '1' : undefined,
+          }}
+        />
+        {tab === 'acervo' ? (
+          <PatrimonioFiltros
+            basePath="/admin/patrimonio"
+            values={values}
+            tab="acervo"
+            variant="toolbar"
+          />
+        ) : null}
+      </AdminPageHeader>
 
-      <AdminPendingTabs
-        tabs={tabs}
-        basePath="/admin/patrimonio"
-        activeId={tab}
-        paramKey="tab"
-        extraParams={{
-          categoria: values.categoria,
-          status: values.status,
-          q: values.q,
-          incluirBaixados: values.incluirBaixados ? '1' : undefined,
-        }}
-      />
-
+      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-4">
         {tab === 'acervo' ? (
           <>
@@ -161,7 +161,6 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               A foto diferencia peças parecidas no inventário.
             </p>
-            <PatrimonioFiltros basePath="/admin/patrimonio" values={values} tab="acervo" />
             <PatrimonioItensLista
               itens={itens}
               podeGerir={podeGerir}
@@ -222,6 +221,7 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
         ) : null}
 
         {tab === 'historico' ? <PatrimonioAuditoriaTimeline entradas={auditoria} /> : null}
+      </div>
       </div>
     </div>
   )

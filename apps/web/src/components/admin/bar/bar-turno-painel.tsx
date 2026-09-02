@@ -2,10 +2,11 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Lock, Unlock } from 'lucide-react'
+import { ArrowLeft, Check, Clock, Lock, Unlock, X } from 'lucide-react'
 import { LIMIAR_DIVERGENCIA_ABS, LIMIAR_DIVERGENCIA_PCT } from '@torcida/types'
 import { toast } from '@torcida/ui'
 import { abrirTurnoBar, fecharTurnoBar } from '@/app/admin/bar/actions'
+import { AppButton } from '@/components/ui/button'
 
 function formatarPreco(valor: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -131,15 +132,16 @@ export function BarTurnoPainel({
             </div>
           </div>
           {podeGerir && (
-            <button
+            <AppButton
+              variant="primary"
+              icon={Unlock}
               type="button"
               disabled={pending}
               onClick={abrir}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on disabled:opacity-50"
+              className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
             >
-              <Unlock className="h-3.5 w-3.5" />
               Abrir turno
-            </button>
+            </AppButton>
           )}
         </div>
       </div>
@@ -167,7 +169,9 @@ export function BarTurnoPainel({
           </div>
         </div>
         {podeGerir && !fechando && (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={() => {
               setFechando(true)
@@ -176,7 +180,7 @@ export function BarTurnoPainel({
             className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Fechar turno
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -298,7 +302,9 @@ export function BarTurnoPainel({
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <AppButton
+              variant="primary"
+              icon={Check}
               type="button"
               disabled={
                 pending ||
@@ -306,11 +312,13 @@ export function BarTurnoPainel({
                 (exigeCiencia && !cienciaComandas)
               }
               onClick={fechar}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium"
             >
               Confirmar fechamento
-            </button>
-            <button
+            </AppButton>
+            <AppButton
+              variant="none"
+              icon={ArrowLeft}
               type="button"
               disabled={pending}
               onClick={() => {
@@ -320,7 +328,7 @@ export function BarTurnoPainel({
               className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
             >
               Voltar
-            </button>
+            </AppButton>
           </div>
         </div>
       )}

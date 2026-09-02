@@ -12,7 +12,7 @@ torcida/unidade é conteúdo nosso. Sem scraper, sem embed de corpo alheio.
 
 | Destino | Âncora | Conteúdo |
 |---|---|---|
-| `/portal/comunidade/noticias` | escopo do canal | Imprensa (`Noticia`) só em `nacional`; artigos (`ArtigoPortal`) no tenant |
+| `/portal/comunidade/noticias` | escopo do canal | Imprensa (`Noticia`) só em `nacional`; artigos (`ArtigoPortal`) no tenant. Botão **Criar notícia** no cabeçalho abre o composer em blocos (`?criar=1`) e oculta o mural; cancelar/publicar volta à lista. Default **Mais vistas** (`visitas`). `/noticias/novo` redireciona para `?criar=1`. |
 | `/portal/comunidade/forum` | escopo do canal | Abas `?aba=topicos` (lista) · `novo` (composer) · `ranking`. `/forum/novo` redireciona para `aba=novo`. |
 | Feed Descobrir | mesmo escopo | Tópico entra como `PostSocialItem` (`forum`) no ranking `scoreDescobrirPost` — mídia, voto de tópico (concordo/discordo) e resposta no card; clique abre o tópico |
 
@@ -73,9 +73,9 @@ Função pura: `wherePracaNoEscopo` em `packages/types/src/portal-noticias-forum
 |---|---|
 | Tópico / resposta (torcida/unidade) | `community:post` no tenant |
 | Tópico / resposta (CN) | `assertComunidadeNacional` (torcedor do clube) |
-| Artigo oficial | `announcements:publish` no **tenant ativo** |
+| Artigo oficial | `announcements:publish` no **tenant ativo** **e** canal elegível (oficial da torcida/unidade ou `portalNoticiasVerificado`) |
 | Curar imprensa | `news:curate` (já existe) |
-| Selo verificada | liderança (`announcements:publish`) + `AuditLog` |
+| Selo verificada | liderança (`announcements:publish`) + `AuditLog` — artigo sai `VERIFICADA`; ainda exige canal elegível |
 | Moderar (aprovar/recusar/ocultar/fixar) | `community:moderate` |
 | Editar / excluir tópico próprio | autor (`editarTopico` / `excluirTopico`) |
 
@@ -84,13 +84,29 @@ duas colunas no desktop (escrita à esquerda, prévia à direita). A primeira
 linha vira o título da listagem; o corpo e os anexos ficam no tópico. A lista
 é compacta (capa 64–80px, como canal). Seed de volume:
 `pnpm --filter @torcida/db seed:forum-praca` (Gaviões + CN do Corinthians).
+Notícias já ranqueadas (Mais vistas / Em alta / Recentes):
+`pnpm --filter @torcida/db seed:noticias-praca` (Gaviões, PDE FIEL BAIXADA, Camisa 12; IDs `noticias-demo-*`, sem `:` — o App Router cola a query no segmento e 404a; só local).
+
+A notícia da torcida/unidade é uma **história em blocos** (texto, foto, vídeo,
+embed de YouTube/Instagram/X/TikTok), no ritmo de um portal — não um único
+texto com mídia no topo. Composer próprio (`NoticiaStoryComposer`); a leitura
+é coluna estreita (título, linha fina, byline, corpo intercalado). Lista no
+estilo mural/comunicados (card com a **primeira** mídia, pin, ocultar).
+Ordenação reusa o ranking do fórum (`scoreHotTopico` em **Em alta**; **Mais
+vistas** por `visitas`, default). Visita incrementa no detalhe, não no GET.
+Canal elegível: `canalElegivelParaNoticia` — `canalOficial` da torcida/unidade
+ou `Conversa.portalNoticiasVerificado` (portal oficial futuro). Sem canal
+elegível, ninguém publica. Artigo antigo (só `corpo` + `midiaUrls`) continua
+legível: `blocosDeArtigoLegado`.
 
 ## Schema
 
 `ForumTopico` (com `midiaUrls` e `rejeitadoMotivo`; status `PENDENTE` |
 `VISIVEL` | `REJEITADO` | `OCULTO` | `REMOVIDO`), `ForumResposta`, `PracaVoto`,
-`PracaComentario`, `ArtigoPortal`, `ForumScoreEvento`, `ForumScoreSaldo`. Selo
-em `SaasMembro`. Default do status continua `VISIVEL` (seed e legado). UGC novo
-na torcida grava `PENDENTE`.
+`PracaComentario`, `ArtigoPortal` (`midiaUrls`, `visitas`, `gostei`/`naoGostei`,
+`fixado`, `conversaId`, `blocos` JSON da história), `Noticia.visitas`, `Conversa.portalNoticiasVerificado`,
+`ForumScoreEvento`, `ForumScoreSaldo`. Selo em `SaasMembro`. Default do status
+do tópico continua `VISIVEL` (seed e legado). UGC novo na torcida grava
+`PENDENTE`.
 
 Pós-merge: `schema:deploy` HML→prod (`docs/ops/schema-deploy.md`).

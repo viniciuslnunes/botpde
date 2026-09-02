@@ -7,20 +7,7 @@ import {
   useTransition,
   type ReactNode,
 } from 'react'
-import {
-  AlertTriangle,
-  BookmarkPlus,
-  CheckCircle2,
-  Contrast,
-  Grid3x3,
-  Layers,
-  Loader2,
-  MousePointerClick,
-  Palette,
-  RotateCcw,
-  Sparkles,
-  Trash2,
-} from 'lucide-react'
+import { AlertTriangle, BookmarkPlus, CheckCircle2, Clock, Contrast, Grid3x3, Layers, Loader2, MousePointerClick, Palette, RotateCcw, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
   ACTION_TOKEN_HINTS,
@@ -64,6 +51,7 @@ import {
   type PreviewScene,
   type TokenFocus,
 } from '@/components/admin/design-studio-preview'
+import { AppButton } from '@/components/ui/button'
 
 type EditorSection = 'identidade' | 'acoes' | 'fundo' | 'superficies'
 
@@ -703,13 +691,15 @@ function ContrastPanel({
               : 'Contraste OK nos temas claro e escuro'}
           </p>
           {fails.length > 0 && onFix ? (
-            <button
+            <AppButton
+              variant="none"
+              icon={Wand2}
               type="button"
               onClick={onFix}
               className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500/25 dark:text-amber-100"
             >
               Corrigir contraste nos dois temas
-            </button>
+            </AppButton>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {(['light', 'dark'] as const).map((mode) => {
@@ -1448,16 +1438,19 @@ export function DesignForm({
                         className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--border-strong))]"
                       />
                       <div className="flex flex-wrap gap-2">
-                        <button
+                        <AppButton
+                          variant="primary"
+                          icon={BookmarkPlus}
                           type="button"
                           onClick={salvarPaletaAtual}
                           disabled={(design.customPalettes ?? []).length >= 20}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+                          className="gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
                         >
-                          <BookmarkPlus className="h-3.5 w-3.5" />
                           Salvar na lista
-                        </button>
-                        <button
+                        </AppButton>
+                        <AppButton
+                          variant="none"
+                          icon={X}
                           type="button"
                           onClick={() => {
                             setMostrarSalvarPaleta(false)
@@ -1466,7 +1459,7 @@ export function DesignForm({
                           className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
                         >
                           Cancelar
-                        </button>
+                        </AppButton>
                       </div>
                       <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                         Fica no rascunho até você salvar o design da torcida.
@@ -1474,15 +1467,16 @@ export function DesignForm({
                       </p>
                     </div>
                   ) : (
-                    <button
+                    <AppButton
+                      variant="none"
+                      icon={BookmarkPlus}
                       type="button"
                       onClick={() => setMostrarSalvarPaleta(true)}
                       disabled={(design.customPalettes ?? []).length >= 20}
                       className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-2.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--border-strong))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                     >
-                      <BookmarkPlus className="h-3.5 w-3.5" />
                       Salvar paleta atual na lista
-                    </button>
+                    </AppButton>
                   )}
                 </div>
 
@@ -1630,9 +1624,11 @@ export function DesignForm({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {catalogoArquirrival ? (
-                          <button
+                          <AppButton
+                            variant="primary"
+                            icon={CheckCircle2}
                             type="button"
-                            className="app-action inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-xs font-semibold text-[rgb(var(--color-primary-on))]"
+                            className="gap-1.5 rounded-lg px-3 text-xs font-semibold"
                             onClick={() =>
                               patch({
                                 brand: {
@@ -1642,9 +1638,8 @@ export function DesignForm({
                               })
                             }
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                             Usar esta cor
-                          </button>
+                          </AppButton>
                         ) : null}
                         <button
                           type="button"
@@ -1653,13 +1648,15 @@ export function DesignForm({
                         >
                           {catalogoArquirrival ? 'Escolher outra' : 'Definir agora'}
                         </button>
-                        <button
+                        <AppButton
+                          variant="none"
+                          icon={Clock}
                           type="button"
                           className="app-action inline-flex items-center rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] underline-offset-2 hover:underline"
                           onClick={() => setArquirrivalPerguntaDispensada(true)}
                         >
                           Agora não
-                        </button>
+                        </AppButton>
                       </div>
                     </div>
                   ) : null}
@@ -1686,13 +1683,15 @@ export function DesignForm({
                     catálogo — clássico alvinegro (Santos × Corinthians) é
                     pulado; entra o próximo hue distinto (Palmeiras / Mancha).
                   </p>
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={Wand2}
                     type="button"
                     onClick={reequilibrarAcoesDaMarca}
                     className="text-left text-xs font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
                   >
                     Reequilibrar claro, escuro e ações a partir da primária
-                  </button>
+                  </AppButton>
                 </div>
               </SectionFrame>
             ) : null}
@@ -1960,15 +1959,16 @@ export function DesignForm({
               </SectionFrame>
             ) : null}
 
-            <button
+            <AppButton
+              variant="none"
+              icon={RotateCcw}
               type="button"
               onClick={handleRestore}
               disabled={pending}
               className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
               Restaurar padrão
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -1994,24 +1994,28 @@ export function DesignForm({
         locked={dirty || pending}
         dirtyLabel={dirty ? 'Prévia não salva — só você está vendo' : undefined}
       >
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={handleCancel}
           disabled={pending || !dirty}
           className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] disabled:opacity-40"
         >
           Descartar
-        </button>
-        <button
+        </AppButton>
+        <AppButton
+          variant="none"
+          icon={Save}
+          loading={pending}
           type="button"
           onClick={handleSave}
           disabled={pending || !dirty}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] disabled:opacity-40"
           style={{ backgroundColor: design.brand.primary }}
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar e aplicar à torcida
-        </button>
+        </AppButton>
       </StickyPersistBar>
     </div>
   )

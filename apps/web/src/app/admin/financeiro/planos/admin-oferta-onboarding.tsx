@@ -12,6 +12,8 @@ import { salvarPeriodicidadesOnboarding } from '@/app/admin/(plataforma)/configu
 import { runPersistAction } from '@/lib/toast-action'
 import { AppFormDrawer } from '@/components/ui/app-form-drawer'
 import { AdminPlanoForm } from './admin-plano-form'
+import { AppButton } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
 
 export type OfertaOnboardingLinha = {
   periodicidade: string
@@ -124,13 +126,15 @@ export function AdminOfertaOnboarding({
                     ) : null}
                   </>
                 ) : oferecida && podeGerir ? (
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={Plus}
                     type="button"
                     onClick={() => setCicloDrawer(p)}
                     className="app-touch-line text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Cadastrar valor
-                  </button>
+                  </AppButton>
                 ) : oferecida ? (
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">
                     Sem valor cadastrado

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export type ForumAbaId = 'topicos' | 'novo' | 'ranking'
 
@@ -14,9 +15,10 @@ export function ForumAbas({
   ativa: ForumAbaId
 }) {
   return (
-    <nav
+    <ScrollRail
+      as="nav"
       aria-label="Seções do fórum"
-      className="app-scrollbar-none flex gap-5 overflow-x-auto border-b border-[rgb(var(--border))] px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex gap-5 border-b border-[rgb(var(--border))] px-1"
     >
       {items.map((item) => {
         const ativo = item.id === ativa
@@ -43,6 +45,6 @@ export function ForumAbas({
           </Link>
         )
       })}
-    </nav>
+    </ScrollRail>
   )
 }

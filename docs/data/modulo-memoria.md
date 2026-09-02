@@ -4,9 +4,13 @@
 > `FeedTimeline` (fan-out por viewer do mural).
 >
 > Planejamento **fechado** em 2026-08-30 (decisão #16). Fases 1–5 entregues
-> neste contrato (`packages/types/src/memoria.js`). Schema Prisma: `MemoriaFato`,
-> `Tenant.memoriaAliados`, `PerfilMembro.memoriaPresencaVisivel` — exige
-> `schema:deploy` em HML/prod.
+> neste contrato (`packages/types/src/memoria.js`). **Enriquecimento do acervo**
+> (busca, marcos, capítulos, composer unificado, notificações) — 2026-09-02.
+>
+> Schema Prisma: `MemoriaFato`, `MemoriaMarco`, `MemoriaCapitulo`,
+> `MemoriaCapituloDia`, `Tenant.memoriaAliados`,
+> `PerfilMembro.memoriaPresencaVisivel`, `TipoNotificacao.MEMORIA_DIA_ABERTO` —
+> exige `schema:deploy` em HML/prod após mudança de enum/tabela.
 
 ## Tese
 
@@ -32,7 +36,10 @@ módulo (header, vazios, aba do admin), não na topbar. Visível também na CN, 
 `hrefDoLink` leva `?escopo=clube`. Abaixo de `xl` entra no hambúrguer com os
 demais módulos.
 
-Rota: `/portal/memoria?escopo=unidade\|torcida\|clube&dia=YYYY-MM-DD&f=jogo\|evento\|publicacao`.
+Rota: `/portal/memoria?escopo=unidade\|torcida\|clube&dia=YYYY-MM-DD&f=jogo\|evento\|publicacao&cap=slug-do-capitulo`.
+
+Query `cap` filtra a espinha para os dias de um **capítulo temático** (vista
+derivada — o eixo continua sendo o dia civil).
 
 Escopo padrão (`resolverEscopoMemoriaPadrao`): segue o **canal da Comunidade**
 (cookie `comunidade_escopo` / top bar), não o tenant ativo da sessão. Sócio da
@@ -170,6 +177,102 @@ LGPD: presença é dado de localização/associação. Sem opt-in não lista, n�
 exporta, não usa para recomendação de follow automática nesta fase (o follow
 continua manual).
 
+## Fase 6 — Acervo (enriquecimento UX) — ✅ 2026-09-02
+
+Camada de **descoberta, curadoria e narrativa** sobre as fases 1–5. O eixo por
+dia civil não muda.
+
+### Explorador e timeline
+
+- Sidebar: busca no acervo, estatísticas, capítulos, filtros em pílulas.
+- Espinha estilo catálogo (preview, miniaturas, badges de tipo, mês com contagem).
+- Painel do dia: marco institucional (leitura), “Neste dia” (paralelos 1/2/3/5 anos),
+  convite contextual, presença em destaque em dia de evento.
+
+Arquivos: `app/portal/memoria/_components/*`, `lib/memoria-acervo.ts`,
+`_lib/memoria-busca.ts`.
+
+### Busca no acervo
+
+- Texto em posts, eventos, fatos aprovados e adversário de partida.
+- Mesma visibilidade do loader (`filtrarPostsVisiveis`, recorte ativo).
+- Resultados agrupados por dia → deep link `?dia=`.
+
+### Marcos institucionais (`MemoriaMarco`)
+
+- Um marco por dia por tenant (`@@unique([tenantId, dia])`).
+- Sempre `PUBLICO` no tenant; **não** vaza para clube nem aliado.
+- Gate: `settings:manage` (diretoria).
+- Aparece na espinha (`kind: marco`) e no painel (card âmbar).
+
+### Capítulos temáticos (`MemoriaCapitulo` + `MemoriaCapituloDia`)
+
+- Coleção nomeada (slug, título, dias `YYYY-MM-DD`) — campanha, temporada, etc.
+- Navegação na sidebar; `?cap=slug` filtra a espinha (`filtrarDiasPorCapitulo`).
+- Admin: `/admin/comunidade/memoria` (bloco Capítulos do acervo).
+- Capítulo **não** substitui o dia — é vista derivada.
+
+### Composer unificado (“Ligar a este dia”)
+
+Um único campo no rodapé do painel. A intenção é inferida no servidor
+(`publicarNaMemoriaDoDia` → `resolverEntradaMemoria`):
+
+| Entrada | Destino | Quem |
+|---|---|---|
+| Texto livre | `MemoriaFato` (relato) | sócio aprovado / `community:post` |
+| Chip ou prefixo `marco:` | `MemoriaMarco` | `settings:manage` |
+| Chip ou prefixo `aniversário:` | `MemoriaMarco` (título prefixado) | `settings:manage` |
+| Menção a criar evento/caravana | Dica → Agenda (`/portal/eventos`) | — |
+
+Opcional no relato: **ligar a evento** ou **publicação** do dia (`eventoId` /
+`postId` no fato). A fila de moderação mostra o vínculo.
+
+Chips na UI: Relato | Marco | Aniversário (diretoria vê os três).
+
+### Surfacing
+
+- Badge **Memória oficial** em fatos aprovados e posts ligados a fato.
+- Badge **Coirmã** em publicações de torcida aliada (`deCoirma`) — só no
+  recorte `torcida`, quando `memoriaAliados` bilateral está ativo.
+- **Compartilhar** (link / Web Share) e **PDF** (impressão do navegador; sidebar
+  e composer ocultos via `@media print`).
+- **Open Graph**: `generateMetadata` com `tituloMemoriaDia` quando `?dia=` está
+  presente (`lib/memoria-meta.ts`).
+
+### Notificação “o dia abriu” (`MEMORIA_DIA_ABERTO`)
+
+Fan-out **1×/dia (~08h America/Sao_Paulo)** para sócios **aprovados** do tenant:
+
+| Gatilho | Link | Corpo (resumo) |
+|---|---|---|
+| `Partida` do clube hoje | `?escopo=clube&dia=` | Memória do jogo aberta |
+| `Evento` da unidade hoje | `?escopo=unidade&dia=` | Memória do evento aberta |
+
+- Implementação: `lib/memoria-dia-aberto.ts` → `dispatchMemoriaDiaAberto`.
+- Deduplicação: `criarNotificacoesEmLoteSePendentes` (mesmo `link` + tipo).
+- Escopo social na inbox (`notificacoes-routing.ts`).
+
+#### Cron (Railway / scheduler)
+
+```
+GET /api/cron/memoria-dia-aberto
+Authorization: Bearer <CRON_SECRET>
+```
+
+Cadência recomendada: **1×/dia às 08:00 BRT** (mesmo padrão de
+`/api/cron/eventos-lembretes`). Fora da janela das 08h SP o handler retorna
+`{ jogos: 0, eventos: 0 }` sem erro.
+
+Teste local (com secret no `.env`):
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  http://localhost:3000/api/cron/memoria-dia-aberto
+```
+
+**Deploy:** novo valor em `TipoNotificacao` exige `pnpm --filter @torcida/db
+schema:deploy` (HML → prod) — ver `docs/ops/schema-deploy.md`.
+
 ## Índice `MemoriaDia` (quando, não agora)
 
 Não bloquear fase 2. Introduzir **junto da fase 3** (passa a haver escrita
@@ -192,6 +295,7 @@ aberto hidrata o detalhe.
 | Ler unidade/torcida/clube | sessão + recorte acima; `filtrarPostsVisiveis` / `getEscopoEventosVisiveis` |
 | Criar fato atrasado | `community:post` (ou torcedor APROVADO da unidade) |
 | Aprovar/rejeitar | `community:moderate` |
+| Marco / capítulo do acervo | `settings:manage` |
 | Flag aliados | `settings:manage` na raiz |
 | Opt-in presença | o próprio usuário no perfil |
 
@@ -215,9 +319,30 @@ R5. Query sempre com `tenantId` ou `afiliacaoId`; nunca filtrar só na UI.
 
 ## Implementação (ordem)
 
-Fases 2–5 entregues juntas em 2026-08-30. `schema:deploy` (HML→prod) para
-`MemoriaFato`, `Tenant.memoriaAliados` e `PerfilMembro.memoriaPresencaVisivel`.
+| Fase | Entrega |
+|---|---|
+| 1–5 | 2026-08-30 — contrato base + `MemoriaFato` + aliados + presença |
+| 6a | Busca, estatísticas, “neste dia”, convite contextual, timeline acervo |
+| 6b | `MemoriaMarco`, `MemoriaCapitulo`, composer unificado, vínculo evento/post |
+| 6c | OG/compartilhar/PDF, badge coirmã, `MEMORIA_DIA_ABERTO` + cron |
+
 Índice `MemoriaDia` continua adiado até métrica de p95 da espinha clube.
+
+### Arquivos-chave (fase 6)
+
+| Área | Caminho |
+|---|---|
+| Loader | `app/portal/memoria/_lib/carregar-memoria.ts` |
+| Marcos/capítulos | `_lib/memoria-capitulos.ts` |
+| Busca | `_lib/memoria-busca.ts`, `actions.ts` → `buscarMemoriaAction` |
+| Regras puras | `lib/memoria-acervo.ts`, `packages/types/src/memoria.js` |
+| Composer | `_components/memoria-composer.tsx`, `publicarNaMemoriaDoDia` |
+| Notificações | `lib/memoria-dia-aberto.ts`, `app/api/cron/memoria-dia-aberto/` |
+| OG | `lib/memoria-meta.ts`, `page.tsx` → `generateMetadata` |
+| Admin | `app/admin/comunidade/memoria/` (fila + capítulos) |
+
+Testes: `memoria-regras.test.ts`, `memoria-acervo.test.ts`, `memoria-dia.test.ts`,
+`memoria-dia-aberto.test.ts`.
 
 ## Seed de teste (local)
 
@@ -226,12 +351,14 @@ TORCIDA_ENV=local pnpm --filter @torcida/db seed:memoria-demo
 ```
 
 Gaviões da Fiel + Camisa 12: eventos passados (caravana/ensaio/geral), posts
-do mural (alguns `alcanceNacional`), fatos `APROVADA`/`PENDENTE` e check-in
-com opt-in de presença. IDs `memoria-demo-*`. `--reset` apaga o lote.
+do mural (alguns `alcanceNacional`), fatos `APROVADA`/`PENDENTE`, check-in
+com opt-in de presença, **marco institucional** no dia do churrasco e capítulo
+**“Temporada demo”** (2 dias). IDs `memoria-demo-*`. `--reset` apaga o lote.
 Não existe "Aviões da Fiel" no catálogo — Camisa 12 é a outra organizada
 do mesmo clube para exercitar o recorte Clube.
 
 Contrato puro: `packages/types/src/memoria.js`. Zod:
 `packages/types/src/schemas/memoria.js`. Invariantes:
-`apps/web/src/lib/__tests__/memoria-regras.test.ts`.
+`apps/web/src/lib/__tests__/memoria-regras.test.ts`,
+`memoria-acervo.test.ts`, `memoria-dia-aberto.test.ts`.
 `ARCHITECTURE.md` §5.30. Decisão #16 em `docs/product/decisoes-abertas.md`.

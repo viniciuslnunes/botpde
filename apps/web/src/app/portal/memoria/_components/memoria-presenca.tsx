@@ -9,9 +9,11 @@ import type { MemoriaPresenca } from '../_lib/carregar-memoria'
 
 type Props = {
   presenca: MemoriaPresenca
+  /** Dia com evento — bloco mais visível. */
+  destaque?: boolean
 }
 
-export function MemoriaPresencaBloco({ presenca }: Props) {
+export function MemoriaPresencaBloco({ presenca, destaque = false }: Props) {
   const [pending, start] = useTransition()
   const extra = presenca.total - presenca.pessoas.length
 
@@ -34,9 +36,16 @@ export function MemoriaPresencaBloco({ presenca }: Props) {
   }
 
   return (
-    <section className="space-y-2">
-      <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-[rgb(var(--foreground-muted))]">
-        Quem estava
+    <section
+      className={[
+        'space-y-2',
+        destaque
+          ? 'rounded-2xl border border-[rgb(var(--color-primary)_/_0.25)] bg-[rgb(var(--color-primary)_/_0.06)] p-4'
+          : '',
+      ].join(' ')}
+    >
+      <h3 className="portal-kicker text-[rgb(var(--foreground-muted))]">
+        {destaque ? 'Quem esteve no evento' : 'Quem estava'}
       </h3>
       {presenca.pessoas.length > 0 && (
         <ul className="flex flex-wrap items-center gap-2">

@@ -37,7 +37,7 @@ export const LIMITE_PRESENCA_DIA = 24
 const SEMANA_CURTA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const
 
 export type MemoriaFiltro = 'todos' | 'jogo' | 'evento' | 'publicacao'
-export type MemoriaKind = 'partida' | 'evento' | 'post' | 'foto'
+export type MemoriaKind = 'partida' | 'evento' | 'post' | 'foto' | 'marco'
 export type MemoriaEventoTipo = 'GERAL' | 'CARAVANA' | 'ENSAIO'
 export type MemoriaMando = 'CASA' | 'FORA'
 
@@ -50,6 +50,8 @@ export type MemoriaPostBruto = {
   autorId: string
   autorNome: string | null
   autorAvatar: string | null
+  tenantId?: string
+  tenantNome?: string | null
 }
 
 export type MemoriaEventoBruto = {
@@ -85,16 +87,27 @@ export type MemoriaFatoBruto = {
   postId: string | null
 }
 
+export type MemoriaMarcoBruto = {
+  id: string
+  dia: Date | string
+  titulo: string
+  descricao: string | null
+}
+
 export type MemoriaBruta = {
   posts: MemoriaPostBruto[]
   eventos: MemoriaEventoBruto[]
   partidas: MemoriaPartidaBruta[]
   fatos?: MemoriaFatoBruto[]
+  marcos?: MemoriaMarcoBruto[]
 }
 
 export type MemoriaMontarOpts = {
   /** Escopo clube: o jogo abre o dia mesmo sem post/evento local. */
   abrirPartidaOrfa?: boolean
+  /** Tenant ativo do viewer — rotula publicações de coirmãs. */
+  homeTenantId?: string
+  idsAliados?: readonly string[]
 }
 
 export type MemoriaPostDia = {
@@ -106,7 +119,13 @@ export type MemoriaPostDia = {
   hora: string
   href: string
   fotos: string[]
+  /** Fato aprovado ou post ligado a fato atrasado — curadoria da memória. */
+  memoriaOficial?: boolean
   atrasado?: boolean
+  tenantId?: string
+  tenantNome?: string | null
+  /** Conteúdo público de torcida aliada (recorte torcida). */
+  deCoirma?: boolean
 }
 
 export type MemoriaEventoDia = {
@@ -130,12 +149,19 @@ export type MemoriaPartidaDia = {
   placarFora: number | null
 }
 
+export type MemoriaMarcoDia = {
+  id: string
+  titulo: string
+  descricao: string | null
+}
+
 export type MemoriaDiaDetalhe = {
   dia: string
   partida: MemoriaPartidaDia | null
   eventos: MemoriaEventoDia[]
   posts: MemoriaPostDia[]
   fotos: string[]
+  marco: MemoriaMarcoDia | null
 }
 
 export type MemoriaEspinhaDia = {
@@ -299,7 +325,7 @@ export function montarEspinhaCalendario(
     return {
       dia,
       kinds: kindsDoDia(det),
-      total: det.eventos.length + det.posts.length + (det.partida ? 1 : 0),
+      total: det.eventos.length + det.posts.length + (det.partida ? 1 : 0) + (det.marco ? 1 : 0),
     }
   })
 }
@@ -315,11 +341,18 @@ function fotosDoPost(post: MemoriaPostBruto): string[] {
 
 function kindsDoDia(dia: MemoriaDiaDetalhe): MemoriaKind[] {
   const kinds: MemoriaKind[] = []
+  if (dia.marco) kinds.push('marco')
   if (dia.partida) kinds.push('partida')
   if (dia.eventos.length > 0) kinds.push('evento')
   if (dia.posts.length > 0) kinds.push('post')
   if (dia.fotos.length > 0) kinds.push('foto')
   return kinds
+}
+
+function totalDia(dia: MemoriaDiaDetalhe): number {
+  return (
+    dia.eventos.length + dia.posts.length + (dia.partida ? 1 : 0) + (dia.marco ? 1 : 0)
+  )
 }
 
 export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): MemoriaMontada {
@@ -339,10 +372,17 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
     eventosPorDia.set(dia, list)
   }
 
+  const aliados = new Set(opts?.idsAliados ?? [])
+  const homeId = opts?.homeTenantId
+
   const postsPorDia = new Map<string, MemoriaPostDia[]>()
   for (const post of bruta.posts) {
     const dia = diaIsoDe(post.criadoEm)
     const list = postsPorDia.get(dia) ?? []
+    const tenantId = post.tenantId
+    const deCoirma = Boolean(
+      tenantId && homeId && tenantId !== homeId && aliados.has(tenantId),
+    )
     list.push({
       id: post.id,
       trecho: trechoPost(post.conteudo),
@@ -352,6 +392,9 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
       hora: formatTimeShort(post.criadoEm),
       href: `/portal/comunidade/post/${post.id}`,
       fotos: fotosDoPost(post),
+      tenantId,
+      tenantNome: post.tenantNome ?? null,
+      deCoirma,
     })
     postsPorDia.set(dia, list)
   }
@@ -359,9 +402,17 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
   for (const fato of bruta.fatos ?? []) {
     const dia = diaIsoDe(fato.dia)
     const list = postsPorDia.get(dia) ?? []
-    if (fato.postId && list.some((p) => p.id === fato.postId)) {
-      postsPorDia.set(dia, list)
-      continue
+    if (fato.postId) {
+      const idx = list.findIndex((p) => p.id === fato.postId)
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx]!,
+          memoriaOficial: true,
+          atrasado: dia < diaIsoDe(fato.criadoEm),
+        }
+        postsPorDia.set(dia, list)
+        continue
+      }
     }
     list.push({
       id: fato.id,
@@ -372,6 +423,7 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
       hora: formatTimeShort(fato.criadoEm),
       href: fato.postId ? `/portal/comunidade/post/${fato.postId}` : `/portal/memoria?dia=${dia}`,
       fotos: fato.midiaUrls.filter(Boolean),
+      memoriaOficial: true,
       atrasado: dia < diaIsoDe(fato.criadoEm),
     })
     postsPorDia.set(dia, list)
@@ -393,7 +445,21 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
     })
   }
 
-  const diasUnidade = new Set([...eventosPorDia.keys(), ...postsPorDia.keys()])
+  const marcosPorDia = new Map<string, MemoriaMarcoDia>()
+  for (const m of bruta.marcos ?? []) {
+    const dia = diaIsoDe(m.dia)
+    marcosPorDia.set(dia, {
+      id: m.id,
+      titulo: m.titulo,
+      descricao: m.descricao,
+    })
+  }
+
+  const diasUnidade = new Set([
+    ...eventosPorDia.keys(),
+    ...postsPorDia.keys(),
+    ...marcosPorDia.keys(),
+  ])
   if (opts?.abrirPartidaOrfa) {
     for (const dia of partidasPorDia.keys()) diasUnidade.add(dia)
   }
@@ -419,6 +485,7 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
       eventos,
       posts,
       fotos,
+      marco: marcosPorDia.get(dia) ?? null,
     }
   }
 
@@ -426,7 +493,7 @@ export function montarMemoria(bruta: MemoriaBruta, opts?: MemoriaMontarOpts): Me
     .map((dia) => ({
       dia: dia.dia,
       kinds: kindsDoDia(dia),
-      total: dia.eventos.length + dia.posts.length + (dia.partida ? 1 : 0),
+      total: totalDia(dia),
     }))
     .sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : 0))
 

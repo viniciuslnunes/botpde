@@ -5,6 +5,7 @@ import { ArrowRight, Building2, Check, Users } from 'lucide-react'
 import { promoverSedeAction } from '@/app/admin/(estrutura)/sedes/actions'
 import { trocarTorcidaAction } from '@/app/portal/tenant-context-actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { AppButton } from '@/components/ui/button'
 
 /**
  * CTA para promover SUBSEDE/PDE a portal próprio (Caso B).
@@ -109,14 +110,15 @@ export function PromoverSedeButton({
           </ul>
 
           <div className="pt-0.5">
-            <button
+            <AppButton
+              variant="primary"
+              icon={Building2}
               type="button"
               onClick={handlePromover}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]"
+              className="gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]"
             >
-              <Building2 className="h-3.5 w-3.5" aria-hidden />
               Criar portal próprio
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>

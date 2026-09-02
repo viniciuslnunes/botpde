@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Save } from 'lucide-react'
 import {
   SETOR_ARQUIBANCADA_LABEL,
   formatarSetorArquibancada,
@@ -13,6 +13,7 @@ import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { runPersistAction } from '@/lib/toast-action'
 import type { SetorArquibancadaCardeal } from '@/lib/setor-arquibancada'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   cardeal: SetorArquibancadaCardeal | null
@@ -167,14 +168,16 @@ export function SetorArquibancadaForm({
         locked={isDirty || pending}
         dirtyLabel={isDirty ? 'Setor na arquibancada' : undefined}
       >
-        <button
+        <AppButton
+          variant="primary"
+          icon={Save}
+          loading={pending}
           type="submit"
           disabled={pending || !cardeal}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-sm font-medium"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar setor
-        </button>
+        </AppButton>
       </StickyPersistBar>
     </form>
   )

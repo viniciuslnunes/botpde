@@ -89,3 +89,45 @@ export function paraTenantRaiz(
 ): string {
   return maePorFilho.get(tenantId) ?? tenantId
 }
+
+/**
+ * Ids dos tenants que **não** são torcida por serem portal de unidade (Caso B).
+ *
+ * Existe para que a regra "ser raiz" — a única das três que não cabia num
+ * `where` — passe a caber: `{ id: { notIn: await listarTenantsNaoRaiz() } }`.
+ * Sem isso, listar torcidas exige carregar TODOS os tenants para filtrar em
+ * memória, e paginar no banco fica impossível.
+ *
+ * O conjunto é pequeno por construção (um id por promoção Caso B na
+ * plataforma inteira), então o `notIn` não vira consulta patológica.
+ */
+export const listarTenantsNaoRaiz = cache(async function listarTenantsNaoRaiz(): Promise<
+  string[]
+> {
+  const maePorFilho = await carregarMapaPortalMae()
+  return [...maePorFilho.keys()]
+})
+
+/**
+ * `where` completo de "este tenant é uma torcida" — **fonte única** de contar e
+ * de listar, agora também para quem pagina no banco.
+ *
+ * Junta as duas condições de coluna (`WHERE_TENANT_E_TORCIDA`) com a terceira
+ * (ser raiz). Quem monta o filtro à mão reproduz o bug do KPI que mostrava 557
+ * onde a lista trazia 554: os portais Caso B contados como torcida.
+ *
+ * Devolve objeto **novo** a cada chamada de propósito — quem monta um `where`
+ * costuma espalhar e completar o resultado, e um literal compartilhado por
+ * `cache` viraria estado global de requisição. A consulta cara já está
+ * memoizada em `listarTenantsNaoRaiz`.
+ */
+export async function whereTenantEhTorcida(): Promise<{
+  ativo: true
+  sintetico: false
+  id?: { notIn: string[] }
+}> {
+  const naoRaiz = await listarTenantsNaoRaiz()
+  return naoRaiz.length > 0
+    ? { ...WHERE_TENANT_E_TORCIDA, id: { notIn: naoRaiz } }
+    : { ...WHERE_TENANT_E_TORCIDA }
+}

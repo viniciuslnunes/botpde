@@ -4,6 +4,11 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import {
+  aplicarVotoPracaLocal,
+  contagemExibidaVotoPraca,
+  proximoVotoPraca,
+} from '@torcida/types/portal-noticias-forum'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import {
   criarTopicoAction,
@@ -89,27 +94,45 @@ export function VotarPracaBotoes({
   alvoId,
   gostei = 0,
   naoGostei = 0,
+  meuVoto = null,
 }: {
   escopo: EscopoComunidade
-  alvoTipo: 'ARTIGO' | 'NOTICIA' | 'TOPICO' | 'RESPOSTA'
+  alvoTipo: 'ARTIGO' | 'NOTICIA' | 'TOPICO' | 'RESPOSTA' | 'COMENTARIO'
   alvoId: string
   gostei?: number
   naoGostei?: number
+  meuVoto?: 1 | -1 | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const saldo = gostei - naoGostei
+  const [voto, setVoto] = useState<1 | -1 | null>(meuVoto)
+  const [totalGostei, setTotalGostei] = useState(gostei)
+  const [totalNao, setTotalNao] = useState(naoGostei)
+  const apoios = contagemExibidaVotoPraca(totalGostei, totalNao)
 
-  function votar(valor: 1 | -1) {
+  function votar(clicado: 1 | -1) {
+    const anterior = voto
+    const novo = proximoVotoPraca(anterior, clicado)
+    const snapshot = { voto: anterior, gostei: totalGostei, nao: totalNao }
+    const local = aplicarVotoPracaLocal(totalGostei, totalNao, anterior, novo)
+    setVoto(novo === 0 ? null : novo)
+    setTotalGostei(local.gostei)
+    setTotalNao(local.naoGostei)
     const fd = new FormData()
     fd.set('escopo', escopo)
     fd.set('alvoTipo', alvoTipo)
     fd.set('alvoId', alvoId)
-    fd.set('valor', String(valor))
+    fd.set('valor', String(novo))
     start(async () => {
       const r = await votarPracaAction(fd)
-      if ('error' in r) toast.error(r.error)
-      else router.refresh()
+      if ('error' in r) {
+        setVoto(snapshot.voto)
+        setTotalGostei(snapshot.gostei)
+        setTotalNao(snapshot.nao)
+        toast.error(r.error)
+        return
+      }
+      router.refresh()
     })
   }
 
@@ -119,23 +142,38 @@ export function VotarPracaBotoes({
         type="button"
         disabled={pending}
         onClick={() => votar(1)}
-        aria-label="Concordo"
-        className="app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+        aria-pressed={voto === 1}
+        aria-label={voto === 1 ? 'Remover concordância' : 'Concordo'}
+        className={[
+          'app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium disabled:opacity-50',
+          voto === 1
+            ? 'text-[rgb(var(--color-primary-fg))]'
+            : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+        ].join(' ')}
       >
-        <ChevronUp className="h-4 w-4" />
+        <ChevronUp className={['h-4 w-4', voto === 1 ? 'stroke-[2.5]' : ''].join(' ')} />
         Concordo
       </button>
-      <span className="min-w-8 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]">
-        {saldo}
+      <span
+        className="min-w-8 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]"
+        aria-label={`${apoios} de saldo no tópico`}
+      >
+        {apoios}
       </span>
       <button
         type="button"
         disabled={pending}
         onClick={() => votar(-1)}
-        aria-label="Discordo"
-        className="app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+        aria-pressed={voto === -1}
+        aria-label={voto === -1 ? 'Remover discordância' : 'Discordo'}
+        className={[
+          'app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium disabled:opacity-50',
+          voto === -1
+            ? 'text-[rgb(var(--foreground))]'
+            : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+        ].join(' ')}
       >
-        <ChevronDown className="h-4 w-4" />
+        <ChevronDown className={['h-4 w-4', voto === -1 ? 'stroke-[2.5]' : ''].join(' ')} />
         Discordo
       </button>
     </div>

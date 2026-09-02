@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { inboxSincronizarCobrancasVencidas } from '@/app/admin/inbox-actions'
+import { AppButton } from '@/components/ui/button'
 
 /** Botão explícito — substitui write no GET da direção financeira. */
 export function SincronizarCobrancasButton() {
@@ -11,9 +12,12 @@ export function SincronizarCobrancasButton() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
+      <AppButton
         type="button"
-        disabled={pending}
+        variant="outline"
+        size="sm"
+        icon={RefreshCw}
+        loading={pending}
         onClick={() => {
           setMsg(null)
           start(async () => {
@@ -22,15 +26,9 @@ export function SincronizarCobrancasButton() {
             else setMsg(`${r.atualizadas ?? 0} atualizada(s)`)
           })
         }}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] disabled:opacity-60"
       >
-        {pending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-        ) : (
-          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-        )}
         Atualizar vencidas
-      </button>
+      </AppButton>
       {msg ? <span className="text-xs text-[rgb(var(--foreground-muted))]">{msg}</span> : null}
     </div>
   )

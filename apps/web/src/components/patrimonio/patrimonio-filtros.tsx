@@ -11,6 +11,9 @@ export type PatrimonioFiltroValues = {
   incluirBaixados?: boolean
 }
 
+const INPUT =
+  'mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]'
+
 export function PatrimonioFiltros({
   basePath,
   values,
@@ -22,11 +25,17 @@ export function PatrimonioFiltros({
   categoriaTravada,
   /** Tab da URL a preservar no GET (admin). Ausente no portal. */
   tab,
+  /**
+   * `toolbar`: linha do cabeçalho admin (sem card). `card`: formulário
+   * empilhado do portal.
+   */
+  variant = 'card',
 }: {
   basePath: string
   values: PatrimonioFiltroValues
   categoriaTravada?: string | null
   tab?: string
+  variant?: 'card' | 'toolbar'
 }) {
   const hasAny = Boolean(
     (!categoriaTravada && values.categoria) ||
@@ -35,74 +44,68 @@ export function PatrimonioFiltros({
       values.incluirBaixados,
   )
   const limparHref = tab ? `${basePath}?tab=${encodeURIComponent(tab)}` : basePath
+  const toolbar = variant === 'toolbar'
 
   return (
     <form
       method="get"
       action={basePath}
-      className="flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+      className={
+        toolbar
+          ? 'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end'
+          : 'flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4'
+      }
     >
       {tab ? <input type="hidden" name="tab" value={tab} /> : null}
-      <div
-        className={
-          categoriaTravada
-            ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'
-            : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
-        }
+      <label
+        className={[
+          'block text-xs font-medium text-[rgb(var(--foreground-muted))]',
+          toolbar ? 'min-w-0 flex-1 sm:max-w-sm' : '',
+        ].join(' ')}
       >
+        Busca
+        <input
+          name="q"
+          defaultValue={values.q ?? ''}
+          placeholder="Nome, local ou observação"
+          className={INPUT}
+        />
+      </label>
+      {!categoriaTravada && (
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Busca
-          <input
-            name="q"
-            defaultValue={values.q ?? ''}
-            placeholder="Nome, local ou observação"
-            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          />
-        </label>
-        {!categoriaTravada && (
-          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Categoria
-            <select
-              name="categoria"
-              defaultValue={values.categoria ?? ''}
-              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-            >
-              <option value="">Todas</option>
-              {Object.entries(CATEGORIA_PATRIMONIO_LABEL).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Status
-          <select
-            name="status"
-            defaultValue={values.status ?? ''}
-            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-          >
-            <option value="">Ativos (sem baixados)</option>
-            {Object.entries(STATUS_PATRIMONIO_LABEL).map(([k, label]) => (
+          Categoria
+          <select name="categoria" defaultValue={values.categoria ?? ''} className={INPUT}>
+            <option value="">Todas</option>
+            {Object.entries(CATEGORIA_PATRIMONIO_LABEL).map(([k, label]) => (
               <option key={k} value={k}>
                 {label}
               </option>
             ))}
           </select>
         </label>
-        <label className="flex items-end gap-2 pb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          <input
-            type="checkbox"
-            name="incluirBaixados"
-            value="1"
-            defaultChecked={values.incluirBaixados}
-            className="rounded border-[rgb(var(--border))]"
-          />
-          Incluir baixados
-        </label>
-      </div>
-      <div className="flex flex-wrap gap-2">
+      )}
+      <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Status
+        <select name="status" defaultValue={values.status ?? ''} className={INPUT}>
+          <option value="">Ativos (sem baixados)</option>
+          {Object.entries(STATUS_PATRIMONIO_LABEL).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2 pb-2 text-xs font-medium text-[rgb(var(--foreground-muted))] sm:pb-2.5">
+        <input
+          type="checkbox"
+          name="incluirBaixados"
+          value="1"
+          defaultChecked={values.incluirBaixados}
+          className="rounded border-[rgb(var(--border))]"
+        />
+        Incluir baixados
+      </label>
+      <div className="flex flex-wrap items-center gap-2 sm:pb-0.5">
         <button
           type="submit"
           className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on"

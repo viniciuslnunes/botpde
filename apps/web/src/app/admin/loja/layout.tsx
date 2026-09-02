@@ -4,7 +4,7 @@ import { Archive, Package, Recycle, ShoppingBag, Ticket, TrendingUp } from 'luci
 import { db } from '@torcida/db'
 import { assertStoreView } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
-import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
@@ -51,10 +51,14 @@ export default async function LojaModuloLayout({ children }: { children: ReactNo
         title="Loja"
         description="Catálogo, pedidos, arquivo de tickets e desempenho de vendas."
         icon={<ShoppingBag className="h-5 w-5" />}
-      />
+      >
+        <AdminModuleTabBar tabs={tabs} />
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <AdminModuleTabs tabs={tabs}>{children}</AdminModuleTabs>
+        <AdminModuleTabs tabs={tabs} chrome="panel">
+          {children}
+        </AdminModuleTabs>
       </div>
     </>
   )

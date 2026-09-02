@@ -324,6 +324,10 @@ model Tenant {
 
   memoriaFatos      MemoriaFato[]
 
+  memoriaMarcos     MemoriaMarco[]
+
+  memoriaCapitulos  MemoriaCapitulo[]
+
   advertencias      Advertencia[]
 
   announcements     Announcement[]
@@ -568,6 +572,8 @@ model User {
   memoriaFatos         MemoriaFato[]
 
   memoriaFatosAprovados MemoriaFato[]       @relation("MemoriaFatoAprovador")
+
+  memoriaMarcos        MemoriaMarco[]
 
   auditLogs            AuditLog[]           @relation("AuditAtor")
 
@@ -3881,6 +3887,74 @@ model MemoriaFato {
 
 }
 
+/// Marco institucional da Memória — curadoria da diretoria (`settings:manage`).
+/// Sempre público no tenant; um marco por dia por unidade.
+model MemoriaMarco {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  autorId  String @map("autor_id")
+
+  dia DateTime
+
+  titulo    String
+  descricao String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor  User   @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dia])
+  @@index([tenantId, dia])
+  @@map("saas_memoria_marcos")
+
+}
+
+/// Capítulo temático do acervo (campanha, temporada, etc.).
+model MemoriaCapitulo {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  titulo    String
+  slug      String
+  descricao String?
+  ativo     Boolean @default(true)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dias   MemoriaCapituloDia[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, ativo])
+  @@map("saas_memoria_capitulos")
+
+}
+
+/// Dia civil ligado a um capítulo — vista derivada, não substitui o eixo dia.
+model MemoriaCapituloDia {
+
+  id         String @id @default(uuid())
+
+  capituloId String @map("capitulo_id")
+
+  dia DateTime
+
+  ordem Int @default(0)
+
+  capitulo MemoriaCapitulo @relation(fields: [capituloId], references: [id], onDelete: Cascade)
+
+  @@unique([capituloId, dia])
+  @@index([capituloId, ordem])
+  @@map("saas_memoria_capitulo_dias")
+
+}
+
 
 
 model Seguimento {
@@ -4547,6 +4621,8 @@ enum TipoNotificacao {
 
   MEMORIA_FATO_DECIDIDA
 
+  MEMORIA_DIA_ABERTO
+
 }
 
 
@@ -4603,6 +4679,10 @@ model Conversa {
 
   canalOficial        Boolean           @default(false) @map("canal_oficial")
 
+  /// Canal de portal de notícias oficial (GE, Lance, etc.) — integração futura.
+  /// Quem tem este selo publica na praça de notícias como fonte verificada.
+  portalNoticiasVerificado Boolean      @default(false) @map("portal_noticias_verificado")
+
   visibilidadeCanal   VisibilidadeCanal @default(HIERARQUIA) @map("visibilidade_canal")
 
   /// Mural do canal: quando true, só admins publicam posts
@@ -4630,6 +4710,8 @@ model Conversa {
   mensagens MensagemDireta[]
 
   posts     Post[]
+
+  artigosPortal ArtigoPortal[]
 
   departamentoCanal Departamento? @relation("DepartamentoCanal")
 
@@ -5006,6 +5088,8 @@ model Noticia {
 
   publicadoEm     DateTime?     @map("publicado_em")
 
+  visitas         Int           @default(0)
+
   curadoPorId     String?       @map("curado_por_id")
 
   criadoEm        DateTime      @default(now()) @map("criado_em")
@@ -5021,6 +5105,8 @@ model Noticia {
   @@unique([afiliacaoId, url])
 
   @@index([afiliacaoId, status, publicadoEm])
+
+  @@index([afiliacaoId, status, visitas])
 
   @@map("saas_noticias")
 
@@ -5071,30 +5157,43 @@ enum PracaAlvoTipo {
   NOTICIA
   TOPICO
   RESPOSTA
+  COMENTARIO
 }
 
 /// Artigo editorial da torcida/unidade — nunca da imprensa (isso é Noticia).
 /// tenantId obrigatório: unidade não vaza para Sede nem irmã.
+/// Publicação exige canal oficial da torcida/unidade ou canal verificado de portal.
 model ArtigoPortal {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  autorId  String @map("autor_id")
+  id         String  @id @default(uuid())
+  tenantId   String  @map("tenant_id")
+  autorId    String  @map("autor_id")
+  conversaId String? @map("conversa_id")
 
-  titulo   String
-  resumo   String?
-  corpo    String
-  capaUrl  String? @map("capa_url")
+  titulo    String
+  resumo    String?
+  corpo     String
+  capaUrl   String?  @map("capa_url")
+  midiaUrls String[] @default([]) @map("midia_urls")
+  /// Corpo em blocos intercalados (texto, foto, video, embed). Null = legado (so corpo e midiaUrls).
+  blocos    Json?
 
-  origem       ArtigoOrigem        @default(OFICIAL)
-  status       ArtigoPortalStatus  @default(RASCUNHO)
-  publicadoEm  DateTime?           @map("publicado_em")
-  criadoEm     DateTime            @default(now()) @map("criado_em")
-  atualizadoEm DateTime            @updatedAt @map("atualizado_em")
+  origem      ArtigoOrigem       @default(OFICIAL)
+  status      ArtigoPortalStatus @default(RASCUNHO)
+  fixado      Boolean            @default(false)
+  visitas     Int                @default(0)
+  gostei      Int                @default(0)
+  naoGostei   Int                @default(0) @map("nao_gostei")
+  publicadoEm DateTime?          @map("publicado_em")
+  criadoEm    DateTime           @default(now()) @map("criado_em")
+  atualizadoEm DateTime          @updatedAt @map("atualizado_em")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autor  User   @relation(fields: [autorId], references: [id])
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor    User      @relation(fields: [autorId], references: [id])
+  conversa Conversa? @relation(fields: [conversaId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, publicadoEm])
+  @@index([tenantId, status, visitas])
+  @@index([conversaId])
   @@map("saas_artigos_portal")
 }
 
@@ -5172,13 +5271,19 @@ model PracaComentario {
   autorId   String        @map("autor_id")
   alvoTipo  PracaAlvoTipo @map("alvo_tipo")
   alvoId    String        @map("alvo_id")
+  parentId  String?       @map("parent_id")
   conteudo  String
-  oculto    Boolean        @default(false)
+  oculto    Boolean       @default(false)
+  gostei    Int           @default(0)
+  naoGostei Int           @default(0) @map("nao_gostei")
   criadoEm  DateTime      @default(now()) @map("criado_em")
 
-  autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  autor   User              @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  parent  PracaComentario?  @relation("PracaComentarioThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies PracaComentario[] @relation("PracaComentarioThread")
 
   @@index([alvoTipo, alvoId, criadoEm])
+  @@index([parentId, criadoEm])
   @@map("saas_praca_comentarios")
 }
 

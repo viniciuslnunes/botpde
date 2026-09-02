@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, useId } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
+import { Check, ChevronDown, Eye, Pencil, Plus, Save, Search, Shield, Trash2, X } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
   applyPermissionCascade,
@@ -51,6 +51,7 @@ import {
   useUnsavedChanges,
   useUnsavedChangesContext,
 } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
 
 // ── Perfil do Tenant ──────────────────────────────────────────────────────────
 
@@ -99,14 +100,16 @@ export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
       </p>
 
       <div className="flex items-center gap-3">
-        <button
+        <AppButton
+          variant="primary"
+          icon={Save}
+          loading={pending}
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-sm font-medium"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar alterações
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -860,14 +863,16 @@ export function DiscordForm({ discordGuildId }: DiscordFormProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
+        <AppButton
+          variant="none"
+          icon={Save}
+          loading={pending}
           type="submit"
           disabled={pending}
           className="flex items-center gap-2 rounded-lg bg-[#5865F2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar Guild ID
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -924,14 +929,16 @@ export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
+        <AppButton
+          variant="primary"
+          icon={Save}
+          loading={pending}
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-sm font-medium"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar afiliação
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -1088,14 +1095,16 @@ export function CanalOficialForm({
       </label>
 
       <div className="flex items-center gap-3">
-        <button
+        <AppButton
+          variant="primary"
+          icon={Save}
+          loading={pending}
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-sm font-medium"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar canal oficial
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -1284,16 +1293,17 @@ export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManag
         </div>
       ) : (
         !editando && (
-          <button
+          <AppButton
+            variant="none"
+            icon={Plus}
             onClick={() => {
               setErro(null)
               setCriando(true)
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))] hover:text-[rgb(var(--foreground))]"
           >
-            <Plus className="h-4 w-4" />
             Criar novo cargo
-          </button>
+          </AppButton>
         )
       )}
     </div>
@@ -1752,7 +1762,9 @@ function RoleForm({
             : 'Revise as permissões e confirme a criação do cargo.'
         }
       >
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={() => {
             void confirmDiscard().then((ok) => {
@@ -1763,16 +1775,18 @@ function RoleForm({
           className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]"
         >
           Cancelar
-        </button>
-        <button
+        </AppButton>
+        <AppButton
+          variant="primary"
+          icon={Check}
+          loading={pending}
           type="submit"
           form={formId}
           disabled={pending || (!departamentoId && selected.size === 0) || isSystem}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-xs font-semibold"
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           {initialNome ? 'Salvar' : 'Criar cargo'}
-        </button>
+        </AppButton>
       </StickyPersistBar>
     </form>
   )
@@ -1871,13 +1885,14 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
           />
         </div>
       ) : (
-        <button
+        <AppButton
+          variant="none"
+          icon={Plus}
           onClick={() => setCriando(true)}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))] hover:text-[rgb(var(--foreground))]"
         >
-          <Plus className="h-4 w-4" />
           Criar novo departamento
-        </button>
+        </AppButton>
       )}
     </div>
   )
@@ -2233,7 +2248,9 @@ function DepartamentoForm({
             : 'Revise membro/gestor e confirme a criação da área.'
         }
       >
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={() => {
             void confirmDiscard().then((ok) => {
@@ -2241,18 +2258,19 @@ function DepartamentoForm({
             })
           }}
           className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <X className="h-3 w-3" /> Cancelar
-        </button>
-        <button
+        > Cancelar
+        </AppButton>
+        <AppButton
+          variant="primary"
+          icon={Check}
+          loading={pending}
           type="submit"
           form={formId}
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="flex gap-2 rounded-lg px-4 py-2 text-xs font-semibold"
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           {isEdit ? 'Salvar' : 'Criar departamento'}
-        </button>
+        </AppButton>
       </StickyPersistBar>
     </form>
   )

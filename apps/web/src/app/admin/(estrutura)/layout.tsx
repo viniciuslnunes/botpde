@@ -5,7 +5,7 @@ import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { tenantIsAdministracaoSede } from '@/lib/authz'
 import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
-import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
@@ -54,10 +54,14 @@ export default async function EstruturaModuloLayout({ children }: { children: Re
         title="Estrutura"
         description={`Organização de ${tenant.nome} — unidades, hierarquia e afiliação.`}
         icon={<Building2 className="h-5 w-5" />}
-      />
+      >
+        <AdminModuleTabBar tabs={tabs} />
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <AdminModuleTabs tabs={tabs}>{children}</AdminModuleTabs>
+        <AdminModuleTabs tabs={tabs} chrome="panel">
+          {children}
+        </AdminModuleTabs>
       </div>
     </>
   )

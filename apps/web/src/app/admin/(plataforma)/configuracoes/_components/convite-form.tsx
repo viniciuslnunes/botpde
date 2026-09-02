@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Copy, Link2, Loader2, RefreshCw } from 'lucide-react'
+import { Check, Copy, Link2, RefreshCw } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import { alternarConviteTenant, gerarConviteTenant } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 interface ConviteFormProps {
   slug: string | null
@@ -119,19 +120,17 @@ export function ConviteForm({ slug, ativo, canalRestrito }: ConviteFormProps) {
         </div>
       ) : null}
 
-      <button
+      <AppButton
+        variant="none"
+        icon={RefreshCw}
+        loading={pending}
         type="button"
         disabled={pending}
         onClick={gerar}
         className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.28)] disabled:opacity-50"
       >
-        {pending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <RefreshCw className="h-3.5 w-3.5" />
-        )}
         {slug ? 'Gerar novo link' : 'Criar link de convite'}
-      </button>
+      </AppButton>
     </div>
   )
 }

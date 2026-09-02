@@ -25,6 +25,7 @@ import { useAdminNavbarContext, markAdminNavbarNotificationRead } from '@/lib/us
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
+import { AppButton } from '@/components/ui/button'
 
 interface AdminMenuItem {
   id: string
@@ -234,14 +235,15 @@ function AdminTopbar({
                   <Shield className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
                   Área Admin
                 </p>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={LogOut}
                   type="button"
                   onClick={() => signOut({ callbackUrl: '/entrar' })}
                   className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                 >
-                  <LogOut className="h-4 w-4" />
                   Sair
-                </button>
+                </AppButton>
               </div>
             )}
           </div>

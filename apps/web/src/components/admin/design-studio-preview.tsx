@@ -1,16 +1,7 @@
 'use client'
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
-import {
-  Bell,
-  Calendar,
-  Check,
-  Home,
-  MessageCircle,
-  ShoppingBag,
-  Users,
-  X,
-} from 'lucide-react'
+import { Bell, Calendar, Check, Heart, Home, LogIn, MessageCircle, Share2, ShoppingBag, Users, X } from 'lucide-react'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
   DEFAULT_ACTIONS,
@@ -21,6 +12,7 @@ import {
   resolveActionTextColors,
   resolverSuperficies,
 } from '@torcida/types'
+import { AppButton } from '@/components/ui/button'
 
 export type PreviewScene = 'portal' | 'admin' | 'entrar'
 export type PreviewMode = 'light' | 'dark'
@@ -274,7 +266,9 @@ function PortalScene({
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Hotspot token="brand.primary" focus={focus} label="Botão primário">
-                      <button
+                      <AppButton
+                        variant="none"
+                        icon={MessageCircle}
                         type="button"
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold"
                         style={{
@@ -283,10 +277,12 @@ function PortalScene({
                         }}
                       >
                         Comentar
-                      </button>
+                      </AppButton>
                     </Hotspot>
                     <Hotspot token="brand.secondary" focus={focus} label="Botão secundário">
-                      <button
+                      <AppButton
+                        variant="none"
+                        icon={Heart}
                         type="button"
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold"
                         style={{
@@ -295,10 +291,12 @@ function PortalScene({
                         }}
                       >
                         Curtir
-                      </button>
+                      </AppButton>
                     </Hotspot>
                     <Hotspot token="surfaceRaised" focus={focus} label="Superfície elevada">
-                      <button
+                      <AppButton
+                        variant="none"
+                        icon={Share2}
                         type="button"
                         className="rounded-lg border px-3 py-1.5 text-xs font-medium"
                         style={{
@@ -308,7 +306,7 @@ function PortalScene({
                         }}
                       >
                         Compartilhar
-                      </button>
+                      </AppButton>
                     </Hotspot>
                   </div>
                 </div>
@@ -665,13 +663,15 @@ function EntrarScene({
               </div>
             </Hotspot>
             <Hotspot token="brand.primary" focus={focus} label="Botão entrar" className="mt-4">
-              <button
+              <AppButton
+                variant="none"
+                icon={LogIn}
                 type="button"
                 className="w-full rounded-lg py-2.5 text-sm font-semibold"
                 style={{ backgroundColor: primaryText.fill, color: primaryText.on }}
               >
                 Entrar
-              </button>
+              </AppButton>
             </Hotspot>
             <Hotspot token="brand.secondary" focus={focus} label="Link secundário" className="mt-3">
               <p className="text-center text-xs">

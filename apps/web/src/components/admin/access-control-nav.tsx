@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { UserRound, Shield, Users2, type LucideIcon } from 'lucide-react'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export type AccessSecao = 'pessoas' | 'cargos' | 'departamentos'
 
@@ -29,7 +30,7 @@ interface AccessControlNavProps {
 export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
   return (
     <nav aria-label="Seções do controle de acesso" className="mt-4">
-      <div className="app-scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+      <ScrollRail className="-mx-1 flex gap-1 px-1 pb-1">
         {SECOES.map((item) => {
           const active = secao === item.id
           const Icon = item.icon
@@ -61,7 +62,7 @@ export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
             </Link>
           )
         })}
-      </div>
+      </ScrollRail>
       <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
         {secao === 'pessoas' && (
           <>

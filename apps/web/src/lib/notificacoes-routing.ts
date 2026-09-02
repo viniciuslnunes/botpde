@@ -178,6 +178,7 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   BRECHO_INTERESSE: { escopo: 'social' },
   BRECHO_TROCA_CONFIRMADA: { escopo: 'social' },
   MEMORIA_FATO_DECIDIDA: { escopo: 'social' },
+  MEMORIA_DIA_ABERTO: { escopo: 'social' },
   BRECHO_DENUNCIA: {
     escopo: 'hibrido',
     permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],

@@ -14,9 +14,11 @@ vi.mock('@torcida/db', () => ({
 
 import {
   filtrarTenantsRaiz,
+  listarTenantsNaoRaiz,
   listarTorcidasDoClube,
   paraTenantRaiz,
   WHERE_TENANT_E_TORCIDA,
+  whereTenantEhTorcida,
 } from '@/lib/tenant-hierarquia-plataforma'
 
 describe('filtrarTenantsRaiz', () => {
@@ -92,5 +94,52 @@ describe('paraTenantRaiz', () => {
     const maePorFilho = new Map([['filho', 'mae']])
     expect(paraTenantRaiz('filho', maePorFilho)).toBe('mae')
     expect(paraTenantRaiz('mae', maePorFilho)).toBe('mae')
+  })
+})
+
+describe('whereTenantEhTorcida', () => {
+  beforeEach(() => {
+    mocks.queryRaw.mockReset()
+  })
+
+  it('exclui os portais Caso B do `where` — é o que fecha a divergência 557 × 554', async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { filho: 'fiel-sao-vicente', mae: 'pde-gavioes-fiel' },
+      { filho: 'subsede-rio-claro', mae: 'pde-gavioes-fiel' },
+    ])
+
+    expect(await whereTenantEhTorcida()).toEqual({
+      ...WHERE_TENANT_E_TORCIDA,
+      id: { notIn: ['fiel-sao-vicente', 'subsede-rio-claro'] },
+    })
+  })
+
+  it('sem promoção Caso B não emite `notIn` — `id: { notIn: [] }` não filtra nada e só polui o plano', async () => {
+    mocks.queryRaw.mockResolvedValue([])
+    const where = await whereTenantEhTorcida()
+
+    expect(where).toEqual({ ...WHERE_TENANT_E_TORCIDA })
+    expect(where).not.toHaveProperty('id')
+  })
+
+  it('devolve objeto novo a cada chamada: quem monta `where` espalha e completa o resultado', async () => {
+    mocks.queryRaw.mockResolvedValue([{ filho: 'b', mae: 'a' }])
+
+    const primeiro = await whereTenantEhTorcida()
+    const segundo = await whereTenantEhTorcida()
+
+    expect(primeiro).not.toBe(segundo)
+    // Sujar um não pode contaminar o outro dentro da mesma requisição.
+    ;(primeiro as { ativo: boolean }).ativo = false
+    expect(segundo.ativo).toBe(true)
+  })
+
+  it('mapa mãe vira lista de ids de filho — nenhuma mãe entra por engano', async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { filho: 'filho-1', mae: 'mae-1' },
+      { filho: 'filho-2', mae: 'mae-1' },
+    ])
+
+    expect(await listarTenantsNaoRaiz()).toEqual(['filho-1', 'filho-2'])
   })
 })

@@ -4,16 +4,7 @@ import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { m } from 'motion/react'
-import {
-  CheckCircle2,
-  Circle,
-  ExternalLink,
-  FileSearch,
-  ImageOff,
-  TriangleAlert,
-  X,
-  XCircle,
-} from 'lucide-react'
+import { CheckCircle2, Circle, ExternalLink, Eye, FileSearch, FileText, IdCard, ImageOff, TriangleAlert, X, XCircle } from 'lucide-react'
 import { labelPontoReprovacao, PONTOS_REPROVACAO } from '@torcida/types'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { StatusBadge } from '@/components/admin/ui'
@@ -30,6 +21,7 @@ import {
   preenchidoCompletude,
   type CompletudeItem,
 } from '@/lib/completude-cadastro-socio'
+import { AppButton } from '@/components/ui/button'
 
 type TabId =
   | 'resumo'
@@ -398,6 +390,9 @@ function TabResumo({
   const rep = membro.reprovacao
   return (
     <div className="space-y-5">
+      {/* lint-botoes: nao-e-acao — card de laudo com titulo, motivo e etapas
+          apontadas. O clique abre a aba; o rotulo e conteudo do registro, nao
+          o nome de uma acao. */}
       {rep && (
         <button
           type="button"
@@ -497,31 +492,37 @@ function TabResumo({
       {membro.isSocio && <Checklist itens={checks} />}
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <AppButton
+          variant="none"
+          icon={Eye}
           type="button"
           onClick={() => onGo('cadastro')}
           className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
         >
           Ver cadastro
-        </button>
+        </AppButton>
         {membro.isSocio && (
-          <button
+          <AppButton
+            variant="none"
+            icon={FileText}
             type="button"
             onClick={() => onGo('documentos')}
             className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             Documentos
             {docsFaltando > 0 ? ` (${docsFaltando})` : ''}
-          </button>
+          </AppButton>
         )}
         {membro.isSocio && (
-          <button
+          <AppButton
+            variant="none"
+            icon={IdCard}
             type="button"
             onClick={() => onGo('associacao')}
             className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             Associação
-          </button>
+          </AppButton>
         )}
       </div>
     </div>

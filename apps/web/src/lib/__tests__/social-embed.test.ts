@@ -5,6 +5,7 @@ import {
   detectEmbedProvider,
   ensureSocialEmbedInMidias,
   firstSocialUrlInText,
+  fatiarTextoEmBlocosHistoria,
   instagramEmbedSrc,
   instagramPermalink,
   midiasAposEditarConteudo,
@@ -77,6 +78,33 @@ describe('firstSocialUrlInText — todas as redes', () => {
     expect(firstSocialUrlInText('x.com/user/status/1234567890123456789')).toBe(
       'https://x.com/user/status/1234567890123456789',
     )
+  })
+})
+
+describe('fatiarTextoEmBlocosHistoria', () => {
+  it('promove linha só com URL a embed e mantém o texto em volta', () => {
+    expect(
+      fatiarTextoEmBlocosHistoria(
+        `Abre a matéria.\n${SOCIAL_URLS.youtube}\nFecha.\n${SOCIAL_URLS.x}`,
+      ),
+    ).toEqual([
+      { tipo: 'texto', texto: 'Abre a matéria.' },
+      { tipo: 'embed', url: SOCIAL_URLS.youtube },
+      { tipo: 'texto', texto: 'Fecha.' },
+      { tipo: 'embed', url: SOCIAL_URLS.x },
+    ])
+  })
+
+  it('URL colada sem protocolo também vira embed', () => {
+    expect(fatiarTextoEmBlocosHistoria('youtube.com/watch?v=O_rzxRdKgkU')).toEqual([
+      { tipo: 'embed', url: 'https://youtube.com/watch?v=O_rzxRdKgkU' },
+    ])
+  })
+
+  it('URL no meio da frase continua texto', () => {
+    expect(fatiarTextoEmBlocosHistoria(`Veja ${SOCIAL_URLS.youtube} depois`)).toEqual([
+      { tipo: 'texto', texto: `Veja ${SOCIAL_URLS.youtube} depois` },
+    ])
   })
 })
 

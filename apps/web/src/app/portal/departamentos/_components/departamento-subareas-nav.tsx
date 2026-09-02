@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { PendenciaBadge } from '@/components/pendencia-badge'
 import { useNavbarSnapshot } from '@/lib/use-navbar-context'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export type SubareaNavItem = {
   id: string
@@ -33,9 +34,10 @@ export function DepartamentoSubareasNav({
   return (
     <div className="sticky top-0 z-10 -mx-1 bg-[rgb(var(--background)_/_0.92)] px-1 py-2 backdrop-blur-sm">
       <div className="relative">
-        <nav
+        <ScrollRail
+          as="nav"
           aria-label="Seções do departamento"
-          className="app-scrollbar-none flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-2"
         >
           {subareas.map((s) => {
             const isExternal = Boolean(s.href?.startsWith('/'))
@@ -62,7 +64,7 @@ export function DepartamentoSubareasNav({
               </a>
             )
           })}
-        </nav>
+        </ScrollRail>
       </div>
     </div>
   )

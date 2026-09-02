@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
 import { buildAdminHref } from '@/lib/admin-href'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 import { adminTabIds } from './admin-tab-ids'
 
 export interface AdminTabItem {
@@ -78,10 +79,10 @@ export function AdminTabs({
   }
 
   return (
-    <div
+    <ScrollRail
       role="tablist"
       onKeyDown={handleKeyDown}
-      className="app-scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+      className="-mx-1 flex gap-1 px-1 pb-1"
     >
       {tabs.map((tab, index) => {
         const active = tab.id === activeId
@@ -127,6 +128,6 @@ export function AdminTabs({
           </m.div>
         )
       })}
-    </div>
+    </ScrollRail>
   )
 }

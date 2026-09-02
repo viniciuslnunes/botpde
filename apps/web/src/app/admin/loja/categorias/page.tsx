@@ -6,8 +6,9 @@ import { criarCategoriaForm, excluirCategoriaForm } from '../actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { Tags } from 'lucide-react'
+import { Plus, Tags, Trash2 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Categorias — Loja Admin' }
 
@@ -38,7 +39,7 @@ export default async function AdminCategoriasPage() {
           <h2 className="text-sm font-semibold">Nova categoria</h2>
           <input name="nome" required placeholder="Nome" className="w-full rounded-lg border px-3 py-2 text-sm" />
           <input name="ordem" type="number" defaultValue={categorias.length + 1} className="w-24 rounded-lg border px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-primary-on">Criar</button>
+          <AppButton variant="primary" icon={Plus} type="submit" className="rounded-xl px-4 py-2 text-sm">Criar</AppButton>
         </AdminActionForm>
       </MotionReveal>
 
@@ -72,9 +73,9 @@ export default async function AdminCategoriasPage() {
               }}
             >
               <input type="hidden" name="id" value={c.id} />
-              <button type="submit" className="text-xs text-red-600 hover:underline">
+              <AppButton variant="none" icon={Trash2} type="submit" className="text-xs text-red-600 hover:underline">
                 Excluir
-              </button>
+              </AppButton>
             </AdminActionForm>
           </li>
         ))}

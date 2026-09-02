@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export function PracaPills({
   items,
@@ -8,7 +9,7 @@ export function PracaPills({
   ativo: string
 }) {
   return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <ScrollRail as="nav" className="-mx-1 flex gap-1 px-1">
       {items.map((item) => {
         const ativoAgora = item.id === ativo
         return (
@@ -26,6 +27,6 @@ export function PracaPills({
           </Link>
         )
       })}
-    </nav>
+    </ScrollRail>
   )
 }

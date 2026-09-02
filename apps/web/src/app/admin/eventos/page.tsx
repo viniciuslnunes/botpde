@@ -392,6 +392,8 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     },
   ]
   const { tabId, panelId } = adminTabIds('vista', vista)
+  const totalVista =
+    vistaCal ? calItens.length : vista === 'historico' ? passados.length : vista === 'lista' ? proximos.length : null
 
   function hrefFiltro(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams()
@@ -429,53 +431,58 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             />
           ) : null
         }
-      />
-
-      <div className="app-container min-w-0 flex-1 space-y-5 py-5 sm:py-8">
-      <AdminTabs
-        tabs={tabs}
-        basePath="/admin/eventos"
-        activeId={vista}
-        paramKey="vista"
-        extraParams={{ tipo: tipoFiltro, q: q || undefined, data: sp.data }}
-      />
-
-      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.92)] p-3 backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          <Link
-            href={hrefFiltro({ tipo: '' })}
-            prefetch
-            className={[
-              'rounded-lg px-2.5 py-1.5 font-medium transition-colors',
-              !tipoFiltro
-                ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-            ].join(' ')}
-          >
-            Todos
-          </Link>
-          {(['CARAVANA', 'ENSAIO', 'GERAL'] as const).map((t) => (
+      >
+        <AdminTabs
+          tabs={tabs}
+          basePath="/admin/eventos"
+          activeId={vista}
+          paramKey="vista"
+          extraParams={{ tipo: tipoFiltro, q: q || undefined, data: sp.data }}
+        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap gap-1.5 text-xs">
             <Link
-              key={t}
-              href={hrefFiltro({ tipo: t })}
+              href={hrefFiltro({ tipo: '' })}
               prefetch
               className={[
                 'rounded-lg px-2.5 py-1.5 font-medium transition-colors',
-                tipoFiltro === t
+                !tipoFiltro
                   ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                   : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
             >
-              {TIPO_EVENTO_LABEL[t]}
+              Todos
             </Link>
-          ))}
+            {(['CARAVANA', 'ENSAIO', 'GERAL'] as const).map((t) => (
+              <Link
+                key={t}
+                href={hrefFiltro({ tipo: t })}
+                prefetch
+                className={[
+                  'rounded-lg px-2.5 py-1.5 font-medium transition-colors',
+                  tipoFiltro === t
+                    ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
+                    : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+                ].join(' ')}
+              >
+                {TIPO_EVENTO_LABEL[t]}
+              </Link>
+            ))}
+          </div>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Suspense fallback={<div className="h-10 min-w-0 flex-1 animate-pulse rounded-lg bg-[rgb(var(--border))]" />}>
+              <AgendaBusca key={sp.q ?? ''} defaultValue={sp.q ?? ''} />
+            </Suspense>
+            {totalVista != null ? (
+              <p className="shrink-0 text-sm tabular-nums text-[rgb(var(--foreground-muted))]">
+                {totalVista} {totalVista === 1 ? 'evento' : 'eventos'}
+              </p>
+            ) : null}
+          </div>
         </div>
+      </AdminPageHeader>
 
-        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-lg bg-[rgb(var(--border))]" />}>
-          <AgendaBusca key={sp.q ?? ''} defaultValue={sp.q ?? ''} />
-        </Suspense>
-      </div>
-
+      <div className="app-container min-w-0 flex-1 space-y-5 py-5 sm:py-8">
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
         {vistaCal && (
           <AgendaCalendario

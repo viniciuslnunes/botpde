@@ -21,6 +21,8 @@ import { ListagemBusca } from './listagem-busca'
 import { ListagemChipFiltro, ListagemColunaFiltro } from './listagem-coluna-filtro'
 import { ListagemForm } from './listagem-form'
 import { ListagemPersistencia } from './listagem-persistencia'
+import { AppButton } from '@/components/ui/button'
+import { Search } from 'lucide-react'
 
 export interface ListagemToolbarProps {
   spec: ListagemSpec
@@ -105,9 +107,9 @@ export function ListagemToolbar({
               ariaLabel={spec.buscaPlaceholder ?? 'Buscar na listagem'}
             />
             {/* Submit acessível e fallback sem JS. */}
-            <button type="submit" className="sr-only">
+            <AppButton variant="none" icon={Search} type="submit" className="sr-only">
               Buscar
-            </button>
+            </AppButton>
           </ListagemForm>
         )}
 

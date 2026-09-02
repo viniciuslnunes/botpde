@@ -8,6 +8,8 @@ import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { useActionStateToast } from '@/lib/toast-action'
 import { FieldError } from '@torcida/ui'
+import { AppButton } from '@/components/ui/button'
+import { Trash2 } from 'lucide-react'
 
 const initial: VitrineState = {}
 
@@ -81,7 +83,9 @@ export function LojaVitrineForm({
       <FieldError errors={state.fieldErrors?.bannerUrl} />
 
       {url ? (
-        <button
+        <AppButton
+          variant="none"
+          icon={Trash2}
           type="button"
           className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           onClick={() => {
@@ -92,7 +96,7 @@ export function LojaVitrineForm({
           }}
         >
           Remover capa
-        </button>
+        </AppButton>
       ) : null}
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">

@@ -6,6 +6,12 @@ import { contextoAdmin } from '@/lib/admin-modulos'
 import { TableShell } from '@/components/admin/ui'
 import { formatDateOnlyIso, formatDateTimeShort, zonedDateParts } from '@/lib/format-datetime'
 import { MemoriaFilaClient } from './memoria-fila-client'
+import { MemoriaCapitulosAdmin } from './memoria-capitulos-admin'
+import {
+  carregarCapitulosMemoria,
+  podeGerirAcervoMemoria,
+} from '@/app/portal/memoria/_lib/memoria-capitulos'
+import { auth } from '@/lib/auth'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Memórias — Comunidade' }
@@ -16,7 +22,11 @@ type FatoPendente = {
   conteudo: string
   visibilidade: 'PUBLICO' | 'TENANT'
   criadoEm: Date
+  eventoId: string | null
+  postId: string | null
   autor: { nome: string | null; nickname: string | null }
+  evento: { titulo: string } | null
+  post: { conteudo: string } | null
 }
 
 export default async function AdminMemoriaPage() {
@@ -25,19 +35,34 @@ export default async function AdminMemoriaPage() {
     redirect('/admin/comunidade')
   }
 
-  const fatos: FatoPendente[] = await db.memoriaFato.findMany({
-    where: { tenantId: tenant.id, status: 'PENDENTE' },
-    orderBy: { criadoEm: 'asc' },
-    select: {
-      id: true,
-      dia: true,
-      conteudo: true,
-      visibilidade: true,
-      criadoEm: true,
-      autor: { select: { nome: true, nickname: true } },
-    },
-    take: 80,
-  })
+  const session = await auth()
+  const userId = session?.user?.id ?? null
+
+  const [fatos, capitulos, podeGerirAcervo]: [
+    FatoPendente[],
+    Awaited<ReturnType<typeof carregarCapitulosMemoria>>,
+    boolean,
+  ] = await Promise.all([
+    db.memoriaFato.findMany({
+      where: { tenantId: tenant.id, status: 'PENDENTE' },
+      orderBy: { criadoEm: 'asc' },
+      select: {
+        id: true,
+        dia: true,
+        conteudo: true,
+        visibilidade: true,
+        criadoEm: true,
+        eventoId: true,
+        postId: true,
+        autor: { select: { nome: true, nickname: true } },
+        evento: { select: { titulo: true } },
+        post: { select: { conteudo: true } },
+      },
+      take: 80,
+    }),
+    carregarCapitulosMemoria(tenant.id),
+    userId ? podeGerirAcervoMemoria(userId, tenant.id) : Promise.resolve(false),
+  ])
 
   return (
     <div className="space-y-4">
@@ -72,9 +97,13 @@ export default async function AdminMemoriaPage() {
             visibilidade: f.visibilidade,
             autorNome: f.autor.nickname || f.autor.nome || 'Membro',
             criadoEmLabel: formatDateTimeShort(f.criadoEm),
+            vinculoEvento: f.evento?.titulo ?? null,
+            vinculoPost: f.post?.conteudo?.trim().slice(0, 80) ?? null,
           }))}
         />
       </TableShell>
+
+      <MemoriaCapitulosAdmin capitulos={capitulos} podeGerir={podeGerirAcervo} />
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, Star, UserPlus, X } from 'lucide-react'
+import { ExternalLink, Star, UserCheck, UserPlus, X } from 'lucide-react'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { AdminRowActions } from '@/components/admin/ui'
 import {
@@ -14,6 +14,7 @@ import {
   type AreaMembroAdmin,
 } from '@/app/portal/departamentos/actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
 
 export type AreaGestaoProps = {
   areaId: string
@@ -36,14 +37,16 @@ export function AreaGestaoAcoes(props: AreaGestaoProps) {
   return (
     <>
       {props.semResponsavel ? (
-        <button
+        <AppButton
+          variant="none"
+          icon={UserCheck}
           type="button"
           onClick={() => setAberto(true)}
           aria-label={`Nomear responsável de ${props.areaNome}`}
           className="app-action inline-flex items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2.5 text-xs font-medium text-[rgb(var(--color-warning-fg))] hover:opacity-90"
         >
           Nomear
-        </button>
+        </AppButton>
       ) : null}
       <AdminRowActions
         ariaLabel={`Ações de ${props.areaNome}`}
@@ -287,24 +290,26 @@ function AreaGestaoModal({
                       </span>
                     ) : null}
                   </span>
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={UserPlus}
                     type="button"
                     disabled={busy}
                     onClick={() => incluir(c.id, nome)}
                     className="app-action inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
                   >
-                    <UserPlus className="h-3 w-3" aria-hidden />
                     Incluir
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
+                    variant="primary"
+                    icon={Star}
                     type="button"
                     disabled={busy}
                     onClick={() => nomear(c.id, nome)}
-                    className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 text-xs font-medium text-primary-on disabled:opacity-50"
+                    className="gap-1 rounded-lg px-2 text-xs font-medium"
                   >
-                    <Star className="h-3 w-3" aria-hidden />
                     Nomear
-                  </button>
+                  </AppButton>
                 </li>
               )
             })}

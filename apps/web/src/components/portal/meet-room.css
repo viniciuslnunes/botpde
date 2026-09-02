@@ -29,6 +29,7 @@
    polegar tingido pela marca (calculado contra a superficie do app) ficaria
    invisivel aqui. Tokens fixos claros, como em `.app-scrollbar-sobre-escuro`. */
 .meet-room-root {
+  --scrollbar-track: rgb(9 9 11);
   --scrollbar-thumb: rgb(250 250 250 / 0.26);
   --scrollbar-thumb-hover: rgb(250 250 250 / 0.45);
   --scrollbar-thumb-active: rgb(250 250 250 / 0.62);

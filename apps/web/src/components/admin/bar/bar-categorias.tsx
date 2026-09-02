@@ -7,6 +7,8 @@ import { FieldError } from '@torcida/ui'
 import { useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
+import { Trash2 } from 'lucide-react'
 
 const initialState: BarActionState = {}
 
@@ -24,7 +26,9 @@ function ExcluirCategoriaBarButton({ categoria }: { categoria: BarCategoriaItem 
   const confirmAction = useConfirmAction()
 
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={Trash2}
       onClick={() =>
         void confirmAction({
           titulo: `Excluir a categoria “${categoria.nome}”?`,
@@ -42,7 +46,7 @@ function ExcluirCategoriaBarButton({ categoria }: { categoria: BarCategoriaItem 
       className="text-xs font-medium text-[rgb(var(--color-danger-fg))] hover:underline"
     >
       Excluir
-    </button>
+    </AppButton>
   )
 }
 

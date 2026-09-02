@@ -221,9 +221,12 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
     expect(contextoDivergente(paginasSobShellDeModulo())).toEqual([])
   })
 
-  it('respeita o teto de 6 etapas por módulo', () => {
+  // Teto de 7: a Loja chegou a 7 etapas quando o Brechó virou tab. O trilho usa
+  // `ScrollRail` (ARCHITECTURE §5.34.1), então o transbordo rola em vez de
+  // cortar — mas o teto segue valendo como limite de carga cognitiva do módulo.
+  it('respeita o teto de 7 etapas por módulo', () => {
     for (const modulo of ADMIN_MODULOS) {
-      expect(modulo.tabs.length, `módulo ${modulo.id} passou de 6 etapas`).toBeLessThanOrEqual(6)
+      expect(modulo.tabs.length, `módulo ${modulo.id} passou de 7 etapas`).toBeLessThanOrEqual(7)
     }
   })
 })
@@ -231,7 +234,7 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
 describe('tabsPermitidasDoModulo', () => {
   it('esconde etapas sem permissão e mantém a ordem declarada', () => {
     const tabs = tabsPermitidasDoModulo('loja', [PERMISSIONS.STORE_VIEW_ORDERS])
-    expect(tabs.map((t) => t.id)).toEqual(['pedidos', 'tickets'])
+    expect(tabs.map((t) => t.id)).toEqual(['pedidos', 'tickets', 'brecho'])
   })
 
   it('dá ao gestor o módulo inteiro', () => {
@@ -241,6 +244,7 @@ describe('tabsPermitidasDoModulo', () => {
       'catalogo',
       'pedidos',
       'tickets',
+      'brecho',
       'cupons',
       'desempenho',
     ])

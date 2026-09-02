@@ -17,7 +17,7 @@ import { listarSlugsGestoriaNoTenant } from '@/lib/departamentos-gestoria'
 import {
   isSuperAdminEmail,
   listarClubesParaSelecao,
-  listarTorcidasParaSelecao,
+  listarTorcidasParaSelecaoSemente,
   usuarioPrecisaNickname,
 } from '@/lib/tenant-context'
 import { listarVinculosAdminDoUsuario } from '@/lib/admin-vinculos'
@@ -102,9 +102,12 @@ export default async function AdminLayout({
       ...('exact' in item && item.exact ? { exact: true as const } : {}),
     }))
 
+  // Semente do switcher: o super-admin vê o topo alfabético mais a torcida
+  // ativa, e busca o resto sob demanda. A lista inteira ia no payload de TODA
+  // rota /admin quando quem navega é operador da plataforma.
   const [torcidas, clubes, unidades] = isSuperAdmin
     ? await Promise.all([
-        listarTorcidasParaSelecao(),
+        listarTorcidasParaSelecaoSemente(tenant.slug),
         listarClubesParaSelecao(),
         listarUnidadesParaSelecao(tenant.id),
       ])

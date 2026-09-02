@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Download, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { importarMock, type ResultadoImportacao } from '@/app/admin/membros/importar/actions'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
 
 /**
  * Formulário de importação. Só a origem MOCK está ativa nesta fase — BOT e CSV
@@ -92,14 +93,16 @@ export function ImportForm() {
             className="mt-1 w-32 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-1.5 text-sm text-[rgb(var(--foreground))]"
           />
         </div>
-        <button
+        <AppButton
+          variant="primary"
+          icon={Download}
+          loading={pending}
           type="submit"
           disabled={pending}
-          className="flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-medium text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="flex gap-1.5 rounded-lg px-4 py-2 text-xs font-medium"
         >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {pending ? 'Importando…' : 'Importar'}
-        </button>
+        </AppButton>
       </form>
 
       {resultado && !resultado.success && (

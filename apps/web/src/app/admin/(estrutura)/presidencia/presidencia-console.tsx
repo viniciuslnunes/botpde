@@ -2,10 +2,11 @@
 
 import { useActionState, useMemo, useState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { AlertTriangle, Crown, Loader2, Search, UserCheck, UserX } from 'lucide-react'
+import { AlertTriangle, Crown, Search, UserCheck, UserX } from 'lucide-react'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import type { CandidatoLideranca, LiderAtual } from '@/lib/lideranca'
 import { transferirPresidenciaAction, type PresidenciaState } from './actions'
+import { AppButton } from '@/components/ui/button'
 
 export type UnidadeLideranca = {
   sedeId: string
@@ -17,14 +18,16 @@ export type UnidadeLideranca = {
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return (
-    <button
+    <AppButton
+      variant="primary"
+      icon={UserCheck}
+      loading={pending}
       type="submit"
       disabled={pending}
-      className="btn-primary inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+      className="gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold"
     >
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
       {pending ? 'Transferindo…' : label}
-    </button>
+    </AppButton>
   )
 }
 

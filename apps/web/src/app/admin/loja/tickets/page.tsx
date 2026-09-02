@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Archive } from 'lucide-react'
+import { Archive, Search } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import {
   idCurtoPedido,
@@ -14,6 +14,7 @@ import {
   type ArquivoTicketsFiltro,
 } from '@/lib/loja-ticket'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Arquivo de tickets — Loja Admin' }
 
@@ -118,12 +119,14 @@ export default async function AdminLojaTicketsArquivoPage({
           placeholder="Buscar cliente, e-mail ou produto…"
           className="min-w-[16rem] flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
         />
-        <button
+        <AppButton
+          variant="primary"
+          icon={Search}
           type="submit"
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-primary-on hover:opacity-90"
+          className="rounded-lg px-3 py-2 text-sm font-semibold"
         >
           Buscar
-        </button>
+        </AppButton>
       </form>
 
       {tickets.length === 0 ? (

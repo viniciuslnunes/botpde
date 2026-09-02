@@ -96,6 +96,72 @@ async function BateriaKpis({
 }
 
 const BATERIA_TABS = ['instrumentos', 'ensaios', 'pendencias', 'historico'] as const
+const ICONE_TAB = 'h-4 w-4 shrink-0'
+
+async function BateriaTabs({
+  tenantId,
+  podeVerPatrimonio,
+  tab,
+}: {
+  tenantId: string
+  podeVerPatrimonio: boolean
+  tab: (typeof BATERIA_TABS)[number]
+}) {
+  const [ops, instrumentos, auditoria] = await Promise.all([
+    carregarDirecaoBateria(tenantId, { incluirInstrumentos: podeVerPatrimonio }),
+    podeVerPatrimonio
+      ? listarPatrimonio(tenantId, {
+          filtro: { categoria: 'INSTRUMENTO', page: 1 },
+          pageSize: 120,
+        })
+      : Promise.resolve(null),
+    podeVerPatrimonio
+      ? listarAuditoriaInventario(tenantId, 'INSTRUMENTO')
+      : Promise.resolve([] as PatrimonioAuditoriaEntrada[]),
+  ])
+  const aba =
+    !podeVerPatrimonio && (tab === 'instrumentos' || tab === 'historico') ? 'ensaios' : tab
+  const tabs: AdminTabItem[] = [
+    ...(podeVerPatrimonio
+      ? [
+          {
+            id: 'instrumentos',
+            label: 'Instrumentos',
+            icon: <Drum className={ICONE_TAB} />,
+            count: instrumentos?.itens.length ?? 0,
+          },
+        ]
+      : []),
+    {
+      id: 'ensaios',
+      label: 'Ensaios',
+      icon: <Music2 className={ICONE_TAB} />,
+      count: ops.lista.length,
+    },
+    {
+      id: 'pendencias',
+      label: 'Precisa de você',
+      icon: <AlertTriangle className={ICONE_TAB} />,
+      count: ops.pendencias.length,
+      countClass:
+        ops.pendencias.length > 0
+          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
+          : undefined,
+    },
+    ...(podeVerPatrimonio
+      ? [
+          {
+            id: 'historico',
+            label: 'Histórico',
+            icon: <History className={ICONE_TAB} />,
+            count: auditoria.length,
+          },
+        ]
+      : []),
+  ]
+
+  return <AdminPendingTabs tabs={tabs} basePath="/admin/bateria" activeId={aba} paramKey="tab" />
+}
 
 async function BateriaTabsEPainel({
   tenantId,
@@ -146,50 +212,8 @@ async function BateriaTabsEPainel({
   const aba =
     !podeVerPatrimonio && (tab === 'instrumentos' || tab === 'historico') ? 'ensaios' : tab
   const { tabId, panelId } = adminTabIds('tab', aba)
-  const iconeTab = 'h-4 w-4 shrink-0'
-  const tabs: AdminTabItem[] = [
-    ...(podeVerPatrimonio
-      ? [
-          {
-            id: 'instrumentos',
-            label: 'Instrumentos',
-            icon: <Drum className={iconeTab} />,
-            count: itensInstrumento.length,
-          },
-        ]
-      : []),
-    {
-      id: 'ensaios',
-      label: 'Ensaios',
-      icon: <Music2 className={iconeTab} />,
-      count: ops.lista.length,
-    },
-    {
-      id: 'pendencias',
-      label: 'Precisa de você',
-      icon: <AlertTriangle className={iconeTab} />,
-      count: ops.pendencias.length,
-      countClass:
-        ops.pendencias.length > 0
-          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
-          : undefined,
-    },
-    ...(podeVerPatrimonio
-      ? [
-          {
-            id: 'historico',
-            label: 'Histórico',
-            icon: <History className={iconeTab} />,
-            count: auditoria.length,
-          },
-        ]
-      : []),
-  ]
 
   return (
-    <>
-      <AdminPendingTabs tabs={tabs} basePath="/admin/bateria" activeId={aba} paramKey="tab" />
-
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-3">
         {aba === 'instrumentos' && podeVerPatrimonio ? (
           <>
@@ -249,7 +273,6 @@ async function BateriaTabsEPainel({
           />
         ) : null}
       </div>
-    </>
   )
 }
 
@@ -339,7 +362,11 @@ export default async function AdminBateriaPage({
             </Suspense>
           </div>
         }
-      />
+      >
+        <Suspense fallback={<div className="h-9 w-full max-w-lg animate-pulse rounded-lg bg-[rgb(var(--border)_/_0.45)]" />}>
+          <BateriaTabs tenantId={tenant.id} podeVerPatrimonio={podeVerPatrimonio} tab={tab} />
+        </Suspense>
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
         <Suspense

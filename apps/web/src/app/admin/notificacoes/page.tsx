@@ -9,7 +9,7 @@ import { AdminMarcarTodasLidasButton } from '@/app/admin/notificacoes/admin-marc
 import { AdminNotificacaoLink } from '@/app/admin/notificacoes/admin-notificacao-link'
 import { AdminNotificacoesAutoRead } from '@/app/admin/notificacoes/admin-notificacoes-auto-read'
 import { AdminNotificacoesLive } from '@/app/admin/notificacoes/admin-notificacoes-live'
-import { MotionReveal } from '@/components/motion/motion-reveal'
+import { AdminPageHeader } from '@/components/admin/ui'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { redirect } from 'next/navigation'
 
@@ -55,19 +55,17 @@ export default async function AdminNotificacoesPage() {
   })
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <MotionReveal>
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-3">
-            <h1 className="portal-display text-2xl text-[rgb(var(--foreground))]">Notificações</h1>
-            <p className="text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-              Alertas operacionais desta torcida, do mais recente ao mais antigo.
-            </p>
-          </div>
-          {notificacoes.some((n) => !n.lida) && <AdminMarcarTodasLidasButton />}
-        </div>
-      </MotionReveal>
+    <div className="flex min-h-full flex-col">
+      <AdminPageHeader
+        title="Notificações"
+        description="Alertas operacionais desta torcida, do mais recente ao mais antigo."
+        icon={<Bell className="h-5 w-5" />}
+        actions={
+          notificacoes.some((n) => !n.lida) ? <AdminMarcarTodasLidasButton /> : null
+        }
+      />
 
+      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
       <AdminNotificacoesLive />
       <AdminNotificacoesAutoRead
         ids={notificacoes.filter((n) => !n.lida).map((n) => n.id)}
@@ -97,6 +95,7 @@ export default async function AdminNotificacoesPage() {
           ))}
         </ul>
       )}
+      </div>
     </div>
   )
 }

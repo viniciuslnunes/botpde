@@ -434,6 +434,38 @@ export function firstSocialUrlInText(text: string): string | null {
   return null
 }
 
+export type FatiaHistoria =
+  | { tipo: 'texto'; texto: string }
+  | { tipo: 'embed'; url: string }
+
+/**
+ * Linha que é só URL de YouTube/X/Instagram/TikTok vira bloco de embed.
+ * O restante do parágrafo continua texto — igual o feed promove o link.
+ */
+export function fatiarTextoEmBlocosHistoria(texto: string): FatiaHistoria[] {
+  const linhas = String(texto ?? '').split('\n')
+  const out: FatiaHistoria[] = []
+  let buffer: string[] = []
+
+  function flush() {
+    const t = buffer.join('\n').trim()
+    if (t) out.push({ tipo: 'texto', texto: t })
+    buffer = []
+  }
+
+  for (const linha of linhas) {
+    const abs = toAbsoluteSocialUrl(linha.trim())
+    if (abs) {
+      flush()
+      out.push({ tipo: 'embed', url: abs })
+    } else {
+      buffer.push(linha)
+    }
+  }
+  flush()
+  return out
+}
+
 /** Garante que midias inclua o embed detectado no texto (cliente ou servidor). */
 export function ensureSocialEmbedInMidias(conteudo: string, midias: string[]): string[] {
   const fromText = firstSocialUrlInText(conteudo)

@@ -2,9 +2,10 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ExternalLink, Loader2 } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
+  buscarTorcidasParaSelecaoAction,
   selecionarTorcidaAction,
   selecionarUnidadeAction,
   type SelecionarTorcidaState,
@@ -19,6 +20,7 @@ import {
   type TorcidaOpcao,
   type UnidadeOpcao,
 } from '@/lib/torcida-labels'
+import { AppButton } from '@/components/ui/button'
 
 type ClubeItem = ClubeOpcao & { recentKey: string }
 type TorcidaItem = TorcidaOpcao & { id: string; recentKey: string }
@@ -197,6 +199,27 @@ export function AdminSuperContextSwitchers({
     [torcidasFiltradas],
   )
 
+  /**
+   * `torcidas` é semente, não universo: o layout manda só o topo alfabético
+   * mais a torcida ativa, e o resto das centenas vem daqui conforme o operador
+   * digita. `chaveExtra` refaz a busca ao trocar o clube — sem ela a cascata
+   * mostraria só as torcidas daquele clube que por acaso estavam na semente.
+   */
+  const buscaRemotaTorcidas = useMemo(
+    () => ({
+      buscar: async (termo: string, recentes: string[]): Promise<TorcidaItem[]> => {
+        const achados = await buscarTorcidasParaSelecaoAction({
+          termo,
+          afiliacaoId: clubeId,
+          recentes,
+        })
+        return achados.map((t) => ({ ...t, id: t.slug, recentKey: t.slug }))
+      },
+      chaveExtra: clubeId ?? '',
+    }),
+    [clubeId],
+  )
+
   const unidadeItems: UnidadeItem[] = useMemo(
     () => unidades.map((u) => ({ ...u, recentKey: u.id })),
     [unidades],
@@ -286,6 +309,7 @@ export function AdminSuperContextSwitchers({
         placeholder={clubeId ? 'Buscar torcida neste clube…' : 'Buscar torcida…'}
         emptyMessage="Nenhuma torcida neste clube."
         items={torcidaItems}
+        buscaRemota={buscaRemotaTorcidas}
         valueId={torcidaValueId}
         getLabel={(t) => t.nome}
         getSearchText={(t) =>
@@ -355,7 +379,10 @@ export function AdminSuperContextSwitchers({
             shouldSubmitOnSelect={(u) => u.id !== unidadeAtualId}
           />
 
-          <button
+          <AppButton
+            variant="none"
+            icon={ExternalLink}
+            loading={portalPending}
             type="button"
             disabled={portalPending || !afiliacoesProntas}
             onClick={irAoPortal}
@@ -367,13 +394,8 @@ export function AdminSuperContextSwitchers({
                 : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
-            {portalPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            ) : (
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-            )}
             Ir ao portal
-          </button>
+          </AppButton>
         </div>
       ) : null}
     </div>

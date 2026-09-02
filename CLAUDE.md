@@ -61,6 +61,7 @@ pnpm --filter @torcida/db seed:brecho-gavioes # anúncios P2P de teste no brech�
 pnpm --filter @torcida/db seed:gavioes-logins # logins nomeados por cargo/área (só Postgres local; senha m1k43l3n)
 pnpm --filter @torcida/db seed:memoria-demo   # eventos, posts e fatos na linha do tempo (Gaviões + Camisa 12; só local)
 pnpm --filter @torcida/db seed:forum-praca    # fórum da praça: CN Corinthians + Gaviões (`[TESTE-FORUM]`; só local)
+pnpm --filter @torcida/db seed:noticias-praca # notícias da praça já ranqueadas: Gaviões + PDE FIEL BAIXADA + Camisa 12 (só local)
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
 pnpm --filter @torcida/db seed:torcedores-estimados  # tier PESQUISA (Datafolha×IBGE) > IBOPE > limite
@@ -225,8 +226,31 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   mesma regra dos badges, senão marca preta some no escuro. Variantes prontas:
   `.app-scrollbar-none` (trilho de abas, feed com snap), `-fina` (popover,
   chat), `-idle` (aparece no hover), `-neutra`, `-sobre-escuro` (superfície
-  preta nos dois temas), `-gutter`. Guia e tabela de medições:
+  preta nos dois temas), `-gutter` (opt-in em container interno — **nunca** no
+  `<html>`, senão o admin ganha filete preto à direita). Guia e tabela de medições:
   `docs/frontend/scrollbars.md`; decisão: `ARCHITECTURE.md` §5.34.
+  **Aba que estoura a coluna (2026-09-02):** trilho de abas/chips usa
+  `ScrollRail` (`components/ui/scroll-rail.tsx`) — nunca `overflow-x-auto` cru
+  nem seta na mão. Ele mede o transbordo (RO no trilho **e nos filhos** + MO +
+  scroll, tudo em um `rAF`), acende cada seta por lado, só com ponteiro fino
+  (no toque o dedo arrasta), e já embute `app-scrollbar-none` +
+  `overflow-x-auto`. Ver `docs/frontend/scrollbars.md` § trilho horizontal e
+  `ARCHITECTURE.md` §5.34.1.
+- **Botões (2026-09-02):** botão de **ação** usa `AppButton`
+  (`components/ui/button.tsx`) — rótulo em UPPERCASE e **ícone à esquerda**.
+  Nunca `<button>` cru com Tailwind inline em área migrada. A caixa alta é CSS
+  (`.app-btn`, em `@layer components`), então o JSX continua escrito "Salvar
+  alterações" — leitor de tela, `getByRole` e busca no repo seguem valendo; a
+  cor vem das variantes de token do módulo Design (`.btn-primary`,
+  `.btn-danger`, `.btn-*-soft`), **nunca** `bg-[rgb(var(--primary))]
+  text-white`. O `icon` é exigido pelo **tipo** quando há rótulo, e
+  `aria-label` quando é ícone puro. **Fora do escopo:** aba, chip/segmented,
+  disclosure (`aria-expanded`), ícone puro, card clicável e rótulo vindo do
+  banco (`MARIA SILVA` lê como grito) — use `textoOriginal` para dado dentro de
+  um botão de ação. CI trava por `pnpm --filter @torcida/web lint:botoes`, que
+  cobre só `AREAS_COBERTAS` (hoje `/admin`) — **ao migrar uma área nova,
+  acrescente o prefixo lá**. Ícone canônico por ação e as exceções:
+  `docs/frontend/botoes.md`; decisão: `ARCHITECTURE.md` §5.36.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
@@ -250,7 +274,8 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   **Tabs (2026-07-30):** módulo com sub-rotas declara suas etapas em
   `ADMIN_MODULOS` (`packages/types/src/menu.js`) — fonte única — e o
   `layout.tsx` do segmento monta o shell com `montarTabsModulo` +
-  `AdminModuleTabs` (tab = rota; ícone/contagem só no layout; imersivo como o
+  `AdminPageHeader` (`AdminModuleTabBar` em children) + `AdminModuleTabs chrome="panel"`
+  (tab = rota; ícone/contagem só no layout; imersivo como o
   PDV fica fora via route group). O menu lateral guarda **uma** entrada por
   módulo. Etapa com permissão própria é filtrada por `tabsPermitidasDoModulo`, e
   quem não pode ver a raiz entra por `primeiraTabPermitida` (nunca expulsar para
@@ -503,6 +528,15 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   `docs/data/modulo-super-admin.md` e `docs/ops/release.md`.
   e `ARCHITECTURE.md` §5.24 (inclui pendência: LGPD só tem exportação, exclusão
   de conta ainda não implementada).
+  **Seletor de torcida é semente + busca (2026-09-02):** layout e página mandam
+  `listarTorcidasParaSelecaoSemente` (topo 30 + a ativa) e o resto vem por
+  `buscarTorcidasParaSelecaoAction` — `listarTorcidasParaSelecao` (lista
+  inteira) **não** entra em layout nem em switcher: eram 147 KB de flight por
+  navegação em toda rota `/super-admin/*` e `/admin/*` de super-admin, e
+  `unstable_cache` não conserta payload. Contar torcidas é
+  `contarTorcidasDaPlataforma()` e o recorte é `whereTenantEhTorcida()` —
+  `tenant.count({ ativo, sintetico: false })` cru conta portal Caso B como
+  torcida (o KPI dizia 557 sobre uma lista de 554). Ver §5.35.
 - **Canal restrito (R5)** — a liderança de uma unidade Caso B pode isolar o
   canal: sai da malha de **interação** (CN, coirmãs, aliados, salas, lojas, DMs,
   onboarding público, busca) e mantém administração e comunidade **internas**.

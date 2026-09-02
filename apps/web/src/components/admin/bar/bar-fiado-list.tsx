@@ -1,12 +1,13 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { HandCoins } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, HandCoins, X } from 'lucide-react'
 import { METODO_PAGAMENTO_QUITACAO_FIADO_BAR, METODO_PAGAMENTO_BAR_LABEL } from '@torcida/types'
 import { cancelarFiadoBar, quitarFiadoBar } from '@/app/admin/bar/actions'
 import type { BarActionState } from '@/app/admin/bar/actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useActionStateToast } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
 
 export type BarFiadoItem = {
   id: string
@@ -74,14 +75,16 @@ function QuitarFiadoForm({ fiado, onClose }: { fiado: BarFiadoItem; onClose: () 
       >
         {pending ? 'Quitando...' : 'Confirmar quitação'}
       </button>
-      <button
+      <AppButton
+        variant="none"
+        icon={ArrowLeft}
         type="button"
         disabled={pending}
         onClick={onClose}
         className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
       >
         Voltar
-      </button>
+      </AppButton>
       {state.error && (
         <p className="w-full text-xs text-[rgb(var(--color-danger-fg))]">{state.error}</p>
       )}
@@ -119,14 +122,16 @@ function CancelarFiadoForm({ fiado, onClose }: { fiado: BarFiadoItem; onClose: (
       >
         {pending ? 'Cancelando...' : 'Confirmar cancelamento'}
       </button>
-      <button
+      <AppButton
+        variant="none"
+        icon={ArrowLeft}
         type="button"
         disabled={pending}
         onClick={onClose}
         className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
       >
         Voltar
-      </button>
+      </AppButton>
       {state.error && (
         <p className="w-full text-xs text-[rgb(var(--color-danger-fg))]">{state.error}</p>
       )}
@@ -154,21 +159,25 @@ function FiadoRow({ fiado }: { fiado: BarFiadoItem }) {
           <StatusFiadoBadge status={fiado.status} label={fiado.statusLabel} />
           {podeAgir && acao === null && (
             <>
-              <button
+              <AppButton
+                variant="none"
+                icon={BadgeCheck}
                 type="button"
                 onClick={() => setAcao('quitar')}
                 className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))]"
               >
                 Registrar quitação
-              </button>
+              </AppButton>
               {fiado.status === 'PENDENTE' || fiado.status === 'VENCIDA' ? (
-                <button
+                <AppButton
+                  variant="none"
+                  icon={X}
                   type="button"
                   onClick={() => setAcao('cancelar')}
                   className="rounded-lg border border-[rgb(var(--color-danger)_/_0.35)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.08)]"
                 >
                   Cancelar
-                </button>
+                </AppButton>
               ) : null}            </>
           )}
         </div>

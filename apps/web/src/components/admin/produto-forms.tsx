@@ -9,6 +9,8 @@ import { ImageUploadField } from '@/components/media/image-upload-field'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AppButton } from '@/components/ui/button'
+import { Plus, X } from 'lucide-react'
 
 const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'XG', 'G1', 'G2', 'G3', 'UN']
 
@@ -248,12 +250,14 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
   return (
     <div>
       {!open ? (
-        <button
+        <AppButton
+          variant="primary"
+          icon={Plus}
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
+          className="rounded-xl px-4 py-2 text-sm font-medium"
         >
           + Novo produto
-        </button>
+        </AppButton>
       ) : (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
           <div className="mb-4 flex items-center justify-between">
@@ -274,13 +278,15 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
               dirtyLabel={isDirty ? (changes.length === 1 ? changes[0] : `${changes.length} campos alterados`) : undefined}
               hint="Preencha os dados do produto e confirme a criação."
             >
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => void closeForm()}
                 className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 Cancelar
-              </button>
+              </AppButton>
               <button
                 type="submit"
                 form={formId}

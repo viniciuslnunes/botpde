@@ -8,6 +8,8 @@ import {
   registrarRealizadoProjeto,
 } from '@/app/portal/departamentos/projetos-actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
+import { ClipboardCheck } from 'lucide-react'
 
 export function ProjetoAcoesInline({
   departamentoId,
@@ -101,13 +103,15 @@ export function ProjetoAcoesInline({
             </button>
           </div>
         ) : (
-          <button
+          <AppButton
+            variant="none"
+            icon={ClipboardCheck}
             type="button"
             onClick={() => setRegistrando(true)}
             className="app-action text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] hover:underline"
           >
             Registrar
-          </button>
+          </AppButton>
         )
       ) : null}
     </div>

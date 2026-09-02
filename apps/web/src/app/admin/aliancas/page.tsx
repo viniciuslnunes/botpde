@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { Handshake } from 'lucide-react'
+import { Handshake, History, Inbox, Send, Sparkles, Users } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import {
@@ -11,8 +11,12 @@ import {
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
-import { AdminPageHeader } from '@/components/admin/ui'
-import { parseAliancaTabId } from '@/lib/alianca-tabs'
+import { AdminPageHeader, AdminPendingTabs, type AdminTabItem } from '@/components/admin/ui'
+import {
+  montarAliancaTabItems,
+  parseAliancaTabId,
+  resolverAliancaTabPadrao,
+} from '@/lib/alianca-tabs'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
@@ -137,13 +141,58 @@ export default async function AdminAliancasPage({
     criadoEm: r.criadoEm.toISOString(),
   }))
 
+  const recomendacoesVisiveis = isSedeRaiz
+    ? recomendacoesSerializadas
+    : recomendacoesSerializadas.filter((r) => r.tipo === 'CO_IRMA')
+  const contagens = {
+    recomendacoes: recomendacoesSerializadas.length,
+    recomendacoesVisiveis: recomendacoesVisiveis.length,
+    recomendacoesAlta: recomendacoesSerializadas.filter(
+      (r) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
+    ).length,
+    recebidas: aliancasSerializadas.filter(
+      (a) => a.status === 'PENDENTE' && a.tenantAliadoId === rootTenantId,
+    ).length,
+    enviadas: aliancasSerializadas.filter(
+      (a) => a.status === 'PENDENTE' && a.tenantOrigemId === rootTenantId,
+    ).length,
+    ativas: aliancasSerializadas.filter((a) => a.status === 'ATIVA').length,
+    encerradas: aliancasSerializadas.filter((a) => a.status === 'ENCERRADA').length,
+  }
+  const activeTab =
+    initialTab &&
+    montarAliancaTabItems(!isSedeRaiz, contagens).some((t) => t.id === initialTab)
+      ? initialTab
+      : resolverAliancaTabPadrao(!isSedeRaiz, contagens)
+
+  const iconeTab = 'h-4 w-4 shrink-0'
+  const iconePorTab: Record<string, AdminTabItem['icon']> = {
+    recomendacoes: <Sparkles className={iconeTab} />,
+    recebidas: <Inbox className={iconeTab} />,
+    enviadas: <Send className={iconeTab} />,
+    ativas: <Users className={iconeTab} />,
+    propor: <Handshake className={iconeTab} />,
+    historico: <History className={iconeTab} />,
+  }
+  const tabs: AdminTabItem[] = montarAliancaTabItems(!isSedeRaiz, contagens).map((item) => ({
+    ...item,
+    icon: iconePorTab[item.id],
+  }))
+
   return (
     <div className="flex h-full flex-col">
       <AdminPageHeader
         title="Alianças"
         description="Aliança formal só entre times distintos. Co-irmãs e PDEs herdam o vínculo da sede."
         icon={<Handshake className="h-5 w-5" />}
-      />
+      >
+        <AdminPendingTabs
+          tabs={tabs}
+          basePath="/admin/aliancas"
+          activeId={activeTab}
+          paramKey="tab"
+        />
+      </AdminPageHeader>
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container">
@@ -155,7 +204,7 @@ export default async function AdminAliancasPage({
               recomendacoes={recomendacoesSerializadas}
               tenants={tenantOptions}
               readOnly={!isSedeRaiz}
-              initialTab={initialTab}
+              activeTab={activeTab}
             />
           </MotionReveal>
         </div>

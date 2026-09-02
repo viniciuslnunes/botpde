@@ -819,6 +819,33 @@ export const LISTAGEM_SUPER_ADMIN_CLUBES: ListagemSpec = {
   ],
 }
 
+/**
+ * Torcidas da plataforma (`Tenant`) no seletor do super-admin.
+ *
+ * O recorte "é torcida" NÃO mora aqui: as duas condições de coluna mais a de
+ * ser raiz vêm de `whereTenantEhTorcida` e entram como `extra` — é o que
+ * impede a listagem de divergir do KPI (ver `tenant-hierarquia-plataforma`).
+ *
+ * `porPaginaPadrao: 25` porque a página trocava 554 linhas por navegação para
+ * exibir um bloco rolável de oito.
+ */
+export const LISTAGEM_SUPER_ADMIN_TORCIDAS: ListagemSpec = {
+  id: 'super-admin-torcidas',
+  basePath: '/super-admin/torcidas',
+  sortPadrao: 'nome',
+  dirPadrao: 'asc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar por torcida, clube ou slug…',
+  buscaModo: 'termos',
+  buscaEm: [{ campo: 'nome' }, { campo: 'slug' }, { campo: 'afiliacao.nome' }],
+  colunas: [
+    { id: 'nome', label: 'Torcida', ordenarPor: 'nome', dirPadrao: 'asc' },
+    { id: 'clube', label: 'Clube', ordenarPor: 'afiliacao.nome', dirPadrao: 'asc' },
+    { id: 'slug', label: 'Slug' },
+    { id: 'criadoEm', label: 'Criada em', ordenarPor: 'criadoEm', dirPadrao: 'desc' },
+  ],
+}
+
 /** Todas as listagens registradas — base dos testes de invariante. */
 export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_TORCEDORES,
@@ -833,4 +860,5 @@ export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_SUPER_ADMIN_SETUP,
   LISTAGEM_SUPER_ADMIN_LIDERANCAS,
   LISTAGEM_SUPER_ADMIN_CLUBES,
+  LISTAGEM_SUPER_ADMIN_TORCIDAS,
 ]

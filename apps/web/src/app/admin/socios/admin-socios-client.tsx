@@ -3,18 +3,7 @@
 import { useCallback, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import {
-  AlertTriangle,
-  Check,
-  CheckCircle2,
-  CreditCard,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Trash2,
-  Users,
-  X,
-} from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, CreditCard, Loader2, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { DatePicker } from '@/components/ui/date-picker'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
@@ -36,6 +25,7 @@ import {
   formatCaixaAltaListagem,
   formatTelefoneListagem,
 } from '@/lib/admin-listagem-format'
+import { AppButton } from '@/components/ui/button'
 
 export interface SocioEmitidoItem {
   id: string
@@ -379,25 +369,25 @@ export function EmitirCarteirinhaModal({
             </div>
 
             <div className="mt-auto flex flex-wrap justify-end gap-2 pt-1">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => void closeForm()}
                 className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
               >
                 Cancelar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="primary"
+                icon={Check}
+                loading={pending}
                 type="submit"
                 disabled={pending || !userId}
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
               >
-                {pending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
                 Emitir
-              </button>
+              </AppButton>
             </div>
           </div>
         </form>
@@ -555,14 +545,15 @@ function EmitirLinhaButton({
   onEmitir: (userId: string) => void
 }) {
   return (
-    <button
+    <AppButton
+      variant="primary"
+      icon={Plus}
       type="button"
       onClick={() => onEmitir(membro.userId)}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90"
+      className="gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
     >
-      <Plus className="h-3.5 w-3.5" />
       Emitir
-    </button>
+    </AppButton>
   )
 }
 
@@ -723,7 +714,9 @@ export function AdminSociosClient({
         }
         actions={
           podeEmitir && !isSolicitacoes ? (
-            <button
+            <AppButton
+              variant="primary"
+              icon={Plus}
               type="button"
               onClick={() => abrirEmit()}
               disabled={contagens.aguardando === 0 || elegiveisModal.length === 0}
@@ -732,11 +725,10 @@ export function AdminSociosClient({
                   ? 'Nenhum sócio aprovado aguardando carteirinha'
                   : undefined
               }
-              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed"
             >
-              <Plus className="h-4 w-4" />
               Emitir carteirinha
-            </button>
+            </AppButton>
           ) : undefined
         }
       >
@@ -863,14 +855,15 @@ export function AdminSociosClient({
                         onKeyDown={(e) => e.stopPropagation()}
                       >
                         {podeEmitir ? (
-                          <button
+                          <AppButton
+                            variant="primary"
+                            icon={Plus}
                             type="button"
                             onClick={() => abrirEmit(membro.userId)}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90"
+                            className="w-full gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
                           >
-                            <Plus className="h-3.5 w-3.5" />
                             Emitir carteirinha
-                          </button>
+                          </AppButton>
                         ) : (
                           <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
                             Sem permissão

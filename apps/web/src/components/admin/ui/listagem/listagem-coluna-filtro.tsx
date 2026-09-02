@@ -8,6 +8,7 @@ import { Check, Filter, X } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import type { ListagemFiltroTipo } from '@/lib/listagem'
+import { AppButton } from '@/components/ui/button'
 
 export interface ListagemFiltroOpcaoUI {
   valor: string
@@ -244,12 +245,14 @@ export function ListagemColunaFiltro({
                 className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-sm text-[rgb(var(--foreground))]"
               />
             )}
-            <button
+            <AppButton
+              variant="primary"
+              icon={Check}
               type="submit"
-              className="w-full rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-primary-on"
+              className="w-full rounded-lg px-3 py-1.5 text-xs font-semibold"
             >
               Aplicar
-            </button>
+            </AppButton>
           </form>
         )}
       </m.div>

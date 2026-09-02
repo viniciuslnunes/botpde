@@ -11,8 +11,10 @@ export interface AdminPageHeaderProps {
   actions?: ReactNode
   backHref?: string
   /**
-   * Chrome abaixo do título (tabs, toolbar). O ritmo é do kit:
+   * Chrome abaixo do título: **tabs e toolbar de busca/filtro**. O ritmo do kit:
    * título ↔ descrição 12px; bloco do título ↔ chrome 20px; peças do chrome 12px.
+   * Tabs (`AdminTabs` / `AdminModuleTabBar` / `AdminPendingTabs`) e busca
+   * (`ListagemToolbar` ou equivalente) entram aqui — nunca no corpo da página.
    */
   children?: ReactNode
 }

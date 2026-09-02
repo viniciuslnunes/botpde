@@ -8,8 +8,12 @@ import {
   prioridadeOrigemPraca,
   ordenarCardsPraca,
   pctAprovacaoPraca,
+  aplicarVotoPracaLocal,
+  contagemExibidaVotoPraca,
+  proximoVotoPraca,
   faixaEngajamentoTopico,
   parseOrdemTopico,
+  parseOrdemNoticia,
   parseJanelaRanking,
   parseForumAba,
   LIMIAR_RANKING_PRACA,
@@ -18,9 +22,15 @@ import {
   wilsonLowerBound,
   scoreHotTopico,
   rankTopicosHot,
+  rankNoticiasHot,
   resumoDeCorpoForum,
   podeVerStatusTopico,
   whereTopicosNaListagem,
+  canalElegivelParaNoticia,
+  parseArtigoBlocos,
+  flattenArtigoBlocos,
+  blocosDeArtigoLegado,
+  tipoBlocoDeUrl,
 } from '@torcida/types'
 
 describe('isolamento da praça (notícias/fórum)', () => {
@@ -87,6 +97,30 @@ describe('isolamento da praça (notícias/fórum)', () => {
     expect(pctAprovacaoPraca(3, 1)).toBe(75)
   })
 
+  it('trocar Concordo por Discordo não pula duas unidades no número exibido', () => {
+    expect(proximoVotoPraca(null, 1)).toBe(1)
+    expect(proximoVotoPraca(null, -1)).toBe(-1)
+    expect(proximoVotoPraca(1, 1)).toBe(0)
+    expect(proximoVotoPraca(1, -1)).toBe(0)
+    expect(proximoVotoPraca(-1, 1)).toBe(0)
+
+    const aposConcordo = aplicarVotoPracaLocal(5, 0, null, proximoVotoPraca(null, 1))
+    expect(aposConcordo).toEqual({ gostei: 6, naoGostei: 0 })
+    expect(contagemExibidaVotoPraca(aposConcordo.gostei, aposConcordo.naoGostei)).toBe(6)
+
+    const aposOposto = aplicarVotoPracaLocal(
+      aposConcordo.gostei,
+      aposConcordo.naoGostei,
+      1,
+      proximoVotoPraca(1, -1),
+    )
+    expect(aposOposto).toEqual({ gostei: 5, naoGostei: 0 })
+    expect(contagemExibidaVotoPraca(aposOposto.gostei, aposOposto.naoGostei)).toBe(5)
+
+    const aposDiscordoDireto = aplicarVotoPracaLocal(5, 0, null, proximoVotoPraca(null, -1))
+    expect(contagemExibidaVotoPraca(aposDiscordoDireto.gostei, aposDiscordoDireto.naoGostei)).toBe(4)
+  })
+
   it('faixa épico/lendário não é cargo', () => {
     expect(faixaEngajamentoTopico({ gostei: 2, respostasCount: 1, visitas: 4 })).toBeNull()
     expect(faixaEngajamentoTopico({ gostei: 10, respostasCount: 12, visitas: 20 })).toBe('epico')
@@ -102,6 +136,59 @@ describe('isolamento da praça (notícias/fórum)', () => {
     expect(parseForumAba('ranking')).toBe('ranking')
     expect(parseForumAba(undefined, '1')).toBe('novo')
     expect(LIMIAR_RANKING_PRACA).toBe(5)
+  })
+
+  it('notícia defaulta em mais acessadas; fórum defaulta em alta', () => {
+    expect(parseOrdemNoticia(undefined)).toBe('acessados')
+    expect(parseOrdemNoticia('em_alta')).toBe('em_alta')
+    expect(parseOrdemNoticia('lixo')).toBe('acessados')
+    expect(parseOrdemTopico(undefined)).toBe('em_alta')
+  })
+
+  it('só canal oficial da torcida/unidade ou portal verificado publica notícia', () => {
+    expect(canalElegivelParaNoticia({ tipo: 'CANAL', canalOficial: true })).toBe(true)
+    expect(canalElegivelParaNoticia({ tipo: 'CANAL', portalNoticiasVerificado: true })).toBe(true)
+    expect(canalElegivelParaNoticia({ tipo: 'CANAL' })).toBe(false)
+    expect(canalElegivelParaNoticia({ tipo: 'GRUPO', canalOficial: true })).toBe(false)
+    expect(canalElegivelParaNoticia(null)).toBe(false)
+  })
+
+  it('ranking de notícias reusa o score do fórum (mais vistas no recorte acessados)', () => {
+    const agora = new Date('2026-09-01T12:00:00Z')
+    const ranked = rankNoticiasHot(
+      [
+        {
+          id: 'fria',
+          status: 'PUBLICADO',
+          fixado: false,
+          gostei: 0,
+          naoGostei: 0,
+          criadoEm: agora,
+          atualizadoEm: agora,
+        },
+        {
+          id: 'quente',
+          status: 'PUBLICADO',
+          fixado: false,
+          gostei: 20,
+          naoGostei: 1,
+          criadoEm: agora,
+          atualizadoEm: agora,
+          midiaUrls: ['https://cdn.example/a.jpg'],
+        },
+        {
+          id: 'fixada',
+          status: 'PUBLICADO',
+          fixado: true,
+          gostei: 0,
+          naoGostei: 0,
+          criadoEm: agora,
+          atualizadoEm: agora,
+        },
+      ],
+      agora,
+    )
+    expect(ranked.map((t) => t.id)).toEqual(['fixada', 'quente', 'fria'])
   })
 
   it('Wilson não deixa 1 voto positivo passar na frente de consenso', () => {
@@ -214,5 +301,42 @@ describe('isolamento da praça (notícias/fórum)', () => {
     expect(tituloDeConteudoForum('ab')).toBeNull()
     expect(tituloDeConteudoForum('abc')).toBe('abc')
     expect(tituloDeConteudoForum('x'.repeat(FORUM_TITULO_MAX + 20))).toHaveLength(FORUM_TITULO_MAX)
+  })
+
+  it('classifica URL de bloco de notícia', () => {
+    expect(tipoBlocoDeUrl('https://www.youtube.com/watch?v=abc')).toBe('embed')
+    expect(tipoBlocoDeUrl('https://instagram.com/p/xyz')).toBe('embed')
+    expect(tipoBlocoDeUrl('https://res.cloudinary.com/x/video/upload/v1/a.mp4')).toBe('video')
+    expect(tipoBlocoDeUrl('https://images.unsplash.com/photo-1')).toBe('imagem')
+  })
+
+  it('história em blocos deriva capa, mídia e corpo na ordem da leitura', () => {
+    const blocos = parseArtigoBlocos([
+      { tipo: 'texto', texto: 'Primeiro parágrafo da matéria.' },
+      { tipo: 'imagem', url: 'https://cdn.example/a.jpg', legenda: 'Ensaio' },
+      { tipo: 'embed', url: 'https://www.youtube.com/watch?v=abc' },
+      { tipo: 'texto', texto: 'Fecha a história.' },
+      { tipo: 'lixo', texto: 'não entra' },
+    ])
+    expect(blocos.map((b) => b.tipo)).toEqual(['texto', 'imagem', 'embed', 'texto'])
+    const flat = flattenArtigoBlocos(blocos)
+    expect(flat.capaUrl).toBe('https://cdn.example/a.jpg')
+    expect(flat.midiaUrls).toEqual([
+      'https://cdn.example/a.jpg',
+      'https://www.youtube.com/watch?v=abc',
+    ])
+    expect(flat.corpo).toContain('Primeiro parágrafo')
+    expect(flat.corpo).toContain('Fecha a história')
+    expect(flat.resumo).toBe('Primeiro parágrafo da matéria.')
+  })
+
+  it('artigo legado (corpo + URLs) vira a mesma sequência de leitura', () => {
+    const blocos = blocosDeArtigoLegado('Texto da sede.\n\nSegundo bloco.', [
+      'https://cdn.example/foto.jpg',
+      'https://www.tiktok.com/@x/video/1',
+    ])
+    expect(blocos[0]).toEqual({ tipo: 'imagem', url: 'https://cdn.example/foto.jpg' })
+    expect(blocos[1]).toEqual({ tipo: 'embed', url: 'https://www.tiktok.com/@x/video/1' })
+    expect(blocos[2]).toEqual({ tipo: 'texto', texto: 'Texto da sede.\n\nSegundo bloco.' })
   })
 })

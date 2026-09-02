@@ -45,19 +45,30 @@ export const APP_MODAL_PANEL_CLASS =
 
 let bodyLockCount = 0
 let previousOverflow = ''
+let previousPaddingRight = ''
 
-/** Trava o scroll do `body` com contador — modal aninhado não restaura cedo. */
+/**
+ * Trava o scroll do `body` com contador — modal aninhado não restaura cedo.
+ * Compensa a largura da barra clássica com `padding-right` (sem calha no
+ * `<html>`, que furava 12px pretos nos shells com scroll interno).
+ */
 export function lockBodyScroll(): () => void {
   if (typeof document === 'undefined') return () => {}
   if (bodyLockCount === 0) {
+    const gutter = window.innerWidth - document.documentElement.clientWidth
     previousOverflow = document.body.style.overflow
+    previousPaddingRight = document.body.style.paddingRight
     document.body.style.overflow = 'hidden'
+    if (gutter > 0) {
+      document.body.style.paddingRight = `${gutter}px`
+    }
   }
   bodyLockCount += 1
   return () => {
     bodyLockCount = Math.max(0, bodyLockCount - 1)
     if (bodyLockCount === 0) {
       document.body.style.overflow = previousOverflow
+      document.body.style.paddingRight = previousPaddingRight
     }
   }
 }

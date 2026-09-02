@@ -12,6 +12,7 @@
     "lint": "eslint",
     "lint:mobile": "node scripts/lint-mobile.mjs --ci",
     "lint:rival-hues": "node scripts/lint-rival-hues.mjs --ci",
+    "lint:botoes": "node scripts/lint-botoes.mjs --ci",
     "rotas:dinamicas": "node scripts/rotas-dinamicas.mjs --json",
     "test": "vitest run",
     "test:e2e": "playwright test",

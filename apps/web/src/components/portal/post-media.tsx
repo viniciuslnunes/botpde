@@ -79,16 +79,19 @@ function processOfficialEmbed(provider: EmbedProvider, host: HTMLElement) {
 interface PostMediaProps {
   urls: string[]
   caption?: string | null
+  className?: string
+  /** Processa o widget na hora (prévia / leitura) — sem esperar o viewport. */
+  eager?: boolean
 }
 
-export function PostMedia({ urls, caption }: PostMediaProps) {
+export function PostMedia({ urls, caption, className, eager = false }: PostMediaProps) {
   const { media, embeds } = classifyMedia(filterDurableImageUrls(urls))
   const slides = media.filter((m) => m.type !== 'sticker')
   const stickers = media.filter((m) => m.type === 'sticker')
   if (media.length === 0 && embeds.length === 0) return null
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className={['mt-2 space-y-3', className].filter(Boolean).join(' ')}>
       {slides.length > 0 && <MediaCarousel slides={slides} caption={caption} />}
       {stickers.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -110,7 +113,7 @@ export function PostMedia({ urls, caption }: PostMediaProps) {
         </div>
       )}
       {embeds.map((url) => (
-        <SocialEmbed key={url} url={url} />
+        <SocialEmbed key={url} url={url} eager={eager} />
       ))}
     </div>
   )
@@ -119,20 +122,24 @@ export function PostMedia({ urls, caption }: PostMediaProps) {
 function Slide({
   item,
   className,
+  hug,
   onOpen,
 }: {
   item: MediaAttachment
   className: string
+  /** Caixa acompanha a foto (sem pillarbox `w-full` + `object-contain`). */
+  hug?: boolean
   onOpen?: () => void
 }) {
   const [broken, setBroken] = useState(false)
+  const hugStyle = hug ? { width: 'auto', height: 'auto' } : undefined
 
   if (broken) {
     return (
       <div
         className={[
           'flex items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-xs text-[rgb(var(--foreground-muted))]',
-          className,
+          hug ? 'mx-auto h-40 w-full max-w-sm' : className,
         ].join(' ')}
       >
         Imagem indisponível
@@ -149,6 +156,7 @@ function Slide({
         playsInline
         preload="metadata"
         className={className}
+        style={hugStyle}
       />
     )
   }
@@ -164,6 +172,7 @@ function Slide({
         height={800}
         sizes="(max-width: 768px) 100vw, 640px"
         className={imageClassName}
+        style={hugStyle}
         onClick={onOpen}
         onError={() => setBroken(true)}
       />
@@ -176,6 +185,7 @@ function Slide({
       src={item.url}
       alt=""
       className={imageClassName}
+      style={hugStyle}
       loading="lazy"
       decoding="async"
       onClick={onOpen}
@@ -207,11 +217,14 @@ function MediaCarousel({ slides, caption }: { slides: MediaAttachment[]; caption
     const only = slides[0]
     return (
       <>
-        <Slide
-          item={only}
-          className="max-h-[32rem] w-full rounded-xl border border-[rgb(var(--border))] object-contain"
-          onOpen={only.type === 'image' ? () => openLightbox(only.url) : undefined}
-        />
+        <div className="flex justify-center">
+          <Slide
+            item={only}
+            hug
+            className="block h-auto max-h-[32rem] w-auto max-w-full rounded-xl border border-[rgb(var(--border))] object-contain"
+            onOpen={only.type === 'image' ? () => openLightbox(only.url) : undefined}
+          />
+        </div>
         {lightboxIdx != null && (
           <MediaLightbox
             urls={imageUrls}
@@ -423,7 +436,7 @@ function YouTubeEmbed({ url, videoId }: { url: string; videoId: string }) {
   )
 }
 
-function SocialEmbed({ url }: { url: string }) {
+function SocialEmbed({ url, eager = false }: { url: string; eager?: boolean }) {
   const provider = detectEmbedProvider(url)
   const { resolvedTheme } = useTheme()
   /** Preferência do portal; undefined (SSR) → dark, alinhado ao restante da UI. */
@@ -438,7 +451,7 @@ function SocialEmbed({ url }: { url: string }) {
    */
   const processedRef = useRef<string | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(eager)
   const [activated, setActivated] = useState(false)
   const [hasFrame, setHasFrame] = useState(false)
 
@@ -457,6 +470,7 @@ function SocialEmbed({ url }: { url: string }) {
 
   // content-visibility no feed: só processa widget quando entra na viewport
   useEffect(() => {
+    if (eager) return
     const el = shellRef.current
     if (!el) return
     const io = new IntersectionObserver(
@@ -470,7 +484,7 @@ function SocialEmbed({ url }: { url: string }) {
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [url])
+  }, [eager, url])
 
   // Rearma o embed no render quando muda a URL — ou o tema, nos widgets que só
   // leem o esquema na criação (hoje: X). Em effect, o frame anterior continuava
@@ -486,7 +500,7 @@ function SocialEmbed({ url }: { url: string }) {
     setHasFrame(false)
     if (url !== urlSincronizada) {
       setUrlSincronizada(url)
-      setVisible(false)
+      setVisible(eager)
     }
   }
 

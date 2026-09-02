@@ -155,7 +155,9 @@ export function NotificationBell({
               className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg"
             >
               <div className="border-b border-[rgb(var(--border))] px-2 pb-2">
-                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Notificações</p>
+                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                  Notificações
+                </p>
               </div>
 
               {items.length === 0 ? (

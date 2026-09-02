@@ -5,6 +5,11 @@ import { AnimatePresence, m } from 'motion/react'
 import { ChevronDown, ChevronUp, Loader2, MessageSquare, MessagesSquare, Send } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
+  aplicarVotoPracaLocal,
+  contagemExibidaVotoPraca,
+  proximoVotoPraca,
+} from '@torcida/types/portal-noticias-forum'
+import {
   comentarTopicoFeed,
   listarRespostasTopicoFeed,
   votarTopicoFeed,
@@ -25,21 +30,6 @@ interface CurrentUser {
 }
 
 type VotoTopico = 1 | -1 | null
-
-function aplicarVotoLocal(
-  gostei: number,
-  naoGostei: number,
-  anterior: VotoTopico,
-  novo: 1 | -1 | 0,
-): { gostei: number; naoGostei: number } {
-  let g = gostei
-  let n = naoGostei
-  if (anterior === 1) g -= 1
-  if (anterior === -1) n -= 1
-  if (novo === 1) g += 1
-  if (novo === -1) n += 1
-  return { gostei: Math.max(0, g), naoGostei: Math.max(0, n) }
-}
 
 export function ForumFeedEngagement({
   topicoId,
@@ -71,7 +61,7 @@ export function ForumFeedEngagement({
   const operador = useModoOperador()
   const carregadasRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const saldo = totalGostei - totalNao
+  const apoios = contagemExibidaVotoPraca(totalGostei, totalNao)
 
   const carregar = useCallback(async () => {
     if (carregadasRef.current) return
@@ -96,9 +86,9 @@ export function ForumFeedEngagement({
       return
     }
     const anterior = voto
-    const novo: 1 | -1 | 0 = anterior === proximo ? 0 : proximo
+    const novo = proximoVotoPraca(anterior, proximo)
     const snapshot = { voto: anterior, gostei: totalGostei, nao: totalNao }
-    const local = aplicarVotoLocal(totalGostei, totalNao, anterior, novo)
+    const local = aplicarVotoPracaLocal(totalGostei, totalNao, anterior, novo)
     setVoto(novo === 0 ? null : novo)
     setTotalGostei(local.gostei)
     setTotalNao(local.naoGostei)
@@ -145,11 +135,12 @@ export function ForumFeedEngagement({
   }
 
   const btnBase =
-    'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50'
+    'inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-xs font-medium transition-colors disabled:opacity-50 sm:gap-1.5 sm:px-2 sm:py-1.5 sm:text-sm'
+  const btnLabel = 'truncate @max-[26rem]:sr-only'
   const mostrarSecao = abertos || respostas.length > 0 || carregando
 
   return (
-    <div className="mt-3">
+    <div className="mt-1.5">
       <AnimatePresence>
         {totalC > 0 && (
           <m.div
@@ -158,15 +149,15 @@ export function ForumFeedEngagement({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={springSnappy}
-            className="flex items-center gap-3 pb-2 text-xs text-[rgb(var(--foreground-muted))]"
+            className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]"
           >
             <span>{totalC} {totalC === 1 ? 'resposta' : 'respostas'}</span>
           </m.div>
         )}
       </AnimatePresence>
 
-      <div className="flex flex-wrap items-center gap-1 border-t border-[rgb(var(--border))] pt-2">
-        <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 border-t border-[rgb(var(--border))] pt-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5">
           <m.button
             type="button"
             whileTap={{ scale: 0.9 }}
@@ -185,14 +176,14 @@ export function ForumFeedEngagement({
             ].join(' ')}
           >
             <ChevronUp className={['h-4 w-4', voto === 1 ? 'stroke-[2.5]' : ''].join(' ')} />
-            Concordo
+            <span className={btnLabel}>Concordo</span>
           </m.button>
 
           <span
             className="min-w-7 px-1 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]"
-            aria-label={`${saldo} de saldo no tópico`}
+            aria-label={`${apoios} de saldo no tópico`}
           >
-            {saldo}
+            {apoios}
           </span>
 
           <m.button
@@ -213,7 +204,7 @@ export function ForumFeedEngagement({
             ].join(' ')}
           >
             <ChevronDown className={['h-4 w-4', voto === -1 ? 'stroke-[2.5]' : ''].join(' ')} />
-            Discordo
+            <span className={btnLabel}>Discordo</span>
           </m.button>
         </div>
 
@@ -223,6 +214,7 @@ export function ForumFeedEngagement({
           transition={springSnappy}
           onClick={abrirRespostas}
           aria-expanded={abertos}
+          aria-label={abertos ? 'Ocultar respostas' : 'Responder'}
           className={[
             btnBase,
             abertos
@@ -231,16 +223,16 @@ export function ForumFeedEngagement({
           ].join(' ')}
         >
           <MessageSquare className="h-4 w-4" />
-          {abertos ? 'Ocultar' : 'Responder'}
+          <span className={btnLabel}>{abertos ? 'Ocultar' : 'Responder'}</span>
         </m.button>
 
         <ComunidadePrefetchLink
           href={linkTopicoForum(topicoId, escopo)}
           aria-label="Abrir este tópico no fórum"
-          className={`${btnBase} ml-auto text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]`}
+          className={`${btnBase} shrink-0 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]`}
         >
           <MessagesSquare className="h-4 w-4" />
-          Ver no fórum
+          <span className={btnLabel}>Fórum</span>
         </ComunidadePrefetchLink>
       </div>
 

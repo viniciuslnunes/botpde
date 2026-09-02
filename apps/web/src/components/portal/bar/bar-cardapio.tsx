@@ -5,6 +5,7 @@ import { m } from 'motion/react'
 import { Beer } from 'lucide-react'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export type BarCardapioItem = {
@@ -50,7 +51,7 @@ export function BarCardapio({
   return (
     <div className="space-y-4">
       {categorias.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <ScrollRail className="flex gap-2 pb-1">
           <button
             type="button"
             onClick={() => setCategoriaId(null)}
@@ -78,7 +79,7 @@ export function BarCardapio({
               {c.nome}
             </button>
           ))}
-        </div>
+        </ScrollRail>
       )}
 
       {filtrados.length === 0 ? (

@@ -96,3 +96,9 @@ jobs:
 
       - name: Lint rival hues (sem emerald/sky crus no tenant)
         run: pnpm --filter @torcida/web lint:rival-hues
+
+      # Botão de ação: rótulo em UPPERCASE (CSS) + ícone à esquerda (só o
+      # call-site sabe qual). Cobre as áreas já migradas — ver
+      # AREAS_COBERTAS em scripts/lint-botoes.mjs.
+      - name: Lint botoes (uppercase + icone na acao)
+        run: pnpm --filter @torcida/web lint:botoes

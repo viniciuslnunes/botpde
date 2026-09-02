@@ -65,20 +65,20 @@ export function FeedPostSkeleton({
       aria-hidden="true"
       style={estiloIndice(index)}
       className={[
-        'skeleton-sweep card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4',
+        'skeleton-sweep card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4',
         className ?? '',
       ].join(' ')}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         <div className="skeleton-track h-10 w-10 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-0.5">
           <div className="skeleton-track h-3.5 w-[68%] rounded-full" />
           <div className="skeleton-track-soft h-3 w-[48%] rounded-full" />
           <div className="skeleton-track-soft h-3 w-[26%] rounded-full" />
         </div>
       </div>
 
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-5 space-y-2.5">
         {Array.from({ length: Math.max(1, linhas) }).map((_, i) => (
           <div
             key={i}
@@ -90,7 +90,7 @@ export function FeedPostSkeleton({
 
       {midia && <div className="skeleton-track mt-3 h-44 rounded-xl sm:h-56" />}
 
-      <div className="mt-4 flex items-center gap-2 border-t border-[rgb(var(--border))] pt-3">
+      <div className="mt-2 flex items-center gap-1 border-t border-[rgb(var(--border))] pt-1.5">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="skeleton-track-soft h-8 flex-1 rounded-full" />
         ))}

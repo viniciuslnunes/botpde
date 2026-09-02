@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { m } from 'motion/react'
-import { ReceiptText } from 'lucide-react'
+import { ArrowLeft, Check, ReceiptText, Undo2, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { cancelarVendaBar, estornarVendaBar } from '@/app/admin/bar/actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { AppButton } from '@/components/ui/button'
 
 export interface BarVendaListItem {
   id: string
@@ -48,7 +49,9 @@ function CancelarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
   const confirmAction = useConfirmAction()
 
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={X}
       onClick={() =>
         void confirmAction({
           titulo: 'Cancelar esta venda?',
@@ -64,7 +67,7 @@ function CancelarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
       className="rounded-lg border border-[rgb(var(--color-danger)_/_0.35)] px-3 py-1.5 text-xs font-medium text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.08)]"
     >
       Cancelar
-    </button>
+    </AppButton>
   )
 }
 
@@ -89,13 +92,15 @@ function EstornarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
 
   if (!aberto) {
     return (
-      <button
+      <AppButton
+        variant="none"
+        icon={Undo2}
         type="button"
         onClick={() => setAberto(true)}
         className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
       >
         Estornar
-      </button>
+      </AppButton>
     )
   }
 
@@ -110,22 +115,26 @@ function EstornarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
         className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
       />
       <div className="flex gap-1.5">
-        <button
+        <AppButton
+          variant="none"
+          icon={Check}
           type="button"
           disabled={pending || motivo.trim().length < 3}
           onClick={confirmar}
           className="rounded-md bg-[rgb(var(--color-danger)_/_0.9)] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
         >
           Confirmar
-        </button>
-        <button
+        </AppButton>
+        <AppButton
+          variant="none"
+          icon={ArrowLeft}
           type="button"
           disabled={pending}
           onClick={() => setAberto(false)}
           className="rounded-md px-2.5 py-1 text-xs text-[rgb(var(--foreground-muted))]"
         >
           Voltar
-        </button>
+        </AppButton>
       </div>
     </div>
   )

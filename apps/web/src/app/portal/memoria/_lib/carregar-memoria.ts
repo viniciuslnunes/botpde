@@ -26,6 +26,8 @@ import {
   limitesCalendarioMemoria,
   clampDiaIso,
   montarMemoria,
+  montarEspinhaCalendario,
+  diasEmTorno,
   isMemoriaDiaIso,
   resolverDiaInicial,
   LIMITE_EVENTOS_MEMORIA,
@@ -37,6 +39,21 @@ import {
   type MemoriaMando,
   type MemoriaMontada,
 } from '@/lib/memoria-dia'
+import {
+  calcularEstatisticas,
+  diasParalelosNesteDia,
+  montarParalelos,
+  type MemoriaEstatisticas,
+  type MemoriaParalelo,
+} from '@/lib/memoria-acervo'
+import { filtrarDiasPorCapitulo } from '@torcida/types'
+import {
+  carregarCapitulosMemoria,
+  carregarMarcosMemoria,
+  podeGerirAcervoMemoria,
+  resolverCapituloAtivo,
+  type MemoriaCapituloResumo,
+} from './memoria-capitulos'
 import {
   MEMORIA_ESCOPO,
   MemoriaEscopoSchema,
@@ -88,6 +105,11 @@ export type MemoriaContexto =
       podeCriarFato: boolean
       fatosDoAutor: MemoriaFatoFila[]
       presenca: MemoriaPresenca | null
+      estatisticas: MemoriaEstatisticas
+      paralelos: MemoriaParalelo[]
+      capitulos: MemoriaCapituloResumo[]
+      capituloAtivo: MemoriaCapituloResumo | null
+      podeGerirAcervo: boolean
     }
 
 type PostMemoriaRow = {
@@ -104,6 +126,7 @@ type PostMemoriaRow = {
   comunicadoOrigemId: string | null
   alcanceNacional: boolean
   autor: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
+  tenant: { id: string; nome: string }
 }
 
 type EventoMemoriaRow = {
@@ -153,6 +176,7 @@ const POST_SELECT = {
   comunicadoOrigemId: true,
   alcanceNacional: true,
   autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+  tenant: { select: { id: true, nome: true } },
 } as const
 
 const EVENTO_SELECT = {
@@ -196,6 +220,7 @@ export const carregarMemoriaUnidade = cache(async function carregarMemoriaUnidad
 export const carregarMemoria = cache(async function carregarMemoria(opts: {
   escopoRaw?: string | null
   diaRaw?: string | null
+  capRaw?: string | null
 } = {}): Promise<MemoriaContexto> {
   const session = await auth()
   if (!session?.user?.id) return { ok: false, motivo: 'sem-sessao' }
@@ -223,6 +248,7 @@ export const carregarMemoria = cache(async function carregarMemoria(opts: {
     maxIso,
   )
   const janela = janelaEmTorno(ancora, minIso, maxIso)
+  const diasJanelaBase = diasEmTorno(ancora, minIso, maxIso)
 
   if (escopo === MEMORIA_ESCOPO.CLUBE) {
     if (!ctxCom.afiliacao) return { ok: false, motivo: 'sem-clube' }
@@ -231,6 +257,9 @@ export const carregarMemoria = cache(async function carregarMemoria(opts: {
       afiliacaoId: ctxCom.afiliacao.id,
       janela,
       escoposDisponiveis,
+      diaAberto: ancora,
+      hojeIso,
+      diasJanela: diasJanelaBase,
     })
   }
 
@@ -274,10 +303,13 @@ export const carregarMemoria = cache(async function carregarMemoria(opts: {
     janela,
     escoposDisponiveis,
     diaAberto: ancora,
+    hojeIso,
+    diasJanela: diasJanelaBase,
+    capRaw: opts.capRaw,
   })
 })
 
-async function idsAliadosComMemoria(tenantId: string): Promise<string[]> {
+export async function idsAliadosComMemoria(tenantId: string): Promise<string[]> {
   const raizId = await resolverTenantRaizId(tenantId)
   const raiz: { memoriaAliados: boolean } | null = await db.tenant.findUnique({
     where: { id: raizId },
@@ -320,66 +352,27 @@ async function carregarEscopoClube(opts: {
   afiliacaoId: string
   janela: { gte: Date; lt: Date }
   escoposDisponiveis: MemoriaEscopo[]
+  diaAberto: string
+  hojeIso: string
+  diasJanela: string[]
 }): Promise<MemoriaContexto> {
-  const sintetico = await getOrCreateComunidadeNacionalTenant(opts.afiliacaoId)
-  const [postsBrutos, partidas, afiliacao]: [
-    PostMemoriaRow[],
-    PartidaMemoriaRow[],
-    { nome: string; apelido: string | null; escudoUrl: string | null } | null,
-  ] = await Promise.all([
-    withDbRetry(
-      () =>
-        db.post.findMany({
-          where: {
-            oculto: false,
-            visibilidade: 'PUBLICO',
-            criadoEm: { gte: opts.janela.gte, lt: opts.janela.lt },
-            ...escopoFeedSemConversa,
-            OR: [{ tenantId: sintetico.id }, { alcanceNacional: true }],
-          },
-          select: POST_SELECT,
-          orderBy: { criadoEm: 'desc' },
-          take: LIMITE_POSTS_MEMORIA,
-        }) as Promise<PostMemoriaRow[]>,
-    ),
-    withDbRetry(
-      () =>
-        db.partida.findMany({
-          where: {
-            afiliacaoId: opts.afiliacaoId,
-            status: { in: ['AGENDADA', 'AO_VIVO', 'ENCERRADA'] },
-            dataHora: { gte: opts.janela.gte, lt: opts.janela.lt },
-          },
-          select: PARTIDA_SELECT,
-          orderBy: { dataHora: 'desc' },
-          take: LIMITE_PARTIDAS_MEMORIA,
-        }) as Promise<PartidaMemoriaRow[]>,
-    ),
-    db.afiliacao.findUnique({
+  const montada = await carregarMontadaClube(opts.userId, opts.afiliacaoId, opts.janela)
+  const afiliacao: { nome: string; apelido: string | null; escudoUrl: string | null } | null =
+    await db.afiliacao.findUnique({
       where: { id: opts.afiliacaoId },
       select: { nome: true, apelido: true, escudoUrl: true },
-    }),
-  ])
-
-  const postsClube = postsBrutos.filter((p) =>
-    itemEntraNoEscopoClube({
-      alcanceNacional: p.alcanceNacional,
-      visibilidade: p.visibilidade,
-      tenantSintetico: p.tenantId === sintetico.id,
-    }),
-  )
-  const postsVisiveis = await filtrarPostsVisiveis(opts.userId, postsClube)
+    })
   const clubeNome = afiliacao
     ? formatNomeAfiliacao(afiliacao.apelido || afiliacao.nome)
     : 'Clube'
-  const montada = montarMemoria(
-    {
-      posts: mapPosts(postsVisiveis),
-      eventos: [],
-      partidas,
-    },
-    { abrirPartidaOrfa: partidaAbreEspinha(MEMORIA_ESCOPO.CLUBE, false) },
-  )
+
+  const { estatisticas, paralelos } = await montarMetaAcervo({
+    montada,
+    diasJanela: opts.diasJanela,
+    diaAberto: opts.diaAberto,
+    hojeIso: opts.hojeIso,
+    hidratarParalelos: (janela) => carregarMontadaClube(opts.userId, opts.afiliacaoId, janela),
+  })
 
   return {
     ok: true,
@@ -394,7 +387,67 @@ async function carregarEscopoClube(opts: {
     fatosDoAutor: [],
     presenca: null,
     mostrarChips: false,
+    estatisticas,
+    paralelos,
+    capitulos: [],
+    capituloAtivo: null,
+    podeGerirAcervo: false,
   }
+}
+
+async function carregarMontadaClube(
+  userId: string,
+  afiliacaoId: string,
+  janela: { gte: Date; lt: Date },
+): Promise<MemoriaMontada> {
+  const sintetico = await getOrCreateComunidadeNacionalTenant(afiliacaoId)
+  const [postsBrutos, partidas]: [PostMemoriaRow[], PartidaMemoriaRow[]] = await Promise.all([
+    withDbRetry(
+      () =>
+        db.post.findMany({
+          where: {
+            oculto: false,
+            visibilidade: 'PUBLICO',
+            criadoEm: { gte: janela.gte, lt: janela.lt },
+            ...escopoFeedSemConversa,
+            OR: [{ tenantId: sintetico.id }, { alcanceNacional: true }],
+          },
+          select: POST_SELECT,
+          orderBy: { criadoEm: 'desc' },
+          take: LIMITE_POSTS_MEMORIA,
+        }) as Promise<PostMemoriaRow[]>,
+    ),
+    withDbRetry(
+      () =>
+        db.partida.findMany({
+          where: {
+            afiliacaoId,
+            status: { in: ['AGENDADA', 'AO_VIVO', 'ENCERRADA'] },
+            dataHora: { gte: janela.gte, lt: janela.lt },
+          },
+          select: PARTIDA_SELECT,
+          orderBy: { dataHora: 'desc' },
+          take: LIMITE_PARTIDAS_MEMORIA,
+        }) as Promise<PartidaMemoriaRow[]>,
+    ),
+  ])
+
+  const postsClube = postsBrutos.filter((p) =>
+    itemEntraNoEscopoClube({
+      alcanceNacional: p.alcanceNacional,
+      visibilidade: p.visibilidade,
+      tenantSintetico: p.tenantId === sintetico.id,
+    }),
+  )
+  const postsVisiveis = await filtrarPostsVisiveis(userId, postsClube)
+  return montarMemoria(
+    {
+      posts: mapPosts(postsVisiveis),
+      eventos: [],
+      partidas,
+    },
+    { abrirPartidaOrfa: partidaAbreEspinha(MEMORIA_ESCOPO.CLUBE, false) },
+  )
 }
 
 async function carregarEscopoTorcidaOuUnidade(opts: {
@@ -406,14 +459,24 @@ async function carregarEscopoTorcidaOuUnidade(opts: {
   janela: { gte: Date; lt: Date }
   escoposDisponiveis: MemoriaEscopo[]
   diaAberto: string | null
+  hojeIso: string
+  diasJanela: string[]
+  capRaw?: string | null
 }): Promise<MemoriaContexto> {
   const { userId, unidade, escopo, janela } = opts
-  const [lineage, aliados, escopoEventosUnidade, raizId] = await Promise.all([
+  const [lineage, aliados, escopoEventosUnidade, raizId, capitulos, podeGerir] =
+    await Promise.all([
     getTorcidaLineageTenantIds(unidade.id),
     idsAliadosComMemoria(unidade.id),
     getEscopoEventosVisiveis(unidade.id, userId),
     resolverTenantRaizId(unidade.id),
+    carregarCapitulosMemoria(unidade.id),
+    podeGerirAcervoMemoria(userId, unidade.id),
   ])
+  const capituloAtivo = resolverCapituloAtivo(capitulos, opts.capRaw)
+  const diasJanela = capituloAtivo
+    ? filtrarDiasPorCapitulo(capituloAtivo.dias, opts.diasJanela)
+    : opts.diasJanela
   const lineageAberta = await filtrarTenantsRestritos(lineage, unidade.id)
 
   const tenantIdsProprios =
@@ -421,69 +484,7 @@ async function carregarEscopoTorcidaOuUnidade(opts: {
   const tenantIdsPostsAliados = aliados
   const tenantIdsPostsTodos = [...new Set([...tenantIdsProprios, ...tenantIdsPostsAliados])]
 
-  const [postsBrutos, eventos, fatos, afiliacao, raiz, podeCriar, logoRaw]: [
-    PostMemoriaRow[],
-    EventoMemoriaRow[],
-    FatoMemoriaRow[],
-    { nome: string; apelido: string | null } | null,
-    { nome: string; logoUrl: string | null } | null,
-    boolean,
-    string | null,
-  ] = await Promise.all([
-    tenantIdsPostsTodos.length === 0
-      ? Promise.resolve([] as PostMemoriaRow[])
-      : withDbRetry(
-          () =>
-            db.post.findMany({
-              where: {
-                tenantId: { in: tenantIdsPostsTodos },
-                oculto: false,
-                criadoEm: { gte: janela.gte, lt: janela.lt },
-                ...escopoFeedSemConversa,
-                OR: [
-                  { tenantId: unidade.id },
-                  { visibilidade: 'PUBLICO' },
-                ],
-              },
-              select: POST_SELECT,
-              orderBy: { criadoEm: 'desc' },
-              take: LIMITE_POSTS_MEMORIA,
-            }) as Promise<PostMemoriaRow[]>,
-        ),
-    withDbRetry(
-      () =>
-        db.evento.findMany({
-          where:
-            escopo === MEMORIA_ESCOPO.UNIDADE
-              ? { ...escopoEventosUnidade, data: { gte: janela.gte, lt: janela.lt } }
-              : {
-                  tenantId: { in: tenantIdsProprios },
-                  data: { gte: janela.gte, lt: janela.lt },
-                },
-          select: EVENTO_SELECT,
-          orderBy: { data: 'desc' },
-          take: LIMITE_EVENTOS_MEMORIA,
-        }) as Promise<EventoMemoriaRow[]>,
-    ),
-    withDbRetry(
-      () =>
-        db.memoriaFato.findMany({
-          where: {
-            status: 'APROVADA',
-            dia: { gte: janela.gte, lt: janela.lt },
-            OR: [
-              { tenantId: unidade.id },
-              {
-                tenantId: { in: tenantIdsPostsTodos.filter((id) => id !== unidade.id) },
-                visibilidade: 'PUBLICO',
-              },
-            ],
-          },
-          select: FATO_SELECT,
-          orderBy: { criadoEm: 'desc' },
-          take: LIMITE_FATOS_MEMORIA,
-        }) as Promise<FatoMemoriaRow[]>,
-    ),
+  const [afiliacao, raiz, podeCriar, logoRaw] = await Promise.all([
     opts.afiliacaoId
       ? db.afiliacao.findUnique({
           where: { id: opts.afiliacaoId },
@@ -498,47 +499,24 @@ async function carregarEscopoTorcidaOuUnidade(opts: {
     ),
   ])
 
-  const postsVisiveis = await filtrarPostsVisiveis(userId, postsBrutos)
-
-  let partidas: PartidaMemoriaRow[] = []
-  if (opts.afiliacaoId) {
-    partidas = await withDbRetry(
-      () =>
-        db.partida.findMany({
-          where: {
-            afiliacaoId: opts.afiliacaoId,
-            status: { in: ['AGENDADA', 'AO_VIVO', 'ENCERRADA'] },
-            dataHora: { gte: janela.gte, lt: janela.lt },
-          },
-          select: PARTIDA_SELECT,
-          orderBy: { dataHora: 'desc' },
-          take: LIMITE_PARTIDAS_MEMORIA,
-        }) as Promise<PartidaMemoriaRow[]>,
-    )
-  }
-
-  const montada = montarMemoria({
-    posts: mapPosts(postsVisiveis),
-    eventos: eventos.map((e) => ({ ...e, fotoUrl: durableImageUrl(e.fotoUrl) })),
-    partidas,
-    fatos: fatos.map((f) => ({
-      id: f.id,
-      dia: f.dia,
-      conteudo: f.conteudo,
-      midiaUrls: filterDurableImageUrls(f.midiaUrls),
-      autorId: f.autorId,
-      autorNome: f.autor.nickname || f.autor.nome,
-      autorAvatar: durableImageUrl(f.autor.avatarUrl),
-      criadoEm: f.criadoEm,
-      postId: f.postId,
-    })),
+  const montada = await carregarMontadaTorcidaOuUnidade({
+    userId,
+    unidade,
+    afiliacaoId: opts.afiliacaoId,
+    escopo,
+    janela,
+    lineageAberta,
+    tenantIdsProprios,
+    tenantIdsPostsTodos,
+    tenantIdsPostsAliados,
+    escopoEventosUnidade,
   })
 
   const diaPainel = isMemoriaDiaIso(opts.diaAberto)
     ? opts.diaAberto
     : resolverDiaInicial(montada.espinha, opts.diaAberto, todayDateOnlyIso())
 
-  const [fatosDoAutor, presenca] = await Promise.all([
+  const [fatosDoAutor, presenca, meta] = await Promise.all([
     diaPainel && podeCriar
       ? carregarFatosDoAutor(unidade.id, userId, diaPainel)
       : Promise.resolve([] as MemoriaFatoFila[]),
@@ -551,6 +529,34 @@ async function carregarEscopoTorcidaOuUnidade(opts: {
           tenantIdsEvento: tenantIdsProprios,
         })
       : Promise.resolve(null),
+    diaPainel
+      ? montarMetaAcervo({
+          montada,
+          diasJanela,
+          diaAberto: diaPainel,
+          hojeIso: opts.hojeIso,
+          hidratarParalelos: (janelaPar) =>
+            carregarMontadaTorcidaOuUnidade({
+              userId,
+              unidade,
+              afiliacaoId: opts.afiliacaoId,
+              escopo,
+              janela: janelaPar,
+              lineageAberta,
+              tenantIdsProprios,
+              tenantIdsPostsTodos,
+              tenantIdsPostsAliados,
+              escopoEventosUnidade,
+            }),
+        })
+      : Promise.resolve({
+          estatisticas: calcularEstatisticas(
+            montarEspinhaCalendario(diasJanela, montada.porDia),
+            null,
+            montada.espinha.at(-1)?.dia ?? null,
+          ),
+          paralelos: [] as MemoriaParalelo[],
+        }),
   ])
 
   const clubeNome = afiliacao
@@ -574,7 +580,155 @@ async function carregarEscopoTorcidaOuUnidade(opts: {
     podeCriarFato: podeCriar,
     fatosDoAutor,
     presenca,
+    estatisticas: meta.estatisticas,
+    paralelos: meta.paralelos,
+    capitulos,
+    capituloAtivo,
+    podeGerirAcervo: podeGerir,
   }
+}
+
+async function carregarMontadaTorcidaOuUnidade(opts: {
+  userId: string
+  unidade: { id: string }
+  afiliacaoId: string | null
+  escopo: typeof MEMORIA_ESCOPO.UNIDADE | typeof MEMORIA_ESCOPO.TORCIDA
+  janela: { gte: Date; lt: Date }
+  lineageAberta: string[]
+  tenantIdsProprios: string[]
+  tenantIdsPostsTodos: string[]
+  tenantIdsPostsAliados: string[]
+  escopoEventosUnidade: Awaited<ReturnType<typeof getEscopoEventosVisiveis>>
+}): Promise<MemoriaMontada> {
+  const { userId, unidade, escopo, janela } = opts
+  const [postsBrutos, eventos, fatos]: [
+    PostMemoriaRow[],
+    EventoMemoriaRow[],
+    FatoMemoriaRow[],
+  ] = await Promise.all([
+    opts.tenantIdsPostsTodos.length === 0
+      ? Promise.resolve([] as PostMemoriaRow[])
+      : withDbRetry(
+          () =>
+            db.post.findMany({
+              where: {
+                tenantId: { in: opts.tenantIdsPostsTodos },
+                oculto: false,
+                criadoEm: { gte: janela.gte, lt: janela.lt },
+                ...escopoFeedSemConversa,
+                OR: [{ tenantId: unidade.id }, { visibilidade: 'PUBLICO' }],
+              },
+              select: POST_SELECT,
+              orderBy: { criadoEm: 'desc' },
+              take: LIMITE_POSTS_MEMORIA,
+            }) as Promise<PostMemoriaRow[]>,
+        ),
+    withDbRetry(
+      () =>
+        db.evento.findMany({
+          where:
+            escopo === MEMORIA_ESCOPO.UNIDADE
+              ? { ...opts.escopoEventosUnidade, data: { gte: janela.gte, lt: janela.lt } }
+              : {
+                  tenantId: { in: opts.tenantIdsProprios },
+                  data: { gte: janela.gte, lt: janela.lt },
+                },
+          select: EVENTO_SELECT,
+          orderBy: { data: 'desc' },
+          take: LIMITE_EVENTOS_MEMORIA,
+        }) as Promise<EventoMemoriaRow[]>,
+    ),
+    withDbRetry(
+      () =>
+        db.memoriaFato.findMany({
+          where: {
+            status: 'APROVADA',
+            dia: { gte: janela.gte, lt: janela.lt },
+            OR: [
+              { tenantId: unidade.id },
+              {
+                tenantId: {
+                  in: opts.tenantIdsPostsTodos.filter((id) => id !== unidade.id),
+                },
+                visibilidade: 'PUBLICO',
+              },
+            ],
+          },
+          select: FATO_SELECT,
+          orderBy: { criadoEm: 'desc' },
+          take: LIMITE_FATOS_MEMORIA,
+        }) as Promise<FatoMemoriaRow[]>,
+    ),
+  ])
+
+  const postsVisiveis = await filtrarPostsVisiveis(userId, postsBrutos)
+
+  let partidas: PartidaMemoriaRow[] = []
+  if (opts.afiliacaoId) {
+    partidas = await withDbRetry(
+      () =>
+        db.partida.findMany({
+          where: {
+            afiliacaoId: opts.afiliacaoId,
+            status: { in: ['AGENDADA', 'AO_VIVO', 'ENCERRADA'] },
+            dataHora: { gte: janela.gte, lt: janela.lt },
+          },
+          select: PARTIDA_SELECT,
+          orderBy: { dataHora: 'desc' },
+          take: LIMITE_PARTIDAS_MEMORIA,
+        }) as Promise<PartidaMemoriaRow[]>,
+    )
+  }
+
+  const marcos = await carregarMarcosMemoria(opts.tenantIdsProprios, janela)
+
+  return montarMemoria({
+    posts: mapPosts(postsVisiveis),
+    eventos: eventos.map((e) => ({ ...e, fotoUrl: durableImageUrl(e.fotoUrl) })),
+    partidas,
+    marcos,
+    fatos: fatos.map((f) => ({
+      id: f.id,
+      dia: f.dia,
+      conteudo: f.conteudo,
+      midiaUrls: filterDurableImageUrls(f.midiaUrls),
+      autorId: f.autorId,
+      autorNome: f.autor.nickname || f.autor.nome,
+      autorAvatar: durableImageUrl(f.autor.avatarUrl),
+      criadoEm: f.criadoEm,
+      postId: f.postId,
+    })),
+  }, {
+    homeTenantId: unidade.id,
+    idsAliados: opts.tenantIdsPostsAliados,
+  })
+}
+
+async function montarMetaAcervo(opts: {
+  montada: MemoriaMontada
+  diasJanela: string[]
+  diaAberto: string
+  hojeIso: string
+  hidratarParalelos: (janela: { gte: Date; lt: Date }) => Promise<MemoriaMontada>
+}): Promise<{ estatisticas: MemoriaEstatisticas; paralelos: MemoriaParalelo[] }> {
+  const espinha = montarEspinhaCalendario(opts.diasJanela, opts.montada.porDia)
+  const primeiro = opts.montada.espinha.at(-1)?.dia ?? null
+  const estatisticas = calcularEstatisticas(espinha, null, primeiro)
+
+  const diasPar = diasParalelosNesteDia(opts.diaAberto, opts.hojeIso)
+  if (diasPar.length === 0) {
+    return { estatisticas, paralelos: [] }
+  }
+
+  const sorted = [...diasPar].sort()
+  const gte = startOfZonedDayUtc(parseDateOnly(sorted[0]!))
+  const lt = startOfZonedDayUtc(addCalendarDays(parseDateOnly(sorted[sorted.length - 1]!), 1))
+  const montadaPar = await opts.hidratarParalelos({ gte, lt })
+  const paralelos = montarParalelos(opts.diaAberto, diasPar, montadaPar.porDia).filter(
+    (p) => p.temConteudo,
+  )
+
+  return { estatisticas, paralelos }
 }
 
 function mapPosts(posts: PostMemoriaRow[]) {
@@ -587,6 +741,8 @@ function mapPosts(posts: PostMemoriaRow[]) {
     autorId: p.autorId,
     autorNome: p.autor.nickname || p.autor.nome,
     autorAvatar: durableImageUrl(p.autor.avatarUrl),
+    tenantId: p.tenantId,
+    tenantNome: p.tenant?.nome ?? null,
   }))
 }
 

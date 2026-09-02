@@ -2,6 +2,7 @@
 
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export interface MotionTabItem {
   id: string
@@ -28,7 +29,7 @@ export function MotionTabBar({
   // `pb-px` compensa o `-mb-px` das abas, que o overflow recortaria.
   return (
     <div className="border-b border-[rgb(var(--border))]">
-      <div className="app-scrollbar-none flex gap-2 overflow-x-auto pb-px">
+      <ScrollRail className="flex gap-2 pb-px">
       {items.map((item) => {
         const ativo = item.id === activeId
 
@@ -60,7 +61,7 @@ export function MotionTabBar({
           </button>
         )
       })}
-      </div>
+      </ScrollRail>
     </div>
   )
 }

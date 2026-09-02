@@ -66,6 +66,16 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 (`variante: success|destructive`), classes `.btn-success`, `.btn-danger`,
 `.btn-*-soft`, etc. em `globals.css`.
 
+**`AppButton` é o consumidor principal desses tokens** (2026-09-02): a prop
+`variant` resolve direto para `.btn-primary` / `.btn-danger` / `.btn-*-soft`,
+então todo botão de ação do produto acompanha a paleta que a torcida salva
+aqui — inclusive o anel de contraste (`--color-*-ring`) e o texto legível
+(`*-on` no sólido). Botão novo **não** escreve
+`bg-[rgb(var(--primary))] text-white`: além de furar o token, `text-white` some
+em identidade branca. A variante `none` existe só como ponte de migração de
+botão legado e não pinta nada. Ver `docs/frontend/botoes.md` e
+`ARCHITECTURE.md` §5.36.
+
 ## Runtime
 
 1. `TenantDesignBridge` nos layouts portal/admin aplica CSS vars via `applyTenantDesign`.

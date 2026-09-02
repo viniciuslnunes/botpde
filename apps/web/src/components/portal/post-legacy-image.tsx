@@ -21,7 +21,7 @@ export function PostLegacyImage({ src, caption }: PostLegacyImageProps) {
       <img
         src={src}
         alt=""
-        className="mt-3 max-h-[28rem] w-full cursor-zoom-in rounded-xl border border-[rgb(var(--border))] object-cover"
+        className="mt-2 max-h-[28rem] w-full cursor-zoom-in rounded-xl border border-[rgb(var(--border))] object-cover"
         loading="lazy"
         decoding="async"
         onClick={() => setOpen(true)}

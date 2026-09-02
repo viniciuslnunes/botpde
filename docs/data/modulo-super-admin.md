@@ -53,7 +53,7 @@ Processo: `docs/ops/release.md` (`ARCHITECTURE.md` §5.25).
 | Rota | Função |
 |---|---|
 | `/super-admin` | Dashboard — KPIs agregados (`lib/super-admin/plataforma-dashboard.ts`) + card **Build da plataforma** (versão · publicação · commit) |
-| `/super-admin/torcidas` | Hub: trocar de torcida (`TenantSwitcher`), lista com busca (`torcidas-lista-cliente.tsx`), transferir owner |
+| `/super-admin/torcidas` | Hub: trocar de torcida (switcher com busca sob demanda), listagem paginada no banco (`LISTAGEM_SUPER_ADMIN_TORCIDAS`), transferir owner |
 | `/super-admin/setup` | Criar tenant; lista todos os tenants (ativos e inativos) com busca (`tenants-lista-cliente.tsx`), toggle ativo/inativo, seletor de plano |
 | `/super-admin/clubes` | Catálogo global de clubes (`Afiliacao`) — CRUD, rivalidades, métricas, qualidade |
 | `/super-admin/unidades` | Fila de solicitações de unidade (subsede/PDE) de todas as torcidas |
@@ -226,3 +226,28 @@ E2EE; “SA lê” e “servidor cego” são mutuamente excludentes. Evolução
   (`SolicitacaoUnidade` PENDENTE) e "Moderação" (`Denuncia` +
   `DenunciaMensagem` PENDENTE). "Auditoria" não tem um conceito de
   pendência — não existe badge lá.
+
+## Seletor de torcida — semente + busca (2026-09-02)
+
+O switcher **não** recebe as torcidas todas. O layout manda
+`listarTorcidasParaSelecaoSemente`: topo alfabético (30) mais a torcida ativa;
+o resto chega por `buscarTorcidasParaSelecaoAction` conforme o operador digita.
+Medido com 557 tenants: **142,6 KB → 7,9 KB** por navegação, em toda rota
+`/super-admin/*` e em todo `/admin/*` navegado por super-admin.
+
+Ao mexer aqui:
+
+- **Não volte a chamar `listarTorcidasParaSelecao` num layout.** Ela é a lista
+  completa e existe hoje só para o `<select>` de filtro de
+  `/super-admin/auditoria`, que é HTML de uma página só. Cache de servidor não
+  conserta payload: `unstable_cache` já cobria a query, e o custo era byte.
+- **A semente precisa conter o item ativo.** Sem ele o input do combobox não
+  tem como exibir o próprio rótulo, e o campo abre em branco sobre uma torcida
+  selecionada.
+- **Contar torcidas é `contarTorcidasDaPlataforma()`**, nunca
+  `tenant.count({ ativo, sintetico: false })` — este último conta os portais
+  Caso B como torcida (era a origem do "557 torcida(s) ativa(s)" sobre uma
+  lista de 554). O recorte canônico é `whereTenantEhTorcida()`, fonte única de
+  contar e de listar.
+
+Decisão e medições: `ARCHITECTURE.md` §5.35.

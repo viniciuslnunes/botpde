@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Loader2, LockOpen, ShieldAlert } from 'lucide-react'
+import { Check, LockOpen, ShieldAlert, X } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import {
   imporReativacaoCanal,
   solicitarReativacaoCanal,
 } from '@/app/admin/(estrutura)/sedes/actions'
+import { AppButton } from '@/components/ui/button'
 
 interface CanalRestritoUnidadeProps {
   tenantId: string
@@ -95,19 +96,17 @@ export function CanalRestritoUnidade({
             : `reabre automaticamente em ${diasRestantes} dia${diasRestantes > 1 ? 's' : ''}`}
         </p>
       ) : podeSolicitar ? (
-        <button
+        <AppButton
+          variant="none"
+          icon={LockOpen}
+          loading={pending}
           type="button"
           disabled={pending}
           onClick={solicitar}
           className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.28)] disabled:opacity-50"
         >
-          {pending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <LockOpen className="h-3.5 w-3.5" />
-          )}
           Solicitar reativação
-        </button>
+        </AppButton>
       ) : null}
 
       {podeImpor ? (
@@ -129,35 +128,40 @@ export function CanalRestritoUnidade({
               className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1.5 text-xs text-[rgb(var(--foreground))]"
             />
             <div className="flex gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={Check}
+                loading={pending}
                 type="button"
                 disabled={pending || motivo.trim().length < 10}
                 onClick={impor}
                 className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--foreground))] px-2.5 py-1.5 text-[11px] font-semibold text-[rgb(var(--background))] disabled:opacity-50"
               >
-                {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                 Confirmar imposição
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 disabled={pending}
                 onClick={() => setImpondo(false)}
                 className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]"
               >
                 Cancelar
-              </button>
+              </AppButton>
             </div>
           </div>
         ) : (
-          <button
+          <AppButton
+            variant="none"
+            icon={ShieldAlert}
             type="button"
             disabled={pending}
             onClick={() => setImpondo(true)}
             className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] disabled:opacity-50"
           >
-            <ShieldAlert className="h-3.5 w-3.5" />
             Impor reativação
-          </button>
+          </AppButton>
         )
       ) : null}
     </div>

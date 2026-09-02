@@ -17,7 +17,7 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 
 | Componente | Uso | Notas |
 |---|---|---|
-| `AdminPageHeader` | Header de toda page admin (título, descrição, `icon`, `actions`, `backHref`, `children` para tabs/toolbar) | Server-safe; full-bleed com `app-container`. Ritmo: título↔descrição 12px; título↔chrome 20px; peças do chrome 12px. Tabs/toolbar entram em `children` — nunca colados no `h1`. |
+| `AdminPageHeader` | Header de toda page admin (título, descrição, `icon`, `actions`, `backHref`, `children` para **tabs e busca/filtro**) | Server-safe; full-bleed com `app-container`. Ritmo: título↔descrição 12px; bloco do título ↔ chrome 20px; peças do chrome 12px. Tabs (`AdminTabs` / `AdminModuleTabBar` / `AdminPendingTabs`) e toolbar (`ListagemToolbar` ou equivalente) **entram em `children`** — nunca no corpo da página. Referência visual: `/admin/torcedores`. |
 | `StatCard` | Indicador (label, `value` já formatado, `icon`, `href`, `badge`, `tone`, `delta`, `sparkline`, `compact`) | Client; anima como filho de `KpiGrid`; `delta` renderiza `TrendDelta` |
 | `KpiGrid` | Grid responsivo de `StatCard` com `staggerContainer`/`staggerItem` | Client |
 | `StatusBadge` | Badge de status por domínio (`membro`, `cobranca`, `pedido`, `rsvp`, `patrimonio`) | Server-safe; compõe `Badge` de `@torcida/ui`; labels centralizados |
@@ -26,7 +26,8 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `InsightSection` | Seção de insights (título + grid) com `MotionRevealOnce` | Usada nos hubs e em `/admin/relatorios` |
 | `AdminChartPeriodFilter` | Período URL-driven para gráficos (`3m`, `6m`, `9m`, range customizado) | Preserva filtros da página; use 3 meses como default e aplique o intervalo a todas as séries/métricas do bloco |
 | `AdminTabs` | Barra de tabs (`tabs`, `basePath?`, `activeId`, `paramKey?`, `extraParams?`); `icon` é `ReactNode` (ex. `<Users className="h-4 w-4" />`), **nunca** o componente Lucide — funções não serializam Server→Client; `href` por tab dispensa `basePath` (modo rota) | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
-| `AdminModuleTabs` | Tabs em que cada tab é uma **rota** do módulo (`tabs` com `href` e `matchPaths?`, `children` = painel) | Client; tab ativa vem do `usePathname()` por casamento mais específico, então deep links seguem válidos; já embrulha o `role="tabpanel"` |
+| `AdminModuleTabBar` | Só a barra das tabs de rota — vai em `AdminPageHeader` children | Client; mesma resolução de tab ativa que `AdminModuleTabs` |
+| `AdminModuleTabs` | Painel da rota ativa (`children` = `tabpanel`). No admin use `chrome="panel"` com a barra no header; `chrome="full"` (default) ainda renderiza barra+painel (super-admin cadastro imersivo) | Client; tab ativa vem do `usePathname()` por casamento mais específico |
 | `AdminCreateDisclosure` | Ação de criar recolhida em botão (`label`, `title?`, `children` = form) | Client; para hubs cujo form de criação é componente compartilhado com a edição (cobranças, financeiro) e por isso não pode virar disclosure internamente |
 | `AdminDetailHeader` | Header de página de **detalhe** (`title`, `backHref`, `backLabel?`, `eyebrow?`, `icon?`, `badges?`, `actions?`) | Server-safe; versão leve, **sem** faixa de superfície — detalhe sob shell de módulo (`/admin/sedes/[id]` em Estrutura) ganharia dois headers full-bleed empilhados se usasse `AdminPageHeader` |
 | `AppModal` / `AppModalBody` | Overlay de diálogo (`components/ui/app-modal.tsx`) — porta no `document.body` acima da sidebar (`--z-modal` 80). Tamanhos: `sm` confirmação · `md` form curto · `lg` cadastro · `xl` ficha (sócio/torcedor). `height="frame"` trava a altura (abas de recrutamento). Nunca `fixed` solto dentro do `main` | Client |
@@ -52,11 +53,13 @@ Receita:
    Ícone e contagem **não** entram: componente React não atravessa
    Server→Client.
 2. `layout.tsx` no segmento resolve permissão e contexto e monta
-   `AdminPageHeader` + `AdminModuleTabs`, com a barra vinda de
+   `AdminPageHeader` com `AdminModuleTabBar` em `children`, e o painel com
+   `AdminModuleTabs chrome="panel"`. A barra vem de
    `montarTabsModulo(id, permissoes, enfeites)`
    (`apps/web/src/lib/admin-modulos.tsx`) — o segundo argumento vem de
    `permissoesEfetivasNoAdmin()`. Libs com `React.cache` não pagam a query duas
-   vezes quando a página repete a chamada.
+   vezes quando a página repete a chamada. Tabs e busca **não** ficam no corpo
+   da página — o padrão visual é Torcedores (`/admin/torcedores`).
 3. Páginas do módulo perdem o wrapper `app-container … py-8` e o back-link
    "← Módulo": o shell já provê ambos. Cada página retorna um fragmento.
 4. Rota que **não** entra na barra (detalhe, ou etapa secundária como
@@ -287,6 +290,13 @@ página), `ListagemVazia`, `ListagemPersistencia`.
 
 ### Decisões
 
+- **Listagem existe para não trafegar a tabela inteira** (2026-09-02). O card
+  "557 torcida(s) ativa(s)" de `/super-admin/torcidas` mandava as 554 linhas ao
+  cliente para exibir um bloco rolável de oito. Virou
+  `LISTAGEM_SUPER_ADMIN_TORCIDAS`: 25 linhas por página, busca e ordenação no
+  banco. Quando o recorte de negócio não cabe numa coluna (ali, "ser raiz"),
+  ele entra por `extra` a partir de um helper compartilhado — nunca remontado
+  na página, senão o KPI e a lista divergem. Ver `ARCHITECTURE.md` §5.35.
 - **Servidor decide, cliente só navega**: as opções do popover são `<a>` com
   href pronto do servidor. A lógica de toggle de filtro não é reimplementada no
   cliente, e o filtro funciona sem JS.

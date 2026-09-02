@@ -10,6 +10,8 @@ import {
   type PlanoState,
 } from './actions'
 import { useActionStateToast } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 const PERIODICIDADES = Object.keys(PERIODICIDADE_PLANO_LABEL)
 
@@ -209,13 +211,15 @@ export function AdminPlanoForm({
           {pending ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Criar plano'}
         </button>
         {onDismiss ? (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onDismiss}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium"
           >
             Cancelar
-          </button>
+          </AppButton>
         ) : (
           <Link
             href="/admin/financeiro/planos"

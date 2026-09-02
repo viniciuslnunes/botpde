@@ -8,7 +8,7 @@ import {
   excluirEvento,
   type EventoState,
 } from '@/app/admin/eventos/actions'
-import { Trash2, CalendarPlus } from 'lucide-react'
+import { CalendarPlus, Trash2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { TIPO_EVENTO_LABEL } from '@torcida/types'
@@ -20,6 +20,7 @@ import { PartidaFields } from '@/components/eventos/partida-fields'
 import { ImageUploadField } from '@/components/media/image-upload-field'
 import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import type { PartidaOption } from '@/lib/partidas'
+import { AppButton } from '@/components/ui/button'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
 
@@ -423,13 +424,15 @@ export function CriarEventoForm({
       <div className="flex flex-wrap items-center gap-2">
         <SubmitButton label={submitLabel} icon={<CalendarPlus className="h-4 w-4" />} />
         {onCancel && (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             className="rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Cancelar
-          </button>
+          </AppButton>
         )}
       </div>
     </form>
@@ -644,35 +647,38 @@ export function ExcluirEventoButton({
 
   if (!serieId) {
     return (
-      <button
+      <AppButton
+        variant="none"
+        icon={Trash2}
         type="button"
         onClick={() => handleExcluir('esta')}
         className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
       >
-        <Trash2 className="h-3.5 w-3.5" />
         Excluir
-      </button>
+      </AppButton>
     )
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
+      <AppButton
+        variant="none"
+        icon={Trash2}
         type="button"
         onClick={() => handleExcluir('esta')}
         className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
       >
-        <Trash2 className="h-3.5 w-3.5" />
         Excluir esta
-      </button>
-      <button
+      </AppButton>
+      <AppButton
+        variant="none"
+        icon={Trash2}
         type="button"
         onClick={() => handleExcluir('futuras')}
         className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
       >
-        <Trash2 className="h-3.5 w-3.5" />
         Excluir série futura
-      </button>
+      </AppButton>
     </div>
   )
 }

@@ -3,23 +3,7 @@
 import { useDeferredValue, useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import {
-  AlertCircle,
-  Building2,
-  ChevronRight,
-  Clock,
-  Crosshair,
-  ImageOff,
-  Loader2,
-  Lock,
-  MapPin,
-  Phone,
-  Plus,
-  Search,
-  Shield,
-  Users,
-  X,
-} from 'lucide-react'
+import { AlertCircle, Building2, ChevronRight, Clock, Crosshair, ImageOff, Lock, MapPin, Phone, Plus, RotateCcw, Search, Shield, Users, X } from 'lucide-react'
 import { CriarSedeForm, SedeAcoesMenu } from '@/components/admin/sede-forms'
 import { CanalRestritoUnidade } from '@/components/admin/canal-restrito-unidade'
 import { LogoImage } from '@/components/media/logo-image'
@@ -28,6 +12,7 @@ import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-m
 import { SEDE_TIPO_BADGE_CLASS } from '@/lib/sede-tipo-badge'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { toast } from 'sonner'
+import { AppButton } from '@/components/ui/button'
 
 const THUMB_W = 240
 const THUMB_H = 180
@@ -726,29 +711,28 @@ export function AdminSedesManager({
 
         <div className="flex flex-wrap gap-2">
           {semCoordsCount > 0 && isGoogleMapsConfigured() && !somenteLeitura && (
-            <button
+            <AppButton
+              variant="none"
+              icon={Crosshair}
+              loading={geoPending}
               type="button"
               onClick={geocodeLote}
               disabled={geoPending}
               className="inline-flex items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
             >
-              {geoPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Crosshair className="h-4 w-4" />
-              )}
               Geocodificar {semCoordsCount}
-            </button>
+            </AppButton>
           )}
           {podeAdicionarLocal && !criando && (
-            <button
+            <AppButton
+              variant="primary"
+              icon={Plus}
               type="button"
               onClick={() => setCriando(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-3.5 py-2 text-sm font-medium text-primary-on hover:opacity-90"
+              className="gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium"
             >
-              <Plus className="h-4 w-4" />
               Adicionar local
-            </button>
+            </AppButton>
           )}
         </div>
       </div>
@@ -874,7 +858,9 @@ export function AdminSedesManager({
                 : 'Ajuste a busca ou limpe os filtros.'}
             </p>
             {sedes.length > 0 && (
-              <button
+              <AppButton
+                variant="none"
+                icon={RotateCcw}
                 type="button"
                 onClick={() => {
                   setBusca('')
@@ -883,7 +869,7 @@ export function AdminSedesManager({
                 className="mt-3 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Limpar filtros
-              </button>
+              </AppButton>
             )}
           </div>
         ) : (

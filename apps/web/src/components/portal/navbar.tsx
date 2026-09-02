@@ -35,6 +35,7 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { LogoMiniatura } from '@/components/media/logo-miniatura'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { PendenciaBadge } from '@/components/pendencia-badge'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 import type { PortalNavBadges } from '@/lib/notificacoes-menu-badges'
 
 function badgeDaNav(href: string, badges: PortalNavBadges): number {
@@ -347,7 +348,11 @@ export function PortalNavbar({
             </span>
           </PortalNavLink>
 
-          <nav className="app-scrollbar-none flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden">
+          <ScrollRail
+            as="nav"
+            wrapperClassName="flex-1 xl:hidden"
+            className="flex items-center gap-0.5"
+          >
             {linksNav
               .filter(
                 (link) =>
@@ -371,9 +376,13 @@ export function PortalNavbar({
                   </PortalNavLink>
                 )
               })}
-          </nav>
+          </ScrollRail>
 
-          <nav className="app-scrollbar-none hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] xl:flex [&::-webkit-scrollbar]:hidden">
+          <ScrollRail
+            as="nav"
+            wrapperClassName="hidden flex-1 xl:block"
+            className="flex items-center gap-0.5"
+          >
             {linksNav.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
@@ -390,7 +399,7 @@ export function PortalNavbar({
                 </PortalNavLink>
               )
             })}
-          </nav>
+          </ScrollRail>
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             <PortalNavLink

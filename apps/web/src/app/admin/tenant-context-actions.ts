@@ -3,10 +3,11 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import {
+  buscarTorcidasParaSelecao,
   isSuperAdminEmail,
-  listarTorcidasParaSelecao,
   setTenantContextSlug,
 } from '@/lib/tenant-context'
+import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import { abrirCanalOperador } from '@/lib/operador-canais-abertos'
 import { db } from '@torcida/db'
 import { z } from 'zod'
@@ -166,10 +167,27 @@ export async function selecionarUnidadeAction(
   redirect(`/admin/sedes/${sede.id}`)
 }
 
-export async function getTorcidasParaSelecaoAction() {
+const buscaTorcidasSchema = z.object({
+  termo: z.string().max(120).optional(),
+  afiliacaoId: z.string().max(64).nullable().optional(),
+  recentes: z.array(z.string().max(120)).max(8).optional(),
+})
+
+/**
+ * Busca sob demanda do switcher de torcida (super-admin).
+ *
+ * Leitura pura: sem mutação, sem `AuditLog`. O gate é o mesmo do resto do
+ * super-admin — allowlist de e-mail — e vem antes de tocar no banco: sem ele a
+ * action viraria um índice aberto das torcidas da plataforma.
+ */
+export async function buscarTorcidasParaSelecaoAction(
+  input: unknown,
+): Promise<TorcidaOpcao[]> {
   const session = await auth()
   if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
     return []
   }
-  return listarTorcidasParaSelecao()
+  const parsed = buscaTorcidasSchema.safeParse(input)
+  if (!parsed.success) return []
+  return buscarTorcidasParaSelecao(parsed.data)
 }

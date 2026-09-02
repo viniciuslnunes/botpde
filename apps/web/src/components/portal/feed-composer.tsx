@@ -25,10 +25,17 @@ import {
   AlertTriangle,
   Siren,
   Megaphone,
+  Newspaper,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { formatNomeTorcida, FORUM_CORPO_MAX, tituloDeConteudoForum } from '@torcida/types'
+import {
+  formatNomeTorcida,
+  FORUM_CORPO_MAX,
+  ARTIGO_TITULO_MAX,
+  ARTIGO_CORPO_MAX,
+  tituloDeConteudoForum,
+} from '@torcida/types'
 import {
   publicarPost,
   publicarEnquete,
@@ -37,7 +44,11 @@ import {
   publicarPostNacional,
   type PublicarPostState,
 } from '@/app/portal/comunidade/actions'
-import { criarTopicoComposerAction } from '@/app/portal/comunidade/praca-actions'
+import {
+  criarTopicoComposerAction,
+  publicarArtigoComposerAction,
+  type ArtigoComposerState,
+} from '@/app/portal/comunidade/praca-actions'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import {
   publicarComunicadoComposer,
@@ -70,6 +81,7 @@ import { useMediaQuery } from '@/lib/use-media-query'
 
 const INITIAL_STATE: PublicarPostState = {}
 const INITIAL_COMUNICADO_STATE: ComunicadoComposerState = {}
+const INITIAL_ARTIGO_STATE: ArtigoComposerState = {}
 const MAX_ANEXOS = 10
 const MAX_IMG_MB = 10
 const MAX_VIDEO_MB = 100
@@ -163,11 +175,17 @@ interface FeedComposerProps {
   /**
    * Fórum (CN, torcida ou unidade): o mesmo composer do feed, mas publica
    * `ForumTopico` em vez de Post. Sem alcance/enquete/evento. Mutuamente
-   * exclusivo com `canal` / `nacional` / `comunicado`.
+   * exclusivo com `canal` / `nacional` / `comunicado` / `noticia`.
    */
   forum?: EscopoComunidade
   /** UGC entra na fila; o botão e a prévia avisam. */
   forumFilaAprovacao?: boolean
+  /**
+   * Praça de notícias: o mesmo composer de comunicado (título, mídia, prévia),
+   * sem prioridade. Publica `ArtigoPortal` no canal oficial da torcida/unidade
+   * ou em canal verificado de portal. Mutuamente exclusivo com os outros modos.
+   */
+  noticia?: EscopoComunidade
   /** Cargo/sede/depto do autor — prepend otimista no feed. */
   autorBadges?: {
     cargoNome: string | null
@@ -204,6 +222,7 @@ export function FeedComposer({
   forumFilaAprovacao = false,
   autorBadges,
   comunicado = false,
+  noticia,
 }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
@@ -230,6 +249,7 @@ export function FeedComposer({
       forumFilaAprovacao={forumFilaAprovacao}
       autorBadges={autorBadges}
       comunicado={comunicado}
+      noticia={noticia}
     />
   )
 }
@@ -250,6 +270,7 @@ function FeedComposerActive({
   forumFilaAprovacao = false,
   autorBadges,
   comunicado = false,
+  noticia,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const router = useRouter()
   const optimisticIdRef = useRef<string | null>(null)
@@ -277,6 +298,10 @@ function FeedComposerActive({
     criarTopicoComposerAction,
     INITIAL_STATE,
   )
+  const [noticiaState, noticiaAction, noticiaPending] = useActionState<
+    ArtigoComposerState,
+    FormData
+  >(publicarArtigoComposerAction, INITIAL_ARTIGO_STATE)
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
   const [comunicadoState, comunicadoAction, comunicadoPending] = useActionState<
     ComunicadoComposerState,
@@ -290,7 +315,9 @@ function FeedComposerActive({
 
   const token = comunicado
     ? (comunicadoState.token ?? 'novo')
-    : forum
+    : noticia
+      ? (noticiaState.token ?? 'novo')
+      : forum
       ? (forumState.token ?? 'novo')
       : canal
       ? (canalState.token ?? 'novo')
@@ -299,7 +326,9 @@ function FeedComposerActive({
         : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
   const state = comunicado
     ? comunicadoState
-    : forum
+    : noticia
+      ? noticiaState
+      : forum
       ? forumState
       : canal
       ? canalState
@@ -415,6 +444,12 @@ function FeedComposerActive({
   }, [comunicado, comunicadoState.success, comunicadoState.token])
 
   useEffect(() => {
+    if (!noticia || !noticiaState.success || !noticiaState.artigoId) return
+    toast.success('Notícia publicada.')
+    router.push(`/portal/comunidade/noticias/${noticiaState.artigoId}?escopo=${noticia}`)
+  }, [noticia, noticiaState.artigoId, noticiaState.success, noticiaState.token, router])
+
+  useEffect(() => {
     if (!forum || !forumState.success || !forumState.topicoId) return
     toast.success(
       forumState.pendente
@@ -440,6 +475,7 @@ function FeedComposerActive({
       nacionalAction={nacionalAction}
       forumAction={forumAction}
       comunicadoAction={comunicadoAction}
+      noticiaAction={noticiaAction}
       postPending={postPending}
       pollPending={pollPending}
       eventPending={eventPending}
@@ -447,6 +483,7 @@ function FeedComposerActive({
       nacionalPending={nacionalPending}
       forumPending={forumPending}
       comunicadoPending={comunicadoPending}
+      noticiaPending={noticiaPending}
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
@@ -455,6 +492,7 @@ function FeedComposerActive({
       forum={forum}
       forumFilaAprovacao={forumFilaAprovacao}
       comunicado={comunicado}
+      noticia={noticia}
       onPrependOtimista={registrarPrependOtimista}
       serverError={
         state.message ??
@@ -551,6 +589,7 @@ function ComposerBody({
   nacionalAction,
   forumAction,
   comunicadoAction,
+  noticiaAction,
   postPending,
   pollPending,
   eventPending,
@@ -558,6 +597,7 @@ function ComposerBody({
   nacionalPending,
   forumPending,
   comunicadoPending,
+  noticiaPending,
   serverError,
   eventos,
   somentePublico = false,
@@ -567,6 +607,7 @@ function ComposerBody({
   forum,
   forumFilaAprovacao = false,
   comunicado = false,
+  noticia,
   onPrependOtimista,
 }: {
   userId: string
@@ -581,6 +622,7 @@ function ComposerBody({
   nacionalAction: (payload: FormData) => void
   forumAction: (payload: FormData) => void
   comunicadoAction: (payload: FormData) => void
+  noticiaAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
   eventPending: boolean
@@ -588,6 +630,7 @@ function ComposerBody({
   nacionalPending: boolean
   forumPending: boolean
   comunicadoPending: boolean
+  noticiaPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
   somentePublico?: boolean
@@ -597,6 +640,7 @@ function ComposerBody({
   forum?: EscopoComunidade
   forumFilaAprovacao?: boolean
   comunicado?: boolean | ComunicadoEdicaoAlvo
+  noticia?: EscopoComunidade
   onPrependOtimista: (opts: {
     conteudo: string
     midiaUrls: string[]
@@ -604,8 +648,9 @@ function ComposerBody({
   }) => void
 }) {
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
-  /** Enquete/evento/alcance só no feed da torcida — canal, CN, fórum e comunicado não. */
-  const ferramentasTorcida = !canal && !comunicado && !nacional && !forum
+  const editorial = Boolean(comunicado) || Boolean(noticia)
+  /** Enquete/evento/alcance só no feed da torcida — canal, CN, fórum e editorial não. */
+  const ferramentasTorcida = !canal && !comunicado && !nacional && !forum && !noticia
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
       ? eventoIdInicial
@@ -689,7 +734,9 @@ function ComposerBody({
   const enviando = medias.some((m) => m.url === null && !m.error)
   const pending = comunicado
     ? comunicadoPending
-    : forum
+    : noticia
+      ? noticiaPending
+      : forum
       ? forumPending
       : canal
       ? canalPending
@@ -705,7 +752,7 @@ function ComposerBody({
     ? anexos
     : ensureSocialEmbedInMidias(texto, [...anexos, ...(embedUrl ? [embedUrl] : [])])
   const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean)
-  const podePublicar = comunicado
+  const podePublicar = editorial
     ? titulo.trim().length > 0 && texto.trim().length > 0 && !enviando && !pending
     : modoEnquete
       ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending
@@ -738,12 +785,13 @@ function ComposerBody({
       return list
     }
     if (comunicado && titulo.trim()) list.push('Título')
+    if (noticia && titulo.trim()) list.push('Título')
     if (texto.trim()) list.push('Texto')
     if (medias.length > 0) list.push(`Anexos (${medias.length})`)
     if (modoEnquete) list.push('Enquete')
     if (modoEvento) list.push('Evento')
     return list
-  }, [comunicado, comunicadoEdicao, titulo, texto, prioridade, anexos, medias.length, modoEnquete, modoEvento])
+  }, [comunicado, comunicadoEdicao, noticia, titulo, texto, prioridade, anexos, medias.length, modoEnquete, modoEvento])
 
   useUnsavedChanges({
     id: comunicadoEdicao ? `comunicado-editar-${comunicadoEdicao.id}` : 'feed-composer',
@@ -808,6 +856,15 @@ function ComposerBody({
       fd.set('escopo', forum)
       startTransition(() => {
         forumAction(fd)
+      })
+      return
+    }
+
+    if (noticia) {
+      fd.set('titulo', titulo.trim())
+      fd.set('escopo', noticia)
+      startTransition(() => {
+        noticiaAction(fd)
       })
       return
     }
@@ -1054,9 +1111,10 @@ function ComposerBody({
       <FileDropOverlay active={fileDrag.active} />
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
       {forum ? <input type="hidden" name="escopo" value={forum} /> : null}
+      {noticia ? <input type="hidden" name="escopo" value={noticia} /> : null}
       {canal ? (
         <input type="hidden" name="conversaId" value={canal.conversaId} />
-      ) : comunicado ? null : (
+      ) : editorial ? null : (
         <input type="hidden" name="visibilidade" value={visibilidadeEfetiva} />
       )}
       {modoEnquete && (
@@ -1075,15 +1133,15 @@ function ComposerBody({
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
         <div ref={composerFieldRef} className="relative min-w-0 flex-1 space-y-2">
-          {comunicado && expanded && (
+          {editorial && expanded && (
             <input
               type="text"
               name="titulo"
               required
-              maxLength={150}
+              maxLength={noticia ? ARTIGO_TITULO_MAX : 150}
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Título do comunicado"
+              placeholder={noticia ? 'Título da notícia' : 'Título do comunicado'}
               className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm font-semibold text-[rgb(var(--foreground))] outline-none transition-colors placeholder:font-normal placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
             />
           )}
@@ -1102,7 +1160,9 @@ function ComposerBody({
               >
                 {comunicado
                   ? 'Novo comunicado oficial…'
-                  : forum
+                  : noticia
+                    ? 'Nova notícia…'
+                    : forum
                     ? `Comece um tópico, ${firstName}…`
                     : canal
                     ? `Publicar em ${canal.nome ?? 'canal'}…`
@@ -1127,7 +1187,7 @@ function ComposerBody({
                   ref={textareaRef}
                   name="conteudo"
                   required
-                  maxLength={forum ? FORUM_CORPO_MAX : 3000}
+                  maxLength={forum ? FORUM_CORPO_MAX : noticia ? ARTIGO_CORPO_MAX : 3000}
                   rows={forum ? 6 : 3}
                   value={texto}
                   onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
@@ -1151,6 +1211,8 @@ function ComposerBody({
                   placeholder={
                     comunicado
                       ? 'Escreva o comunicado oficial para a torcida…'
+                      : noticia
+                        ? 'Escreva a notícia — a prévia aparece abaixo'
                       : forum
                         ? `Comece um tópico, ${firstName}… Use @ para mencionar e # para hashtags`
                         : canal
@@ -1343,10 +1405,10 @@ function ComposerBody({
             </p>
           )}
 
-          {comunicado && (
+          {editorial && (
             <div className="mt-3 ml-[52px]">
               <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                Prévia — como vai aparecer no feed
+                {noticia ? 'Prévia — como vai aparecer nas notícias' : 'Prévia — como vai aparecer no feed'}
               </p>
               {titulo.trim() || texto.trim() || anexos.length > 0 || (embedUrl && !embedDispensado) ? (
                 <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
@@ -1369,7 +1431,12 @@ function ComposerBody({
                   ) : null}
                   {(texto.trim() || (!titulo.trim() && anexos.length === 0)) && (
                     <ExpandableText
-                      text={texto.trim() || 'O texto do comunicado aparece aqui.'}
+                      text={
+                        texto.trim() ||
+                        (noticia
+                          ? 'O texto da notícia aparece aqui.'
+                          : 'O texto do comunicado aparece aqui.')
+                      }
                       lines={8}
                       className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
                     />
@@ -1904,8 +1971,12 @@ function ComposerBody({
               >
                 {pending || enviando ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : comunicado ? (
-                  <Megaphone className="h-4 w-4" />
+                ) : comunicado || noticia ? (
+                  comunicado ? (
+                    <Megaphone className="h-4 w-4" />
+                  ) : (
+                    <Newspaper className="h-4 w-4" />
+                  )
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
@@ -1920,6 +1991,8 @@ function ComposerBody({
                         ? 'Salvar alterações'
                         : comunicado
                           ? 'Publicar comunicado'
+                          : noticia
+                            ? 'Publicar notícia'
                           : forum
                             ? forumFilaAprovacao
                               ? 'Enviar tópico'

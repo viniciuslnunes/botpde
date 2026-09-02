@@ -17,6 +17,7 @@ export { SortableTh, type SortableThProps } from './sortable-th'
 export { AdminTabs, type AdminTabItem, type AdminTabsProps } from './admin-tabs'
 export { AdminPendingTabs } from './admin-pending-tabs'
 export {
+  AdminModuleTabBar,
   AdminModuleTabs,
   resolveAdminModuleTab,
   type AdminModuleTabItem,

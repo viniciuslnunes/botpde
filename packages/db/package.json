@@ -80,6 +80,8 @@
     "seed:corinthians-teste": "node scripts/seed-corinthians-teste.js",
     "seed:corinthians-teste-modulos": "node scripts/seed-corinthians-teste-modulos.js",
     "seed:forum-praca": "node scripts/seed-forum-praca.js",
+    "seed:noticias-praca": "node scripts/seed-noticias-praca.js",
+    "seed:noticias-feed-demo": "node scripts/seed-noticias-feed-demo.js",
     "reset:corinthians-teste": "node scripts/reset-corinthians-teste.js",
     "seed:nacional-teste": "node scripts/seed-nacional-teste.js",
     "reset:nacional-teste": "node scripts/reset-nacional-teste.js",

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { KeyRound, Palette, Plug, ScrollText, Scale, Settings, SlidersHorizontal } from 'lucide-react'
 import { contextoAdmin, montarTabsModulo } from '@/lib/admin-modulos'
-import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
@@ -35,10 +35,14 @@ export default async function PlataformaModuloLayout({ children }: { children: R
         title="Plataforma"
         description={`Ajustes, identidade, acessos e auditoria de ${tenant.nome}.`}
         icon={<Settings className="h-5 w-5" />}
-      />
+      >
+        <AdminModuleTabBar tabs={tabs} />
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <AdminModuleTabs tabs={tabs}>{children}</AdminModuleTabs>
+        <AdminModuleTabs tabs={tabs} chrome="panel">
+          {children}
+        </AdminModuleTabs>
       </div>
     </>
   )

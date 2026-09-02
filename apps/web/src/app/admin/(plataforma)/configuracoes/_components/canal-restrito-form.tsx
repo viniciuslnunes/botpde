@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Loader2, Lock, LockOpen, ShieldOff } from 'lucide-react'
+import { Lock, LockOpen, Play, Send, ShieldOff, X, XCircle } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import {
@@ -9,6 +9,7 @@ import {
   desativarCanalRestrito,
   responderReativacaoCanal,
 } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 export interface SolicitacaoReativacaoView {
   solicitadoPorNome: string | null
@@ -192,44 +193,52 @@ export function CanalRestritoForm({
                 className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
               />
               <div className="flex flex-wrap gap-2">
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Send}
+                  loading={pending}
                   type="button"
                   disabled={pending || motivo.trim().length < 10}
                   onClick={() => responder('recusar')}
                   className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--foreground))] px-3 py-2 text-xs font-semibold text-[rgb(var(--background))] disabled:opacity-50"
                 >
-                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                   Enviar recusa
-                </button>
-                <button
+                </AppButton>
+                <AppButton
+                  variant="none"
+                  icon={X}
                   type="button"
                   disabled={pending}
                   onClick={() => setRecusando(false)}
                   className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]"
                 >
                   Cancelar
-                </button>
+                </AppButton>
               </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <button
+              <AppButton
+                variant="primary"
+                icon={Play}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={() => responder('aprovar')}
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
+                className="gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))]"
               >
-                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Reabrir canal agora
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={XCircle}
                 type="button"
                 disabled={pending}
                 onClick={() => setRecusando(true)}
                 className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))]"
               >
                 Recusar
-              </button>
+              </AppButton>
             </div>
           )}
         </div>

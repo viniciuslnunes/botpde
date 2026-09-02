@@ -11,10 +11,7 @@ import {
   type ClubeOpcao,
   type TorcidaOpcao,
 } from '@/lib/torcida-labels'
-import {
-  carregarMapaPortalMae,
-  filtrarTenantsRaiz,
-} from '@/lib/tenant-hierarquia-plataforma'
+import { whereTenantEhTorcida } from '@/lib/tenant-hierarquia-plataforma'
 
 export type { ClubeOpcao, TorcidaOpcao }
 export { labelClubeComUf, labelTorcidaComClube }
@@ -242,23 +239,21 @@ export const TORCIDAS_SELECAO_CACHE_TAG = 'torcidas-para-selecao'
 export const CLUBES_SELECAO_CACHE_TAG = 'clubes-para-selecao'
 
 async function fetchTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
-  const [rows, maePorFilho]: [TorcidaRowComAfiliacao[], Map<string, string>] = await Promise.all([
-    db.tenant.findMany({
-      where: { ativo: true, sintetico: false },
-      select: TORCIDA_SELECAO_SELECT,
-      orderBy: { nome: 'asc' },
-    }),
-    carregarMapaPortalMae(),
-  ])
-  const raizes = filtrarTenantsRaiz(
-    rows.map((r) => r.id),
-    maePorFilho,
-  )
-  const raizSet = new Set(raizes)
-  return rows.filter((r) => raizSet.has(r.id)).map(mapTorcidaOpcao)
+  const rows: TorcidaRowComAfiliacao[] = await db.tenant.findMany({
+    where: await whereTenantEhTorcida(),
+    select: TORCIDA_SELECAO_SELECT,
+    orderBy: { nome: 'asc' },
+  })
+  return rows.map(mapTorcidaOpcao)
 }
 
-/** Lista enxuta para seletores de super-admin (cache cross-request 5 min). */
+/**
+ * TODAS as torcidas da plataforma. **Não usar em layout nem em switcher**: a
+ * 554ª linha custa os mesmos bytes de flight que a primeira e o dropdown só
+ * mostra 40. Sobrou para o `<select>` de filtro da auditoria, que é HTML de uma
+ * página só. Para seletor, use `listarTorcidasParaSelecaoSemente` + busca sob
+ * demanda (`buscarTorcidasParaSelecao`).
+ */
 export const listarTorcidasParaSelecao = cache(async function listarTorcidasParaSelecao(): Promise<
   TorcidaOpcao[]
 > {
@@ -267,6 +262,122 @@ export const listarTorcidasParaSelecao = cache(async function listarTorcidasPara
     tags: [TORCIDAS_SELECAO_CACHE_TAG],
   })()
 })
+
+/**
+ * Quantas torcidas a plataforma tem — mesmo `where` de quem lista, para que o
+ * KPI e a listagem nunca divirjam (ver `whereTenantEhTorcida`).
+ */
+export const contarTorcidasDaPlataforma = cache(
+  async function contarTorcidasDaPlataforma(): Promise<number> {
+    return db.tenant.count({ where: await whereTenantEhTorcida() })
+  },
+)
+
+/** Quantas linhas o switcher embarca no payload antes de qualquer digitação. */
+export const SEMENTE_TORCIDAS_MAX = 30
+
+/** Teto de uma busca sob demanda — o dropdown mostra 40 e trunca depois disso. */
+const BUSCA_TORCIDAS_MAX = 40
+
+async function fetchSementeTorcidas(): Promise<TorcidaOpcao[]> {
+  const rows: TorcidaRowComAfiliacao[] = await db.tenant.findMany({
+    where: await whereTenantEhTorcida(),
+    select: TORCIDA_SELECAO_SELECT,
+    orderBy: { nome: 'asc' },
+    take: SEMENTE_TORCIDAS_MAX,
+  })
+  return rows.map(mapTorcidaOpcao)
+}
+
+/**
+ * Semente do switcher de torcida: as primeiras `SEMENTE_TORCIDAS_MAX` em ordem
+ * alfabética, mais a torcida ativa — que precisa estar presente para o input
+ * conseguir exibir o próprio rótulo. O resto chega por
+ * `buscarTorcidasParaSelecao` quando o operador abre o dropdown.
+ *
+ * Por que existe: a lista inteira ia no payload RSC de TODA rota
+ * `/super-admin/*` e de todo `/admin/*` de super-admin — 147 KB por navegação,
+ * medidos com 557 tenants, para uma lista em que 40 é o teto do que aparece.
+ */
+export const listarTorcidasParaSelecaoSemente = cache(
+  async function listarTorcidasParaSelecaoSemente(
+    slugAtual?: string | null,
+  ): Promise<TorcidaOpcao[]> {
+    const semente = await unstable_cache(fetchSementeTorcidas, ['torcidas-selecao-semente'], {
+      revalidate: 300,
+      tags: [TORCIDAS_SELECAO_CACHE_TAG],
+    })()
+
+    const slug = slugAtual?.trim()
+    if (!slug || semente.some((t) => t.slug === slug)) return semente
+
+    const atual: TorcidaRowComAfiliacao | null = await db.tenant.findUnique({
+      where: { slug },
+      select: TORCIDA_SELECAO_SELECT,
+    })
+    return atual ? [mapTorcidaOpcao(atual), ...semente] : semente
+  },
+)
+
+export type BuscaTorcidasParaSelecao = {
+  /** Termo digitado. Vazio = "abriu o dropdown": devolve o topo alfabético. */
+  termo?: string
+  /** Cascata clube → torcida: quando presente, restringe ao clube. */
+  afiliacaoId?: string | null
+  /** Slugs no localStorage do operador — resolvidos no mesmo round-trip. */
+  recentes?: string[]
+}
+
+/**
+ * Busca sob demanda do switcher. Devolve quem casa com o termo (teto
+ * `BUSCA_TORCIDAS_MAX`) **mais** os recentes pedidos — assim a seção "Recentes"
+ * do dropdown continua funcionando sem que o servidor precise adivinhar o
+ * localStorage de quem está olhando.
+ */
+export async function buscarTorcidasParaSelecao(
+  input: BuscaTorcidasParaSelecao,
+): Promise<TorcidaOpcao[]> {
+  const base = await whereTenantEhTorcida()
+  const termo = (input.termo ?? '').trim().slice(0, 80)
+  const afiliacaoId = input.afiliacaoId?.trim() || undefined
+  const recentes = (input.recentes ?? []).filter((s) => typeof s === 'string' && s).slice(0, 8)
+
+  const filtroTermo = termo
+    ? {
+        OR: [
+          { nome: { contains: termo, mode: 'insensitive' as const } },
+          { slug: { contains: termo, mode: 'insensitive' as const } },
+          { afiliacao: { nome: { contains: termo, mode: 'insensitive' as const } } },
+          { afiliacao: { apelido: { contains: termo, mode: 'insensitive' as const } } },
+        ],
+      }
+    : {}
+
+  const [achados, dosRecentes]: [TorcidaRowComAfiliacao[], TorcidaRowComAfiliacao[]] =
+    await Promise.all([
+      db.tenant.findMany({
+        where: { ...base, ...(afiliacaoId ? { afiliacaoId } : {}), ...filtroTermo },
+        select: TORCIDA_SELECAO_SELECT,
+        orderBy: { nome: 'asc' },
+        take: BUSCA_TORCIDAS_MAX,
+      }),
+      recentes.length > 0
+        ? db.tenant.findMany({
+            where: { ...base, slug: { in: recentes } },
+            select: TORCIDA_SELECAO_SELECT,
+          })
+        : Promise.resolve([]),
+    ])
+
+  const vistos = new Set<string>()
+  const saida: TorcidaOpcao[] = []
+  for (const row of [...achados, ...dosRecentes]) {
+    if (vistos.has(row.id)) continue
+    vistos.add(row.id)
+    saida.push(mapTorcidaOpcao(row))
+  }
+  return saida
+}
 
 type ClubeRow = {
   id: string

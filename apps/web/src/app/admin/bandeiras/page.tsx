@@ -63,6 +63,62 @@ async function BandeirasKpis({ tenantId }: { tenantId: string }) {
 }
 
 const BANDEIRAS_TABS = ['acervo', 'fora', 'pendencias', 'historico'] as const
+const ICONE_TAB = 'h-4 w-4 shrink-0'
+
+async function BandeirasTabs({
+  tenantId,
+  tab,
+}: {
+  tenantId: string
+  tab: (typeof BANDEIRAS_TABS)[number]
+}) {
+  const [ops, emprestimos, auditoria] = await Promise.all([
+    carregarDirecaoBandeiras(tenantId),
+    listarEmprestimosPatrimonio(tenantId, {
+      status: 'ABERTO',
+      limite: 24,
+      escopoCategoria: 'BANDEIRA',
+    }),
+    listarAuditoriaInventario(tenantId, 'BANDEIRA'),
+  ])
+
+  const tabs: AdminTabItem[] = [
+    {
+      id: 'acervo',
+      label: 'Acervo',
+      icon: <Flag className={ICONE_TAB} />,
+      count: ops.itens.length,
+    },
+    {
+      id: 'fora',
+      label: 'Fora agora',
+      icon: <Timer className={ICONE_TAB} />,
+      count: emprestimos.length,
+      countClass:
+        ops.atrasados > 0 ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400' : undefined,
+    },
+    {
+      id: 'pendencias',
+      label: 'Precisa de você',
+      icon: <ShieldAlert className={ICONE_TAB} />,
+      count: ops.pendencias.length,
+      countClass:
+        ops.pendencias.length > 0
+          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
+          : undefined,
+    },
+    {
+      id: 'historico',
+      label: 'Histórico',
+      icon: <History className={ICONE_TAB} />,
+      count: auditoria.length,
+    },
+  ]
+
+  return (
+    <AdminPendingTabs tabs={tabs} basePath="/admin/bandeiras" activeId={tab} paramKey="tab" />
+  )
+}
 
 async function BandeirasCorpo({
   tenantId,
@@ -85,45 +141,9 @@ async function BandeirasCorpo({
   ])
 
   const { tabId, panelId } = adminTabIds('tab', tab)
-  const iconeTab = 'h-4 w-4 shrink-0'
-  const tabs: AdminTabItem[] = [
-    {
-      id: 'acervo',
-      label: 'Acervo',
-      icon: <Flag className={iconeTab} />,
-      count: ops.itens.length,
-    },
-    {
-      id: 'fora',
-      label: 'Fora agora',
-      icon: <Timer className={iconeTab} />,
-      count: emprestimos.length,
-      countClass:
-        ops.atrasados > 0 ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400' : undefined,
-    },
-    {
-      id: 'pendencias',
-      label: 'Precisa de você',
-      icon: <ShieldAlert className={iconeTab} />,
-      count: ops.pendencias.length,
-      countClass:
-        ops.pendencias.length > 0
-          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
-          : undefined,
-    },
-    {
-      id: 'historico',
-      label: 'Histórico',
-      icon: <History className={iconeTab} />,
-      count: auditoria.length,
-    },
-  ]
 
   return (
-    <>
-      <AdminPendingTabs tabs={tabs} basePath="/admin/bandeiras" activeId={tab} paramKey="tab" />
-
-      <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-3">
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-3">
         {tab === 'acervo' ? (
           <>
             <BandeirasKpis tenantId={tenantId} />
@@ -196,7 +216,6 @@ async function BandeirasCorpo({
           />
         ) : null}
       </div>
-    </>
   )
 }
 
@@ -248,7 +267,11 @@ export default async function AdminBandeirasPage({
             </Link>
           </div>
         }
-      />
+      >
+        <Suspense fallback={<div className="h-9 w-full max-w-lg animate-pulse rounded-lg bg-[rgb(var(--border)_/_0.45)]" />}>
+          <BandeirasTabs tenantId={tenant.id} tab={tab} />
+        </Suspense>
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
         <Suspense

@@ -3,6 +3,7 @@
 import { Undo2 } from 'lucide-react'
 import { desfazerImportacao } from '@/app/admin/membros/importar/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { AppButton } from '@/components/ui/button'
 
 /** Desfaz uma importação MOCK (remove membros + users mock órfãos). */
 export function UndoImportButton({ importacaoId }: { importacaoId: string }) {
@@ -29,13 +30,14 @@ export function UndoImportButton({ importacaoId }: { importacaoId: string }) {
   }
 
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={Undo2}
       onClick={handleUndo}
       className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-red-600 disabled:opacity-50"
       title="Remove os membros criados por esta importação"
     >
-      <Undo2 className="h-3 w-3" />
       Desfazer
-    </button>
+    </AppButton>
   )
 }

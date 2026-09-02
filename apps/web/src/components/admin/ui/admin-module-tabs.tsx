@@ -44,23 +44,7 @@ export function resolveAdminModuleTab(tabs: AdminModuleTabItem[], pathname: stri
   return ativa ?? tabs[0]?.id ?? ''
 }
 
-export interface AdminModuleTabsProps {
-  tabs: AdminModuleTabItem[]
-  /** Conteúdo da rota ativa — vira o `tabpanel` ligado à tab correspondente. */
-  children: ReactNode
-}
-
-/**
- * Barra de tabs em que cada tab é uma **rota** do módulo, não um `?tab=`.
- * Montada no `layout.tsx` do segmento: o hub vira a primeira etapa e as
- * sub-rotas passam a ser painéis irmãos, em vez de destinos soltos no menu
- * lateral. A tab ativa vem do pathname, então deep links seguem válidos.
- *
- * Contagem SSR (fila de denúncia, cobrança vencida…) combina com não-lidas
- * do sino (`tabBadges`): mostra o maior dos dois, e pinta de alerta quando
- * há notificação pendente.
- */
-export function AdminModuleTabs({ tabs, children }: AdminModuleTabsProps) {
+function useAdminModuleTabState(tabs: AdminModuleTabItem[]) {
   const pathname = usePathname()
   const activeId = resolveAdminModuleTab(tabs, pathname)
   const { tabId, panelId } = adminTabIds(PARAM_KEY, activeId)
@@ -78,9 +62,47 @@ export function AdminModuleTabs({ tabs, children }: AdminModuleTabsProps) {
     }
   })
 
+  return { activeId, tabId, panelId, tabsComPendencia }
+}
+
+/**
+ * Só a barra — entra em `AdminPageHeader` children, no mesmo lugar que as
+ * tabs de Torcedores/Sócios. O painel fica em `AdminModuleTabs chrome="panel"`.
+ */
+export function AdminModuleTabBar({ tabs }: { tabs: AdminModuleTabItem[] }) {
+  const { tabsComPendencia, activeId } = useAdminModuleTabState(tabs)
+  return <AdminTabs tabs={tabsComPendencia} activeId={activeId} paramKey={PARAM_KEY} />
+}
+
+export interface AdminModuleTabsProps {
+  tabs: AdminModuleTabItem[]
+  /** Conteúdo da rota ativa — vira o `tabpanel` ligado à tab correspondente. */
+  children: ReactNode
+  /**
+   * `full` (default): barra + painel, para chrome que ainda não tem
+   * `AdminPageHeader` (ex.: cadastro imersivo no super-admin).
+   * `panel`: só o tabpanel — a barra vai no cabeçalho via `AdminModuleTabBar`.
+   */
+  chrome?: 'full' | 'panel'
+}
+
+/**
+ * Barra de tabs em que cada tab é uma **rota** do módulo, não um `?tab=`.
+ * No admin, a barra mora no `AdminPageHeader` (`AdminModuleTabBar`) e este
+ * componente renderiza só o painel (`chrome="panel"`).
+ *
+ * Contagem SSR (fila de denúncia, cobrança vencida…) combina com não-lidas
+ * do sino (`tabBadges`): mostra o maior dos dois, e pinta de alerta quando
+ * há notificação pendente.
+ */
+export function AdminModuleTabs({ tabs, children, chrome = 'full' }: AdminModuleTabsProps) {
+  const { activeId, tabId, panelId, tabsComPendencia } = useAdminModuleTabState(tabs)
+
   return (
     <>
-      <AdminTabs tabs={tabsComPendencia} activeId={activeId} paramKey={PARAM_KEY} />
+      {chrome === 'full' ? (
+        <AdminTabs tabs={tabsComPendencia} activeId={activeId} paramKey={PARAM_KEY} />
+      ) : null}
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
         {children}
       </div>

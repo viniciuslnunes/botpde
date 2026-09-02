@@ -6,8 +6,9 @@ import { criarCupomForm, toggleCupomForm } from '../actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { Ticket } from 'lucide-react'
+import { Plus, Ticket } from 'lucide-react'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Cupons — Loja Admin' }
 
@@ -52,7 +53,7 @@ export default async function AdminCuponsPage() {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="ativo" defaultChecked /> Ativo
         </label>
-        <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-primary-on">Criar cupom</button>
+        <AppButton variant="primary" icon={Plus} type="submit" className="rounded-xl px-4 py-2 text-sm">Criar cupom</AppButton>
       </AdminActionForm>
       </MotionReveal>
 

@@ -5,7 +5,7 @@ import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
-import { AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
@@ -51,10 +51,14 @@ export default async function DepartamentosModuloLayout({ children }: { children
         title="Departamentos"
         description="Áreas e projetos têm tela própria. Equipe, fila e o painel do domínio ficam aqui."
         icon={<Building2 className="h-5 w-5" />}
-      />
+      >
+        <AdminModuleTabBar tabs={tabs} />
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <AdminModuleTabs tabs={tabs}>{children}</AdminModuleTabs>
+        <AdminModuleTabs tabs={tabs} chrome="panel">
+          {children}
+        </AdminModuleTabs>
       </div>
     </>
   )

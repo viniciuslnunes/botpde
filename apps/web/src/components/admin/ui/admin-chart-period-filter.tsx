@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { CalendarRange } from 'lucide-react'
+import { CalendarRange, Check } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { buildAdminHref } from '@/lib/admin-href'
+import { AppButton } from '@/components/ui/button'
 
 export type AdminChartPeriod = '3m' | '6m' | '9m' | 'custom'
 
@@ -184,12 +185,14 @@ export function AdminChartPeriodFilter({
                   />
                 </label>
               </div>
-              <button
+              <AppButton
+                variant="none"
+                icon={Check}
                 type="submit"
                 className="mt-3 h-8 w-full rounded-lg bg-[rgb(var(--color-primary))] px-3 text-xs font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary)_/_0.35)]"
               >
                 Aplicar período
-              </button>
+              </AppButton>
             </form>,
             document.body,
           )

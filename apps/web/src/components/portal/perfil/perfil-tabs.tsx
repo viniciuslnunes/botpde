@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
+import { ScrollRail } from '@/components/ui/scroll-rail'
 
 export type PerfilAba = 'sobre' | 'publicacoes' | 'fotos' | 'atividade'
 
@@ -20,7 +21,7 @@ const ABAS: { id: PerfilAba; label: string }[] = [
 
 export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
   return (
-    <nav className="app-scrollbar-none flex gap-6 overflow-x-auto border-b border-[rgb(var(--border))] px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <ScrollRail as="nav" className="flex gap-6 border-b border-[rgb(var(--border))] px-1">
       {ABAS.map((aba) => {
         const ativo = aba.id === abaAtiva
         return (
@@ -46,6 +47,6 @@ export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
           </Link>
         )
       })}
-    </nav>
+    </ScrollRail>
   )
 }

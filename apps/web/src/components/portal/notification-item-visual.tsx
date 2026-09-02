@@ -104,6 +104,7 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   BRECHO_DENUNCIA: ShieldAlert,
   BRECHO_TROCA_CONFIRMADA: PackageCheck,
   MEMORIA_FATO_DECIDIDA: History,
+  MEMORIA_DIA_ABERTO: History,
 }
 
 export interface NotificacaoAtorInfo {

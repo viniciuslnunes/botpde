@@ -88,10 +88,12 @@
      escuro, marca branca sumiria no claro. O bridge recalcula `-fg` por tema
      e por superfície, então o scroll acompanha a paleta configurada sem uma
      linha de JS. `--scrollbar-inset` é a borda transparente do polegar: a
-     pegada continua valendo os 12px do trilho, mas o desenho fica com 6px. */
+     pegada continua valendo os 12px do trilho, mas o desenho fica com 6px.
+     O trilho NÃO é transparente: no Chromium, track transparente pinta o
+     canvas do `<html>` (mais preto que a grade), não a superfície do painel. */
   --scrollbar-size: 12px;
   --scrollbar-inset: 3px;
-  --scrollbar-track: transparent;
+  --scrollbar-track: rgb(var(--grid-base, var(--background-subtle)));
   --scrollbar-thumb: rgb(var(--color-primary-fg) / 0.3);
   --scrollbar-thumb-hover: rgb(var(--color-primary-fg) / 0.55);
   --scrollbar-thumb-active: rgb(var(--color-primary-fg) / 0.78);
@@ -159,6 +161,13 @@
   cursor: default;
 }
 
+html {
+  /* Mesma tinta do body: a calha da barra (e o canvas do `color-scheme`)
+     não pode ficar mais preta que a superfície — era o filete à direita
+     no admin, cujo scroll vive no `<main>` e não na viewport. */
+  background-color: rgb(var(--background));
+}
+
 body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
@@ -169,9 +178,10 @@ body {
 }
 
 /* Tipografia dos módulos do canal (Loja, Memórias, Agenda, Sedes,
-   Departamentos, Carteirinha). Comunidade fica de fora — continua no
-   sans do produto. Corpo do texto permanece no stack do body; kicker,
-   chip e display são o vocabulário que a Loja consolidou. */
+   Departamentos, Carteirinha, Mensagens, Notificações). O feed da
+   Comunidade fica de fora — continua no sans do produto. Corpo do
+   texto permanece no stack do body; kicker, chip e display são o
+   vocabulário que a Loja consolidou. */
 .portal-kicker {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
@@ -600,6 +610,126 @@ button,
   background-color: rgb(var(--color-success) / 0.16);
 }
 /*
+  A camada abaixo vai em `@layer components` de propósito. Este arquivo é
+  quase todo unlayered, e CSS fora de layer vence QUALQUER utilitário do
+  Tailwind (é o mesmo motivo documentado na regra de `min-w-0` mais acima).
+  Se `.app-btn` ficasse unlayered, o `border-radius`/`gap`/`font-size` dela
+  passaria por cima de `rounded-full`, `gap-1` e `text-sm` escritos no
+  call-site — um botão pill viraria retangular sem ninguém pedir. Em
+  `components` o call-site continua mandando, e o `text-transform` segue
+  valendo porque não há utilitário concorrente (quem quiser sair usa
+  `.app-btn-texto-original`, ou `normal-case`, que aí é intencional).
+*/
+@layer components {
+  /* ── Botão de ação (`.app-btn`) ───────────────────────────────────
+     Camada única do rótulo em UPPERCASE + ícone à esquerda. Mora aqui,
+     e não no componente, por três motivos medidos neste repo:
+
+     1. `text-transform` é APRESENTAÇÃO. O JSX continua escrito "Salvar
+        alterações", então leitor de tela, `getByRole('button', { name })`
+        dos testes e busca no código seguem funcionando com o texto real —
+        reescrever os literais para "SALVAR" quebraria os três de uma vez.
+     2. Acento sobrevive: `text-transform: uppercase` do CSS respeita o
+        locale e devolve "AÇÕES"/"NÃO", enquanto `toUpperCase()` do JS em
+        alguns caminhos e a fonte errada comem o til.
+     3. Reverter (ou trocar para small-caps) é uma linha, não um diff de
+        centenas de arquivos.
+
+     Escopo: SÓ botão de ação. Aba, chip de filtro, célula de calendário,
+     item de lista clicável e botão de ícone puro ficam fora — caixa alta
+     em nome de pessoa ("MARIA SILVA") e em cidade lê como grito, e ícone
+     puro não tem rótulo para transformar. Ver docs/frontend/botoes.md. */
+  .app-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-transform: uppercase;
+    /* Caixa alta perde o contorno de ascendente/descendente que o olho usa
+       para separar palavra; o tracking devolve a legibilidade. 0.04em foi o
+       menor valor que não deixou "EXCLUIR PERMANENTEMENTE" virar bloco. */
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition:
+      filter 120ms ease,
+      background-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  /* O ícone acompanha o texto: encolher nunca (`shrink-0`), e a cor vem do
+     `currentColor` do botão — nunca uma fill crua, que some com marca preta
+     no escuro (mesma regra dos badges, ver módulo Design). */
+  .app-btn > svg {
+    flex: none;
+    /* Base de 1rem para quem nao declara tamanho — sem isto o lucide cai no
+       default de 24px e estoura a linha do botao. As variantes de tamanho
+       abaixo ajustam, e um `h-4 w-4` no call-site vence as duas. */
+    width: 1rem;
+    height: 1rem;
+  }
+
+  /* Tamanhos. A altura mínima real do toque continua vindo de `.app-action`
+     (2.5rem no mouse, 2.75rem no toque) — aqui só o ritmo horizontal e a
+     escala tipográfica, para não duplicar a regra de alvo de toque. */
+  .app-btn-sm {
+    padding-inline: 0.75rem;
+    font-size: 0.6875rem;
+  }
+  .app-btn-sm > svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  .app-btn-md {
+    padding-inline: 1rem;
+    font-size: 0.75rem;
+  }
+  .app-btn-md > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .app-btn-lg {
+    padding-inline: 1.25rem;
+    font-size: 0.8125rem;
+  }
+  .app-btn-lg > svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  /* Variantes neutras — as coloridas já existem acima (`.btn-primary`,
+     `.btn-danger`, `.btn-*-soft`…) e vêm dos tokens do módulo Design. */
+  .app-btn-outline {
+    border: 1px solid rgb(var(--border));
+    background-color: transparent;
+    color: rgb(var(--foreground));
+  }
+  .app-btn-outline:hover:not(:disabled) {
+    background-color: rgb(var(--background-subtle));
+    border-color: rgb(var(--border-strong));
+  }
+  .app-btn-ghost {
+    background-color: transparent;
+    color: rgb(var(--foreground-muted));
+  }
+  .app-btn-ghost:hover:not(:disabled) {
+    background-color: rgb(var(--background-subtle));
+    color: rgb(var(--foreground));
+  }
+
+  /* Escape consciente: botão que precisa mostrar dado do banco (nome de
+     sócio, título de post) mantém a caixa original. Existe para ser usado,
+     não para contornar a regra — o lint aponta quem abusa. */
+  .app-btn-texto-original {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+}
+
+/*
   Banner/status positivo. NUNCA emerald/green hardcoded: verde só entra
   se a identidade da torcida/clube já for verde (`actions.success`).
 */
@@ -948,16 +1078,12 @@ html[data-grid='off'] .app-shell-bg {
   display: none;
 }
 
-/* A barra da página some quando um modal trava `body{overflow:hidden}` — são
-   10+ lugares fazendo isso (AppModal, lightbox, stories, reels, sidebar
-   mobile) e nenhum compensa a largura. Medido: o conteúdo saltava de 785px
-   para 800px a cada abertura. Reservar a calha resolve todos de uma vez, e é
-   no-op onde a barra é overlay (toque, macOS). */
-html {
-  scrollbar-gutter: stable;
-}
-
-/* Container interno que não pode saltar quando a lista cresce e passa do teto. */
+/* NÃO colocar `scrollbar-gutter: stable` no `<html>`. Admin/portal/super-admin
+   são `h-dvh` com scroll no `<main>`: a viewport quase nunca transborda, mas
+   a calha no html reserva 12px mesmo assim. Com barra overlay (Windows 11,
+   Chrome, macOS) esse espaço fica vazio — o filete preto à direita da barra
+   do painel. A compensação de modal é `lockBodyScroll` (padding-right).
+   Container interno que não pode saltar quando a lista cresce: esta classe. */
 .app-scrollbar-gutter {
   scrollbar-gutter: stable;
 }
@@ -1002,6 +1128,7 @@ html {
    superfície do app, não contra o preto do palco — no tema claro o polegar
    sumiria. Valor fixo, de propósito. */
 .app-scrollbar-sobre-escuro {
+  --scrollbar-track: rgb(9 9 11);
   --scrollbar-thumb: rgb(250 250 250 / 0.26);
   --scrollbar-thumb-hover: rgb(250 250 250 / 0.45);
   --scrollbar-thumb-active: rgb(250 250 250 / 0.62);
@@ -1245,13 +1372,34 @@ html {
   margin: 0 !important;
 }
 /* Fallback pré-hydration do widget: enquanto o script do X/TikTok não troca o
-   <blockquote> pelo iframe, o markup cru é um link com a URL inteira, que não
-   quebra e vaza da coluna no mobile. `!important` porque os widgets injetam
-   folha própria e vencem por especificidade. */
+   <blockquote> pelo iframe, o markup cru é um link com a URL inteira. Esconde
+   o link (o skeleton cobre) e quebra a URL se o skeleton sair. */
+.social-embed-host:not(:has(iframe)) blockquote a {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+}
 .social-embed-host blockquote a {
   display: block !important;
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
 }
 
+/* Memória — exportar dia (impressão / PDF do navegador) */
+@media print {
+  .memoria-no-print {
+    display: none !important;
+  }
+  .memoria-print-area {
+    max-width: 100% !important;
+  }
+  .memoria-print-area button,
+  .memoria-print-area textarea,
+  .memoria-print-area select,
+  .memoria-print-area fieldset {
+    display: none !important;
+  }
+}
 

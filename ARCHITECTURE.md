@@ -885,10 +885,16 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
   `admin/configuracoes` (seções de settings) e `admin/socios` (barra de status).
   Uso: seções de conteúdo mutuamente exclusivas — não para filtros que se
   combinam com paginação/busca. Guia: `docs/frontend/admin-ui-kit.md`.
+- **Chrome do header** (2026-09-01): título, ações, tabs e busca/filtro ficam
+  dentro de `AdminPageHeader` (`children`) — o padrão é `/admin/torcedores`.
+  Módulo com sub-rotas usa `AdminModuleTabBar` no header e
+  `AdminModuleTabs chrome="panel"` no corpo. Proibido reintroduzir barra de
+  tabs ou `ListagemToolbar` solta abaixo da faixa de superfície.
 - **Tabs de rota — o hub vira shell do módulo** (2026-07-29): módulo com
   sub-rotas (Bar, Loja) tinha navegação duplicada — seção longa no menu lateral
   **mais** fileira de botões no hub, que no Bar sequer estava no menu. Agora o
-  `layout.tsx` do segmento monta `AdminPageHeader` + `AdminModuleTabs` (tab =
+  `layout.tsx` do segmento monta `AdminPageHeader` (tabs em `children` via
+  `AdminModuleTabBar`) + `AdminModuleTabs chrome="panel"` (tab =
   rota, ativa resolvida pelo `usePathname()`; `matchPaths` cobre rotas que não
   aparecem na barra) e o menu guarda **uma** entrada por módulo. Página
   imersiva de tela cheia fica fora do shell via route group — PDV em
@@ -2049,11 +2055,12 @@ Chromium headed antes de escrever a regra:
    `/admin/design` nos dois temas sem uma linha de JS. Superfície escura nos
    **dois** temas (palco do Meet) é a exceção: token fixo claro, porque ali o
    `-fg` foi calculado contra a superfície do app, não contra o preto do palco.
-3. **`scrollbar-gutter: stable` no `<html>`.** São 10+ lugares travando
-   `body{overflow:hidden}` (AppModal, lightbox, stories, reels, sidebar mobile)
-   e nenhum compensava a largura da barra: medido, o conteúdo saltava de 785px
-   para 800px a cada abertura de modal. A calha reservada corrige todos de uma
-   vez e é no-op onde a barra é overlay (toque, macOS).
+3. **Sem `scrollbar-gutter` no `<html>`.** A calha na viewport fura 12px pretos
+   nos shells `h-dvh` (admin/portal): o scroll vive no `<main>`, a viewport não
+   transborda, e com barra overlay o espaço reservado fica vazio — filete à
+   direita da grade. Compensação de modal é `padding-right` em `lockBodyScroll`
+   (só quando `innerWidth - clientWidth > 0`). Calha opt-in:
+   `.app-scrollbar-gutter`.
 
 Custo: zero JS, zero bundle, zero biblioteca de scroll customizado — pintura do
 compositor, e no-op inteiro no alvo mobile-first. Anatomia (trilho de 12px com
@@ -2061,6 +2068,155 @@ polegar pintado de 6px pelo par `border transparente` + `background-clip`, para
 o alvo de arrasto não encolher junto com o desenho), variantes
 (`fina`/`idle`/`neutra`/`sobre-escuro`/`none`/`gutter`) e a tabela de medições:
 `docs/frontend/scrollbars.md`.
+
+### 5.34.1 Aba escondida no desktop — setas por medição (2026-09-02)
+
+Complemento de §5.34. Esconder a barra no trilho de abas é certo no toque e cego
+no mouse: sem gesto de arrastar e sem barra, a aba que não cabe na largura da
+coluna some sem deixar pista — e a única saída era diminuir o zoom. `ScrollRail`
+(`apps/web/src/components/ui/scroll-rail.tsx`) devolve a ação que faltava, com
+três decisões que seguram o custo:
+
+1. **Reativo por medição, nunca por contagem de itens.** `ResizeObserver` no
+   trilho **e em cada filho** — a largura do trilho é a do pai, então trocar de
+   aba ou ganhar um badge muda o `scrollWidth` sem redimensionar o container e
+   um observer só no trilho não veria nada. Mais `MutationObserver` (item que
+   entra/sai) e o evento de `scroll`, tudo coalescido num `rAF` — que também é o
+   que evita `setState` síncrono dentro do efeito (§5.27).
+2. **Só com ponteiro fino.** No toque a seta cobriria uma aba para resolver um
+   problema que o dedo já resolve; o gate é `useMediaQuery` com snapshot `false`
+   no servidor, então as setas entram depois da hidratação e o HTML do SSR não
+   diverge. Nada de classe global nova: o alvo mobile-first não paga por isto.
+3. **Seta fora do `tablist`.** O componente rende um wrapper `div` neutro e
+   mantém o trilho como tag semântica (`as="nav"`, `role="tablist"`): botão que
+   não é aba dentro de um tablist é erro de ARIA. As setas ainda saem da árvore
+   de acessibilidade (`aria-hidden` + `tabIndex={-1}`) porque o teclado já
+   navega as abas e o foco rola o trilho sozinho.
+
+O esmaecimento sob a seta é `mask-image` e não gradiente colorido: o mesmo
+trilho aparece sobre `--surface` e sobre `--background`, e a máscara serve os
+dois sem saber em qual está.
+
+Alcance: um único ponto de troca cobriu `AdminTabs` (todo o admin, inclusive
+`AdminModuleTabs` e `AdminPendingTabs`), `MotionTabBar`, `ComunidadeTabBar`,
+fórum, praça, perfil, loja, bar, departamentos, controle de acesso, filtros da
+Memória e a top bar do portal. Guia e o que ficou de fora:
+`docs/frontend/scrollbars.md` § trilho horizontal.
+
+### 5.35 Seletor de torcida — semente + busca, não lista inteira (2026-09-02)
+
+`/super-admin/torcidas` carregava as **557 torcidas ativas** em toda visita, e
+o custo não estava na query — `listarTorcidasParaSelecao` já era
+`unstable_cache` de 5 min sobre `React.cache`, então repetir a chamada era
+grátis em banco e caro em bytes. O gargalo era o **payload RSC**: medidos no
+banco local, os 554 registros do seletor dão **147 KB**, e a rota mandava a
+lista **três vezes** — o switcher do layout, o switcher do card "Selecionar
+torcida" e a lista rolável — perto de **500 KB de flight** por navegação. Pior:
+o switcher do layout repetia os 147 KB em **toda** rota `/super-admin/*` e em
+**todo** `/admin/*` navegado por super-admin, para um dropdown que nunca mostra
+mais de 40 linhas (`MAX_SUGESTOES`).
+
+1. **Semente, não universo.** Layout e página passam a mandar
+   `listarTorcidasParaSelecaoSemente`: o topo alfabético (`SEMENTE_TORCIDAS_MAX`
+   = 30) **mais a torcida ativa** — que precisa estar presente para o input
+   exibir o próprio rótulo sem um round-trip. Medido: 142,6 KB → **7,9 KB**. O
+   resto chega por `buscarTorcidasParaSelecao` quando o operador abre o campo.
+   `listarTorcidasParaSelecao` (lista completa) continua existindo só para o
+   `<select>` de filtro da auditoria, que é HTML de uma página só.
+2. **A busca é do servidor, o filtro continua local.** `SearchableContextSwitcher`
+   ganhou `buscaRemota`; o filtro local segue rodando por cima do que já
+   chegou, então o que está em mãos responde na hora e o servidor só amplia. O
+   termo vai **cru**, não normalizado: `alvoBusca` tira acento para o
+   `includes` local, e "sao" normalizado nunca casaria com "SÃO" num `ILIKE`.
+   Debounce de 220ms ao digitar, **zero** ao abrir ou ao trocar de clube — a
+   cascata precisa estar pronta quando o operador chegar no campo seguinte.
+   Estado é o par `(chave, itens)` da última busca concluída, gravado só depois
+   do `await` (receita de `docs/frontend/react-compiler.md` § busca com
+   debounce); os **recentes** do `localStorage` viajam junto no mesmo pedido,
+   porque o servidor não tem como adivinhá-los.
+3. **A lista da página virou `ListagemSpec`.** `LISTAGEM_SUPER_ADMIN_TORCIDAS`
+   com paginação, busca e ordenação no banco, como `/super-admin/clubes` — 25
+   linhas, **5,6 KB**. O `?proxima=` viaja como `extras` para que buscar ou
+   paginar não perca o destino com que o operador chegou.
+4. **"Ser raiz" agora cabe num `where`.** O KPI dizia **557** sobre uma lista de
+   **554**: contava com `{ ativo, sintetico: false }` cru, enquanto a lista
+   filtrava os portais Caso B em memória — exatamente a divergência que o
+   comentário de `WHERE_TENANT_E_TORCIDA` já advertia. Paginar no banco tornava
+   o filtro em memória impossível, então a terceira condição virou coluna:
+   `whereTenantEhTorcida()` = as duas de coluna **mais**
+   `id: { notIn: listarTenantsNaoRaiz() }`. O conjunto excluído é pequeno por
+   construção (um id por promoção Caso B na plataforma), e o `where` passou a
+   ser fonte única de contar **e** de listar. Devolve objeto novo a cada
+   chamada de propósito: quem monta `where` espalha e completa o resultado, e um
+   literal compartilhado viraria estado global de requisição.
+
+**A lição que generaliza:** cache de servidor não conserta payload. Quando uma
+lista longa alimenta um combobox, o teto do que aparece (`MAX_SUGESTOES`) é o
+teto do que deve trafegar — e uma lista carregada no **layout** multiplica esse
+custo por cada rota do segmento, onde não aparece no perfil de nenhuma página.
+
+### 5.36 Botão de ação — UPPERCASE por CSS, ícone por tipo (2026-09-02)
+
+O produto não tinha componente de botão: **731 `<button>` em 213 arquivos**,
+cada um com Tailwind inline. "Salvar" era `text-sm font-medium` numa tela e
+`text-xs font-semibold` na outra, e 250 botões de ação não tinham ícone nenhum.
+A decisão foi criar o componente central (`components/ui/button.tsx`) e partir
+o padrão em duas metades, cada uma no lugar onde ela é barata de manter:
+
+1. **Caixa alta é CSS** (`.app-btn` em `globals.css`), não texto reescrito. O
+   JSX continua `Salvar alterações`, então leitor de tela lê a frase, os testes
+   por `getByRole('button', { name })` continuam achando o botão, a busca no
+   repo continua funcionando e o acento sobrevive (`text-transform` respeita
+   locale; `toUpperCase()` e fonte errada comem o til). Reverter é uma linha.
+2. **Ícone é prop, cobrada pelo tipo.** É a única metade que não dá para
+   centralizar — depende do significado da ação. `PropsComRotulo` exige `icon`
+   quando há `children`, e `PropsIconeOnly` exige `aria-label` quando não há.
+   O padrão não depende de ninguém lembrar dele.
+3. **Cor continua no módulo Design.** As variantes resolvem para `.btn-primary`,
+   `.btn-danger`, `.btn-*-soft` — os tokens que o tenant edita em
+   `/admin/design` (§5.12). Nunca `bg-[rgb(var(--primary))] text-white`:
+   `text-white` vence o token e some em identidade branca (Santos, Ceará).
+
+**Escopo é só ação.** Aba, chip de seleção, disclosure, botão de ícone puro,
+card clicável e rótulo vindo do banco ficam fora — `MARIA SILVA` e
+`SÃO PAULO/SP` em caixa alta leem como grito, e disclosure já diz o que faz
+pelo chevron. O lint conhece essas exceções e tem escape explícito com motivo
+escrito no código.
+
+**Duas armadilhas que custaram tempo e generalizam:**
+
+- **`@layer components` não é estilo, é correção.** `globals.css` é quase todo
+  unlayered, e CSS fora de layer vence **qualquer** utilitário do Tailwind — o
+  mesmo mecanismo já documentado na regra de `min-w-0` (§5.20). Com `.app-btn`
+  unlayered, o `border-radius` dela passava por cima de `rounded-full` e um
+  botão pill virava retangular sem ninguém pedir.
+- **`[^>]*>` não acha o fim de uma tag JSX.** O primeiro `>` de
+  `onClick={() => salvar()}` é a seta da arrow function. O lint lia o handler
+  inteiro como rótulo do botão até o parser passar a contar chaves e ignorar
+  strings. Vale para todo script deste repo que leia JSX com regex.
+
+**Migração.** `/admin` inteiro: **170 botões em 54 arquivos**, dos quais 90 não
+tinham ícone nenhum. Feita em três passadas de codemod descartável —
+`<button>` → `AppButton`, depois `{pending ? <Loader2/> : <Save/>}` →
+`loading={pending} icon={Save}`, e por fim `variant="none"` → variante de
+**token** onde a className dizia a cor sem ambiguidade (50 botões; os outros
+120 têm neutros escritos à mão e ficam na ponte). Enquanto a cor estiver no
+call-site, trocar a paleta em `/admin/design` não mexe no botão — é por isso
+que a terceira passada existe.
+
+O passivo é `portal`, `onboarding`, `super-admin` e `comunidade`;
+`AREAS_COBERTAS` em `scripts/lint-botoes.mjs` delimita o que o CI cobra, então
+área nova entra na lista quando termina de migrar. `variant="none"` é a ponte:
+traz o botão legado ao padrão sem repintar a tela no mesmo commit — botão novo
+não usa.
+
+**Nota de processo:** rodar `prettier --write` sobre as pastas migradas
+reformatou **113 arquivos que o codemod nem tocou** — o repo não roda prettier
+no CI e o código está numa largura menor que o `printWidth` do `.prettierrc`.
+Foi revertido e o codemod passou a emitir no estilo do call-site. Vale para a
+próxima migração em massa: aqui, formatar não é neutro.
+
+Guia de uso, dicionário de ícones e as exceções: `docs/frontend/botoes.md`.
 
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 

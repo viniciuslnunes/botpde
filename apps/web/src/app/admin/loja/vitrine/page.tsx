@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, resolveLojaVitrine } from '@torcida/types'
-import { AdminPageHeader } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { LojaVitrineForm } from './loja-vitrine-form'
 import type { Metadata } from 'next'
@@ -20,11 +19,9 @@ export default async function AdminLojaVitrinePage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Vitrine"
-        description="Capa e hero do catálogo no portal desta unidade. Cores e logo da loja continuam em Design."
-      />
-
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Capa e hero do catálogo no portal desta unidade. Cores e logo da loja continuam em Design.
+      </p>
       <MotionReveal>
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-6">
           <LojaVitrineForm

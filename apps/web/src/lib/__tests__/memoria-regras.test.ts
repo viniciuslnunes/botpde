@@ -11,6 +11,11 @@ import {
   podeListarPresenca,
   resolverEscopoMemoriaPadrao,
   escoposMemoriaDoCanal,
+  slugMemoriaCapitulo,
+  filtrarDiasPorCapitulo,
+  interpretarEntradaMemoria,
+  resolverEntradaMemoria,
+  MEMORIA_INTENCAO,
 } from '@torcida/types'
 
 describe('escopo padrão', () => {
@@ -179,5 +184,55 @@ describe('presença', () => {
         relation: 'allied',
       }),
     ).toBe(false)
+  })
+})
+
+describe('capítulos do acervo', () => {
+  it('normaliza slug a partir do título', () => {
+    expect(slugMemoriaCapitulo('Libertadores 2026')).toBe('libertadores-2026')
+    expect(slugMemoriaCapitulo('  Ação & Reação  ')).toBe('acao-reacao')
+    expect(slugMemoriaCapitulo('')).toBeNull()
+  })
+
+  it('filtra espinha mantendo ordem e só dias do capítulo', () => {
+    const espinha = ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04']
+    expect(filtrarDiasPorCapitulo(['2026-01-02', '2026-01-04'], espinha)).toEqual([
+      '2026-01-02',
+      '2026-01-04',
+    ])
+    expect(filtrarDiasPorCapitulo([], espinha)).toEqual(espinha)
+  })
+})
+
+describe('composer unificado', () => {
+  it('prefixo marco separa título e corpo', () => {
+    const r = interpretarEntradaMemoria('marco: Fundação da subsede\nPrimeiro barracão.')
+    expect(r.intencao).toBe(MEMORIA_INTENCAO.MARCO)
+    expect(r.titulo).toBe('Fundação da subsede')
+    expect(r.descricao).toBe('Primeiro barracão.')
+  })
+
+  it('prefixo aniversário normaliza título', () => {
+    const r = interpretarEntradaMemoria('aniversário: 40 anos da Gaviões')
+    expect(r.intencao).toBe(MEMORIA_INTENCAO.ANIVERSARIO)
+    expect(r.titulo).toBe('Aniversário — 40 anos da Gaviões')
+  })
+
+  it('menção a criar evento vira dica de agenda', () => {
+    const r = interpretarEntradaMemoria('Quero criar um evento de caravana')
+    expect(r.intencao).toBe(MEMORIA_INTENCAO.EVENTO)
+  })
+
+  it('texto livre vira relato', () => {
+    const r = interpretarEntradaMemoria('Sede lotada no churrasco.')
+    expect(r.intencao).toBe(MEMORIA_INTENCAO.FATO)
+    expect(r.conteudo).toBe('Sede lotada no churrasco.')
+  })
+
+  it('chip marco ignora prefixo ausente', () => {
+    const r = resolverEntradaMemoria('Fundação da subsede\nBarracão inaugurado.', MEMORIA_INTENCAO.MARCO)
+    expect(r.intencao).toBe(MEMORIA_INTENCAO.MARCO)
+    expect(r.titulo).toBe('Fundação da subsede')
+    expect(r.descricao).toBe('Barracão inaugurado.')
   })
 })

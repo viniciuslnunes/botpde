@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -13,8 +14,12 @@ import { HoverTip, hoverTipFromElement, type HoverTipAnchor } from '@/components
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { lerRecentes, registrarRecente } from '@/lib/context-switcher-recentes'
 import { useHidratado } from '@/lib/use-hidratado'
+import { useLatestRef } from '@/lib/use-latest-ref'
 
 const MAX_SUGESTOES = 40
+
+/** Espera antes de mandar o termo ao servidor. Abrir/trocar de pai não espera. */
+const DEBOUNCE_BUSCA_MS = 220
 
 function SubmitSpinner({ pending }: { pending: boolean }) {
   const { pending: formPending } = useFormStatus()
@@ -56,6 +61,23 @@ type Props<T extends ContextSwitcherItem> = {
   shouldSubmitOnSelect?: (item: T) => boolean
   /** Se false, não submete o form após selecionar (só filtro local). */
   submitOnSelect?: boolean
+  /**
+   * Busca sob demanda. Quando presente, `items` deixa de ser o universo e passa
+   * a ser só a **semente** (topo da lista + o item selecionado, que precisa
+   * estar lá para o input exibir o próprio rótulo); o resto chega por
+   * `buscar` conforme o operador digita.
+   *
+   * Existe porque a lista inteira viajava no payload RSC de toda navegação —
+   * 147 KB de torcidas para um dropdown que mostra 40. O filtro local continua
+   * rodando por cima do que já chegou, então o que está em mãos responde na
+   * hora e o servidor só amplia.
+   */
+  buscaRemota?: {
+    /** Recebe o termo cru (não normalizado) e os recentes a resolver junto. */
+    buscar: (termo: string, recentes: string[]) => Promise<T[]>
+    /** Redispara a busca quando um filtro-pai muda (ex.: clube da cascata). */
+    chaveExtra?: string
+  }
 }
 
 export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
@@ -80,10 +102,13 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   onSelect,
   shouldSubmitOnSelect,
   submitOnSelect = true,
+  buscaRemota,
 }: Props<T>) {
   const listId = useId()
   const formRef = useRef<HTMLFormElement>(null)
 
+  // Resolvido na SEMENTE de propósito: com busca remota o universo muda a cada
+  // digitação, e o rótulo do item ativo não pode piscar por causa disso.
   const atual = useMemo(
     () => items.find((t) => t.id === valueId) ?? null,
     [items, valueId],
@@ -103,6 +128,15 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     atual && getFormFields ? getFormFields(atual) : {},
   )
   const [tip, setTip] = useState<HoverTipAnchor | null>(null)
+  /**
+   * Par (chave, itens) da última busca concluída — nunca zerado dentro do
+   * effect, como manda `docs/frontend/react-compiler.md` § busca com debounce.
+   * `chave: null` = nada buscado ainda (≠ buscado e veio vazio).
+   */
+  const [pool, setPool] = useState<{ chave: string | null; itens: T[] }>({
+    chave: null,
+    itens: [],
+  })
 
   function limparTip() {
     setTip(null)
@@ -131,17 +165,29 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     setRecentesIds(lerRecentes(recentNamespace))
   }
 
-  const porId = useMemo(() => {
+  /**
+   * Semente + o que a busca remota já trouxe. Sem `buscaRemota` é a própria
+   * lista, e todo o resto do componente segue idêntico ao que era.
+   */
+  const universo = useMemo(() => {
+    if (!buscaRemota || pool.itens.length === 0) return items
     const map = new Map<string, T>()
     for (const t of items) map.set(t.id, t)
+    for (const t of pool.itens) if (!map.has(t.id)) map.set(t.id, t)
+    return [...map.values()]
+  }, [items, pool.itens, buscaRemota])
+
+  const porId = useMemo(() => {
+    const map = new Map<string, T>()
+    for (const t of universo) map.set(t.id, t)
     return map
-  }, [items])
+  }, [universo])
 
   const porRecentKey = useMemo(() => {
     const map = new Map<string, T>()
-    for (const t of items) map.set(t.recentKey ?? t.id, t)
+    for (const t of universo) map.set(t.recentKey ?? t.id, t)
     return map
-  }, [items])
+  }, [universo])
 
   const selecionada = porId.get(selectedId) ?? null
   const labelSelecionada = selecionada ? getLabel(selecionada) : ''
@@ -169,11 +215,14 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
       if (t && coincide(t, alvoBusca)) recentesLista.push(t)
     }
 
-    const demaisLista = items.filter((t) => {
+    const demaisLista = universo.filter((t) => {
       const key = t.recentKey ?? t.id
       return !recenteSet.has(key) && coincide(t, alvoBusca)
     })
 
+    // Com busca remota o servidor já cortou em `MAX_SUGESTOES`: nesse caso há
+    // mais resultados lá fora mesmo que o filtro local não tenha cortado nada.
+    const totalRemoto = pool.itens.length
     const total = recentesLista.length + demaisLista.length
     const recentesVisiveis = recentesLista.slice(0, MAX_SUGESTOES)
     const demaisVisiveis = demaisLista.slice(
@@ -184,11 +233,64 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     return {
       recentes: recentesVisiveis,
       demais: demaisVisiveis,
-      truncado: total > MAX_SUGESTOES,
+      truncado: total > MAX_SUGESTOES || totalRemoto >= MAX_SUGESTOES,
     }
-  }, [items, porRecentKey, recentesIds, alvoBusca, getLabel, getSubLabel, getSearchText])
+  }, [
+    universo,
+    porRecentKey,
+    recentesIds,
+    alvoBusca,
+    pool.itens.length,
+    getLabel,
+    getSubLabel,
+    getSearchText,
+  ])
 
   const sugestoes = useMemo(() => [...recentes, ...demais], [recentes, demais])
+
+  // `alvoBusca` é normalizado (sem acento) e serve ao filtro local; o servidor
+  // faz `contains` no texto cru, então recebe o que foi digitado de fato —
+  // "sao" normalizado nunca casaria com "SÃO" num ILIKE.
+  const termoRemoto = alvoBusca ? query.trim() : ''
+  const chaveExtra = buscaRemota?.chaveExtra ?? ''
+  // Busca ao abrir (para trazer os recentes e o topo) e sempre que o
+  // filtro-pai muda, mesmo fechado — assim escolher um clube já deixa as
+  // torcidas dele prontas quando o operador abrir o campo seguinte.
+  const chaveDesejada =
+    buscaRemota && (aberto || chaveExtra !== '')
+      ? `${chaveExtra}\0${termoRemoto}`
+      : null
+  const buscandoRemoto = chaveDesejada !== null && pool.chave !== chaveDesejada
+
+  const buscarRef = useLatestRef(buscaRemota?.buscar)
+  const recentesRef = useLatestRef(recentesIds)
+
+  useEffect(() => {
+    if (chaveDesejada === null) return
+    if (pool.chave === chaveDesejada) return
+    let cancelado = false
+    const timer = window.setTimeout(
+      () => {
+        void (async () => {
+          const buscar = buscarRef.current
+          if (!buscar) return
+          try {
+            const itens = await buscar(termoRemoto, recentesRef.current)
+            // Grava só depois do await, inclusive em falha: sem isso o
+            // "buscando" derivado nunca desligaria.
+            if (!cancelado) setPool({ chave: chaveDesejada, itens })
+          } catch {
+            if (!cancelado) setPool({ chave: chaveDesejada, itens: [] })
+          }
+        })()
+      },
+      termoRemoto ? DEBOUNCE_BUSCA_MS : 0,
+    )
+    return () => {
+      cancelado = true
+      window.clearTimeout(timer)
+    }
+  }, [chaveDesejada, pool.chave, termoRemoto, buscarRef, recentesRef])
 
   // Volta o destaque ao topo quando a lista muda (mesmo ajuste em render que
   // o bloco de `syncKey` acima já usa).
@@ -369,7 +471,9 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
               onScroll={limparTip}
             >
               {sugestoes.length === 0 ? (
-                <li className={`px-3 py-2 text-sm ${mutedClass}`}>{emptyMessage}</li>
+                <li className={`px-3 py-2 text-sm ${mutedClass}`}>
+                  {buscandoRemoto ? 'Buscando…' : emptyMessage}
+                </li>
               ) : (
                 <>
                   {recentes.length > 0 && !alvoBusca && (
@@ -387,9 +491,9 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
                   {demais.map((t, i) => renderItem(t, recentes.length + i))}
                 </>
               )}
-              {truncado && (
+              {(truncado || buscandoRemoto) && sugestoes.length > 0 && (
                 <li className={`px-3 py-1.5 text-[11px] ${mutedClass}`}>
-                  Digite mais para refinar a busca…
+                  {buscandoRemoto ? 'Buscando…' : 'Digite mais para refinar a busca…'}
                 </li>
               )}
             </ul>

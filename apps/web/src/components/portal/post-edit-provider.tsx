@@ -420,7 +420,7 @@ export function PostEditableTexto({ children }: { children: ReactNode }) {
       <ExpandableText
         conteudo={visivel}
         lines={8}
-        className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+        className="whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
       />
     )
   }

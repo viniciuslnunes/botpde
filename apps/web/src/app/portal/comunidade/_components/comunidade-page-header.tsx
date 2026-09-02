@@ -38,7 +38,7 @@ export function ComunidadePageHeader({
       </span>
 
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">
+        <h1 className="portal-display truncate text-xl text-[rgb(var(--foreground))] sm:text-2xl">
           {titulo}
         </h1>
         {subtitulo && (

@@ -95,6 +95,7 @@ export default async function ForumTopicoPage({
             alvoId={topico.id}
             gostei={topico.gostei}
             naoGostei={topico.naoGostei}
+            meuVoto={topico.meuVoto}
           />
           {pct !== null && (
             <span className="text-xs text-[rgb(var(--foreground-muted))]">{pct}% positivo</span>

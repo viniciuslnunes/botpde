@@ -175,7 +175,7 @@ export function MensagensShell({
         ].join(' ')}
       >
         <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Conversas</h2>
+          <h2 className="portal-display text-sm text-[rgb(var(--foreground))]">Conversas</h2>
           <div className="flex gap-1">
             <button
               type="button"

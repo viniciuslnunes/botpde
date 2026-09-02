@@ -3,7 +3,7 @@
 import { useActionState, useId, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { m } from 'motion/react'
-import { ArrowDownCircle, ArrowUpCircle, Boxes, Settings2 } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Boxes, Plus, Settings2, Wand2, X } from 'lucide-react'
 import { FieldError } from '@torcida/ui'
 import { registrarAjusteEstoqueBar, registrarCompraBar } from '@/app/admin/bar/actions'
 import type { BarActionState } from '@/app/admin/bar/actions'
@@ -13,6 +13,7 @@ import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AppButton } from '@/components/ui/button'
 
 const initialState: BarActionState = {}
 
@@ -78,12 +79,14 @@ export function RegistrarCompraBarForm({
   return (
     <div>
       {!open ? (
-        <button
+        <AppButton
+          variant="primary"
+          icon={Plus}
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
+          className="rounded-xl px-4 py-2 text-sm font-medium"
         >
           + Registrar compra
-        </button>
+        </AppButton>
       ) : (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
           <div className="mb-4 flex items-center justify-between">
@@ -202,13 +205,15 @@ export function RegistrarCompraBarForm({
               }
               hint="Informe produto, quantidade e custo da compra."
             >
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => void closeForm()}
                 className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 Cancelar
-              </button>
+              </AppButton>
               <button
                 type="submit"
                 form={formId}
@@ -259,13 +264,15 @@ function AjusteEstoqueRow({ produto, onClose }: { produto: BarProdutoSerializado
         />
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={onClose}
           className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background))]"
         >
           Cancelar
-        </button>
+        </AppButton>
         <button
           type="button"
           disabled={pending || motivo.trim().length < 3}
@@ -348,13 +355,15 @@ export function BarEstoqueTabela({ produtos }: { produtos: BarProdutoSerializado
                     Repor
                   </span>
                 )}
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Wand2}
                   type="button"
                   onClick={() => setAjustandoId((atual) => (atual === p.id ? null : p.id))}
                   className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium hover:bg-[rgb(var(--background-subtle))]"
                 >
                   Ajuste manual
-                </button>
+                </AppButton>
               </div>
             </div>
             {ajustandoId === p.id && (

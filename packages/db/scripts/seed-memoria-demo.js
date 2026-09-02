@@ -133,6 +133,62 @@ async function carregarAlvo(slug) {
  *   autorOffset?: number
  * }>} fatos
  */
+async function semearAcervoCurado(alvo) {
+  const hoje = hojeSp()
+  const diaChurrasco = inicioDiaUtc(addDays(hoje, -14))
+  const diaConcentracao = inicioDiaUtc(addDays(hoje, -21))
+
+  await db.memoriaMarco.upsert({
+    where: { tenantId_dia: { tenantId: alvo.tenant.id, dia: diaChurrasco } },
+    create: {
+      tenantId: alvo.tenant.id,
+      autorId: alvo.ownerId,
+      dia: diaChurrasco,
+      titulo: 'Churrasco institucional da sede',
+      descricao: 'Marco demo — dia de confraternização pós-jogo no acervo.',
+    },
+    update: {
+      titulo: 'Churrasco institucional da sede',
+      descricao: 'Marco demo — dia de confraternização pós-jogo no acervo.',
+      autorId: alvo.ownerId,
+    },
+  })
+
+  const capId = 'memoria-demo-cap-temporada'
+  await db.memoriaCapitulo.upsert({
+    where: { id: capId },
+    create: {
+      id: capId,
+      tenantId: alvo.tenant.id,
+      titulo: 'Temporada demo',
+      slug: 'temporada-demo',
+      descricao: 'Capítulo de teste com dias do seed memoria-demo.',
+      ativo: true,
+    },
+    update: {
+      titulo: 'Temporada demo',
+      slug: 'temporada-demo',
+      descricao: 'Capítulo de teste com dias do seed memoria-demo.',
+      ativo: true,
+    },
+  })
+
+  await db.memoriaCapituloDia.deleteMany({ where: { capituloId: capId } })
+  const diasCap = [
+    { dia: diaChurrasco, ordem: 0 },
+    { dia: diaConcentracao, ordem: 1 },
+  ]
+  for (const row of diasCap) {
+    await db.memoriaCapituloDia.create({
+      data: {
+        capituloId: capId,
+        dia: row.dia,
+        ordem: row.ordem,
+      },
+    })
+  }
+}
+
 async function semearAlvo(prefixo, alvo, eventos, posts, fatos) {
   const hoje = hojeSp()
   const autor = (offset = 0) => alvo.autores[offset % alvo.autores.length] ?? alvo.ownerId
@@ -457,6 +513,7 @@ async function main() {
       ],
     )
     await ligarPostAoJogo(gavioes)
+    await semearAcervoCurado(gavioes)
   }
 
   const camisa = await carregarAlvo('camisa-12-corinthians')

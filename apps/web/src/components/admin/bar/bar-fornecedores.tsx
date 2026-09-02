@@ -1,13 +1,14 @@
 'use client'
 
 import { useActionState, useState, useTransition } from 'react'
-import { Truck } from 'lucide-react'
+import { Truck, X } from 'lucide-react'
 import { FieldError } from '@torcida/ui'
 import { alternarAtivoFornecedorBar, criarFornecedorBar, editarFornecedorBar } from '@/app/admin/bar/actions'
 import type { BarActionState } from '@/app/admin/bar/actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
 
 const initialState: BarActionState = {}
 
@@ -120,14 +121,16 @@ function EditarFornecedorForm({
         >
           {pending ? 'Salvando...' : 'Salvar'}
         </button>
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           disabled={pending}
           onClick={onClose}
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
         >
           Cancelar
-        </button>
+        </AppButton>
       </div>
     </form>
   )

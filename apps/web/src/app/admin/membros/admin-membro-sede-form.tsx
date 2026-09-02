@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Loader2, MapPin } from 'lucide-react'
+import { MapPin, Save } from 'lucide-react'
 import { reatribuirSedeMembro } from '@/app/admin/membros/actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
 
 type SedeOption = { id: string; nome: string; tipo: string }
 
@@ -83,9 +84,12 @@ export function AdminMembroSedeForm({
             ))}
           </select>
         </label>
-        <button
+        <AppButton
+          variant="primary"
+          icon={Save}
+          loading={pending}
           type="button"
-          disabled={pending || !dirty}
+          disabled={!dirty}
           onClick={() =>
             startTransition(async () => {
               await runPersistAction(
@@ -94,11 +98,10 @@ export function AdminMembroSedeForm({
               )
             })
           }
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl px-4 py-2 text-sm"
         >
-          {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Salvar unidade
-        </button>
+        </AppButton>
       </div>
     </div>
   )

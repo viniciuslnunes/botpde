@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { OrgDepartamentoBranch, OrgPerson, OrganizacaoTree } from '@/lib/organizacao-tree'
 import { AvatarFoto } from '@/components/media/avatar-foto'
+import { AppButton } from '@/components/ui/button'
 
 const BASE_PREVIEW = 8
 
@@ -516,24 +517,26 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <button
+            <AppButton
+              variant="none"
+              icon={ChevronsUpDown}
               type="button"
               onClick={expandirTodos}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
               title="Expandir todos os departamentos"
             >
-              <ChevronsUpDown className="h-3.5 w-3.5" />
               Expandir
-            </button>
-            <button
+            </AppButton>
+            <AppButton
+              variant="none"
+              icon={ChevronsDownUp}
               type="button"
               onClick={recolherTodos}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
               title="Recolher todos os departamentos"
             >
-              <ChevronsDownUp className="h-3.5 w-3.5" />
               Recolher
-            </button>
+            </AppButton>
             <button
               type="button"
               onClick={() => setSoComPessoas((v) => !v)}

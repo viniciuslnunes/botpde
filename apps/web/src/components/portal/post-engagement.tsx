@@ -330,13 +330,15 @@ export function PostEngagement({
   }
 
   const btnBase =
-    'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50'
+    'inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-xs font-medium transition-colors disabled:opacity-50 sm:gap-1.5 sm:px-2 sm:py-1.5 sm:text-sm'
+  const btnAcao = `${btnBase} flex-1 @[26rem]:flex-none`
+  const btnLabel = 'truncate @max-[26rem]:sr-only'
 
   const mostrarSecaoComentarios =
     comentariosAbertos || comentarios.length > 0 || carregandoComentarios
 
   return (
-    <div className="mt-3">
+    <div className="mt-1.5">
       <AnimatePresence>
         {(totalR > 0 || totalC > 0) && (
           <m.div
@@ -345,7 +347,7 @@ export function PostEngagement({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={springSnappy}
-            className="flex items-center gap-3 pb-2 text-xs text-[rgb(var(--foreground-muted))]"
+            className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]"
           >
             {totalR > 0 && (
               <m.span layout className="inline-flex items-center gap-1">
@@ -385,8 +387,9 @@ export function PostEngagement({
         )}
       </AnimatePresence>
 
-      <div className="flex flex-wrap items-center gap-1 border-t border-[rgb(var(--border))] pt-2">
-        <EngajamentoBtn
+      <div className="flex items-center gap-0.5 border-t border-[rgb(var(--border))] pt-1.5">
+        <div className="flex min-w-0 flex-1 items-center">
+          <EngajamentoBtn
           disabled={pending || operador}
           title={operador ? AVISO_MODO_OPERADOR : undefined}
           active={reacao === 'CURTIR'}
@@ -394,7 +397,7 @@ export function PostEngagement({
           aria-pressed={reacao === 'CURTIR'}
           aria-label={reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}
           className={[
-            btnBase,
+            btnAcao,
             reacao === 'CURTIR'
               ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
@@ -415,7 +418,7 @@ export function PostEngagement({
             </AnimatePresence>
             <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
           </span>
-          {reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}
+          <span className={btnLabel}>{reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}</span>
         </EngajamentoBtn>
         <EngajamentoBtn
           active={comentariosAbertos}
@@ -423,14 +426,14 @@ export function PostEngagement({
           aria-expanded={comentariosAbertos}
           aria-label={comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
           className={[
-            btnBase,
+            btnAcao,
             comentariosAbertos
               ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
           <MessageCircle className="h-4 w-4" />
-          {comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
+          <span className={btnLabel}>{comentariosAbertos ? 'Ocultar' : 'Comentar'}</span>
         </EngajamentoBtn>
         {!isRepost && podeCompartilhar && !operador && (
           <EngajamentoBtn
@@ -439,7 +442,7 @@ export function PostEngagement({
             aria-pressed={compartilhado}
             aria-label={compartilhado ? 'Compartilhado' : 'Compartilhar'}
             className={[
-              btnBase,
+              btnAcao,
               repostando || compartilhado
                 ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
@@ -452,7 +455,7 @@ export function PostEngagement({
             >
               <Repeat2 className="h-4 w-4" />
             </m.span>
-            {compartilhado ? 'Compartilhado' : 'Compartilhar'}
+            <span className={btnLabel}>{compartilhado ? 'Compartilhado' : 'Compartilhar'}</span>
           </EngajamentoBtn>
         )}
         <EngajamentoBtn
@@ -465,15 +468,16 @@ export function PostEngagement({
           aria-pressed={salvo}
           aria-label={salvo ? 'Salvo' : 'Salvar'}
           className={[
-            btnBase,
+            btnAcao,
             salvo
               ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
           <Bookmark className={['h-4 w-4', salvo ? 'fill-current' : ''].join(' ')} />
-          {salvo ? 'Salvo' : 'Salvar'}
+          <span className={btnLabel}>{salvo ? 'Salvo' : 'Salvar'}</span>
         </EngajamentoBtn>
+        </div>
         {!isAuthor && (
           <EngajamentoBtn
             onClick={() => {
@@ -484,7 +488,7 @@ export function PostEngagement({
             aria-pressed={denunciado}
             className={[
               btnBase,
-              'ml-auto',
+              'shrink-0',
               denunciado
                 ? 'text-red-600'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-red-600',

@@ -170,7 +170,7 @@ export function ComunidadeChatPanel({
           aria-expanded={expanded}
         >
           <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-          <span className="text-sm font-semibold text-[rgb(var(--foreground))]">Mensagens</span>
+          <span className="portal-display text-sm text-[rgb(var(--foreground))]">Mensagens</span>
           <AnimatePresence initial={false}>
             {naoLidas > 0 && (
               <m.span

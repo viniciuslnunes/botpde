@@ -17,6 +17,8 @@ import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import { AppButton } from '@/components/ui/button'
+import { Plus, Trash2, X } from 'lucide-react'
 
 const initialState: BarActionState = {}
 
@@ -216,12 +218,14 @@ export function CriarProdutoBarForm({ categorias }: { categorias: BarCategoriaOp
   return (
     <div>
       {!open ? (
-        <button
+        <AppButton
+          variant="primary"
+          icon={Plus}
           onClick={() => setOpen(true)}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on hover:opacity-90"
+          className="rounded-xl px-4 py-2 text-sm font-medium"
         >
           + Novo produto
-        </button>
+        </AppButton>
       ) : (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
           <div className="mb-4 flex items-center justify-between">
@@ -248,13 +252,15 @@ export function CriarProdutoBarForm({ categorias }: { categorias: BarCategoriaOp
               }
               hint="Preencha os dados do produto e confirme a criação."
             >
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => void closeForm()}
                 className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 Cancelar
-              </button>
+              </AppButton>
               <button
                 type="submit"
                 form={formId}
@@ -359,7 +365,9 @@ export function ExcluirProdutoBarButton({
   const router = useRouter()
 
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={Trash2}
       onClick={() =>
         void confirmAction({
           titulo: `Excluir “${nome}”?`,
@@ -377,6 +385,6 @@ export function ExcluirProdutoBarButton({
       className="rounded-lg border border-[rgb(var(--color-danger)_/_0.35)] px-3 py-1.5 text-xs font-medium text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.08)]"
     >
       Excluir
-    </button>
+    </AppButton>
   )
 }

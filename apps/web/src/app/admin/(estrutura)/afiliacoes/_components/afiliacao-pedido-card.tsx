@@ -2,18 +2,7 @@
 
 import { useActionState, useMemo, useState, type ReactNode } from 'react'
 import Image from 'next/image'
-import {
-  Check,
-  FileImage,
-  Loader2,
-  Mail,
-  MapPin,
-  Pencil,
-  Phone,
-  Trash2,
-  User,
-  X,
-} from 'lucide-react'
+import { Check, FileImage, Loader2, Mail, MapPin, Pencil, Phone, Trash2, User, X } from 'lucide-react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
 import {
   STATUS_EXIBICAO_SOLICITACAO_LABEL,
@@ -33,6 +22,7 @@ import {
   recusarSolicitacao,
   type SolicitacaoActionState,
 } from '../afiliacao-actions'
+import { AppButton } from '@/components/ui/button'
 
 export interface SolicitacaoView {
   id: string
@@ -609,37 +599,37 @@ export function AfiliacaoPedidoCard({
             <div className="flex flex-wrap items-center gap-2">
               <form action={aprovarAction}>
                 <input type="hidden" name="solicitacaoId" value={pedido.id} />
-                <button
+                <AppButton
+                  variant="primary"
+                  icon={Check}
+                  loading={aprovando}
                   type="submit"
                   disabled={ocupado}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3.5 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold"
                 >
-                  {aprovando ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Check className="h-3.5 w-3.5" />
-                  )}
                   Aprovar e promover a portal
-                </button>
+                </AppButton>
               </form>
-              <button
+              <AppButton
+                variant="none"
+                icon={Pencil}
                 type="button"
                 onClick={() => setModo('editar')}
                 disabled={ocupado}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3.5 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
               >
-                <Pencil className="h-3.5 w-3.5" />
                 Editar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setModo('recusar')}
                 disabled={ocupado}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3.5 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
               >
-                <X className="h-3.5 w-3.5" />
                 Recusar
-              </button>
+              </AppButton>
             </div>
           )}
 
@@ -654,21 +644,25 @@ export function AfiliacaoPedidoCard({
                 placeholder="Motivo da recusa"
                 className={`min-w-0 flex-1 ${inputClass}`}
               />
-              <button
+              <AppButton
+                variant="none"
+                icon={Check}
+                loading={recusando}
                 type="submit"
                 disabled={ocupado}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {recusando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Confirmar recusa
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setModo('ver')}
                 className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
               >
                 Cancelar
-              </button>
+              </AppButton>
             </form>
           )}
 
@@ -718,13 +712,15 @@ export function AfiliacaoPedidoCard({
                 >
                   {editando ? <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> : 'Salvar'}
                 </button>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={X}
                   type="button"
                   onClick={() => setModo('ver')}
                   className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
                 >
                   Cancelar
-                </button>
+                </AppButton>
               </div>
             </form>
           )}

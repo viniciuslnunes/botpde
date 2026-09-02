@@ -44,6 +44,15 @@ export const MEMORIA_ALIADOS_DEFAULT = false
 /** Presença visível na linha. Default off — opt-in explícito. */
 export const MEMORIA_PRESENCA_DEFAULT = false
 
+/** Slug de capítulo: minúsculas, hífens, sem espaços. */
+export const MEMORIA_CAPITULO_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+export const MEMORIA_CAPITULO_TITULO_MAX = 120
+export const MEMORIA_CAPITULO_DESCRICAO_MAX = 500
+export const MEMORIA_MARCO_TITULO_MAX = 120
+export const MEMORIA_MARCO_DESCRICAO_MAX = 500
+export const MEMORIA_CAPITULO_DIAS_MAX = 120
+
 /** Fato atrasado: não é o dia de hoje nem o futuro; teto de 5 anos. */
 export const MEMORIA_FATO_ANOS_MAX = 5
 
@@ -213,4 +222,159 @@ export function podeListarPresenca(opts) {
     return false
   }
   return true
+}
+
+/**
+ * Normaliza slug de capítulo da memória.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+export function slugMemoriaCapitulo(raw) {
+  if (typeof raw !== 'string') return null
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+  if (!s || !MEMORIA_CAPITULO_SLUG_RE.test(s)) return null
+  return s
+}
+
+/**
+ * Filtra dias da espinha para um capítulo (união de dias do capítulo).
+ *
+ * @param {string[]} diasCapitulo ISO YYYY-MM-DD
+ * @param {string[]} diasEspinha
+ * @returns {string[]}
+ */
+export function filtrarDiasPorCapitulo(diasCapitulo, diasEspinha) {
+  if (!diasCapitulo?.length) return diasEspinha
+  const set = new Set(diasCapitulo)
+  return diasEspinha.filter((d) => set.has(d))
+}
+
+/** Intenção inferida do texto único do composer da Memória. */
+export const MEMORIA_INTENCAO = /** @type {const} */ ({
+  FATO: 'fato',
+  MARCO: 'marco',
+  ANIVERSARIO: 'aniversario',
+  EVENTO: 'evento',
+})
+
+/** @typedef {'fato' | 'marco' | 'aniversario' | 'evento'} MemoriaIntencao */
+
+/**
+ * @typedef {{
+ *   intencao: MemoriaIntencao,
+ *   conteudo: string | null,
+ *   titulo: string | null,
+ *   descricao: string | null,
+ * }} MemoriaEntradaInterpretada
+ */
+
+const PREFIXO_MARCO_RE = /^marco\s*:\s*/i
+const PREFIXO_ANIVERSARIO_RE = /^anivers[aá]rio\s*:\s*/i
+const DICA_EVENTO_RE =
+  /\b(criar|novo|cadastrar|agendar)\s+(um\s+)?(evento|caravana|ensaio|jogo)\b/i
+
+/**
+ * @param {string} body
+ * @returns {{ titulo: string, descricao: string | null }}
+ */
+function parseTituloCorpoMemoria(body) {
+  const trimmed = body.trim()
+  const nl = trimmed.indexOf('\n')
+  if (nl === -1) return { titulo: trimmed, descricao: null }
+  const titulo = trimmed.slice(0, nl).trim()
+  const descricao = trimmed.slice(nl + 1).trim() || null
+  return { titulo, descricao }
+}
+
+/**
+ * Um único campo de texto na Memória — prefixos explícitos direcionam o destino.
+ *
+ * - `marco: título` (+ linhas = contexto) → marco institucional
+ * - `aniversário: …` → marco com título prefixado
+ * - menção a criar evento/caravana → dica para a Agenda
+ * - resto → fato / relato (moderação se dia passado)
+ *
+ * @param {string} texto
+ * @returns {MemoriaEntradaInterpretada}
+ */
+export function interpretarEntradaMemoria(texto) {
+  const raw = typeof texto === 'string' ? texto.trim() : ''
+  if (!raw) {
+    return { intencao: MEMORIA_INTENCAO.FATO, conteudo: '', titulo: null, descricao: null }
+  }
+
+  if (PREFIXO_MARCO_RE.test(raw)) {
+    const body = raw.replace(PREFIXO_MARCO_RE, '').trim()
+    const { titulo, descricao } = parseTituloCorpoMemoria(body)
+    return {
+      intencao: MEMORIA_INTENCAO.MARCO,
+      titulo,
+      descricao,
+      conteudo: null,
+    }
+  }
+
+  if (PREFIXO_ANIVERSARIO_RE.test(raw)) {
+    const body = raw.replace(PREFIXO_ANIVERSARIO_RE, '').trim()
+    const { titulo, descricao } = parseTituloCorpoMemoria(body)
+    const base = titulo || 'da torcida'
+    const tituloFinal = /^anivers[aá]rio/i.test(base) ? base : `Aniversário — ${base}`
+    return {
+      intencao: MEMORIA_INTENCAO.ANIVERSARIO,
+      titulo: tituloFinal,
+      descricao,
+      conteudo: null,
+    }
+  }
+
+  if (DICA_EVENTO_RE.test(raw)) {
+    return { intencao: MEMORIA_INTENCAO.EVENTO, conteudo: raw, titulo: null, descricao: null }
+  }
+
+  return { intencao: MEMORIA_INTENCAO.FATO, conteudo: raw, titulo: null, descricao: null }
+}
+
+/**
+ * Resolve entrada do composer — `modo` explícito (chip) tem prioridade sobre prefixos.
+ *
+ * @param {string} texto
+ * @param {MemoriaIntencao | null | undefined} modo
+ * @returns {MemoriaEntradaInterpretada}
+ */
+export function resolverEntradaMemoria(texto, modo) {
+  if (modo === MEMORIA_INTENCAO.MARCO) {
+    const { titulo, descricao } = parseTituloCorpoMemoria(texto)
+    return {
+      intencao: MEMORIA_INTENCAO.MARCO,
+      titulo,
+      descricao,
+      conteudo: null,
+    }
+  }
+  if (modo === MEMORIA_INTENCAO.ANIVERSARIO) {
+    const { titulo, descricao } = parseTituloCorpoMemoria(texto)
+    const base = titulo || 'da torcida'
+    const tituloFinal = /^anivers[aá]rio/i.test(base) ? base : `Aniversário — ${base}`
+    return {
+      intencao: MEMORIA_INTENCAO.ANIVERSARIO,
+      titulo: tituloFinal,
+      descricao,
+      conteudo: null,
+    }
+  }
+  if (modo === MEMORIA_INTENCAO.FATO) {
+    const raw = typeof texto === 'string' ? texto.trim() : ''
+    if (DICA_EVENTO_RE.test(raw)) {
+      return { intencao: MEMORIA_INTENCAO.EVENTO, conteudo: raw, titulo: null, descricao: null }
+    }
+    return { intencao: MEMORIA_INTENCAO.FATO, conteudo: raw, titulo: null, descricao: null }
+  }
+  return interpretarEntradaMemoria(texto)
 }

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { MOTIVO_BLOQUEIO_MIN, MOTIVO_BLOQUEIO_MAX } from '@torcida/types'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { runPersistAction } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 interface BloquearMembroDialogProps {
   aberto: boolean
@@ -98,14 +100,16 @@ export function BloquearMembroDialog({
       </AppModalBody>
 
         <div className="flex items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onFechar}
             disabled={enviando}
             className="rounded-lg px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-50"
           >
             Cancelar
-          </button>
+          </AppButton>
           <button
             type="button"
             onClick={() => void handleConfirmar()}

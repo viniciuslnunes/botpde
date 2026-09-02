@@ -8,6 +8,9 @@ export const FORUM_CORPO_MAX = 8000
 export const ARTIGO_TITULO_MAX = 180
 export const ARTIGO_RESUMO_MAX = 400
 export const ARTIGO_CORPO_MAX = 20000
+export const ARTIGO_BLOCOS_MAX = 40
+export const ARTIGO_BLOCO_TEXTO_MAX = 4000
+export const ARTIGO_BLOCO_LEGENDA_MAX = 240
 export const PRACA_COMENTARIO_MAX = 2000
 
 /** Sinal barato: teto de tópicos + respostas + votos emitidos por semana. */
@@ -123,6 +126,64 @@ export function pctAprovacaoPraca(gostei, naoGostei) {
   const total = gostei + naoGostei
   if (total <= 0) return null
   return Math.round((gostei / total) * 100)
+}
+
+/**
+ * Delta nas contagens denormalizadas ao mudar o voto do viewer.
+ *
+ * @param {1 | -1 | 0 | null | undefined} valorAntigo
+ * @param {1 | -1 | 0} valorNovo
+ * @returns {{ gostei: number, naoGostei: number }}
+ */
+export function deltaContagemVotoPraca(valorAntigo, valorNovo) {
+  const antigo = valorAntigo === 1 || valorAntigo === -1 ? valorAntigo : 0
+  const novo = valorNovo === 1 || valorNovo === -1 ? valorNovo : 0
+  return {
+    gostei: (novo === 1 ? 1 : 0) - (antigo === 1 ? 1 : 0),
+    naoGostei: (novo === -1 ? 1 : 0) - (antigo === -1 ? 1 : 0),
+  }
+}
+
+/**
+ * Aplica o delta de voto nas contagens do card (otimista / testes).
+ *
+ * @param {number} gostei
+ * @param {number} naoGostei
+ * @param {1 | -1 | 0 | null | undefined} valorAntigo
+ * @param {1 | -1 | 0} valorNovo
+ * @returns {{ gostei: number, naoGostei: number }}
+ */
+export function aplicarVotoPracaLocal(gostei, naoGostei, valorAntigo, valorNovo) {
+  const d = deltaContagemVotoPraca(valorAntigo, valorNovo)
+  return {
+    gostei: Math.max(0, gostei + d.gostei),
+    naoGostei: Math.max(0, naoGostei + d.naoGostei),
+  }
+}
+
+/**
+ * Número entre Concordo/Discordo: líquido (apoios − rejeições).
+ * Cada clique move 1: o oposto primeiro tira o voto (ver `proximoVotoPraca`);
+ * trocar +1 por −1 num único clique pulava duas unidades.
+ *
+ * @param {number} gostei
+ * @param {number} [naoGostei]
+ */
+export function contagemExibidaVotoPraca(gostei, naoGostei = 0) {
+  return gostei - naoGostei
+}
+
+/**
+ * Já tem voto: qualquer clique volta ao neutro (mesmo botão ou o oposto).
+ * Sem voto: aplica o clicado. Assim Concordo→Discordo vai 6→5, não 6→4.
+ *
+ * @param {1 | -1 | null | undefined} anterior
+ * @param {1 | -1} clicado
+ * @returns {1 | -1 | 0}
+ */
+export function proximoVotoPraca(anterior, clicado) {
+  if (anterior === 1 || anterior === -1) return 0
+  return clicado
 }
 
 export const LIMIAR_RANKING_PRACA = 5
@@ -297,6 +358,60 @@ export function parseOrdemTopico(valor) {
   return 'em_alta'
 }
 
+/**
+ * Notícias defaultam em Mais vistos (visitas) — o fórum defaulta em alta.
+ * @param {string | undefined} valor
+ * @returns {'em_alta' | 'acessados' | 'recentes'}
+ */
+export function parseOrdemNoticia(valor) {
+  if (valor === 'em_alta' || valor === 'acessados' || valor === 'recentes') return valor
+  return 'acessados'
+}
+
+/**
+ * Quem publica notícia precisa de um canal oficial da torcida/unidade
+ * ou de um canal verificado de portal de notícias (integração futura).
+ *
+ * @param {{
+ *   tipo?: string
+ *   canalOficial?: boolean
+ *   portalNoticiasVerificado?: boolean
+ * } | null | undefined} canal
+ */
+export function canalElegivelParaNoticia(canal) {
+  if (!canal || canal.tipo !== 'CANAL') return false
+  return Boolean(canal.canalOficial || canal.portalNoticiasVerificado)
+}
+
+/**
+ * Reusa `rankTopicosHot`: PUBLICADO conta como VISIVEL; visitas entram no
+ * recorte `acessados` (orderBy), não neste score.
+ *
+ * @template {{
+ *   status?: string
+ *   fixado?: boolean
+ *   gostei: number
+ *   naoGostei: number
+ *   respostasCount?: number
+ *   criadoEm: Date | string
+ *   atualizadoEm?: Date | string
+ *   midiaUrls?: string[]
+ * }} T
+ * @param {T[]} itens
+ * @param {Date} [agora]
+ * @returns {T[]}
+ */
+export function rankNoticiasHot(itens, agora = new Date()) {
+  return rankTopicosHot(
+    itens.map((n) => ({
+      ...n,
+      status: n.status === 'PUBLICADO' ? 'VISIVEL' : n.status,
+      respostasCount: n.respostasCount ?? 0,
+    })),
+    agora,
+  )
+}
+
 export function parseJanelaRanking(valor) {
   if (valor === 'semana') return 'semana'
   return 'geral'
@@ -376,22 +491,194 @@ export const responderTopicoSchema = z.object({
 })
 
 export const votarPracaSchema = z.object({
-  alvoTipo: z.enum(['ARTIGO', 'NOTICIA', 'TOPICO', 'RESPOSTA']),
+  alvoTipo: z.enum(['ARTIGO', 'NOTICIA', 'TOPICO', 'RESPOSTA', 'COMENTARIO']),
   alvoId: z.string().min(1),
-  valor: z.union([z.literal(1), z.literal(-1)]),
+  valor: z.union([z.literal(1), z.literal(-1), z.literal(0)]),
 })
 
 export const comentarPracaSchema = z.object({
   alvoTipo: z.enum(['ARTIGO', 'NOTICIA']),
   alvoId: z.string().min(1),
   conteudo: z.string().trim().min(1).max(PRACA_COMENTARIO_MAX),
+  parentId: z.string().min(1).optional(),
 })
+
+/**
+ * Comentários de primeiro nível: saldo de apoios (gostei − naoGostei), depois recência.
+ *
+ * @template {{ gostei: number, naoGostei: number, criadoEm: Date | string }} T
+ * @param {T[]} comentarios
+ * @returns {T[]}
+ */
+export function rankComentariosPraca(comentarios) {
+  return [...comentarios].sort((a, b) => {
+    const sa = contagemExibidaVotoPraca(a.gostei, a.naoGostei)
+    const sb = contagemExibidaVotoPraca(b.gostei, b.naoGostei)
+    if (sb !== sa) return sb - sa
+    const ta = a.criadoEm instanceof Date ? a.criadoEm : new Date(a.criadoEm)
+    const tb = b.criadoEm instanceof Date ? b.criadoEm : new Date(b.criadoEm)
+    return tb.getTime() - ta.getTime()
+  })
+}
 
 export const publicarArtigoSchema = z.object({
   titulo: z.string().trim().min(3).max(ARTIGO_TITULO_MAX),
   resumo: z.string().trim().max(ARTIGO_RESUMO_MAX).optional(),
   corpo: z.string().trim().min(1).max(ARTIGO_CORPO_MAX),
   capaUrl: z.string().url().max(500).optional(),
+})
+
+/** Composer de comunicado reusado na praça de notícias (título + corpo + mídia). */
+export const publicarArtigoComposerSchema = z.object({
+  titulo: z.string().trim().min(3).max(ARTIGO_TITULO_MAX),
+  corpo: z.string().trim().min(1).max(ARTIGO_CORPO_MAX),
+  midias: z.array(z.string().url().max(500)).max(10).optional(),
+})
+
+const EMBED_HOST_RE = /youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|tiktok\.com/i
+const VIDEO_URL_RE = /\/video\/upload|\.(?:mp4|webm|mov|m4v)(?:\?|$)/i
+
+/**
+ * @param {string | null | undefined} url
+ * @returns {'imagem' | 'video' | 'embed' | null}
+ */
+export function tipoBlocoDeUrl(url) {
+  const u = String(url ?? '').trim()
+  if (!u) return null
+  if (EMBED_HOST_RE.test(u)) return 'embed'
+  if (VIDEO_URL_RE.test(u)) return 'video'
+  return 'imagem'
+}
+
+/**
+ * @param {unknown} valor
+ * @param {number} [max]
+ */
+function urlHttpArtigo(valor, max = 500) {
+  const u = String(valor ?? '').trim()
+  if (!u || u.length > max) return null
+  try {
+    const parsed = new URL(u)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {{ tipo: 'texto', texto: string } | { tipo: 'imagem' | 'video' | 'embed', url: string, legenda?: string } | null}
+ */
+export function parseArtigoBloco(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const item = /** @type {Record<string, unknown>} */ (raw)
+  if (item.tipo === 'texto') {
+    const texto = String(item.texto ?? '').trim()
+    if (!texto || texto.length > ARTIGO_BLOCO_TEXTO_MAX) return null
+    return { tipo: 'texto', texto }
+  }
+  if (item.tipo === 'imagem' || item.tipo === 'video' || item.tipo === 'embed') {
+    const url = urlHttpArtigo(item.url)
+    if (!url) return null
+    const tipo = tipoBlocoDeUrl(url) ?? item.tipo
+    const legenda = String(item.legenda ?? '')
+      .trim()
+      .slice(0, ARTIGO_BLOCO_LEGENDA_MAX)
+    if (tipo === 'embed') return { tipo: 'embed', url }
+    return legenda ? { tipo, url, legenda } : { tipo, url }
+  }
+  return null
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {NonNullable<ReturnType<typeof parseArtigoBloco>>[]}
+ */
+export function parseArtigoBlocos(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  for (const item of raw) {
+    if (out.length >= ARTIGO_BLOCOS_MAX) break
+    const bloco = parseArtigoBloco(item)
+    if (bloco) out.push(bloco)
+  }
+  return out
+}
+
+/**
+ * Deriva os campos densos (lista, busca, capa) a partir dos blocos.
+ *
+ * @param {ReturnType<typeof parseArtigoBlocos>} blocos
+ */
+export function flattenArtigoBlocos(blocos) {
+  const textos = []
+  const midiaUrls = []
+  let capaUrl = /** @type {string | null} */ (null)
+  for (const bloco of blocos) {
+    if (bloco.tipo === 'texto') {
+      textos.push(bloco.texto)
+      continue
+    }
+    midiaUrls.push(bloco.url)
+    if (!capaUrl && bloco.tipo === 'imagem') capaUrl = bloco.url
+  }
+  if (!capaUrl) capaUrl = midiaUrls[0] ?? null
+  const corpo = textos.join('\n\n').trim().slice(0, ARTIGO_CORPO_MAX)
+  const primeiro = textos[0] ?? ''
+  const resumo =
+    !primeiro
+      ? null
+      : primeiro.length <= ARTIGO_RESUMO_MAX
+        ? primeiro
+        : `${primeiro.slice(0, Math.max(1, ARTIGO_RESUMO_MAX - 1))}…`
+  return { corpo: corpo || ' ', midiaUrls, capaUrl, resumo }
+}
+
+/**
+ * Artigo antigo (só corpo + URLs) vira a mesma sequência da leitura em blocos.
+ *
+ * @param {string | null | undefined} corpo
+ * @param {string[] | null | undefined} midiaUrls
+ */
+export function blocosDeArtigoLegado(corpo, midiaUrls) {
+  /** @type {ReturnType<typeof parseArtigoBlocos>} */
+  const blocos = []
+  for (const url of midiaUrls ?? []) {
+    const tipo = tipoBlocoDeUrl(url)
+    if (tipo) blocos.push(tipo === 'embed' ? { tipo, url } : { tipo, url })
+  }
+  const texto = String(corpo ?? '').trim()
+  if (texto && texto !== ' ') blocos.push({ tipo: 'texto', texto })
+  return blocos
+}
+
+export const artigoBlocoSchema = z.discriminatedUnion('tipo', [
+  z.object({
+    tipo: z.literal('texto'),
+    texto: z.string().trim().min(1).max(ARTIGO_BLOCO_TEXTO_MAX),
+  }),
+  z.object({
+    tipo: z.literal('imagem'),
+    url: z.string().url().max(500),
+    legenda: z.string().trim().max(ARTIGO_BLOCO_LEGENDA_MAX).optional(),
+  }),
+  z.object({
+    tipo: z.literal('video'),
+    url: z.string().url().max(500),
+    legenda: z.string().trim().max(ARTIGO_BLOCO_LEGENDA_MAX).optional(),
+  }),
+  z.object({
+    tipo: z.literal('embed'),
+    url: z.string().url().max(500),
+  }),
+])
+
+/** História em blocos — texto, foto, vídeo e embed intercalados. */
+export const publicarArtigoHistoriaSchema = z.object({
+  titulo: z.string().trim().min(3).max(ARTIGO_TITULO_MAX),
+  resumo: z.string().trim().max(ARTIGO_RESUMO_MAX).optional(),
+  blocos: z.array(artigoBlocoSchema).min(1).max(ARTIGO_BLOCOS_MAX),
 })
 
 export const concederFonteVerificadaSchema = z.object({

@@ -1,17 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
-import {
-  Loader2,
-  Check,
-  X,
-  ShieldCheck,
-  UserRound,
-  ArrowLeft,
-  Save,
-  Pencil,
-  Trash2,
-} from 'lucide-react'
+import { ArrowLeft, Check, Pencil, Save, ShieldCheck, Trash2, UserRound, X } from 'lucide-react'
 import {
   calculateEffectivePermissions,
   rotuloCargoSistema,
@@ -30,6 +20,7 @@ import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-chang
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { AvatarFoto } from '@/components/media/avatar-foto'
+import { AppButton } from '@/components/ui/button'
 
 export interface AccessRoleOpt {
   id: string
@@ -565,14 +556,15 @@ export function AccessUserPanel({
     >
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-6">
         {!embutido && (
-          <button
+          <AppButton
+            variant="none"
+            icon={ArrowLeft}
             type="button"
             onClick={() => void handleClose()}
             className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
             Voltar à lista
-          </button>
+          </AppButton>
         )}
         <div className="flex items-start gap-3 sm:gap-4">
           {!embutido &&
@@ -813,28 +805,27 @@ export function AccessUserPanel({
       {(() => {
         const acoes = (
           <>
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={() => void handleClose()}
               disabled={pending || salvandoPerfil}
               className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
-              <X className="h-3.5 w-3.5" />
               Cancelar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
+              variant="primary"
+              icon={Check}
+              loading={pending || salvandoPerfil}
               type="submit"
               form={formId}
               disabled={pending || salvandoPerfil}
-              className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="gap-2 rounded-lg px-4 py-2 text-xs font-semibold"
             >
-              {pending || salvandoPerfil ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="h-3.5 w-3.5" />
-              )}
               Salvar acesso
-            </button>
+            </AppButton>
           </>
         )
 
@@ -921,27 +912,27 @@ export function AccessUserPanel({
               />
             </label>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={ArrowLeft}
                 type="button"
                 disabled={salvandoPerfil}
                 onClick={() => setModalNovoPerfil(false)}
                 className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-60"
               >
                 Voltar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="primary"
+                icon={Save}
+                loading={salvandoPerfil}
                 type="button"
                 disabled={salvandoPerfil || novoPerfilNome.trim().length < 2}
                 onClick={() => void handleConfirmarNovoPerfilESalvar()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on disabled:opacity-60"
+                className="gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
               >
-                {salvandoPerfil ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
                 Criar perfil e salvar
-              </button>
+              </AppButton>
             </div>
         </AppModalBody>
       </AppModal>
@@ -1085,14 +1076,15 @@ function PerfilManagePanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
+        <AppButton
+          variant="none"
+          icon={ArrowLeft}
           type="button"
           onClick={() => void handleVoltar()}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
           Voltar aos perfis
-        </button>
+        </AppButton>
         <button
           type="button"
           onClick={onToggleAtribuicao}
@@ -1219,24 +1211,27 @@ function PerfilManagePanel({
 
       {!somenteLeitura && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
-          <button
+          <AppButton
+            variant="none"
+            icon={Trash2}
             type="button"
             disabled={pending}
             onClick={() => void excluir()}
             className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/5 disabled:opacity-60"
           >
-            <Trash2 className="h-3.5 w-3.5" />
             Excluir perfil
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="primary"
+            icon={Save}
+            loading={pending}
             type="button"
             disabled={pending || nome.trim().length < 2}
             onClick={() => void salvar()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-primary-on disabled:opacity-60"
+            className="gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
           >
-            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Salvar perfil
-          </button>
+          </AppButton>
         </div>
       )}
     </div>
@@ -1294,13 +1289,15 @@ function DepartamentoAreasPanel({
                 Visualizar permissões · {detalhe.nome}
               </h3>
             </div>
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={() => setDetalheId(null)}
               className="rounded-lg px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
             >
               Fechar
-            </button>
+            </AppButton>
           </div>
           <AccessPermissionCompare
             permissionsMembro={detalhe.permissions}
@@ -1439,14 +1436,15 @@ export function AccessUserNotFound({ onBack }: { onBack: () => void }) {
       <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
         Este link aponta para alguém que não está mais nesta torcida (ou o id é inválido).
       </p>
-      <button
+      <AppButton
+        variant="primary"
+        icon={ShieldCheck}
         type="button"
         onClick={onBack}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-primary-on"
+        className="mt-5 gap-2 rounded-lg px-4 py-2 text-sm font-medium"
       >
-        <ShieldCheck className="h-4 w-4" />
         Voltar à lista
-      </button>
+      </AppButton>
     </div>
   )
 }

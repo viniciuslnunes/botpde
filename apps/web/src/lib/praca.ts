@@ -1,3 +1,7 @@
+import {
+  extrairMetaArtigoBlocos,
+  midiaPrincipalDeUrls,
+} from '@/lib/noticias-artigo-meta'
 import { db } from '@torcida/db'
 import type {
   ArtigoPortal,
@@ -24,13 +28,17 @@ import {
   LIMIAR_RANKING_PRACA,
   whereTopicosNaListagem,
   rankTopicosHot,
+  rankNoticiasHot,
   podeVerStatusTopico,
   prioridadeStatusListagem,
+  deltaContagemVotoPraca,
+  canalElegivelParaNoticia,
 } from '@torcida/types'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import type { ContextoComunidadePortal } from '@/lib/comunidade-contexto'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { ExpectedError } from '@/lib/expected-error'
+import { idDeRotaPraca, idsCandidatosRotaPraca } from '@/lib/praca-rota-id'
 
 export type AncoraPraca = { tenantId: string | null; afiliacaoId: string | null }
 
@@ -58,6 +66,42 @@ export type ArtigoPortalItem = {
   origem: 'OFICIAL' | 'VERIFICADA'
   publicadoEm: Date | null
   autorNome: string | null
+}
+
+export type CanalElegivelNoticia = {
+  id: string
+  nome: string | null
+  canalOficial: boolean
+  portalNoticiasVerificado: boolean
+}
+
+export type NoticiaRelacionada = {
+  id: string
+  titulo: string
+}
+
+export type NoticiaPracaItem = {
+  kind: 'artigo' | 'noticia'
+  id: string
+  titulo: string
+  resumo: string | null
+  corpo: string | null
+  midiaUrls: string[]
+  /** Primeira mídia — define capa e carrossel de vídeos curtos. */
+  midiaPrincipal: 'imagem' | 'video' | 'embed' | null
+  duracaoSegundos: number | null
+  relacionados: NoticiaRelacionada[]
+  origem: 'imprensa' | 'oficial' | 'verificada'
+  publicadoEm: Date | null
+  criadoEm: Date
+  visitas: number
+  gostei: number
+  naoGostei: number
+  fixado: boolean
+  autorId: string | null
+  autorNome: string | null
+  fonte: string | null
+  url: string | null
 }
 
 export type ForumTopicoStatus = 'PENDENTE' | 'VISIVEL' | 'REJEITADO' | 'OCULTO' | 'REMOVIDO'
@@ -121,6 +165,220 @@ export async function listarArtigosPortalDoTenant(tenantId: string): Promise<Art
     publicadoEm: a.publicadoEm,
     autorNome: a.autor.nome,
   }))
+}
+
+type CanalNoticiaRow = {
+  id: string
+  nome: string | null
+  tipo: string
+  canalOficial: boolean
+  portalNoticiasVerificado: boolean
+}
+
+/** Canal oficial da torcida/unidade, ou portal de notícias verificado (futuro). */
+export async function resolverCanalElegivelNoticia(
+  tenantId: string,
+): Promise<CanalElegivelNoticia | null> {
+  const canais: CanalNoticiaRow[] = await db.conversa.findMany({
+    where: {
+      tenantId,
+      tipo: 'CANAL',
+      OR: [{ canalOficial: true }, { portalNoticiasVerificado: true }],
+    },
+    orderBy: { criadoEm: 'asc' },
+    select: {
+      id: true,
+      nome: true,
+      tipo: true,
+      canalOficial: true,
+      portalNoticiasVerificado: true,
+    },
+  })
+  const elegiveis = canais.filter((c) => canalElegivelParaNoticia(c))
+  const oficial = elegiveis.find((c) => c.canalOficial)
+  const escolhido = oficial ?? elegiveis[0]
+  if (!escolhido) return null
+  return {
+    id: escolhido.id,
+    nome: escolhido.nome,
+    canalOficial: escolhido.canalOficial,
+    portalNoticiasVerificado: escolhido.portalNoticiasVerificado,
+  }
+}
+
+export async function podePublicarNoticiaNoTenant(
+  userId: string,
+  tenantId: string,
+): Promise<{
+  pode: boolean
+  canal: CanalElegivelNoticia | null
+  oficial: boolean
+  podePessoa: boolean
+}> {
+  const [{ rolePermissions, overrides }, canal] = await Promise.all([
+    getUserPermissionsInTenant(userId, tenantId),
+    resolverCanalElegivelNoticia(tenantId),
+  ])
+  const efetivas = calculateEffectivePermissions(rolePermissions, overrides)
+  const oficial = hasPermission(efetivas, PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+  const podePessoa = oficial ? true : await podePublicarArtigoNoTenant(userId, tenantId)
+  return {
+    pode: Boolean(podePessoa && canal),
+    canal,
+    oficial,
+    podePessoa,
+  }
+}
+
+type ArtigoListRow = {
+  id: string
+  titulo: string
+  resumo: string | null
+  midiaUrls: string[]
+  capaUrl: string | null
+  blocos: unknown
+  origem: 'OFICIAL' | 'VERIFICADA'
+  publicadoEm: Date | null
+  criadoEm: Date
+  visitas: number
+  gostei: number
+  naoGostei: number
+  fixado: boolean
+  autorId: string
+  autor: { nome: string | null }
+}
+
+type ImprensaListRow = {
+  id: string
+  titulo: string
+  resumo: string | null
+  fonte: string
+  url: string
+  embedThumbnail: string | null
+  publicadoEm: Date | null
+  criadoEm: Date
+  visitas: number
+}
+
+function mapArtigoParaItem(a: ArtigoListRow): NoticiaPracaItem {
+  const capa = a.capaUrl && !a.midiaUrls.includes(a.capaUrl) ? [a.capaUrl] : []
+  const midiaUrls = [...capa, ...a.midiaUrls]
+  const meta = extrairMetaArtigoBlocos(a.blocos)
+  return {
+    kind: 'artigo',
+    id: a.id,
+    titulo: a.titulo,
+    resumo: a.resumo,
+    corpo: a.resumo,
+    midiaUrls,
+    midiaPrincipal: midiaPrincipalDeUrls(midiaUrls),
+    duracaoSegundos: meta.duracaoSegundos,
+    relacionados: meta.relacionados,
+    origem: a.origem === 'OFICIAL' ? 'oficial' : 'verificada',
+    publicadoEm: a.publicadoEm,
+    criadoEm: a.criadoEm,
+    visitas: a.visitas,
+    gostei: a.gostei,
+    naoGostei: a.naoGostei,
+    fixado: a.fixado,
+    autorId: a.autorId,
+    autorNome: a.autor.nome,
+    fonte: null,
+    url: null,
+  }
+}
+
+function mapImprensaParaItem(n: ImprensaListRow): NoticiaPracaItem {
+  const midiaUrls = n.embedThumbnail ? [n.embedThumbnail] : []
+  return {
+    kind: 'noticia',
+    id: n.id,
+    titulo: n.titulo,
+    resumo: n.resumo,
+    corpo: null,
+    midiaUrls,
+    midiaPrincipal: midiaPrincipalDeUrls(midiaUrls),
+    duracaoSegundos: null,
+    relacionados: [],
+    origem: 'imprensa',
+    publicadoEm: n.publicadoEm,
+    criadoEm: n.criadoEm,
+    visitas: n.visitas,
+    gostei: 0,
+    naoGostei: 0,
+    fixado: false,
+    autorId: null,
+    autorNome: null,
+    fonte: n.fonte,
+    url: n.url,
+  }
+}
+
+function ordenarNoticiasPraca(
+  itens: NoticiaPracaItem[],
+  ordem: 'em_alta' | 'acessados' | 'recentes',
+): NoticiaPracaItem[] {
+  if (ordem === 'em_alta') {
+    return rankNoticiasHot(
+      itens.map((n) => ({ ...n, respostasCount: 0, status: 'VISIVEL' as const })),
+    )
+  }
+  return [...itens].sort((a, b) => {
+    if (Boolean(a.fixado) !== Boolean(b.fixado)) return a.fixado ? -1 : 1
+    if (ordem === 'acessados' && a.visitas !== b.visitas) return b.visitas - a.visitas
+    const ta = (a.publicadoEm ?? a.criadoEm).getTime()
+    const tb = (b.publicadoEm ?? b.criadoEm).getTime()
+    return tb - ta
+  })
+}
+
+export async function listarNoticiasDaPraca(
+  escopo: EscopoComunidade,
+  ancora: AncoraPraca,
+  ordem: 'em_alta' | 'acessados' | 'recentes' = 'acessados',
+): Promise<NoticiaPracaItem[]> {
+  if (escopo === 'nacional' && ancora.afiliacaoId) {
+    const noticias: ImprensaListRow[] = await db.noticia.findMany({
+      where: { afiliacaoId: ancora.afiliacaoId, status: 'APROVADA' },
+      take: 80,
+      select: {
+        id: true,
+        titulo: true,
+        resumo: true,
+        fonte: true,
+        url: true,
+        embedThumbnail: true,
+        publicadoEm: true,
+        criadoEm: true,
+        visitas: true,
+      },
+    })
+    return ordenarNoticiasPraca(noticias.map(mapImprensaParaItem), ordem).slice(0, 50)
+  }
+
+  if (!ancora.tenantId) return []
+  const artigos: ArtigoListRow[] = await db.artigoPortal.findMany({
+    where: { tenantId: ancora.tenantId, status: 'PUBLICADO' },
+    take: 80,
+    select: {
+      id: true,
+      titulo: true,
+      resumo: true,
+      midiaUrls: true,
+      capaUrl: true,
+      blocos: true,
+      origem: true,
+      publicadoEm: true,
+      criadoEm: true,
+      visitas: true,
+      gostei: true,
+      naoGostei: true,
+      fixado: true,
+      autorId: true,
+      autor: { select: { nome: true } },
+    },
+  })
+  return ordenarNoticiasPraca(artigos.map(mapArtigoParaItem), ordem).slice(0, 50)
 }
 
 type TopicoRow = {
@@ -483,6 +741,8 @@ export type NoticiaPracaDetalhe = {
   url: string
   fonte: string
   publicadoEm: Date | null
+  visitas: number
+  embedThumbnail: string | null
 }
 
 export type ArtigoPracaDetalhe = {
@@ -491,10 +751,18 @@ export type ArtigoPracaDetalhe = {
   titulo: string
   resumo: string | null
   corpo: string
+  blocos: unknown
+  midiaUrls: string[]
   origem: 'OFICIAL' | 'VERIFICADA'
   publicadoEm: Date | null
   autorNome: string | null
+  autorAvatarUrl: string | null
+  autorId: string
   tenantId: string
+  visitas: number
+  gostei: number
+  naoGostei: number
+  fixado: boolean
 }
 
 export async function resolverNoticiaOuArtigo(
@@ -502,6 +770,7 @@ export async function resolverNoticiaOuArtigo(
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
 ): Promise<NoticiaPracaDetalhe | ArtigoPracaDetalhe | null> {
+  const candidatos = idsCandidatosRotaPraca(id)
   if (escopo === 'nacional' && ancora.afiliacaoId) {
     const n: {
       id: string
@@ -510,10 +779,12 @@ export async function resolverNoticiaOuArtigo(
       url: string
       fonte: string
       publicadoEm: Date | null
+      visitas: number
+      embedThumbnail: string | null
       afiliacaoId: string
       status: string
-    } | null = await db.noticia.findUnique({
-      where: { id },
+    } | null = await db.noticia.findFirst({
+      where: { id: { in: candidatos }, status: 'APROVADA', afiliacaoId: ancora.afiliacaoId },
       select: {
         id: true,
         titulo: true,
@@ -521,22 +792,24 @@ export async function resolverNoticiaOuArtigo(
         url: true,
         fonte: true,
         publicadoEm: true,
+        visitas: true,
+        embedThumbnail: true,
         afiliacaoId: true,
         status: true,
       },
     })
-    if (n && n.status === 'APROVADA' && n.afiliacaoId === ancora.afiliacaoId) {
-      return {
-        kind: 'noticia',
-        id: n.id,
-        titulo: n.titulo,
-        resumo: n.resumo,
-        url: n.url,
-        fonte: n.fonte,
-        publicadoEm: n.publicadoEm,
-      }
+    if (!n) return null
+    return {
+      kind: 'noticia',
+      id: n.id,
+      titulo: n.titulo,
+      resumo: n.resumo,
+      url: n.url,
+      fonte: n.fonte,
+      publicadoEm: n.publicadoEm,
+      visitas: n.visitas,
+      embedThumbnail: n.embedThumbnail,
     }
-    return null
   }
 
   if (!ancora.tenantId) return null
@@ -545,37 +818,62 @@ export async function resolverNoticiaOuArtigo(
     titulo: string
     resumo: string | null
     corpo: string
+    blocos: unknown
+    midiaUrls: string[]
+    capaUrl: string | null
     origem: 'OFICIAL' | 'VERIFICADA'
     publicadoEm: Date | null
     tenantId: string
     status: string
-    autor: { nome: string | null }
-  } | null = await db.artigoPortal.findUnique({
-    where: { id },
+    visitas: number
+    gostei: number
+    naoGostei: number
+    fixado: boolean
+    autorId: string
+    autor: { nome: string | null; avatarUrl: string | null }
+  } | null = await db.artigoPortal.findFirst({
+    where: { id: { in: candidatos }, status: 'PUBLICADO' },
     select: {
       id: true,
       titulo: true,
       resumo: true,
       corpo: true,
+      blocos: true,
+      midiaUrls: true,
+      capaUrl: true,
       origem: true,
       publicadoEm: true,
       tenantId: true,
       status: true,
-      autor: { select: { nome: true } },
+      visitas: true,
+      gostei: true,
+      naoGostei: true,
+      fixado: true,
+      autorId: true,
+      autor: { select: { nome: true, avatarUrl: true } },
     },
   })
-  if (!a || a.status !== 'PUBLICADO') return null
+  if (!a) return null
   if (!podeVerArtigoNoEscopo(escopo, ancora, a.tenantId)) return null
+  const capa = a.capaUrl && !a.midiaUrls.includes(a.capaUrl) ? [a.capaUrl] : []
   return {
     kind: 'artigo',
     id: a.id,
     titulo: a.titulo,
     resumo: a.resumo,
     corpo: a.corpo,
+    blocos: a.blocos,
+    midiaUrls: [...capa, ...a.midiaUrls],
     origem: a.origem,
     publicadoEm: a.publicadoEm,
     autorNome: a.autor.nome,
+    autorAvatarUrl: a.autor.avatarUrl,
+    autorId: a.autorId,
     tenantId: a.tenantId,
+    visitas: a.visitas,
+    gostei: a.gostei,
+    naoGostei: a.naoGostei,
+    fixado: a.fixado,
   }
 }
 
@@ -592,77 +890,94 @@ export type ForumTopicoDetalhe = ForumTopicoItem & {
   autorAvatarUrl: string | null
   autorNickname: string | null
   respostas: ForumRespostaItem[]
+  meuVoto: 1 | -1 | null
 }
 
 export async function getTopicoDetalhe(
-  id: string,
+  idRaw: string,
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
   viewer: { userId: string; podeModerar: boolean },
 ): Promise<ForumTopicoDetalhe | null> {
-  const t: {
-    id: string
-    titulo: string
-    corpo: string
-    midiaUrls: string[]
-    visitas: number
-    respostasCount: number
-    gostei: number
-    naoGostei: number
-    fixado: boolean
-    status: ForumTopicoStatus
-    rejeitadoMotivo: string | null
-    criadoEm: Date
-    atualizadoEm: Date
-    autorId: string
-    escopo: 'CLUBE' | 'TORCIDA'
-    tenantId: string | null
-    afiliacaoId: string | null
-    autor: { nome: string | null; nickname: string | null; avatarUrl: string | null }
-    respostas: {
+  const id = idDeRotaPraca(idRaw)
+  const [t, voto]: [
+    {
       id: string
-      conteudo: string
+      titulo: string
+      corpo: string
+      midiaUrls: string[]
+      visitas: number
+      respostasCount: number
+      gostei: number
+      naoGostei: number
+      fixado: boolean
+      status: ForumTopicoStatus
+      rejeitadoMotivo: string | null
       criadoEm: Date
-      oculto: boolean
+      atualizadoEm: Date
       autorId: string
-      autor: { nome: string | null }
-    }[]
-  } | null = await db.forumTopico.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      titulo: true,
-      corpo: true,
-      midiaUrls: true,
-      visitas: true,
-      respostasCount: true,
-      gostei: true,
-      naoGostei: true,
-      fixado: true,
-      status: true,
-      rejeitadoMotivo: true,
-      criadoEm: true,
-      atualizadoEm: true,
-      autorId: true,
-      escopo: true,
-      tenantId: true,
-      afiliacaoId: true,
-      autor: { select: { nome: true, nickname: true, avatarUrl: true } },
+      escopo: 'CLUBE' | 'TORCIDA'
+      tenantId: string | null
+      afiliacaoId: string | null
+      autor: { nome: string | null; nickname: string | null; avatarUrl: string | null }
       respostas: {
-        where: viewer.podeModerar ? { parentId: null } : { oculto: false, parentId: null },
-        orderBy: { criadoEm: 'asc' },
-        take: 80,
-        select: {
-          id: true,
-          conteudo: true,
-          criadoEm: true,
-          oculto: true,
-          autorId: true,
-          autor: { select: { nome: true } },
+        id: string
+        conteudo: string
+        criadoEm: Date
+        oculto: boolean
+        autorId: string
+        autor: { nome: string | null }
+      }[]
+    } | null,
+    { valor: number } | null,
+  ] = await Promise.all([
+    db.forumTopico.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        titulo: true,
+        corpo: true,
+        midiaUrls: true,
+        visitas: true,
+        respostasCount: true,
+        gostei: true,
+        naoGostei: true,
+        fixado: true,
+        status: true,
+        rejeitadoMotivo: true,
+        criadoEm: true,
+        atualizadoEm: true,
+        autorId: true,
+        escopo: true,
+        tenantId: true,
+        afiliacaoId: true,
+        autor: { select: { nome: true, nickname: true, avatarUrl: true } },
+        respostas: {
+          where: viewer.podeModerar ? { parentId: null } : { oculto: false, parentId: null },
+          orderBy: { criadoEm: 'asc' },
+          take: 80,
+          select: {
+            id: true,
+            conteudo: true,
+            criadoEm: true,
+            oculto: true,
+            autorId: true,
+            autor: { select: { nome: true } },
+          },
         },
       },
-    },
-  })
+    }),
+    db.pracaVoto.findUnique({
+      where: {
+        userId_alvoTipo_alvoId: {
+          userId: viewer.userId,
+          alvoTipo: 'TOPICO',
+          alvoId: id,
+        },
+      },
+      select: { valor: true },
+    }),
+  ])
   if (!t) return null
   if (!podeVerTopicoNoEscopo(escopo, ancora, t)) return null
   if (
@@ -692,6 +1007,7 @@ export async function getTopicoDetalhe(
     autorAvatarUrl: t.autor.avatarUrl,
     autorNickname: t.autor.nickname,
     autorId: t.autorId,
+    meuVoto: voto?.valor === 1 || voto?.valor === -1 ? (voto.valor as 1 | -1) : null,
     respostas: t.respostas.map((r) => ({
       id: r.id,
       conteudo: r.conteudo,
@@ -709,36 +1025,69 @@ export type PracaComentarioItem = {
   criadoEm: Date
   autorId: string
   autorNome: string | null
+  autorAvatarUrl: string | null
+  parentId: string | null
+  gostei: number
+  naoGostei: number
+  meuVoto: 1 | -1 | null
 }
 
 export async function listarComentariosPraca(
   alvoTipo: 'ARTIGO' | 'NOTICIA',
   alvoId: string,
+  viewerId?: string,
 ): Promise<PracaComentarioItem[]> {
   const rows: {
     id: string
     conteudo: string
     criadoEm: Date
     autorId: string
-    autor: { nome: string | null }
+    parentId: string | null
+    gostei: number
+    naoGostei: number
+    autor: { nome: string | null; avatarUrl: string | null }
   }[] = await db.pracaComentario.findMany({
     where: { alvoTipo, alvoId, oculto: false },
     orderBy: { criadoEm: 'asc' },
-    take: 40,
+    take: 80,
     select: {
       id: true,
       conteudo: true,
       criadoEm: true,
       autorId: true,
-      autor: { select: { nome: true } },
+      parentId: true,
+      gostei: true,
+      naoGostei: true,
+      autor: { select: { nome: true, avatarUrl: true } },
     },
   })
+
+  const votosPorId = new Map<string, 1 | -1>()
+  if (viewerId && rows.length > 0) {
+    const votos: { alvoId: string; valor: number }[] = await db.pracaVoto.findMany({
+      where: {
+        userId: viewerId,
+        alvoTipo: 'COMENTARIO',
+        alvoId: { in: rows.map((r) => r.id) },
+      },
+      select: { alvoId: true, valor: true },
+    })
+    for (const v of votos) {
+      if (v.valor === 1 || v.valor === -1) votosPorId.set(v.alvoId, v.valor)
+    }
+  }
+
   return rows.map((c) => ({
     id: c.id,
     conteudo: c.conteudo,
     criadoEm: c.criadoEm,
     autorId: c.autorId,
     autorNome: c.autor.nome,
+    autorAvatarUrl: c.autor.avatarUrl,
+    parentId: c.parentId,
+    gostei: c.gostei,
+    naoGostei: c.naoGostei,
+    meuVoto: votosPorId.get(c.id) ?? null,
   }))
 }
 
@@ -915,12 +1264,39 @@ export async function aplicarDeltaVotoTopico(
   valorNovo: number,
   valorAntigo: number | null,
 ): Promise<void> {
-  const gosteiDelta =
-    (valorNovo === 1 ? 1 : 0) - (valorAntigo === 1 ? 1 : 0)
-  const naoDelta =
-    (valorNovo === -1 ? 1 : 0) - (valorAntigo === -1 ? 1 : 0)
+  const novo: 1 | -1 | 0 = valorNovo === 1 || valorNovo === -1 ? valorNovo : 0
+  const antigo: 1 | -1 | 0 | null = valorAntigo === 1 || valorAntigo === -1 ? valorAntigo : null
+  const { gostei: gosteiDelta, naoGostei: naoDelta } = deltaContagemVotoPraca(antigo, novo)
   await db.forumTopico.update({
     where: { id: topicoId },
+    data: { gostei: { increment: gosteiDelta }, naoGostei: { increment: naoDelta } },
+  })
+}
+
+export async function aplicarDeltaVotoArtigo(
+  artigoId: string,
+  valorNovo: number,
+  valorAntigo: number | null,
+): Promise<void> {
+  const novo: 1 | -1 | 0 = valorNovo === 1 || valorNovo === -1 ? valorNovo : 0
+  const antigo: 1 | -1 | 0 | null = valorAntigo === 1 || valorAntigo === -1 ? valorAntigo : null
+  const { gostei: gosteiDelta, naoGostei: naoDelta } = deltaContagemVotoPraca(antigo, novo)
+  await db.artigoPortal.update({
+    where: { id: artigoId },
+    data: { gostei: { increment: gosteiDelta }, naoGostei: { increment: naoDelta } },
+  })
+}
+
+export async function aplicarDeltaVotoComentario(
+  comentarioId: string,
+  valorNovo: number,
+  valorAntigo: number | null,
+): Promise<void> {
+  const novo: 1 | -1 | 0 = valorNovo === 1 || valorNovo === -1 ? valorNovo : 0
+  const antigo: 1 | -1 | 0 | null = valorAntigo === 1 || valorAntigo === -1 ? valorAntigo : null
+  const { gostei: gosteiDelta, naoGostei: naoDelta } = deltaContagemVotoPraca(antigo, novo)
+  await db.pracaComentario.update({
+    where: { id: comentarioId },
     data: { gostei: { increment: gosteiDelta }, naoGostei: { increment: naoDelta } },
   })
 }

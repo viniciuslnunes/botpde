@@ -2,12 +2,13 @@ import { contextoAdmin } from '@/lib/admin-modulos'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
-import { Newspaper } from 'lucide-react'
+import { Check, Newspaper, XCircle } from 'lucide-react'
 import { aprovarNoticia, rejeitarNoticia } from './actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Curadoria de Notícias' }
 
@@ -101,12 +102,14 @@ export default async function AdminNoticiasPage() {
                     cancelled: 'Aprovação cancelada.',
                   }}
                 >
-                  <button
+                  <AppButton
+                    variant="success"
+                    icon={Check}
                     type="submit"
-                    className="btn-success rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+                    className="rounded-lg px-3 py-2 text-sm font-medium"
                   >
                     Aprovar
-                  </button>
+                  </AppButton>
                 </AdminActionForm>
                 <AdminActionForm
                   action={rejeitarNoticia.bind(null, noticia.id)}
@@ -119,12 +122,14 @@ export default async function AdminNoticiasPage() {
                     cancelled: 'Rejeição cancelada.',
                   }}
                 >
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={XCircle}
                     type="submit"
                     className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >
                     Rejeitar
-                  </button>
+                  </AppButton>
                 </AdminActionForm>
                   </>
                 ) : null}

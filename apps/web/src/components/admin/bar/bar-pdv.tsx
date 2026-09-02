@@ -5,27 +5,7 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import {
-  ArrowLeft,
-  Banknote,
-  Beer,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Copy,
-  CreditCard,
-  LayoutGrid,
-  Loader2,
-  Minus,
-  NotebookPen,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  QrCode,
-  ReceiptText,
-  Search,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, Banknote, Beer, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard, Eye, LayoutGrid, Loader2, Minus, NotebookPen, PanelLeftClose, PanelLeftOpen, Play, Plus, QrCode, ReceiptText, RotateCcw, Save, Search, Trash2, Unlock, X } from 'lucide-react'
 import {
   LIMITE_COMANDA_PADRAO,
   METODO_PAGAMENTO_BAR_LABEL,
@@ -61,6 +41,7 @@ import type {
   BarProdutoSerializado,
   BarVendaSerializada,
 } from '@/lib/bar-serialize'
+import { AppButton } from '@/components/ui/button'
 
 /** Métodos do Pedido (venda rápida) e do fechamento de comanda — sem FIADO. */
 type Metodo = (typeof METODO_PAGAMENTO_QUITACAO_FIADO_BAR)[number]
@@ -1016,13 +997,15 @@ export function BarPdv({
             </h2>
           </div>
           {pedido.length > 0 && (
-            <button
+            <AppButton
+              variant="none"
+              icon={RotateCcw}
               type="button"
               onClick={limparPedido}
               className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-[rgb(var(--color-danger-fg))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.1)]"
             >
               Limpar
-            </button>
+            </AppButton>
           )}
         </div>
 
@@ -1095,15 +1078,16 @@ export function BarPdv({
                 ))}
               </select>
             </div>
-            <button
+            <AppButton
+              variant="none"
+              icon={Plus}
               type="button"
               disabled={!turnoAberto || pending}
               onClick={() => setModalAbrir(true)}
               className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-[rgb(var(--border))] px-2.5 text-xs font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
             >
-              <Plus className="h-3.5 w-3.5" />
               Abrir
-            </button>
+            </AppButton>
           </div>
         )}
       </div>
@@ -1122,7 +1106,9 @@ export function BarPdv({
                   )}
                 </span>
                 {podeGerir && (
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={Unlock}
                     type="button"
                     onClick={() => {
                       setNovoLimiteStr(
@@ -1133,7 +1119,7 @@ export function BarPdv({
                     className="text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Liberar
-                  </button>
+                  </AppButton>
                 )}
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border))]">
@@ -1288,6 +1274,9 @@ export function BarPdv({
       <div className="mt-2.5 shrink-0 space-y-2.5 border-t border-[rgb(var(--border))] pt-2.5">
         {painelModo === 'venda' && (
           <>
+            {/* lint-botoes: nao-e-acao — disclosure da secao de desconto; o
+                rotulo e o titulo do bloco e o chevron ja diz o que o clique
+                faz. */}
             <button
               type="button"
               onClick={() => setOpcoesAbertas((v) => !v)}
@@ -1409,7 +1398,9 @@ export function BarPdv({
                 <span className="tabular-nums opacity-90">· {formatarPreco(resumo.total)}</span>
               )}
             </button>
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               disabled={pending || !comandaAtiva || comandaAtiva.lancamentos.length === 0}
               onClick={abrirModalFechar}
@@ -1421,7 +1412,7 @@ export function BarPdv({
                   · {formatarPreco(comandaAtiva.total)}
                 </span>
               )}
-            </button>
+            </AppButton>
           </div>
         ) : (
           <button
@@ -1483,6 +1474,9 @@ export function BarPdv({
         </>
       ) : (
         <button
+          // lint-botoes: nao-e-acao — trilho vertical colapsado da sidebar; o
+          // texto e escrito em writing-mode vertical e serve de etiqueta da
+          // faixa, nao de rotulo de botao.
           type="button"
           onClick={() => setTurnoSidebarStored(true)}
           aria-label="Expandir trilha de turno"
@@ -1542,14 +1536,16 @@ export function BarPdv({
           description={formatarPreco(ultimoTotal)}
           className="w-full max-w-md rounded-3xl border border-[rgb(var(--color-success)_/_0.35)] bg-[rgb(var(--color-success)_/_0.08)] p-8 text-center"
         >
-          <button
+          <AppButton
+            variant="primary"
+            icon={Plus}
             type="button"
             autoFocus
             onClick={novaVenda}
-            className="mt-6 inline-flex rounded-xl bg-[rgb(var(--primary))] px-6 py-3 text-sm font-bold text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-90"
+            className="mt-6 rounded-xl px-6 py-3 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
           >
             Nova venda
-          </button>
+          </AppButton>
         </MotionSuccessPanel>
       </div>
     )
@@ -1568,7 +1564,9 @@ export function BarPdv({
               {formatarPreco(pix.total)}
             </p>
           </div>
-          <button
+          <AppButton
+            variant="none"
+            icon={ArrowLeft}
             type="button"
             onClick={() => {
               setFase('venda')
@@ -1578,7 +1576,7 @@ export function BarPdv({
             className="rounded-full border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             Voltar ao PDV
-          </button>
+          </AppButton>
         </header>
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
           <div className="w-full max-w-md space-y-4 rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
@@ -1617,34 +1615,35 @@ export function BarPdv({
             </button>
 
             {mock && (
-              <button
+              <AppButton
+                variant="primary"
+                icon={CheckCircle2}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={confirmarMock}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-3 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+                className="flex w-full gap-2 rounded-xl px-4 py-3 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
               >
-                {pending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
                 Já paguei (mock)
-              </button>
+              </AppButton>
             )}
 
             {podeCancelar && pix.kind === 'venda' && (
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 disabled={pending}
                 onClick={cancelarPix}
                 className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-[rgb(var(--color-danger-fg))] transition-colors hover:bg-[rgb(var(--color-danger)_/_0.08)] disabled:opacity-60"
               >
-                <X className="h-4 w-4" />
                 Cancelar venda
-              </button>
+              </AppButton>
             )}
             {pix.kind === 'comanda' && (
-              <button
+              <AppButton
+                variant="none"
+                icon={ArrowLeft}
                 type="button"
                 onClick={() => {
                   setFase('venda')
@@ -1653,7 +1652,7 @@ export function BarPdv({
                 className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))]"
               >
                 Voltar sem confirmar
-              </button>
+              </AppButton>
             )}
           </div>
         </div>
@@ -1704,15 +1703,16 @@ export function BarPdv({
           </div>
         )}
 
-        <button
+        <AppButton
+          variant="none"
+          icon={Clock}
           type="button"
           onClick={() => setTurnoDrawerAberto(true)}
           className="inline-flex h-10 items-center gap-2 rounded-full border border-[rgb(var(--border))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] @[82rem]/pdv:hidden"
         >
-          <Clock className="h-4 w-4" />
           {turnoStatusDot}
           <span className="hidden @[48rem]/pdv:inline">Turno</span>
-        </button>
+        </AppButton>
 
         {pendentesTotal > 0 ? (
           <span
@@ -1964,14 +1964,16 @@ export function BarPdv({
                                   </button>
                                 </div>
                               ) : (
-                                <button
+                                <AppButton
+                                  variant="none"
+                                  icon={Plus}
                                   type="button"
                                   disabled={bloqueado}
                                   onClick={lancar}
                                   className="flex h-9 w-full items-center justify-center rounded-xl bg-[rgb(var(--background-subtle))] text-[11px] font-bold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.14)] hover:text-[rgb(var(--color-primary-fg))] disabled:opacity-40"
                                 >
                                   Adicionar
-                                </button>
+                                </AppButton>
                               )}
                             </div>
                           </div>
@@ -2064,14 +2066,16 @@ export function BarPdv({
                       {qtd} {qtd === 1 ? 'item' : 'itens'} · {formatarTempoRelativo(v.criadoEm)}
                     </span>
                   </span>
-                  <button
+                  <AppButton
+                    variant="primary"
+                    icon={Play}
                     type="button"
                     disabled={pending || !v.pixCopiaCola}
                     onClick={() => retomarPendente(v)}
-                    className="h-7 rounded-full bg-[rgb(var(--primary))] px-2.5 text-[11px] font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
+                    className="h-7 rounded-full px-2.5 text-[11px] font-bold text-[rgb(var(--color-primary-fg))]"
                   >
                     Retomar
-                  </button>
+                  </AppButton>
                   {podeCancelar && (
                     <button
                       type="button"
@@ -2093,11 +2097,13 @@ export function BarPdv({
       {/* Frame estreito: barra de resumo + bottom sheet do Pedido. */}
       {turnoAberto && !pedidoMobileAberto && pedido.length > 0 && (
         <div className="absolute inset-x-0 bottom-0 z-30 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.97)] p-3 backdrop-blur @[60rem]/pdv:hidden">
-          <button
+          <AppButton
+            variant="primary"
+            icon={Eye}
             type="button"
             disabled={pending}
             onClick={() => setPedidoMobileAberto(true)}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl bg-[rgb(var(--primary))] px-4 py-3.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-50"
+            className="flex w-full justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
           >
             <span className="flex items-center gap-2">
               Ver pedido
@@ -2106,7 +2112,7 @@ export function BarPdv({
               </span>
             </span>
             <span className="tabular-nums">{formatarPreco(resumo.total)}</span>
-          </button>
+          </AppButton>
         </div>
       )}
 
@@ -2224,22 +2230,26 @@ export function BarPdv({
               </label>
             </div>
             <div className="mt-4 flex gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setModalAbrir(false)}
                 className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
               >
                 Cancelar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="primary"
+                icon={Eye}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={confirmarAbrirComanda}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+                className="flex flex-1 gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Abrir
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -2297,7 +2307,9 @@ export function BarPdv({
                 <p className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                   Pagamentos
                 </p>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Plus}
                   type="button"
                   onClick={() =>
                     setFecharPagamentos((prev) => [...prev, { metodo: 'DINHEIRO', valorStr: '' }])
@@ -2305,7 +2317,7 @@ export function BarPdv({
                   className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]"
                 >
                   + linha
-                </button>
+                </AppButton>
               </div>
               {fecharPagamentos.map((linha, idx) => (
                 <div key={idx} className="flex gap-2">
@@ -2395,22 +2407,26 @@ export function BarPdv({
             })()}
 
             <div className="mt-4 flex gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={ArrowLeft}
                 type="button"
                 onClick={() => setModalFechar(false)}
                 className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
               >
                 Voltar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="primary"
+                icon={Check}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={confirmarFecharComanda}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
+                className="flex flex-1 gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Confirmar fechamento
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -2441,22 +2457,26 @@ export function BarPdv({
               />
             </label>
             <div className="mt-4 flex gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setModalLimite(false)}
                 className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
               >
                 Cancelar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="primary"
+                icon={Save}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={confirmarLiberarLimite}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
+                className="flex flex-1 gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-[rgb(var(--color-primary-fg))]"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Salvar
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -2482,22 +2502,26 @@ export function BarPdv({
               />
             </label>
             <div className="mt-4 flex gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => setRemoverVendaId(null)}
                 className="flex-1 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-semibold"
               >
                 Cancelar
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="none"
+                icon={Trash2}
+                loading={pending}
                 type="button"
                 disabled={pending}
                 onClick={confirmarRemoverLancamento}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--color-danger-fg))] px-3 py-2.5 text-sm font-bold text-white"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Remover
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
