@@ -503,8 +503,20 @@ export const comentarPracaSchema = z.object({
   parentId: z.string().min(1).optional(),
 })
 
+export const editarComentarioPracaSchema = z.object({
+  comentarioId: z.string().min(1),
+  conteudo: z.string().trim().min(1).max(PRACA_COMENTARIO_MAX),
+})
+
+export const editarRespostaForumSchema = z.object({
+  respostaId: z.string().min(1),
+  conteudo: z.string().trim().min(1).max(FORUM_CORPO_MAX),
+})
+
 /**
- * Comentários de primeiro nível: saldo de apoios (gostei − naoGostei), depois recência.
+ * Raiz da thread de comentários da praça: saldo de apoios (gostei − naoGostei),
+ * depois recência. Respostas a um comentário ficam na ordem da árvore (criação),
+ * não passam por aqui.
  *
  * @template {{ gostei: number, naoGostei: number, criadoEm: Date | string }} T
  * @param {T[]} comentarios

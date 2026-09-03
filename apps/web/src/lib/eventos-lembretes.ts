@@ -36,6 +36,7 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
     titulo: string
     data: Date
     tipo: string
+    departamento: { slug: string } | null
     projeto: { departamento: { slug: string } | null } | null
     rsvps: Array<{ userId: string }>
     _count: { rsvps: number }
@@ -50,6 +51,7 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         titulo: true,
         data: true,
         tipo: true,
+        departamento: { select: { slug: true } },
         projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },
@@ -66,6 +68,7 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         titulo: true,
         data: true,
         tipo: true,
+        departamento: { select: { slug: true } },
         projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },
@@ -82,6 +85,7 @@ export async function dispatchLembretesEventos(now = new Date()): Promise<{
         titulo: true,
         data: true,
         tipo: true,
+        departamento: { select: { slug: true } },
         projeto: { select: { departamento: { select: { slug: true } } } },
         rsvps: {
           where: { status: 'CONFIRMADO' },

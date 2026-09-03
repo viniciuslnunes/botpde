@@ -8,7 +8,6 @@ import {
   ChevronsUpDown,
   Crown,
   Network,
-  Search,
   Shield,
   UserRound,
   Users2,
@@ -20,6 +19,7 @@ import {
 import type { OrgDepartamentoBranch, OrgPerson, OrganizacaoTree } from '@/lib/organizacao-tree'
 import { AvatarFoto } from '@/components/media/avatar-foto'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 const BASE_PREVIEW = 8
 
@@ -371,6 +371,26 @@ function branchIds(tree: OrganizacaoTree): string[] {
   return ids
 }
 
+function coletarPessoas(tree: OrganizacaoTree): OrgPerson[] {
+  const out: OrgPerson[] = []
+  const push = (list: OrgPerson[]) => {
+    for (const p of list) out.push(p)
+  }
+  push(tree.presidentes)
+  push(tree.vices)
+  if (tree.diretoria) {
+    push(tree.diretoria.gestores)
+    push(tree.diretoria.membros)
+  }
+  for (const d of tree.departamentos) {
+    push(d.gestores)
+    push(d.membros)
+  }
+  push(tree.sociosBase)
+  push(tree.torcedoresBase)
+  return out
+}
+
 export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
   const allIds = useMemo(() => branchIds(tree), [tree])
   const [busca, setBusca] = useState('')
@@ -384,6 +404,33 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
   })
 
   const needle = busca.trim()
+
+  const sugestoesBusca = useMemo((): ReactiveSearchOption[] => {
+    const vistos = new Set<string>()
+    return coletarPessoas(tree)
+      .filter((p) => {
+        if (vistos.has(p.id)) return false
+        vistos.add(p.id)
+        return true
+      })
+      .map((p) => ({
+        id: p.id,
+        label: p.nome,
+        sublabel: [p.email, ...p.badges].filter(Boolean).join(' · ') || null,
+        searchText: [p.nome, p.email, ...p.badges].filter(Boolean).join(' '),
+        leading: p.avatarUrl ? (
+          <AvatarFoto
+            src={p.avatarUrl}
+            px={32}
+            className="h-8 w-8 shrink-0 rounded-md object-cover"
+          />
+        ) : (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[rgb(var(--primary))] text-xs font-semibold text-white">
+            {initials(p.nome)}
+          </div>
+        ),
+      }))
+  }, [tree])
 
   const stats = useMemo(() => {
     const emDepto = new Set<string>()
@@ -505,17 +552,18 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <input
-              type="search"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar pessoa, e-mail ou departamento…"
-              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
-              aria-label="Buscar na hierarquia"
-            />
-          </div>
+          <SearchFilterInput
+            className="min-w-0 flex-1"
+            value={busca}
+            onChange={setBusca}
+            placeholder="Buscar pessoa, e-mail ou departamento…"
+            ariaLabel="Buscar na hierarquia"
+            suggestions={sugestoesBusca}
+            onSelectSuggestion={(item) => setBusca(item.label)}
+            minChars={1}
+            size="sm"
+            inputClassName="[&_input]:rounded-lg [&_input]:bg-[rgb(var(--background))] [&_input]:focus:border-[rgb(var(--primary))]"
+          />
           <div className="flex flex-wrap gap-1.5">
             <AppButton
               variant="none"

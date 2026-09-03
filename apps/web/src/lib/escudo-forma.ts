@@ -159,7 +159,56 @@ export function analisarEscudoCircularDeImageData(data: Uint8ClampedArray): bool
   if (fora < 12) return false
   if (fundoFora / fora < 0.75) return false
 
+  // Escudo heráldico em quadrado branco cabe no círculo mas não é badge redondo.
+  if (pareceSilhuetaEscudoHeraldico(data, fundo)) return false
+
   return true
+}
+
+/** Silhueta alta ou mais larga no topo → escudo de clube, não badge circular. */
+function pareceSilhuetaEscudoHeraldico(
+  data: Uint8ClampedArray,
+  fundo: [number, number, number],
+): boolean {
+  let minX = SAMPLE
+  let maxX = -1
+  let minY = SAMPLE
+  let maxY = -1
+  const larguraPorLinha = new Int16Array(SAMPLE).fill(-1)
+
+  for (let y = 0; y < SAMPLE; y++) {
+    let rowMin = SAMPLE
+    let rowMax = -1
+    for (let x = 0; x < SAMPLE; x++) {
+      const i = idx(x, y)
+      if (isTransparente(data, i) || isFundoOpaco(data, i, fundo)) continue
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      rowMin = Math.min(rowMin, x)
+      rowMax = Math.max(rowMax, x)
+    }
+    if (rowMax >= rowMin) larguraPorLinha[y] = rowMax - rowMin + 1
+  }
+
+  if (maxX < minX || maxY < minY) return false
+
+  const w = maxX - minX + 1
+  const h = maxY - minY + 1
+  if (h > w * 1.06) return true
+
+  let yMaxLarg = minY
+  let maxLarg = 0
+  for (let y = minY; y <= maxY; y++) {
+    const larg = larguraPorLinha[y]!
+    if (larg > maxLarg) {
+      maxLarg = larg
+      yMaxLarg = y
+    }
+  }
+  const fracaoVertical = (yMaxLarg - minY) / Math.max(1, h - 1)
+  return fracaoVertical < 0.35 && maxLarg > w * 0.75
 }
 
 /** Zera o alpha fora do círculo inscrito (cantos do quadrado de fundo). */
@@ -258,7 +307,7 @@ function analisarElemento(img: HTMLImageElement): boolean {
   }
 }
 
-const STORAGE_KEY = 'torcida.escudoCircular.v1'
+const STORAGE_KEY = 'torcida.escudoCircular.v2'
 const MAX_CACHE_ENTRIES = 200
 const cacheMemoria = new Map<string, boolean>()
 const inflight = new Map<string, Promise<boolean>>()

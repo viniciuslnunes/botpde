@@ -68,6 +68,13 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: [PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_APPROVE],
     secao: 'pessoas',
   },
+  {
+    id: 'portaria',
+    label: 'Portaria',
+    href: '/admin/portaria',
+    permissao: PERMISSIONS.MEMBERS_VIEW,
+    secao: 'pessoas',
+  },
   // Departamento como área operacional (áreas de atuação, equipes). O pacote
   // de PERMISSÃO de cada departamento continua em /admin/acessos — aqui é
   // organização de gente, não RBAC.
@@ -343,6 +350,13 @@ export const ADMIN_MODULOS = ([
     tabs: [
       { id: 'comando', label: 'Comando', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
       {
+        id: 'atendimento',
+        label: 'Atendimento',
+        href: '/admin/loja/atendimento',
+        permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
+        matchPaths: ['/admin/loja/tickets'],
+      },
+      {
         id: 'catalogo',
         label: 'Catálogo',
         href: '/admin/loja/produtos',
@@ -353,12 +367,6 @@ export const ADMIN_MODULOS = ([
         id: 'pedidos',
         label: 'Pedidos',
         href: '/admin/loja/pedidos',
-        permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
-      },
-      {
-        id: 'tickets',
-        label: 'Arquivo',
-        href: '/admin/loja/tickets',
         permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
       },
       {

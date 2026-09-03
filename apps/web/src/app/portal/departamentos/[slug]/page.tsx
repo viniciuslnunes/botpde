@@ -20,6 +20,8 @@ import { DepartamentoFluxoPrefs } from '../_components/departamento-fluxo-prefs'
 import { resolverFluxosDepartamento } from '../_components/departamento-proxima-acao-data'
 import { DepartamentoDominioPanel } from './_components/departamento-dominio-panel'
 import { DepartamentoHashRedirect } from './_components/departamento-hash-redirect'
+import { LojaTicketKanbanSection } from '@/components/loja/loja-ticket-kanban-section'
+import { LojaTicketKanbanSkeleton } from '@/components/loja/loja-ticket-kanban'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import { getDepartamentoContexto } from './_lib/contexto'
 import {
@@ -87,9 +89,12 @@ export default async function DepartamentoHomePage({
   const podeGerirPatrimonio = escopoPatrimonio.podeGerirTudo
   const podeVerPedidos =
     isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.STORE_VIEW_ORDERS)
+  const podeGerirPedidos =
+    isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.STORE_MANAGE)
   const panel = capability?.portalPanel ?? 'generico'
   const temFila = panel === 'diretoria' && podeAprovarArea
   const temPedidos = isGestor && podeAprovarArea
+  const temAtendimentoLoja = depto.slug === 'materiais-loja' && podeVerPedidos
   const sp = await searchParams
   const focoAreaId = primeiroSearchParam(sp.area)
   const focoProjetoId = primeiroSearchParam(sp.projeto)
@@ -102,7 +107,7 @@ export default async function DepartamentoHomePage({
         pessoa: focoPessoaId,
       }) ??
       undefined,
-    { temFila, temPedidos },
+    { temFila, temPedidos, temAtendimentoLoja },
   )
   const acervoPage = parseAcervoPage(primeiroSearchParam(sp.page))
 
@@ -220,6 +225,24 @@ export default async function DepartamentoHomePage({
       <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
         {aba === 'painel' && (
           <>
+            {temAtendimentoLoja ? (
+              <Suspense
+                fallback={
+                  <LojaTicketKanbanSkeleton compacto somenteAtivos mostrarCabecalho />
+                }
+              >
+                <LojaTicketKanbanSection
+                  tenantId={tenant.id}
+                  podeGerir={podeGerirPedidos}
+                  compacto
+                  somenteAtivos
+                  sectionId="atendimento"
+                  mostrarCabecalho
+                  arquivoHref={hrefHomeDepartamento(depto.slug, 'atendimento')}
+                  arquivoRotulo="Ver fila completa"
+                />
+              </Suspense>
+            ) : null}
             <DepartamentoProximaAcao
               fluxos={fluxos}
               isGestor={isGestor}
@@ -283,6 +306,17 @@ export default async function DepartamentoHomePage({
 
         {aba === 'pedidos' && (
           <DepartamentoFilaArea nomeArea={depto.nome} pedidos={pedidosArea} />
+        )}
+
+        {aba === 'atendimento' && temAtendimentoLoja && (
+          <Suspense fallback={<LojaTicketKanbanSkeleton mostrarCabecalho={false} />}>
+            <LojaTicketKanbanSection
+              tenantId={tenant.id}
+              podeGerir={podeGerirPedidos}
+              mostrarCabecalho={false}
+              arquivoHref="/admin/loja/atendimento?v=arquivo"
+            />
+          </Suspense>
         )}
       </div>
     </>

@@ -4,13 +4,12 @@ import { faixaEngajamentoTopico, pctAprovacaoPraca } from '@torcida/types'
 import { ComunidadePageHeader } from '../../_components/comunidade-page-header'
 import { PracaOrigemBadge } from '../../_components/praca-origem-badge'
 import { ForumTopicoCard } from '../../_components/forum-topico-card'
-import { ResponderTopicoForm, VotarPracaBotoes } from '../../_components/praca-forms'
-import { ModerarRespostaBotao, ModerarTopicoBotoes } from '../../_components/praca-moderar'
-import { PracaDenunciarBotao } from '../../_components/praca-denuncia-modal'
+import { VotarPracaBotoes } from '../../_components/praca-forms'
+import { ForumRespostasSection } from '../../_components/forum-respostas-section'
+import { ModerarTopicoBotoes } from '../../_components/praca-moderar'
 import { RegistrarVisitaTopico } from '../../_components/registrar-visita-topico'
 import { exigirContextoPraca } from '../../_lib/praca-page'
 import { getTopicoDetalhe, podeModerarPraca, tenantModeracaoPraca } from '@/lib/praca'
-import { formatRelative } from '@/lib/format-datetime'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Tópico — Comunidade' }
@@ -85,83 +84,59 @@ export default async function ForumTopicoPage({
         )}
       </div>
 
-      <ForumTopicoCard topico={topico} escopo={escopo} isAuthor={isAuthor} />
+      <ForumTopicoCard
+        topico={topico}
+        escopo={escopo}
+        isAuthor={isAuthor}
+        rodape={
+          publico || podeModerar ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              {publico ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <VotarPracaBotoes
+                    escopo={escopo}
+                    alvoTipo="TOPICO"
+                    alvoId={topico.id}
+                    gostei={topico.gostei}
+                    naoGostei={topico.naoGostei}
+                    meuVoto={topico.meuVoto}
+                  />
+                  {pct !== null ? (
+                    <span className="text-xs tabular-nums text-[rgb(var(--foreground-muted))]">
+                      {pct}% positivo
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {podeModerar ? (
+                <ModerarTopicoBotoes
+                  escopo={escopo}
+                  topicoId={topico.id}
+                  fixado={topico.fixado}
+                  status={topico.status}
+                />
+              ) : null}
+            </div>
+          ) : null
+        }
+      />
 
-      {publico ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-0.5">
-          <VotarPracaBotoes
-            escopo={escopo}
-            alvoTipo="TOPICO"
-            alvoId={topico.id}
-            gostei={topico.gostei}
-            naoGostei={topico.naoGostei}
-            meuVoto={topico.meuVoto}
-          />
-          {pct !== null && (
-            <span className="text-xs text-[rgb(var(--foreground-muted))]">{pct}% positivo</span>
-          )}
-        </div>
-      ) : null}
-      {podeModerar && (
-        <ModerarTopicoBotoes
-          escopo={escopo}
-          topicoId={topico.id}
-          fixado={topico.fixado}
-          status={topico.status}
-        />
-      )}
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Respostas</h2>
-        {!publico ? (
+      {!publico ? (
+        <section className="space-y-3">
+          <h2 className="portal-display text-lg text-[rgb(var(--foreground))]">Respostas</h2>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
             A thread abre depois que o tópico for aprovado.
           </p>
-        ) : topico.respostas.length === 0 ? (
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">Nenhuma resposta ainda.</p>
-        ) : (
-          <ul className="space-y-2">
-            {topico.respostas.map((r) => (
-              <li
-                key={r.id}
-                className={[
-                  'rounded-xl border p-3',
-                  r.oculto
-                    ? 'border-red-500/25 bg-red-500/5'
-                    : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',
-                ].join(' ')}
-              >
-                <p className="text-xs font-medium text-[rgb(var(--foreground))]">
-                  {r.autorNome ?? 'Alguém'}{' '}
-                  <span className="font-normal text-[rgb(var(--foreground-muted))]">
-                    · {formatRelative(r.criadoEm)}
-                    {r.oculto ? ' · recusada' : ''}
-                  </span>
-                </p>
-                <p
-                  className={[
-                    'mt-1 max-w-[70ch] whitespace-pre-wrap text-sm [text-wrap:pretty]',
-                    r.oculto
-                      ? 'text-[rgb(var(--foreground-muted))] line-through'
-                      : 'text-[rgb(var(--foreground))]',
-                  ].join(' ')}
-                >
-                  {r.conteudo}
-                </p>
-                {r.autorId !== session.user.id ? (
-                  <div className="mt-2">
-                    <PracaDenunciarBotao escopo={escopo} alvoTipo="FORUM_RESPOSTA" alvoId={r.id} />
-                  </div>
-                ) : null}
-                {podeModerar ? (
-                  <ModerarRespostaBotao escopo={escopo} respostaId={r.id} oculto={r.oculto} />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        {publico ? <ResponderTopicoForm escopo={escopo} topicoId={topico.id} /> : null}
-      </section>
+        </section>
+      ) : (
+        <ForumRespostasSection
+          escopo={escopo}
+          topicoId={topico.id}
+          respostas={topico.respostas}
+          viewerId={session.user.id}
+          podeModerar={podeModerar}
+        />
+      )}
     </div>
   )
 }

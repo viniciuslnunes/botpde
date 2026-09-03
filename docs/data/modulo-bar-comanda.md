@@ -217,6 +217,25 @@ Rótulos em `lib/audit-labels.ts`.
     total, limite e quanto falta para o teto. Leitura apenas — não paga nem lança.
 39. Débito em aberto (`FECHADA_COM_DEBITO` / `VENCIDA`) aparece com valor e
     vencimento. Sem pagamento pelo portal no MVP.
+40. **QR da comanda (2026-09-02)** — o card da comanda aberta traz um QR
+    (disclosure) que o sócio mostra no balcão; o operador escaneia no PDV em vez
+    de digitar o código. É o gesto do cartão de comanda de papel, sem o erro de
+    digitação que troca a conta de duas pessoas. Payload por
+    `lib/comanda-qr.ts` (propósito `bar-comanda`) sobre a primitiva
+    `lib/qr-token.ts`.
+
+    **Este QR não autoriza nada — e por isso o PDV o lê sem verificar
+    assinatura** (`BarComandaScan` + `lib/qr-payload.ts`, tudo no cliente). As
+    comandas abertas da unidade já estão carregadas na tela do operador;
+    escanear apenas escolhe uma delas, e um QR forjado no máximo seleciona algo
+    que ele podia selecionar no `<select>` ao lado. Em troca, a leitura é
+    instantânea e sobrevive à rede caindo no subsolo da sede. Id fora da lista
+    (outra unidade, comanda fechada) é recusado com mensagem própria.
+
+    A regra geral: **verificar existe para impedir que um payload forjado
+    autorize algo.** Leitura que decide — embarcar, entregar pedido, validar
+    carteirinha — vai para action no servidor com `lerPayload`. `qr-payload.ts`
+    é a exceção, não o padrão.
 
 ## 7. Superfícies
 - `/admin/bar/pdv` — abrir comanda, lançar, fechar. A coluna do carrinho vira

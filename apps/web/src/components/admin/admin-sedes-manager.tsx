@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { AlertCircle, Building2, ChevronRight, Clock, Crosshair, ImageOff, Lock, MapPin, Phone, Plus, RotateCcw, Search, Shield, Users, X } from 'lucide-react'
+import { AlertCircle, Building2, ChevronRight, Clock, Crosshair, ImageOff, Lock, MapPin, Phone, Plus, RotateCcw, Shield, Users, X } from 'lucide-react'
 import { CriarSedeForm, SedeAcoesMenu } from '@/components/admin/sede-forms'
 import { CanalRestritoUnidade } from '@/components/admin/canal-restrito-unidade'
 import { LogoImage } from '@/components/media/logo-image'
@@ -13,6 +13,7 @@ import { SEDE_TIPO_BADGE_CLASS } from '@/lib/sede-tipo-badge'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { toast } from 'sonner'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 const THUMB_W = 240
 const THUMB_H = 180
@@ -640,6 +641,15 @@ export function AdminSedesManager({
     return c
   }, [sedes])
 
+  const sugestoesBusca = useMemo((): ReactiveSearchOption[] => {
+    return sedes.map((s) => ({
+      id: s.id,
+      label: s.nome,
+      sublabel: [s.cidade, s.estado].filter(Boolean).join(' · ') || s.endereco || null,
+      searchText: [s.nome, s.endereco, s.cidade, s.estado, s.responsavel].filter(Boolean).join(' '),
+    }))
+  }, [sedes])
+
   const tree = useMemo(() => {
     const q = normalizarTexto(buscaDeferred)
     const pred = (s: AdminSedeListItem) => {
@@ -787,27 +797,16 @@ export function AdminSedesManager({
       )}
 
       <div className="space-y-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, cidade ou endereço"
-            aria-label="Buscar sedes"
-            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2.5 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
-          />
-          {busca && (
-            <button
-              type="button"
-              onClick={() => setBusca('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-              aria-label="Limpar busca"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+        <SearchFilterInput
+          value={busca}
+          onChange={setBusca}
+          placeholder="Buscar por nome, cidade ou endereço"
+          ariaLabel="Buscar sedes"
+          suggestions={sugestoesBusca}
+          onSelectSuggestion={(item) => setBusca(item.label)}
+          minChars={1}
+          fallbackIcon={MapPin}
+        />
 
         <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar sedes">
           {filtros.map((f) => {

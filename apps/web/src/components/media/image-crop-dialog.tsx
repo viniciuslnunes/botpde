@@ -14,6 +14,7 @@ import {
   type CropViewport,
 } from '@/lib/image-crop'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   /** Object URL ou data URL da imagem a ajustar. */
@@ -239,14 +240,16 @@ export function ImageCropDialog({
         </AppModalBody>
 
         <div className="flex flex-wrap justify-end gap-2 px-5 py-4">
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             disabled={busy}
             className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] shadow-sm hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
           >
             Cancelar
-          </button>
+          </AppButton>
           <button
             type="button"
             onClick={() => void confirmar()}

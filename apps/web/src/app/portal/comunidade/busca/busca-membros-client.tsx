@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import { Search, Loader2, Hash, FileText, Radio, Building2, Users } from 'lucide-react'
+import { Loader2, Hash, FileText, Radio, Building2, Users } from 'lucide-react'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
@@ -50,6 +51,11 @@ export function BuscaMembrosClient({
   const [erro, setErro] = useState<string | null>(null)
   const [, startTransition] = useTransition()
   const abortRef = useRef<AbortController | null>(null)
+  const buscaInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!inicial) buscaInputRef.current?.focus()
+  }, [inicial])
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 300)
@@ -105,17 +111,16 @@ export function BuscaMembrosClient({
 
   return (
     <div className="space-y-6">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar membros, canais, unidades, hashtags ou posts…"
-          className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pl-10 pr-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          autoFocus={!inicial}
-        />
-      </div>
+      <SearchFilterInput
+        value={q}
+        onChange={setQ}
+        placeholder="Buscar membros, canais, unidades, hashtags ou posts…"
+        ariaLabel="Buscar na comunidade"
+        exibirDropdown={false}
+        loading={carregando}
+        inputRef={buscaInputRef}
+        inputClassName="h-11 rounded-xl bg-[rgb(var(--surface))] focus:border-[rgb(var(--primary))]"
+      />
 
       <AnimatePresence mode="wait">
         {carregando && (

@@ -6,7 +6,7 @@ import { CheckInPorQr } from '@/components/eventos/checkin-por-qr'
 import { ExportEmbarqueCsvButton } from '@/components/eventos/export-embarque-csv'
 import { PromoverEsperaButton } from '@/components/eventos/promover-espera-button'
 import { STATUS_PAGAMENTO_VAGA } from '@torcida/types'
-import { UserCheck, UserX, Hourglass } from 'lucide-react'
+import { UserCheck, UserX, Hourglass, MapPin } from 'lucide-react'
 
 export type StatusPagamentoEmbarque = keyof typeof STATUS_PAGAMENTO_VAGA
 
@@ -17,6 +17,11 @@ export type EmbarqueRow = {
   email: string
   status: 'CONFIRMADO' | 'RECUSADO' | 'LISTA_ESPERA'
   checkedInAt: string | null
+  /** Ledger por trecho. Só a caravana usa; os demais eventos têm uma perna só. */
+  embarcouIda?: boolean
+  embarcouVolta?: boolean
+  /** Registrou embarque fora do raio esperado. Sinal para o gestor, não trava. */
+  embarqueLonge?: boolean
   /** Preenchido só quando o evento tem valorVaga (caravana paga). */
   pagamento?: StatusPagamentoEmbarque
   labelPagamento?: string
@@ -48,6 +53,28 @@ function BadgePagamento({
   )
 }
 
+/**
+ * Marca de trecho: preenchida quando a pessoa embarcou naquela perna.
+ *
+ * Ida e volta lado a lado é o que deixa visível o caso que importa — quem foi
+ * e não voltou no ônibus. Um só campo de presença esconderia exatamente isso.
+ */
+function MarcaTrecho({ label, feito }: { label: string; feito: boolean }) {
+  return (
+    <span
+      className={[
+        'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        feito
+          ? 'bg-[rgb(var(--color-success)_/_0.16)] text-[rgb(var(--color-success-fg))]'
+          : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+      ].join(' ')}
+      title={feito ? `Embarcou — ${label.toLowerCase()}` : `Não embarcou — ${label.toLowerCase()}`}
+    >
+      {label}
+    </span>
+  )
+}
+
 type FiltroPagamento = 'todos' | 'alerta' | 'pago'
 
 export function ListaEmbarque({
@@ -57,6 +84,7 @@ export function ListaEmbarque({
   labelCheckin = 'Embarque',
   tituloEvento,
   mostrarPagamento = false,
+  mostrarTrechos = false,
 }: {
   eventoId: string
   itens: EmbarqueRow[]
@@ -65,6 +93,8 @@ export function ListaEmbarque({
   tituloEvento?: string
   /** Liga badges/KPIs/filtro de pagamento (caravana com valorVaga). */
   mostrarPagamento?: boolean
+  /** Liga as marcas de ida/volta por pessoa (caravana). */
+  mostrarTrechos?: boolean
 }) {
   const [filtro, setFiltro] = useState<FiltroPagamento>('todos')
 
@@ -118,6 +148,7 @@ export function ListaEmbarque({
               titulo={tituloEvento ?? labelCheckin}
               itens={itens}
               incluirPagamento={mostrarPagamento}
+              incluirTrechos={mostrarTrechos}
             />
           )}
         </div>
@@ -207,6 +238,18 @@ export function ListaEmbarque({
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{r.nome}</span>
+                  {mostrarTrechos ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <MarcaTrecho label="Ida" feito={Boolean(r.embarcouIda)} />
+                      <MarcaTrecho label="Volta" feito={Boolean(r.embarcouVolta)} />
+                      {r.embarqueLonge ? (
+                        <MapPin
+                          className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                          aria-label="Embarque registrado longe do local"
+                        />
+                      ) : null}
+                    </span>
+                  ) : null}
                   {mostrarPagamento && r.pagamento && r.labelPagamento ? (
                     <BadgePagamento pagamento={r.pagamento} label={r.labelPagamento} />
                   ) : null}

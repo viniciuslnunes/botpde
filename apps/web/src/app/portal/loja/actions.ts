@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import type { Prisma } from '@torcida/db'
+import { Prisma } from '@torcida/db'
 import { z } from 'zod'
 import { podeGerirLoja, tenantsPermitidosLoja } from '@/lib/loja-lojas'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
@@ -264,6 +264,32 @@ export async function finalizarPedido(
     }
 
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      // ── Trava de linha ANTES de ler o estoque ────────────────────────────
+      // O decremento abaixo é read-modify-write sobre a coluna JSON `estoque`
+      // (`{...estoque, [chave]: disponivel - qtd}`). Sob READ COMMITTED, dois
+      // checkouts simultâneos na última unidade **leem o mesmo valor** e o
+      // segundo sobrescreve o primeiro: os dois pedidos são criados e a torcida
+      // vende duas vezes a mesma peça. `audit:loja` reproduziu.
+      //
+      // `FOR UPDATE` serializa as transações nessas linhas — a segunda espera a
+      // primeira comitar e só então lê o estoque já decrementado, caindo no
+      // "Estoque insuficiente" que deveria ter dado desde sempre.
+      //
+      // `ORDER BY id` não é decoração: duas sacolas com os mesmos produtos em
+      // ordens diferentes travariam em ordem cruzada e dariam deadlock. Ordem
+      // determinística resolve.
+      const idsProdutos = [
+        ...new Set([...porTenant.values()].flat().map((i) => i.produtoId)),
+      ].sort()
+      if (idsProdutos.length > 0) {
+        await tx.$queryRaw`
+          SELECT id FROM saas_produtos
+          WHERE id IN (${Prisma.join(idsProdutos)})
+          ORDER BY id
+          FOR UPDATE
+        `
+      }
+
       for (const [tenantDonoId, itens] of porTenant) {
         let subtotal = 0
         const linhas: Array<{
@@ -409,7 +435,7 @@ export async function finalizarPedido(
             titulo: 'Novo pedido na loja',
             corpo: `Pedido de ${formatarMoedaBRL(Number(p.total))} recebido. Ticket na fila.`,
             link: ticketConversaId
-              ? `/admin/loja/pedidos?ticket=fila`
+              ? `/admin/loja/atendimento`
               : '/admin/loja/pedidos',
             atorId: session.user.id,
             excetoUserId: session.user.id,

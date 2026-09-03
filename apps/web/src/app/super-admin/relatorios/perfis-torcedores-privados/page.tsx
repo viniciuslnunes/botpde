@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { FileSearch } from 'lucide-react'
+import { FileSearch, Filter } from 'lucide-react'
 import { getTenantFromHost } from '@/lib/tenant'
 // listarTorcidasParaSelecao não é usada — usamos a listagem específica para relatórios.
 import {
@@ -15,6 +15,7 @@ import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import { TableShell } from '@/components/admin/ui/table-shell'
 import { TablePagination } from '@/components/admin/ui/table-pagination'
 import { buildAdminHref } from '@/lib/admin-href'
+import { AppButton } from '@/components/ui/button'
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback
@@ -190,12 +191,14 @@ export default async function PerfisTorcedoresPrivadosPage({
           </div>
 
           <div className="mt-4 flex gap-3">
-            <button
+            <AppButton
+              variant="primary"
+              icon={Filter}
               type="submit"
-              className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
+              className="rounded-lg px-4 py-2 text-sm font-semibold"
             >
               Filtrar
-            </button>
+            </AppButton>
             <Link
               href="/super-admin/relatorios/perfis-torcedores-privados"
               className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--surface-raised))]"

@@ -23,7 +23,13 @@ export function LojaUnidadeCard({
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-[rgb(var(--background-subtle))]">
         <Link href={href} className="absolute inset-0" tabIndex={-1} aria-hidden>
-          <LojaCapaMidia src={loja.capaUrl} alt="" corPrimaria={loja.corPrimaria} />
+          <LojaCapaMidia
+            src={loja.capaUrl}
+            alt=""
+            corPrimaria={loja.corPrimaria}
+            logoUrl={!loja.capaCustom ? loja.logoUrl : null}
+            logoAlt={loja.nome}
+          />
         </Link>
         {podeGerir ? (
           <LojaCapaControles

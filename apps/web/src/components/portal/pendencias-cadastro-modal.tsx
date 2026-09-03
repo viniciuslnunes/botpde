@@ -3,7 +3,7 @@
 import { useEffect, useId, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
-import { AlertTriangle, IdCard, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, EyeOff, IdCard, RefreshCw, ShieldCheck } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   CAMPO_PENDENCIA_LABEL,
@@ -11,6 +11,7 @@ import {
 } from '@/lib/pendencias-cadastro'
 import { dispensarPendenciaCadastro } from '@/app/portal/cadastro/associacao/actions'
 import { useHidratado } from '@/lib/use-hidratado'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   pendencias: PendenciaCadastro[]
@@ -205,21 +206,25 @@ export function PendenciasCadastroModal({ pendencias }: Props) {
         </label>
 
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button
+          <AppButton
+            variant="none"
+            icon={EyeOff}
             type="button"
             disabled={pending || !ciencia}
             onClick={dispensar}
             className="app-action rounded-xl border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
           >
             Ocultar aviso
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="primary"
+            icon={RefreshCw}
             type="button"
             onClick={irAtualizar}
-            className="btn-primary app-action inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold"
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold"
           >
             Atualizar cadastro
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>,

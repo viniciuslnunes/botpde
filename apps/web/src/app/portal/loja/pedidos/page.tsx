@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { ArrowLeft } from 'lucide-react'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { LojaPedidosList, type PedidoListItem } from '@/components/portal/loja-pedidos-list'
+import { montarQrRetirada } from '@/lib/pedido-qr'
 import { formatNomeTorcida } from '@torcida/types'
 import type { Metadata } from 'next'
 
@@ -70,6 +71,13 @@ function serializarPedido(pedido: {
     lojaNome: formatNomeTorcida(pedido.tenant.nome),
     conversaId: pedido.ticket?.conversaId ?? null,
     ticketStatus: pedido.ticket?.status ?? null,
+    // Só faz sentido no que ainda vai ser retirado: envio não passa pelo
+    // balcão, e pedido entregue ou cancelado não tem o que apresentar.
+    qrRetirada:
+      pedido.modalidadeEntrega === 'RETIRADA' &&
+      !['ENTREGUE', 'CANCELADO'].includes(pedido.status)
+        ? montarQrRetirada(pedido.id)
+        : null,
   }
 }
 

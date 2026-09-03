@@ -21,6 +21,7 @@ import {
   markSuperAdminNavbarNotificationRead,
   useSuperAdminNavbarContext,
 } from '@/lib/use-super-admin-navbar-context'
+import { AppButton } from '@/components/ui/button'
 
 interface SuperAdminBadges {
   afiliacoes: number
@@ -67,7 +68,7 @@ function SidebarBody({
           <Link
             href="/portal/perfil"
             onClick={onNavigate}
-            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            className="app-nav-link app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
             Meu Perfil
@@ -76,7 +77,7 @@ function SidebarBody({
             href="/admin"
             prefetch={false}
             onClick={onNavigate}
-            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            className="app-nav-link app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             <Lock className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
             Área administrativa
@@ -85,7 +86,7 @@ function SidebarBody({
             href="/super-admin"
             prefetch={false}
             onClick={onNavigate}
-            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            className="app-nav-link app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
             Área Super Admin
@@ -117,7 +118,7 @@ function SuperAdminTopbar({
   const pathname = usePathname()
   const firstName = userName?.split(' ')[0] ?? 'Operador'
   const dropItemClass =
-    'app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
+    'app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
 
   // Fecha o dropdown ao navegar, no render — em effect ele sobrevive um frame
   // aberto sobre a página nova.
@@ -186,7 +187,7 @@ function SuperAdminTopbar({
             <button
               type="button"
               onClick={() => setUserDropOpen((v) => !v)}
-              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
             >
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-[10px] font-bold text-[rgb(var(--color-primary-fg))]">
                 {firstName.charAt(0).toUpperCase()}
@@ -207,6 +208,7 @@ function SuperAdminTopbar({
                 <Link
                   href="/portal/perfil"
                   onClick={() => setUserDropOpen(false)}
+                  data-cursor-action=""
                   className={dropItemClass}
                 >
                   <UserCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -216,6 +218,7 @@ function SuperAdminTopbar({
                   href="/admin"
                   prefetch={false}
                   onClick={() => setUserDropOpen(false)}
+                  data-cursor-action=""
                   className={dropItemClass}
                 >
                   <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -225,6 +228,7 @@ function SuperAdminTopbar({
                   href="/super-admin"
                   prefetch={false}
                   onClick={() => setUserDropOpen(false)}
+                  data-cursor-action=""
                   className={dropItemClass}
                 >
                   <Shield className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -232,14 +236,16 @@ function SuperAdminTopbar({
                 </Link>
                 <ThemeToggle variant="dropdown" />
                 <div className="my-1 border-t border-[rgb(var(--border))]" />
-                <button
+                <AppButton
+                  variant="none"
+                  icon={LogOut}
+                  textoOriginal
                   type="button"
                   onClick={() => signOut({ callbackUrl: '/entrar' })}
-                  className="app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                  className="app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                 >
-                  <LogOut className="h-4 w-4" />
                   Sair
-                </button>
+                </AppButton>
               </div>
             )}
           </div>

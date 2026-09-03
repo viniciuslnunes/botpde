@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
+import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { APP_TIME_ZONE } from '@/lib/format-datetime'
 import type { PartidaNoticiasCard } from '@/lib/noticias-jogos-feed'
 
@@ -22,24 +23,25 @@ function formatDataJogo(dataHora: Date): string {
   return `${bag.day}/${bag.month} · ${bag.hour}:${bag.minute}`
 }
 
-function siglaAdversario(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean)
-  if (partes.length === 0) return 'ADV'
-  if (partes.length === 1) return partes[0].slice(0, 3).toUpperCase()
-  return partes
-    .slice(0, 3)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
+function rotuloLocal(partida: PartidaNoticiasCard): string | null {
+  if (!partida.estadio) return null
+  return partida.estadioEstado
+    ? `${partida.estadio}, ${partida.estadioEstado}`
+    : partida.estadio
 }
 
 function PartidaChip({ partida }: { partida: PartidaNoticiasCard }) {
   const temPlacar = partida.placarCasa != null && partida.placarFora != null
-  const casa = partida.mando === 'CASA' ? partida.clubeSigla : siglaAdversario(partida.adversario)
-  const fora = partida.mando === 'CASA' ? siglaAdversario(partida.adversario) : partida.clubeSigla
+  const nomeCasa = partida.mando === 'CASA' ? partida.clubeNome : partida.adversario
+  const nomeFora = partida.mando === 'CASA' ? partida.adversario : partida.clubeNome
+  const escudoCasa =
+    partida.mando === 'CASA' ? partida.clubeEscudoUrl : partida.adversarioEscudoUrl
+  const escudoFora =
+    partida.mando === 'CASA' ? partida.adversarioEscudoUrl : partida.clubeEscudoUrl
   const placarCasa = partida.mando === 'CASA' ? partida.placarCasa : partida.placarFora
   const placarFora = partida.mando === 'CASA' ? partida.placarFora : partida.placarCasa
   const aoVivo = partida.status === 'AO_VIVO'
+  const localLabel = rotuloLocal(partida)
 
   return (
     <Link
@@ -57,18 +59,14 @@ function PartidaChip({ partida }: { partida: PartidaNoticiasCard }) {
 
       <div className="mt-3 flex items-center justify-center gap-2">
         <div className="flex flex-col items-center gap-1">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[10px] font-bold">
-            {casa}
-          </span>
+          <EscudoClube nome={nomeCasa} escudoUrl={escudoCasa} size="xs" />
           {temPlacar ? (
             <span className="text-sm font-bold tabular-nums">{placarCasa}</span>
           ) : null}
         </div>
         <span className="text-xs font-semibold text-[rgb(var(--foreground-muted))]">×</span>
         <div className="flex flex-col items-center gap-1">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[10px] font-bold">
-            {fora}
-          </span>
+          <EscudoClube nome={nomeFora} escudoUrl={escudoFora} size="xs" />
           {temPlacar ? (
             <span className="text-sm font-bold tabular-nums">{placarFora}</span>
           ) : null}
@@ -78,6 +76,11 @@ function PartidaChip({ partida }: { partida: PartidaNoticiasCard }) {
       <p className="mt-3 line-clamp-2 text-center text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
         {partida.competicao ?? 'Campeonato'}
       </p>
+      {localLabel ? (
+        <p className="mt-1 line-clamp-2 text-center text-[9px] text-[rgb(var(--foreground-muted))]">
+          {localLabel}
+        </p>
+      ) : null}
     </Link>
   )
 }
@@ -147,8 +150,8 @@ export function NoticiasSidebarJogos({
   const competicaoTitulo = destaque?.competicao ?? 'Próximos jogos'
 
   return (
-    <aside className="space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-4 lg:self-start">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <aside className="hidden min-w-0 lg:block">
+      <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-sm app-scrollbar-fina">
         <p className="text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           Agenda do clube
         </p>
@@ -160,20 +163,38 @@ export function NoticiasSidebarJogos({
               Próximos
             </p>
             <ul className="space-y-2">
-              {proximos.slice(0, 5).map((p) => (
-                <li
-                  key={p.id}
-                  className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.35)] px-3 py-2.5"
-                >
-                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                    {formatDataJogo(p.dataHora)}
-                    {p.local ? ` · ${p.local}` : ''}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[rgb(var(--foreground))]">
-                    {p.mando === 'CASA' ? 'Casa' : 'Fora'} × {p.adversario}
-                  </p>
-                </li>
-              ))}
+              {proximos.slice(0, 5).map((p) => {
+                const localLabel = rotuloLocal(p)
+                return (
+                  <li
+                    key={p.id}
+                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.35)] px-3 py-2.5"
+                  >
+                    <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                      {formatDataJogo(p.dataHora)}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <EscudoClube
+                        nome={p.clubeNome}
+                        escudoUrl={p.clubeEscudoUrl}
+                        size="xs"
+                      />
+                      <span className="text-xs font-semibold text-[rgb(var(--foreground-muted))]">×</span>
+                      <EscudoClube
+                        nome={p.adversario}
+                        escudoUrl={p.adversarioEscudoUrl}
+                        size="xs"
+                      />
+                      <p className="min-w-0 truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                        {p.mando === 'CASA' ? 'Casa' : 'Fora'} × {p.adversario}
+                      </p>
+                    </div>
+                    {localLabel ? (
+                      <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">{localLabel}</p>
+                    ) : null}
+                  </li>
+                )
+              })}
             </ul>
           </div>
         ) : null}
@@ -187,8 +208,13 @@ export function NoticiasSidebarJogos({
               {recentes.slice(0, 4).map((p) => {
                 const temPlacar = p.placarCasa != null && p.placarFora != null
                 return (
-                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 truncate text-[rgb(var(--foreground-muted))]">
+                  <li key={p.id} className="flex items-center gap-2 text-sm">
+                    <EscudoClube
+                      nome={p.adversario}
+                      escudoUrl={p.adversarioEscudoUrl}
+                      size="xs"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[rgb(var(--foreground-muted))]">
                       × {p.adversario}
                     </span>
                     {temPlacar ? (

@@ -7,7 +7,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from '@torcida/types'
-import { assertAnyPermission } from '@/lib/authz'
+import { assertAnyPermission, tenantIsAdministracaoSede } from '@/lib/authz'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { hrefAdminPessoa } from '@/lib/perfil-admin-href'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
@@ -67,11 +67,12 @@ export default async function TorcedorDetalhePage({ params }: Props) {
   }
 
   // Membro, planos, sedes e permissões são independentes → um round-trip.
-  const [membro, planos, sedes, perms]: [
+  const [membro, planos, sedes, perms, isAdministracaoSede]: [
     MembroRow | null,
     { id: string; nome: string }[],
     { id: string; nome: string; tipo: string }[],
     Awaited<ReturnType<typeof getUserPermissionsInTenant>>,
+    boolean,
   ] = await Promise.all([
     db.saasMembro.findFirst({
       where: { id, tenantId: tenant.id },
@@ -115,6 +116,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
       select: { id: true, nome: true, tipo: true },
     }),
     getUserPermissionsInTenant(session.user.id, tenant.id),
+    tenantIsAdministracaoSede(tenant.id),
   ])
 
   if (!membro) notFound()
@@ -230,9 +232,8 @@ export default async function TorcedorDetalhePage({ params }: Props) {
             status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
             departamentoNome={membro.departamento?.nome}
             espelhado={membro.espelhado}
+            isAdministracaoSede={isAdministracaoSede}
             aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
-            aprovadoPorNome={membro.aprovadoPorNome}
-            aprovadoEmLabel={aprovadoEmLabel}
             nomeMembro={membro.nome}
             isSocio={false}
             podeBloquear={podeBloquear}
@@ -257,6 +258,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
           sedes={sedes}
           canEdit={podeReatribuirSede}
           espelhado={membro.espelhado}
+          isAdministracaoSede={isAdministracaoSede}
           aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
         />
       </MotionReveal>
@@ -277,6 +279,7 @@ export default async function TorcedorDetalhePage({ params }: Props) {
           podeDesligar={podeDesligar}
           desligadoEm={membro.desligadoEm}
           espelhado={membro.espelhado}
+          isAdministracaoSede={isAdministracaoSede}
           aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
           canEdit={podeEditarLge}
         />

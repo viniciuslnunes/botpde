@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, BadgeCheck, Search } from 'lucide-react'
-import { Input } from '@torcida/ui'
+import { ArrowLeft, ArrowRight, BadgeCheck } from 'lucide-react'
 import { toast } from '@torcida/ui/services/toast'
 import { mensagemSemLiderancaUnidade } from '@torcida/types/associe-se'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
@@ -11,6 +10,8 @@ import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboardin
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import type { AssocieSePagina, TorcidaAssocieSe } from '@/lib/associe-se'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 type Props = {
   pagina: AssocieSePagina
@@ -45,6 +46,17 @@ export function AssocieSeExplorer({ pagina, torcidaInicialId = null }: Props) {
     Boolean(torcida) && pagina.podeAssociar && Boolean(torcida?.temLideranca)
   const [filtro, setFiltro] = useState('')
   const q = filtro.trim().toLowerCase()
+  const sugestoesTorcidas = useMemo((): ReactiveSearchOption[] => {
+    return pagina.torcidas.map((t) => ({
+      id: t.id,
+      label: t.nome,
+      sublabel: t.temLideranca ? null : 'Sem liderança no portal',
+      searchText: t.nome,
+      leading: (
+        <EscudoClube nome={t.nome} escudoUrl={pagina.clube.escudoUrl} size="xs" />
+      ),
+    }))
+  }, [pagina.torcidas, pagina.clube.escudoUrl])
   const torcidasVisiveis = useMemo(() => {
     if (!q) return pagina.torcidas
     return pagina.torcidas.filter((t) => t.nome.toLowerCase().includes(q))
@@ -106,16 +118,16 @@ export function AssocieSeExplorer({ pagina, torcidaInicialId = null }: Props) {
               </span>
             </h2>
             {pagina.torcidas.length > 4 ? (
-              <div className="relative w-full max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-                <Input
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  placeholder="Buscar organizada…"
-                  className="pl-9"
-                  aria-label="Buscar organizada"
-                />
-              </div>
+              <SearchFilterInput
+                className="w-full max-w-xs"
+                value={filtro}
+                onChange={setFiltro}
+                placeholder="Buscar organizada…"
+                ariaLabel="Buscar organizada"
+                suggestions={sugestoesTorcidas}
+                onSelectSuggestion={(item) => setFiltro(item.label)}
+                minChars={1}
+              />
             ) : null}
           </div>
           {pagina.torcidas.length === 0 ? (
@@ -157,7 +169,9 @@ export function AssocieSeExplorer({ pagina, torcidaInicialId = null }: Props) {
               2 · Unidades da {torcida.nome}
             </h2>
             {!pagina.torcidaTravadaId ? (
-              <button
+              <AppButton
+                variant="none"
+                icon={ArrowLeft}
                 type="button"
                 onClick={() => {
                   setTorcidaId(null)
@@ -165,9 +179,8 @@ export function AssocieSeExplorer({ pagina, torcidaInicialId = null }: Props) {
                 }}
                 className="inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
                 Trocar torcida
-              </button>
+              </AppButton>
             ) : null}
           </div>
           {torcida.sedes.length === 0 ? (

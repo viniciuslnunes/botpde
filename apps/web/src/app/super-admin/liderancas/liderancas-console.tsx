@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { Crown, Loader2, UserCheck, UserMinus, UserX } from 'lucide-react'
+import { Crown, UserCheck, UserMinus, UserX } from 'lucide-react'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { LogoImage } from '@/components/media/logo-image'
 import type {
@@ -16,18 +16,21 @@ import {
   transferirLiderancaSuperAdmin,
   type LiderancaState,
 } from './actions'
+import { AppButton } from '@/components/ui/button'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <button
+    <AppButton
+      variant="primary"
+      icon={UserCheck}
+      loading={pending}
       type="submit"
       disabled={pending}
-      className="btn-primary flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+      className="flex shrink-0 gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold"
     >
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
       {pending ? 'Salvando…' : 'Transferir'}
-    </button>
+    </AppButton>
   )
 }
 
@@ -269,14 +272,15 @@ function LinhaItem({
           {selecionada ? 'Fechar' : 'Transferir'}
         </button>
         {linha.lideres.length > 0 && (
-          <button
+          <AppButton
+            variant="none"
+            icon={UserMinus}
             type="button"
             onClick={() => onRemover(linha)}
             className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
           >
-            <UserMinus className="h-3 w-3" />
             Remover
-          </button>
+          </AppButton>
         )}
       </div>
     </li>

@@ -9,7 +9,8 @@ import {
   hasPermission,
   labelCategoriaReprovacao,
 } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, tenantIsAdministracaoSede } from '@/lib/authz'
+import { carregarDepartamentoUnidadePorMembro } from '@/lib/admin-membro-espelho'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
@@ -88,10 +89,12 @@ const SPEC = LISTAGEM_TORCEDORES
 const COLUNA_CLASSE: Record<string, string> = {
   departamento: 'hidden md:table-cell',
   sede: 'hidden lg:table-cell',
+  areaUnidade: 'hidden lg:table-cell',
   origem: '',
   cidade: 'hidden xl:table-cell',
   status: 'hidden sm:table-cell',
   criadoEm: 'hidden 2xl:table-cell',
+  situacao: 'hidden lg:table-cell',
 }
 
 /**
@@ -598,7 +601,7 @@ export default async function TorcedoresPage({
     extra: extraWhere,
   })
 
-  const [membros, total, contagens, totalDesligados, sedes, departamentosOpts] =
+  const [membros, total, contagens, totalDesligados, sedes, departamentosOpts, isAdministracaoSede] =
     await Promise.all([
     db.saasMembro.findMany({
       where,
@@ -630,6 +633,7 @@ export default async function TorcedoresPage({
       orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
       select: { id: true, nome: true },
     }),
+    tenantIsAdministracaoSede(tenant.id),
   ])
 
   type SedeOpt = { id: string; nome: string; tipo: string }
@@ -707,6 +711,18 @@ export default async function TorcedoresPage({
   const areasEfetivadasPorUser = await getAreasEfetivadasPorUser(
     tenant.id,
     membros.map((m: (typeof membros)[number]) => m.userId),
+  )
+
+  const departamentoUnidadePorMembro = await carregarDepartamentoUnidadePorMembro(
+    db,
+    membros.map((m: (typeof membros)[number]) => ({
+      id: m.id,
+      espelhado: m.espelhado,
+      membroOrigemId: m.membroOrigemId,
+      departamento: m.departamento,
+      sede: m.sede,
+    })),
+    isAdministracaoSede,
   )
 
   // Bloqueios em lote (nunca por linha). Inclui os ancestrais: um bloqueio na
@@ -803,17 +819,7 @@ export default async function TorcedoresPage({
 
   return (
     <div className="flex h-full flex-col">
-      <AdminPageHeader
-        title="Torcedores"
-        description={
-          <span className="tabular-nums">
-            {paginacao.total === 0
-              ? 'Nenhum resultado'
-              : `${paginacao.faixa.de}–${paginacao.faixa.ate} de ${paginacao.total}`}
-          </span>
-        }
-        actions={<ExportarLgeButton />}
-      >
+      <AdminPageHeader title="Torcedores" actions={<ExportarLgeButton />}>
         <AdminPendingTabs
           tabs={tabs.map((tab) => ({
             id: tab.status,
@@ -892,6 +898,7 @@ export default async function TorcedoresPage({
           podeBloquear={podeBloquear}
           podeApagar={podeApagar}
           bloqueadosUserIds={bloqueadosUserIds}
+          isAdministracaoSede={isAdministracaoSede}
           membros={membros.map((membro: (typeof membros)[number]) =>
             mapToAdminMembroItem(
               {
@@ -944,6 +951,7 @@ export default async function TorcedoresPage({
                 criadoEm: membro.criadoEm,
                 atualizadoEm: membro.atualizadoEm,
                 espelhado: membro.espelhado,
+                membroOrigemId: membro.membroOrigemId,
                 aprovadoNaUnidadeTenantId: membro.aprovadoNaUnidadeTenantId,
                 importacaoId: membro.importacaoId,
                 user: {
@@ -956,7 +964,9 @@ export default async function TorcedoresPage({
                 departamentoSede: membro.departamentoSede
                   ? { nome: membro.departamentoSede.nome }
                   : null,
-                sede: membro.sede ? { nome: membro.sede.nome } : null,
+                sede: membro.sede
+                  ? { nome: membro.sede.nome, tipo: membro.sede.tipo }
+                  : null,
               },
               {
                 aprovadoNaUnidadeNome: membro.aprovadoNaUnidadeTenantId
@@ -972,6 +982,7 @@ export default async function TorcedoresPage({
                 ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
                 origemCanal: origemCanalPorMembro.get(membro.id) ?? null,
                 areasEfetivadas: areasEfetivadasPorUser.get(membro.userId) ?? new Set<string>(),
+                departamentoUnidadeNome: departamentoUnidadePorMembro.get(membro.id) ?? null,
               },
             ),
           )}

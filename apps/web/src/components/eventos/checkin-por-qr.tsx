@@ -4,42 +4,35 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { registrarCheckInPorQr } from '@/app/admin/eventos/actions'
 import { Camera, CloudOff, QrCode, StopCircle, Wifi } from 'lucide-react'
 import { useOnline } from '@/lib/use-online'
+import { useQrScanner } from '@/lib/use-qr-scanner'
 import {
   enqueueCheckinOffline,
   listCheckinOffline,
   removeCheckinOffline,
   type CheckinOfflineItem,
 } from '@/lib/checkin-offline'
+import { AppButton } from '@/components/ui/button'
 
 type State = { ok?: boolean; error?: string; nome?: string; aviso?: string }
-
-type BarcodeDetectorLike = {
-  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>
-}
-
-declare global {
-  interface Window {
-    BarcodeDetector?: new (opts?: { formats: string[] }) => BarcodeDetectorLike
-  }
-}
-
-function supportsBarcodeDetector() {
-  return typeof window !== 'undefined' && typeof window.BarcodeDetector === 'function'
-}
 
 export function CheckInPorQr({ eventoId }: { eventoId: string }) {
   const [payload, setPayload] = useState('')
   const [pending, start] = useTransition()
   const [state, setState] = useState<State>({})
-  const [scanning, setScanning] = useState(false)
-  const [cameraError, setCameraError] = useState<string | null>(null)
   const [fila, setFila] = useState<CheckinOfflineItem[]>([])
   const online = useOnline()
   const [syncing, setSyncing] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const rafRef = useRef<number>(0)
   const lastScanRef = useRef('')
+
+  // `registrar` é declaração de função (içada), então dá para passá-la aqui
+  // mesmo definida abaixo; o hook guarda a versão mais recente por dentro.
+  const {
+    videoRef,
+    iniciar: iniciarCamera,
+    parar: pararCamera,
+    ativo: scanning,
+    erro: cameraError,
+  } = useQrScanner(registrar)
 
   const refreshFila = useCallback(() => {
     setFila(listCheckinOffline(eventoId))
@@ -78,16 +71,6 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
     void syncFila()
     return () => window.removeEventListener('online', onOnline)
   }, [refreshFila, syncFila])
-
-  const stopCamera = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    rafRef.current = 0
-    streamRef.current?.getTracks().forEach((t) => t.stop())
-    streamRef.current = null
-    setScanning(false)
-  }, [])
-
-  useEffect(() => () => stopCamera(), [stopCamera])
 
   function registrar(token: string) {
     const trimmed = token.trim()
@@ -128,49 +111,6 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
     registrar(payload)
   }
 
-  async function startCamera() {
-    setCameraError(null)
-    if (!supportsBarcodeDetector()) {
-      setCameraError('Este navegador não lê QR pela câmera. Cole o código abaixo.')
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      })
-      streamRef.current = stream
-      const video = videoRef.current
-      if (!video) {
-        stream.getTracks().forEach((t) => t.stop())
-        return
-      }
-      video.srcObject = stream
-      await video.play()
-      setScanning(true)
-
-      const detector = new window.BarcodeDetector!({ formats: ['qr_code'] })
-      const tick = async () => {
-        if (!videoRef.current || videoRef.current.readyState < 2) {
-          rafRef.current = requestAnimationFrame(() => void tick())
-          return
-        }
-        try {
-          const codes = await detector.detect(videoRef.current)
-          const raw = codes[0]?.rawValue
-          if (raw) registrar(raw)
-        } catch {
-          /* frame skip */
-        }
-        rafRef.current = requestAnimationFrame(() => void tick())
-      }
-      rafRef.current = requestAnimationFrame(() => void tick())
-    } catch {
-      setCameraError('Não foi possível abrir a câmera. Verifique a permissão.')
-      stopCamera()
-    }
-  }
-
   return (
     <div className="space-y-3 rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -197,23 +137,25 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
             </button>
           )}
           {scanning ? (
-            <button
+            <AppButton
+              variant="none"
+              icon={StopCircle}
               type="button"
-              onClick={stopCamera}
+              onClick={pararCamera}
               className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))]"
             >
-              <StopCircle className="h-3.5 w-3.5" />
               Parar câmera
-            </button>
+            </AppButton>
           ) : (
-            <button
+            <AppButton
+              variant="none"
+              icon={Camera}
               type="button"
-              onClick={() => void startCamera()}
+              onClick={() => void iniciarCamera()}
               className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
             >
-              <Camera className="h-3.5 w-3.5" />
               Abrir câmera
-            </button>
+            </AppButton>
           )}
         </div>
       </div>

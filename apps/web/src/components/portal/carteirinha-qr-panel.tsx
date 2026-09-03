@@ -3,10 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Check, Copy, ExternalLink } from 'lucide-react'
+import { QrCodeVisual } from '@/components/ui/qr-code'
+import { useHidratado } from '@/lib/use-hidratado'
 
 /**
- * QR sem terceiros: evita enviar o token HMAC a APIs externas (LGPD).
- * Mostra link de validação + cópia do payload; leitores de câmera abrem o link.
+ * QR sem terceiros: o código é desenhado localmente (`QrCodeVisual`), então o
+ * token HMAC nunca sai para uma API de imagem externa — que era o motivo de
+ * este painel ter vivido como um quadrado tracejado. O link de validação e a
+ * cópia do payload continuam como saída para quem não consegue escanear.
  */
 export function CarteirinhaQrPanel({
   validarUrl,
@@ -16,10 +20,10 @@ export function CarteirinhaQrPanel({
   qrPayload: string
 }) {
   const [copied, setCopied] = useState(false)
-  const absolute =
-    typeof window !== 'undefined'
-      ? new URL(validarUrl, window.location.origin).toString()
-      : validarUrl
+  const hidratado = useHidratado()
+  const absolute = hidratado
+    ? new URL(validarUrl, window.location.origin).toString()
+    : validarUrl
 
   async function copy() {
     try {
@@ -40,10 +44,15 @@ export function CarteirinhaQrPanel({
         Mostre este link na entrada ou peça para escanear o código do celular (câmera abre a
         validação pública). O segredo não é enviado a serviços externos.
       </p>
-      <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-xl border-2 border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 text-center">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
-          Abra o link de validação
-        </span>
+      <div className="flex justify-center">
+        {hidratado ? (
+          <QrCodeVisual value={absolute} size={168} label="QR de validação da carteirinha" />
+        ) : (
+          <div
+            className="h-[192px] w-[192px] animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]"
+            aria-hidden
+          />
+        )}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <Link

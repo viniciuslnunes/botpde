@@ -8,16 +8,7 @@ import {
   useTransition,
 } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import {
-  Crosshair,
-  Loader2,
-  Lock,
-  MapPin,
-  Plus,
-  Search,
-  Users,
-  X,
-} from 'lucide-react'
+import { Crosshair, Loader2, Lock, MapPin, Plus, Users } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
 import {
@@ -57,6 +48,8 @@ import {
 } from '@/lib/canais-shared'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
 import { useHidratado } from '@/lib/use-hidratado'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 /** Mesma chave do explorer de sedes — localização persiste entre telas do portal. */
 const GEO_STORAGE_KEY = 'portal:sedes:geo'
@@ -233,6 +226,42 @@ export function CanaisClient({
       }
     }
     return c
+  }, [canais])
+
+  const sugestoesBusca = useMemo((): ReactiveSearchOption[] => {
+    return canais.map((canal) => {
+      const local = localizacaoLabel(canal)
+      return {
+        id: canal.id,
+        label: canal.nome ?? 'Canal',
+        sublabel: local ?? canal.tenantNome ?? canal.descricao ?? null,
+        searchText: [
+          canal.nome,
+          canal.descricao,
+          canal.tenantNome,
+          canal.cidade,
+          canal.estado,
+        ]
+          .filter(Boolean)
+          .join(' '),
+        leading: canal.avatarUrl ? (
+          <Avatar
+            avatarUrl={canal.avatarUrl}
+            nome={canal.nome}
+            size="sm"
+            className="h-8 w-8 shrink-0 rounded-md"
+          />
+        ) : canal.tenantLogoUrl ? (
+          <LogoImage
+            src={canal.tenantLogoUrl}
+            alt=""
+            className="h-8 w-8 shrink-0 rounded-md object-cover"
+          />
+        ) : (
+          <Avatar avatarUrl={null} nome={canal.nome} size="sm" className="h-8 w-8 shrink-0 rounded-md" />
+        ),
+      }
+    })
   }, [canais])
 
   const filtrados = useMemo(() => {
@@ -489,29 +518,22 @@ export function CanaisClient({
       {crop.dialog}
       <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Buscar canais</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome, cidade ou unidade…"
-              className="h-10 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.35)]"
-            />
-            {busca ? (
-              <button
-                type="button"
-                onClick={() => setBusca('')}
-                aria-label="Limpar busca"
-                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </label>
+          <SearchFilterInput
+            className="min-w-0 flex-1"
+            value={busca}
+            onChange={setBusca}
+            placeholder="Buscar por nome, cidade ou unidade…"
+            ariaLabel="Buscar canais"
+            suggestions={sugestoesBusca}
+            onSelectSuggestion={(item) => setBusca(item.label)}
+            minChars={1}
+          />
 
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            <AppButton
+              variant="none"
+              icon={Crosshair}
+              loading={geoStatus === 'loading'}
               type="button"
               onClick={pedirLocalizacao}
               disabled={geoStatus === 'loading'}
@@ -524,25 +546,20 @@ export function CanaisClient({
                   : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
             >
-              {geoStatus === 'loading' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Crosshair className="h-4 w-4" />
-              )}
               <span className="hidden sm:inline">{localizacao ? 'Perto de mim' : 'Proximidade'}</span>
-            </button>
+            </AppButton>
 
             {podeCriarCanal && (
-              <m.button
+              <AppButton
+                variant="primary"
+                icon={Plus}
                 type="button"
                 onClick={() => setCriando((v) => !v)}
-                whileTap={{ scale: 0.96 }}
-                transition={springSnappy}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+                className="h-10 rounded-xl shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
               >
-                <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Novo canal</span>
-              </m.button>
+                <span className="sm:hidden">Novo</span>
+              </AppButton>
             )}
           </div>
         </div>
@@ -731,14 +748,14 @@ export function CanaisClient({
                 </span>
               </span>
             </label>
-            <button
+            <AppButton
+              variant="primary"
+              icon={Plus}
+              loading={pending || crop.busy}
               type="submit"
-              disabled={pending || crop.busy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
             >
-              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
               Criar canal
-            </button>
+            </AppButton>
           </m.form>
         )}
       </AnimatePresence>

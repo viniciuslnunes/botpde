@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ImageIcon,
   Landmark,
   MessageSquareText,
   Trophy,
@@ -65,7 +66,7 @@ const KIND_META: Record<
   },
   foto: {
     label: 'Imagem',
-    Icon: MessageSquareText,
+    Icon: ImageIcon,
     dot: 'bg-[rgb(var(--color-info))]',
     pill: 'bg-[rgb(var(--color-info)_/_0.12)] text-[rgb(var(--color-info-fg))]',
   },
@@ -236,6 +237,9 @@ function NoDiaDesktop({
   const preview = resumoNo(detalhe)
   const thumb = thumbNo(detalhe)
   const opaco = vazio || (filtro !== 'todos' && !combina)
+  const fundoColunaData = ativo
+    ? 'bg-[rgb(var(--surface))]'
+    : 'bg-[rgb(var(--background))]'
 
   return (
     <button
@@ -246,55 +250,69 @@ function NoDiaDesktop({
         'app-touch-target group relative flex w-full min-w-0 gap-2.5 rounded-2xl border px-2 py-2 text-left transition-[border-color,background-color,box-shadow]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.45)]',
         ativo
-          ? 'border-[rgb(var(--color-primary)_/_0.4)] bg-[rgb(var(--color-primary)_/_0.08)] shadow-[inset_3px_0_0_0_rgb(var(--color-primary))]'
+          ? 'z-[1] border-[rgb(var(--color-primary)_/_0.75)] bg-[rgb(var(--color-primary)_/_0.16)] shadow-[inset_4px_0_0_0_rgb(var(--color-primary)),0_0_0_1px_rgb(var(--color-primary)_/_0.35),0_4px_18px_rgb(var(--color-primary)_/_0.12)]'
           : opaco
             ? 'border-transparent bg-transparent hover:border-[rgb(var(--border))] hover:bg-[rgb(var(--background-subtle)_/_0.45)]'
             : 'border-[rgb(var(--border)_/_0.55)] bg-[rgb(var(--surface)_/_0.55)] hover:border-[rgb(var(--color-primary)_/_0.25)] hover:bg-[rgb(var(--surface))]',
       ].join(' ')}
     >
-      <span className="relative z-10 flex w-11 shrink-0 flex-col items-center pt-0.5">
+      <span className="relative z-10 w-11 shrink-0 pt-0.5">
         <span
           className={[
-            'flex h-8 w-8 flex-col items-center justify-center rounded-xl border transition-colors',
-            ativo
-              ? 'border-[rgb(var(--color-primary)_/_0.5)] bg-[rgb(var(--color-primary)_/_0.14)]'
-              : vazio
-                ? 'border-[rgb(var(--border))] bg-transparent'
-                : 'border-[rgb(var(--border-strong))] bg-[rgb(var(--background-subtle))]',
+            'flex flex-col items-center rounded-xl px-0.5 py-1',
+            fundoColunaData,
           ].join(' ')}
         >
           <span
             className={[
-              'font-mono text-sm font-bold tabular-nums leading-none',
+              'flex h-8 w-8 flex-col items-center justify-center rounded-xl border transition-colors',
               ativo
-                ? 'text-[rgb(var(--color-primary-fg))]'
-                : opaco
-                  ? 'text-[rgb(var(--foreground-muted)_/_0.65)]'
-                  : 'text-[rgb(var(--foreground))]',
+                ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.22)] ring-2 ring-[rgb(var(--color-primary)_/_0.35)]'
+                : vazio
+                  ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
+                  : 'border-[rgb(var(--border-strong))] bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
-            {String(parts.day).padStart(2, '0')}
+            <span
+              className={[
+                'font-mono text-sm font-bold tabular-nums leading-none',
+                ativo
+                  ? 'text-[rgb(var(--color-primary-fg))]'
+                  : opaco
+                    ? 'text-[rgb(var(--foreground-muted)_/_0.65)]'
+                    : 'text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              {String(parts.day).padStart(2, '0')}
+            </span>
           </span>
-        </span>
-        <span
-          className={[
-            'mt-1 font-mono text-[9px] uppercase tracking-[0.12em]',
-            ativo ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
-          ].join(' ')}
-        >
-          {weekdayCurto(no.dia)}
-        </span>
-        {hoje && (
-          <span className="mt-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.1em] text-[rgb(var(--color-primary-fg))]">
-            hoje
+          <span
+            className={[
+              'mt-1 font-mono text-[9px] uppercase tracking-[0.12em]',
+              ativo ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
+            ].join(' ')}
+          >
+            {weekdayCurto(no.dia)}
           </span>
-        )}
+          {hoje && (
+            <span className="mt-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.1em] text-[rgb(var(--color-primary-fg))]">
+              hoje
+            </span>
+          )}
+        </span>
       </span>
 
       <span className="relative z-10 min-w-0 flex-1 py-0.5">
         {vazio ? (
-          <span className="block pt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgb(var(--foreground-muted)_/_0.55)]">
-            Em branco
+          <span
+            className={[
+              'block pt-2 font-mono text-[10px] uppercase tracking-[0.12em]',
+              ativo
+                ? 'font-semibold text-[rgb(var(--color-primary-fg))]'
+                : 'text-[rgb(var(--foreground-muted)_/_0.55)]',
+            ].join(' ')}
+          >
+            {ativo ? 'Dia selecionado' : 'Em branco'}
           </span>
         ) : (
           <>
@@ -306,13 +324,14 @@ function NoDiaDesktop({
                   return (
                     <span
                       key={k}
+                      aria-label={meta.label}
+                      title={meta.label}
                       className={[
-                        'inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-mono text-[8px] font-medium uppercase tracking-[0.1em]',
+                        'inline-flex items-center justify-center rounded-md p-1',
                         meta.pill,
                       ].join(' ')}
                     >
                       <Icon className="h-2.5 w-2.5 shrink-0" aria-hidden />
-                      {meta.label}
                     </span>
                   )
                 })}
@@ -341,7 +360,7 @@ function NoDiaDesktop({
       {ativo && (
         <m.span
           layoutId="memoria-no-ativo"
-          className="pointer-events-none absolute inset-0 -z-0 rounded-2xl ring-1 ring-[rgb(var(--color-primary)_/_0.2)]"
+          className="pointer-events-none absolute inset-0 -z-0 rounded-2xl ring-2 ring-[rgb(var(--color-primary)_/_0.5)]"
           transition={springSnappy}
         />
       )}
@@ -380,7 +399,7 @@ function NoDiaMobile({
       className={[
         'app-touch-target flex w-[4.75rem] shrink-0 flex-col overflow-hidden rounded-2xl border text-left transition-colors',
         ativo
-          ? 'border-[rgb(var(--color-primary)_/_0.5)] bg-[rgb(var(--color-primary)_/_0.12)]'
+          ? 'z-[1] border-2 border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.18)] shadow-[0_0_0_1px_rgb(var(--color-primary)_/_0.4),0_4px_16px_rgb(var(--color-primary)_/_0.15)]'
           : opaco
             ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.35)]'
             : 'border-[rgb(var(--border-strong))] bg-[rgb(var(--surface))]',
@@ -405,7 +424,12 @@ function NoDiaMobile({
           >
             {parts.day}
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgb(var(--foreground-muted))]">
+          <span
+            className={[
+              'font-mono text-[9px] uppercase tracking-[0.12em]',
+              ativo ? 'font-semibold text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
+            ].join(' ')}
+          >
             {weekdayCurto(no.dia)}
           </span>
         </span>

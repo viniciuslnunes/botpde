@@ -11,7 +11,14 @@ function abaAtiva(pathname: string, slug: string, tabQuery: string | null): stri
   const base = `/portal/departamentos/${slug}`
   if (pathname === `${base}/areas` || pathname.startsWith(`${base}/areas/`)) return 'areas'
   if (pathname === `${base}/projetos` || pathname.startsWith(`${base}/projetos/`)) return 'projetos'
-  if (tabQuery === 'equipe' || tabQuery === 'fila' || tabQuery === 'pedidos') return tabQuery
+  if (
+    tabQuery === 'equipe' ||
+    tabQuery === 'fila' ||
+    tabQuery === 'pedidos' ||
+    tabQuery === 'atendimento'
+  ) {
+    return tabQuery
+  }
   return 'painel'
 }
 

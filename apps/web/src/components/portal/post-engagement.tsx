@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
+import { useCallback, useMemo, useRef, useState, useTransition, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Heart, Flag, MessageCircle, Send, Loader2, Repeat2, Bookmark } from 'lucide-react'
+import { Bookmark, Flag, Heart, Loader2, MessageCircle, Repeat2, RotateCcw, Send, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   comentarPost,
@@ -37,6 +37,18 @@ import {
 import { Avatar } from './avatar'
 import { ComentarioMenu } from './comentario-menu'
 import { PostConteudoRich } from './post-conteudo-rich'
+import { AppButton } from '@/components/ui/button'
+import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import {
+  achatarRespostasDaArvore,
+  contarRespostasNaArvore,
+  montarArvoreComentarios,
+  type NoComentario,
+} from '@/lib/comentario-thread'
+import {
+  ComentarioRespostasBloco,
+  comentarioEstaNaThread,
+} from '@/components/portal/comentario-respostas-bloco'
 
 interface CurrentUser {
   id: string
@@ -56,6 +68,8 @@ interface PostEngagementProps {
   salvoInicial?: boolean
   /** Sócio com community:post. Torcedor só curte/comenta/salva. */
   podeCompartilhar?: boolean
+  /** Data/hora formatada no servidor (fuso SP). */
+  publicadoEm: string
 }
 
 function EngajamentoBtn({
@@ -99,6 +113,261 @@ function EngajamentoBtn({
   )
 }
 
+function BotaoResponderComentario({
+  onClick,
+}: {
+  onClick: () => void
+}) {
+  return (
+    <AppButton
+      variant="none"
+      icon={MessageCircle}
+      type="button"
+      onClick={onClick}
+      className="app-touch-line inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+    >
+      Responder
+    </AppButton>
+  )
+}
+
+/** Composer de resposta no post — mantém @menções do campo inferior. */
+function ComposerRespostaPost({
+  valor,
+  onChange,
+  onKeyUp,
+  onSubmit,
+  onCancelar,
+  respondendoANome,
+  pending,
+  mencaoQuery,
+  onSelectMencao,
+  onCloseMencao,
+  inputRef,
+  campoRef,
+}: {
+  valor: string
+  onChange: (value: string, caret?: number) => void
+  onKeyUp: (caret: number) => void
+  onSubmit: (e: FormEvent) => void
+  onCancelar: () => void
+  respondendoANome: string
+  pending: boolean
+  mencaoQuery: string | null
+  onSelectMencao: (m: MencaoSelecionada) => void
+  onCloseMencao: () => void
+  inputRef: RefObject<HTMLInputElement | null>
+  campoRef: RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-2.5"
+    >
+      <div className="flex items-center justify-between gap-2 px-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+        <span>
+          Respondendo a{' '}
+          <span className="font-semibold text-[rgb(var(--foreground))]">{respondendoANome}</span>
+        </span>
+        <button
+          type="button"
+          onClick={onCancelar}
+          aria-label="Cancelar resposta"
+          className="app-touch-target inline-flex rounded-lg p-1 hover:bg-[rgb(var(--surface))]"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <div ref={campoRef} className="relative min-w-0 flex-1">
+          <input
+            ref={inputRef}
+            value={valor}
+            onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? undefined)}
+            onKeyUp={(e) => onKeyUp(e.currentTarget.selectionStart ?? 0)}
+            maxLength={500}
+            placeholder="Escreva sua resposta… use @ para mencionar"
+            autoFocus
+            className="min-h-11 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-base text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))] sm:h-9 sm:py-0 sm:text-sm"
+          />
+          {mencaoQuery !== null && (
+            <MentionPicker
+              query={mencaoQuery}
+              onSelect={onSelectMencao}
+              onClose={onCloseMencao}
+              anchorRef={campoRef}
+            />
+          )}
+        </div>
+        <m.button
+          type="submit"
+          disabled={pending || !valor.trim()}
+          whileTap={{ scale: 0.9 }}
+          transition={springSnappy}
+          aria-label="Enviar resposta"
+          className="app-action shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+        >
+          <Send className="h-4 w-4" />
+        </m.button>
+      </div>
+    </form>
+  )
+}
+
+function LinhaRespostaPost({
+  comentario,
+  currentUser,
+  onResponder,
+  onEditado,
+  onExcluido,
+}: {
+  comentario: ComentarioPostItem
+  currentUser: CurrentUser
+  onResponder: (c: ComentarioPostItem) => void
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+}) {
+  const proprio = comentario.autor.id === currentUser.id
+  const autorLabel = proprio ? 'Você' : (comentario.autor.nome ?? 'Membro')
+  const persistido = !comentario.id.startsWith('tmp-')
+  const conteudo = (
+    <PostConteudoRich conteudo={comentario.conteudo} className="text-sm text-[rgb(var(--foreground))]" />
+  )
+
+  return (
+    <div className="flex items-start gap-2.5 py-2.5 pr-3">
+      <ComunidadePrefetchLink
+        href={`/portal/comunidade/perfil/${comentario.autor.id}`}
+        className="shrink-0"
+      >
+        <Avatar nome={comentario.autor.nome} avatarUrl={comentario.autor.avatarUrl} size="xs" />
+      </ComunidadePrefetchLink>
+      <div className="min-w-0 flex-1">
+        {proprio && persistido ? (
+          <ComentarioMenu
+            comentarioId={comentario.id}
+            conteudoInicial={comentario.conteudo}
+            autorLabel={autorLabel}
+            onEditado={(next) => onEditado(comentario.id, next)}
+            onExcluido={() => onExcluido(comentario.id)}
+          >
+            {conteudo}
+          </ComentarioMenu>
+        ) : (
+          <>
+            <ComunidadePrefetchLink
+              href={`/portal/comunidade/perfil/${comentario.autor.id}`}
+              className="app-sem-piso-toque text-xs font-semibold text-[rgb(var(--foreground))] hover:text-[rgb(var(--color-primary-fg))]"
+            >
+              {autorLabel}
+            </ComunidadePrefetchLink>
+            {conteudo}
+          </>
+        )}
+        {persistido ? (
+          <BotaoResponderComentario onClick={() => onResponder(comentario)} />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function LinhaComentarioPost({
+  no,
+  currentUser,
+  onResponder,
+  onEditado,
+  onExcluido,
+  index,
+  respondendoA,
+  composer,
+}: {
+  no: NoComentario<ComentarioPostItem>
+  currentUser: CurrentUser
+  onResponder: (c: ComentarioPostItem) => void
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+  index: number
+  respondendoA: string | null
+  composer: ReactNode
+}) {
+  const comentario = no.comentario
+  const proprio = comentario.autor.id === currentUser.id
+  const autorLabel = proprio ? 'Você' : (comentario.autor.nome ?? 'Membro')
+  const persistido = !comentario.id.startsWith('tmp-')
+  const totalRespostas = contarRespostasNaArvore(no)
+  const respostas = achatarRespostasDaArvore(no)
+  const naThread = comentarioEstaNaThread(
+    comentario.id,
+    respostas.map((r) => r.id),
+    respondendoA,
+  )
+  const conteudo = (
+    <PostConteudoRich conteudo={comentario.conteudo} className="text-sm text-[rgb(var(--foreground))]" />
+  )
+
+  return (
+    <div>
+      <m.div
+        custom={index}
+        variants={menuItemStagger}
+        className="flex items-start gap-2"
+      >
+        <ComunidadePrefetchLink
+          href={`/portal/comunidade/perfil/${comentario.autor.id}`}
+          className="shrink-0"
+        >
+          <Avatar nome={comentario.autor.nome} avatarUrl={comentario.autor.avatarUrl} size="xs" />
+        </ComunidadePrefetchLink>
+        <div className="min-w-0 flex-1">
+          {proprio && persistido ? (
+            <ComentarioMenu
+              comentarioId={comentario.id}
+              conteudoInicial={comentario.conteudo}
+              autorLabel={autorLabel}
+              onEditado={(next) => onEditado(comentario.id, next)}
+              onExcluido={() => onExcluido(comentario.id)}
+            >
+              {conteudo}
+            </ComentarioMenu>
+          ) : (
+            <div className="rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
+              <ComunidadePrefetchLink
+                href={`/portal/comunidade/perfil/${comentario.autor.id}`}
+                className="app-sem-piso-toque text-xs font-semibold text-[rgb(var(--foreground))] hover:text-[rgb(var(--color-primary-fg))]"
+              >
+                {autorLabel}
+              </ComunidadePrefetchLink>
+              {conteudo}
+            </div>
+          )}
+          <ComentarioRespostasBloco
+            total={totalRespostas}
+            forcarAberto={naThread}
+            acaoResponder={
+              persistido ? (
+                <BotaoResponderComentario onClick={() => onResponder(comentario)} />
+              ) : null
+            }
+            composer={composer}
+          >
+            {respostas.map((r) => (
+              <LinhaRespostaPost
+                key={r.id}
+                comentario={r}
+                currentUser={currentUser}
+                onResponder={onResponder}
+                onEditado={onEditado}
+                onExcluido={onExcluido}
+              />
+            ))}
+          </ComentarioRespostasBloco>
+        </div>
+      </m.div>
+    </div>
+  )
+}
+
 export function PostEngagement({
   postId,
   totalReacoes,
@@ -109,6 +378,7 @@ export function PostEngagement({
   isRepost = false,
   salvoInicial = false,
   podeCompartilhar = true,
+  publicadoEm,
 }: PostEngagementProps) {
   const [reacao, setReacao] = useState<TipoReacaoSocial | null>(minhaReacao)
   const [salvo, setSalvo] = useState(salvoInicial)
@@ -123,6 +393,7 @@ export function PostEngagement({
   const [erroComentarios, setErroComentarios] = useState<string | null>(null)
   const [comentario, setComentario] = useState('')
   const [mencoesComentario, setMencoesComentario] = useState<MencaoParsed[]>([])
+  const [respondendoA, setRespondendoA] = useState<string | null>(null)
   const [denunciando, setDenunciando] = useState(false)
   const [denunciado, setDenunciado] = useState(false)
   const [repostando, setRepostando] = useState(false)
@@ -137,6 +408,34 @@ export function PostEngagement({
   const inputRef = useRef<HTMLInputElement>(null)
   const comentarioCampoRef = useRef<HTMLDivElement>(null)
   const comentariosCarregadosRef = useRef(false)
+
+  const arvoreComentarios = useMemo(() => montarArvoreComentarios(comentarios), [comentarios])
+
+  const respondendoComentario = respondendoA
+    ? comentarios.find((c) => c.id === respondendoA) ?? null
+    : null
+
+  function cancelarResposta() {
+    setRespondendoA(null)
+    setComentario('')
+    setMencoesComentario([])
+    setMencaoQuery(null)
+  }
+
+  function iniciarResposta(alvo: ComentarioPostItem) {
+    const nome = alvo.autor.nome?.trim() || 'Membro'
+    const prefixo = `@${nome} `
+    setRespondendoA(alvo.id)
+    setComentario(prefixo)
+    setMencoesComentario([{ nome, userId: alvo.autor.id }])
+    setMencaoQuery(null)
+    setComentariosAbertos(true)
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      const el = inputRef.current
+      if (el) el.selectionStart = el.selectionEnd = prefixo.length
+    })
+  }
 
   const carregarComentarios = useCallback(async () => {
     if (comentariosCarregadosRef.current) return
@@ -191,11 +490,13 @@ export function PostEngagement({
     e.preventDefault()
     const persistido = serializarMencoes(comentario, mencoesComentario).trim()
     if (!persistido || pending) return
+    const parentId = respondendoA
     const tempId = `tmp-${Date.now()}`
     const otimista: ComentarioPostItem = {
       id: tempId,
       conteudo: persistido,
       criadoEm: new Date().toISOString(),
+      parentId,
       autor: {
         id: currentUser.id,
         nome: currentUser.nome,
@@ -207,10 +508,11 @@ export function PostEngagement({
     setComentario('')
     setMencoesComentario([])
     setMencaoQuery(null)
+    setRespondendoA(null)
     setComentariosAbertos(true)
     startTransition(async () => {
       try {
-        const salvoComentario = await comentarPost(postId, persistido)
+        const salvoComentario = await comentarPost(postId, persistido, parentId ?? undefined)
         setComentarios((prev) => prev.map((c) => (c.id === tempId ? salvoComentario : c)))
         comentariosCarregadosRef.current = true
       } catch (err) {
@@ -219,6 +521,7 @@ export function PostEngagement({
         const { texto, mencoes } = paraTextoLegivel(persistido)
         setComentario(texto)
         setMencoesComentario(mencoes)
+        if (parentId) setRespondendoA(parentId)
         toast.error(err instanceof Error ? err.message : 'Não foi possível comentar.')
       }
     })
@@ -338,54 +641,57 @@ export function PostEngagement({
     comentariosAbertos || comentarios.length > 0 || carregandoComentarios
 
   return (
-    <div className="mt-1.5">
-      <AnimatePresence>
-        {(totalR > 0 || totalC > 0) && (
-          <m.div
-            key="contagens"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={springSnappy}
-            className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]"
-          >
-            {totalR > 0 && (
-              <m.span layout className="inline-flex items-center gap-1">
-                <Heart className="h-3.5 w-3.5 fill-[rgb(var(--color-primary-fg))] text-[rgb(var(--color-primary-fg))]" />
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <m.span
-                    key={totalR}
-                    className="inline-flex"
-                    initial={{ opacity: 0, scale: 0.6, y: -6 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.6, y: 6 }}
-                    transition={springSnappy}
-                  >
-                    {totalR}
-                  </m.span>
-                </AnimatePresence>
-              </m.span>
-            )}
-            {totalC > 0 && (
-              <m.span layout className="inline-flex items-center gap-1">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <m.span
-                    key={totalC}
-                    className="inline-flex"
-                    initial={{ opacity: 0, scale: 0.6, y: -6 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.6, y: 6 }}
-                    transition={springSnappy}
-                  >
-                    {totalC}
-                  </m.span>
-                </AnimatePresence>
-                comentário{totalC === 1 ? '' : 's'}
-              </m.span>
-            )}
-          </m.div>
-        )}
-      </AnimatePresence>
+    <div className="mt-4">
+      <div className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]">
+        <AnimatePresence>
+          {(totalR > 0 || totalC > 0) && (
+            <m.div
+              key="contagens"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={springSnappy}
+              className="flex min-w-0 items-center gap-3"
+            >
+              {totalR > 0 && (
+                <m.span layout className="inline-flex items-center gap-1">
+                  <Heart className="h-3.5 w-3.5 fill-[rgb(var(--color-primary-fg))] text-[rgb(var(--color-primary-fg))]" />
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <m.span
+                      key={totalR}
+                      className="inline-flex"
+                      initial={{ opacity: 0, scale: 0.6, y: -6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.6, y: 6 }}
+                      transition={springSnappy}
+                    >
+                      {totalR}
+                    </m.span>
+                  </AnimatePresence>
+                </m.span>
+              )}
+              {totalC > 0 && (
+                <m.span layout className="inline-flex items-center gap-1">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <m.span
+                      key={totalC}
+                      className="inline-flex"
+                      initial={{ opacity: 0, scale: 0.6, y: -6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.6, y: 6 }}
+                      transition={springSnappy}
+                    >
+                      {totalC}
+                    </m.span>
+                  </AnimatePresence>
+                  comentário{totalC === 1 ? '' : 's'}
+                </m.span>
+              )}
+            </m.div>
+          )}
+        </AnimatePresence>
+        <time className="ml-auto shrink-0 tabular-nums">{publicadoEm}</time>
+      </div>
 
       <div className="flex items-center gap-0.5 border-t border-[rgb(var(--border))] pt-1.5">
         <div className="flex min-w-0 flex-1 items-center">
@@ -584,13 +890,15 @@ export function PostEngagement({
             {!carregandoComentarios && erroComentarios && comentarios.length === 0 && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
                 <span>{erroComentarios}</span>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={RotateCcw}
                   type="button"
                   onClick={() => void carregarComentarios()}
                   className="app-touch-target rounded-lg px-2 py-1 font-semibold text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--background-subtle))]"
                 >
                   Tentar de novo
-                </button>
+                </AppButton>
               </div>
             )}
 
@@ -601,47 +909,54 @@ export function PostEngagement({
               initial="hidden"
               animate="show"
             >
-              {comentarios.map((c, i) => {
-                const proprio = c.autor.id === currentUser.id
-                const autorLabel = proprio ? 'Você' : (c.autor.nome ?? 'Membro')
-                const conteudo = (
-                  <PostConteudoRich
-                    conteudo={c.conteudo}
-                    className="text-sm text-[rgb(var(--foreground))]"
-                  />
+              {arvoreComentarios.map((no, i) => {
+                const flat = achatarRespostasDaArvore(no)
+                const naThread = comentarioEstaNaThread(
+                  no.comentario.id,
+                  flat.map((r) => r.id),
+                  respondendoA,
                 )
                 return (
-                  <m.div
-                    key={c.id}
-                    custom={i}
-                    variants={menuItemStagger}
-                    className="flex items-start gap-2"
-                  >
-                    <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
-                    {proprio && !c.id.startsWith('tmp-') ? (
-                      <ComentarioMenu
-                        comentarioId={c.id}
-                        conteudoInicial={c.conteudo}
-                        autorLabel={autorLabel}
-                        onEditado={(next) => {
-                          setComentarios((prev) =>
-                            prev.map((item) => (item.id === c.id ? { ...item, conteudo: next } : item)),
-                          )
-                        }}
-                        onExcluido={() => {
-                          setComentarios((prev) => prev.filter((item) => item.id !== c.id))
-                          setTotalC((n) => Math.max(0, n - 1))
-                        }}
-                      >
-                        {conteudo}
-                      </ComentarioMenu>
-                    ) : (
-                      <div className="min-w-0 flex-1 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
-                        <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
-                        {conteudo}
-                      </div>
-                    )}
-                  </m.div>
+                  <LinhaComentarioPost
+                    key={no.comentario.id}
+                    no={no}
+                    currentUser={currentUser}
+                    onResponder={iniciarResposta}
+                    respondendoA={respondendoA}
+                    composer={
+                      !operador && naThread && respondendoComentario ? (
+                        <ComposerRespostaPost
+                          valor={comentario}
+                          onChange={handleComentarioChange}
+                          onKeyUp={(caret) => handleComentarioChange(comentario, caret)}
+                          onSubmit={enviarComentario}
+                          onCancelar={cancelarResposta}
+                          respondendoANome={respondendoComentario.autor.nome ?? 'Membro'}
+                          pending={pending}
+                          mencaoQuery={mencaoQuery}
+                          onSelectMencao={inserirMencaoComentario}
+                          onCloseMencao={() => setMencaoQuery(null)}
+                          inputRef={inputRef}
+                          campoRef={comentarioCampoRef}
+                        />
+                      ) : null
+                    }
+                    onEditado={(id, conteudo) => {
+                      setComentarios((prev) =>
+                        prev.map((item) => (item.id === id ? { ...item, conteudo } : item)),
+                      )
+                    }}
+                    onExcluido={(id) => {
+                      setComentarios((prev) =>
+                        prev
+                          .filter((item) => item.id !== id)
+                          .map((item) => (item.parentId === id ? { ...item, parentId: null } : item)),
+                      )
+                      setTotalC((n) => Math.max(0, n - 1))
+                      setRespondendoA((atual) => (atual === id ? null : atual))
+                    }}
+                    index={i}
+                  />
                 )
               })}
             </m.div>
@@ -652,15 +967,19 @@ export function PostEngagement({
               </p>
             )}
 
-            {comentariosAbertos && !operador && (
+            {comentariosAbertos && !operador && !respondendoA && (
               <form onSubmit={enviarComentario} className="flex items-center gap-2">
                 <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
                 <div ref={comentarioCampoRef} className="relative min-w-0 flex-1">
                   <input
                     ref={inputRef}
                     value={comentario}
-                    onChange={(e) => handleComentarioChange(e.target.value, e.target.selectionStart ?? undefined)}
-                    onKeyUp={(e) => handleComentarioChange(comentario, e.currentTarget.selectionStart ?? undefined)}
+                    onChange={(e) =>
+                      handleComentarioChange(e.target.value, e.target.selectionStart ?? undefined)
+                    }
+                    onKeyUp={(e) =>
+                      handleComentarioChange(comentario, e.currentTarget.selectionStart ?? undefined)
+                    }
                     maxLength={500}
                     placeholder="Escreva um comentário… use @ para mencionar"
                     className="h-9 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"

@@ -15,6 +15,7 @@ import {
 } from '@/app/portal/departamentos/actions'
 import { runPersistAction } from '@/lib/toast-action'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 export type AreaGestaoProps = {
   areaId: string
@@ -89,14 +90,25 @@ function AreaGestaoModal({
   const router = useRouter()
   const [membros, setMembros] = useState<AreaMembroAdmin[] | null>(null)
   const [q, setQ] = useState('')
-  const [busca, setBusca] = useState<{
-    termo: string
-    itens: Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
-  }>({ termo: '', itens: [] })
-  const [pendingSearch, startSearch] = useTransition()
+  const [resultados, setResultados] = useState<
+    Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
+  >([])
   const [pendingAcao, startAcao] = useTransition()
+
+  async function buscarPessoas(termo: string): Promise<ReactiveSearchOption[]> {
+    const rows = await buscarCandidatosParaArea(areaId, departamentoId, termo)
+    setResultados(rows)
+    return rows.map((c) => ({
+      id: c.id,
+      label: c.nome?.trim() || c.email,
+      sublabel: c.nickname ? `@${c.nickname}` : c.email,
+      searchText: [c.nome, c.email, c.nickname].filter(Boolean).join(' '),
+      payload: c,
+    }))
+  }
+
   const qBusca = q.trim().length >= 2 ? q.trim() : ''
-  const candidatos = busca.termo === qBusca ? busca.itens : []
+  const candidatos = qBusca ? resultados : []
 
   useEffect(() => {
     let cancelled = false
@@ -107,22 +119,6 @@ function AreaGestaoModal({
       cancelled = true
     }
   }, [areaId, departamentoId])
-
-  useEffect(() => {
-    if (!qBusca) return
-    let cancelled = false
-    const t = setTimeout(() => {
-      startSearch(() => {
-        void buscarCandidatosParaArea(areaId, departamentoId, qBusca).then((rows) => {
-          if (!cancelled) setBusca({ termo: qBusca, itens: rows })
-        })
-      })
-    }, 280)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
-  }, [qBusca, areaId, departamentoId])
 
   function recarregar() {
     void listarMembrosArea(areaId, departamentoId).then(setMembros)
@@ -158,7 +154,7 @@ function AreaGestaoModal({
         success: `${nome} entrou em ${areaNome}`,
       })
       if (ok) {
-        setBusca((prev) => ({ ...prev, itens: prev.itens.filter((p) => p.id !== userId) }))
+        setResultados((prev) => prev.filter((p) => p.id !== userId))
         recarregar()
       }
     })
@@ -252,21 +248,21 @@ function AreaGestaoModal({
           </ul>
         )}
 
-        <label className="block">
-          <span className="sr-only">Buscar pessoa do departamento</span>
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar quem já está no departamento…"
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          />
-        </label>
+        <SearchFilterInput
+          value={q}
+          onChange={(next) => {
+            setQ(next)
+            if (next.trim().length < 2) setResultados([])
+          }}
+          placeholder="Buscar quem já está no departamento…"
+          ariaLabel="Buscar pessoa do departamento"
+          onSearch={buscarPessoas}
+          onSelectSuggestion={(item) => setQ(item.label)}
+          minChars={2}
+          noResultsMessage="Ninguém do departamento — inclua a pessoa em Acessos · Pessoas primeiro."
+        />
 
-        {pendingSearch && qBusca ? (
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">Buscando…</p>
-        ) : null}
-        {!pendingSearch && qBusca && candidatos.length === 0 ? (
+        {qBusca && candidatos.length === 0 ? (
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
             Ninguém do departamento para “{qBusca}”. Inclua a pessoa em{' '}
             <a href="/admin/acessos?secao=pessoas" className="underline">

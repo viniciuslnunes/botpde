@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
+import { BarChart3, CheckCircle2, CircleSlash, Loader2, Plus, X } from 'lucide-react'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { toast } from '@torcida/ui'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { AvatarFoto } from '@/components/media/avatar-foto'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { collapsePanel, springGentle, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { AppButton } from '@/components/ui/button'
 
 type VotanteEnquete = {
   userId: string
@@ -189,13 +190,15 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
             />
           ))}
           {opcoes.length < 6 && (
-            <button
+            <AppButton
+              variant="none"
+              icon={Plus}
               type="button"
               onClick={() => setOpcoes((prev) => [...prev, ''])}
               className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]"
             >
               + Adicionar opção
-            </button>
+            </AppButton>
           )}
           <m.button
             type="submit"
@@ -233,13 +236,15 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
               <div className="mb-3 flex items-start justify-between gap-2">
                 <p className="text-base font-semibold text-[rgb(var(--foreground))]">{enquete.pergunta}</p>
                 {isHost && (
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={CircleSlash}
                     type="button"
                     onClick={() => void encerrar(enquete.id)}
                     className="shrink-0 text-xs text-red-500 hover:underline"
                   >
                     Encerrar
-                  </button>
+                  </AppButton>
                 )}
               </div>
 
@@ -250,6 +255,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                   return (
                     <li key={opcao.id}>
                       <button
+                        // lint-botoes: nao-e-acao — opção de voto da enquete (card clicável)
                         type="button"
                         disabled={votando === opcao.id}
                         onClick={() => void votar(enquete.id, opcao.id)}

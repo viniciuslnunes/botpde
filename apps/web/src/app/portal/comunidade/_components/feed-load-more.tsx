@@ -4,6 +4,7 @@ import type { RefObject } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { CheckCircle2, RotateCw } from 'lucide-react'
 import { FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
+import { AppButton } from '@/components/ui/button'
 
 interface FeedLoadMoreProps {
   /** Observado pelo IntersectionObserver do feed — envolve a área de carga. */
@@ -45,14 +46,15 @@ export function FeedLoadMore({
       {error ? (
         <div className="card-soft flex flex-col items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5 text-center">
           <p className="text-sm text-[rgb(var(--foreground-muted))]">{error}</p>
-          <button
+          <AppButton
+            variant="none"
+            icon={RotateCw}
             type="button"
             onClick={onRetry}
             className="app-action inline-flex items-center gap-2 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-4 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--border-strong))]"
           >
-            <RotateCw className="h-4 w-4" />
             Tentar de novo
-          </button>
+          </AppButton>
         </div>
       ) : !hasMore ? (
         temConteudo ? (

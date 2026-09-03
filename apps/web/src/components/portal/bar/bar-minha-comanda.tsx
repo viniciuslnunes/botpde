@@ -1,5 +1,6 @@
-import { Receipt, AlertCircle } from 'lucide-react'
+import { Receipt, AlertCircle, QrCode } from 'lucide-react'
 import type { BarComandaAbertaPortal, BarDebitoComandaPortal } from '@/lib/bar-comanda'
+import { QrCodeVisual } from '@/components/ui/qr-code'
 
 function formatarPreco(valor: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -19,9 +20,12 @@ function formatarData(d: Date) {
 export function BarMinhaComanda({
   comanda,
   debitos,
+  qrComanda,
 }: {
   comanda: BarComandaAbertaPortal | null
   debitos: BarDebitoComandaPortal[]
+  /** Payload do QR da comanda aberta — o balcão escaneia em vez de digitar. */
+  qrComanda?: string | null
 }) {
   if (!comanda && debitos.length === 0) {
     return (
@@ -41,6 +45,17 @@ export function BarMinhaComanda({
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">
                   Código {comanda.codigo} · só leitura — paga no balcão
                 </p>
+                {qrComanda && (
+                  <details className="mt-2">
+                    <summary className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
+                      <QrCode className="h-3.5 w-3.5" aria-hidden />
+                      Mostrar QR da comanda
+                    </summary>
+                    <div className="mt-2">
+                      <QrCodeVisual value={qrComanda} size={150} label="QR da comanda do bar" />
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
             <p className="text-lg font-bold tabular-nums text-[rgb(var(--foreground))]">

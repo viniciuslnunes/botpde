@@ -486,6 +486,10 @@ button,
   color: rgb(var(--color-primary-on));
   box-shadow: inset 0 0 0 1px rgb(var(--color-primary-ring) / var(--color-primary-ring-a, 0));
 }
+:is(button, a).btn-primary:not(.app-btn-texto-original):not(.app-nav-link) {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 /*
   Fill sólida via classe arbitrária do Tailwind (`bg-[rgb(var(--primary))]`
   + `text-white`). `text-white` vence o token e some em marca branca
@@ -724,6 +728,23 @@ button,
      sócio, título de post) mantém a caixa original. Existe para ser usado,
      não para contornar a regra — o lint aponta quem abusa. */
   .app-btn-texto-original {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* Legado: botão/link com `.app-action` mas ainda sem `AppButton`.
+     Mesma caixa alta; exclui chip/aba/disclosure/card (fora do escopo —
+     ver docs/frontend/botoes.md).
+     Seletor `a`, não `a[href]`: o LinkStatusBarSuppressor tira `href` no
+     hover (status bar do navegador) e `a[href]` deixava de casar — o rótulo
+     voltava à caixa do JSX no :hover. */
+  :is(button, a).app-action:not(.app-btn-texto-original):not(.app-nav-link):not([aria-expanded]):not([aria-pressed]):not([role='tab']) {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Topbar / nav principal — navegação, não botão de ação. */
+  .app-nav-link {
     text-transform: none;
     letter-spacing: normal;
   }
@@ -1400,6 +1421,72 @@ html[data-grid='off'] .app-shell-bg {
   .memoria-print-area select,
   .memoria-print-area fieldset {
     display: none !important;
+  }
+}
+
+/* ── Cartaz imprimível (convite por QR) ──────────────────────────────────
+   O cartaz não existe na tela: ele só aparece na impressão, e quando aparece
+   toma a folha inteira. Usa `visibility` em vez de `display` de propósito —
+   `display:none` no resto da árvore colapsaria o layout e o cartaz herdaria
+   posição de um pai já removido. Escopado em `.app-cartaz`: sem um cartaz na
+   página, este bloco não faz nada. */
+.app-cartaz {
+  display: none;
+}
+
+/* Folha de etiquetas: mesma mecânica do cartaz, mas grade — imprimir 200 QR do
+   acervo um por página não é opção. `break-inside: avoid` impede a etiqueta de
+   ser cortada ao meio na quebra de página, que a tornaria inútil. */
+.app-folha-etiquetas {
+  display: none;
+}
+
+@media print {
+  body:has(.app-folha-etiquetas) * {
+    visibility: hidden;
+  }
+  .app-folha-etiquetas,
+  .app-folha-etiquetas * {
+    visibility: visible;
+  }
+  .app-folha-etiquetas {
+    display: grid;
+    position: absolute;
+    inset: 0;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.5rem;
+    background: #fff;
+    color: #000;
+  }
+  .app-folha-etiquetas > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.4rem;
+    text-align: center;
+  }
+}
+
+@media print {
+  body:has(.app-cartaz) * {
+    visibility: hidden;
+  }
+  .app-cartaz,
+  .app-cartaz * {
+    visibility: visible;
+  }
+  .app-cartaz {
+    display: block;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 2rem;
+    /* Fundo branco e texto preto: cartaz é tinta em papel, não tema do app. */
+    background: #fff;
+    color: #000;
   }
 }
 

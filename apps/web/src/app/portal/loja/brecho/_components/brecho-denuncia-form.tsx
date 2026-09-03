@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react'
 import { denunciarBrechoAction } from '../actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
+import { Gavel, X } from 'lucide-react'
 
 export function BrechoDenunciaForm({
   anuncioId,
@@ -23,13 +25,15 @@ export function BrechoDenunciaForm({
 
   if (!aberto) {
     return (
-      <button
+      <AppButton
+        variant="none"
+        icon={Gavel}
         type="button"
         className="app-touch-line text-sm text-[rgb(var(--foreground-muted))] underline-offset-2 hover:underline"
         onClick={() => setAberto(true)}
       >
         Declarar má fé
-      </button>
+      </AppButton>
     )
   }
 
@@ -67,9 +71,9 @@ export function BrechoDenunciaForm({
         >
           {pending ? 'Enviando…' : 'Enviar denúncia'}
         </button>
-        <button type="button" className="app-action px-3 text-sm" onClick={() => setAberto(false)}>
+        <AppButton variant="none" icon={X} type="button" className="app-action px-3 text-sm" onClick={() => setAberto(false)}>
           Cancelar
-        </button>
+        </AppButton>
       </div>
     </form>
   )

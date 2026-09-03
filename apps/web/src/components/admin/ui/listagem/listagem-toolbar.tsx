@@ -10,11 +10,13 @@ import {
   type ListagemParams,
   type ListagemSpec,
 } from '@/lib/listagem'
+import { serializarListagemParams } from '@/lib/listagem/params'
 import {
   montarChips,
   montarFiltroUI,
   ocultosPreservados,
   paramsDoContrato,
+  paramsDoContratoPersistivel,
   type OpcoesDinamicas,
 } from '@/lib/listagem/ui'
 import { ListagemBusca } from './listagem-busca'
@@ -65,6 +67,13 @@ export function ListagemToolbar({
 }: ListagemToolbarProps) {
   const chips = montarChips(spec, params, facetas, dinamicas)
   const filtrando = temFiltroAtivo(params)
+  const filtrosQueryParams = serializarListagemParams(spec, params, { q: null, pagina: 1 })
+  if (extras) {
+    for (const [nome, valor] of Object.entries(extras)) {
+      if (valor != null && valor !== '') filtrosQueryParams.set(nome, valor)
+    }
+  }
+  const filtrosQuery = filtrosQueryParams.toString()
   const ocultos = ocultosPreservados(spec, params, null, extras).filter(
     (campo) => campo.nome !== PARAM_BUSCA,
   )
@@ -87,6 +96,7 @@ export function ListagemToolbar({
           listagemId={spec.id}
           basePath={spec.basePath}
           paramsDoContrato={paramsDoContrato(spec)}
+          paramsPersistiveis={paramsDoContratoPersistivel(spec)}
           escopoChave={escopoChave}
         />
       )}
@@ -102,6 +112,8 @@ export function ListagemToolbar({
               <input key={campo.nome} type="hidden" name={campo.nome} value={campo.valor} />
             ))}
             <ListagemBusca
+              specId={spec.id}
+              filtrosQuery={filtrosQuery}
               defaultValue={params.q}
               placeholder={spec.buscaPlaceholder ?? 'Buscar…'}
               ariaLabel={spec.buscaPlaceholder ?? 'Buscar na listagem'}

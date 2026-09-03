@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { formatRelative } from '@/lib/format-datetime'
 import { editarTopico } from '../praca-actions'
@@ -19,6 +20,7 @@ export function ForumTopicoCard({
   topico,
   escopo,
   isAuthor,
+  rodape,
 }: {
   topico: {
     id: string
@@ -33,6 +35,7 @@ export function ForumTopicoCard({
   }
   escopo: EscopoComunidade
   isAuthor: boolean
+  rodape?: ReactNode
 }) {
   const midias = ensureSocialEmbedInMidias(topico.corpo, topico.midiaUrls)
   const conteudoVisivel = stripEmbeddedSocialUrls(topico.corpo, midias)
@@ -100,6 +103,10 @@ export function ForumTopicoCard({
           <PostEditableMidia>{null}</PostEditableMidia>
         )}
       </PostEditProvider>
+
+      {rodape ? (
+        <footer className="mt-4 border-t border-[rgb(var(--border))] pt-1.5">{rodape}</footer>
+      ) : null}
     </article>
   )
 }

@@ -1,29 +1,36 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarHeart, CalendarRange, Users, Venus } from 'lucide-react'
+import { AlertTriangle, CalendarHeart, CalendarRange, Users, Venus } from 'lucide-react'
 import { hasPermission, PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoFeminino } from '@/lib/feminino-direcao'
+import { parseAcervoTab } from '@/lib/acervo-tab'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
 import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
+  AdminHeaderActionLink,
+  AdminPendingTabs,
+  adminTabIds,
   DirecaoInboxSkeleton,
   DirecaoKpisSkeleton,
   DirecaoListaSkeleton,
   KpiGrid,
   StatCard,
+  type AdminTabItem,
 } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Feminino — Admin' }
+
+const FEMININO_TABS = ['agenda', 'pendencias'] as const
+const ICONE_TAB = 'h-4 w-4 shrink-0'
 
 async function FemininoKpis({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoFeminino(tenantId)
@@ -47,66 +54,105 @@ async function FemininoKpis({ tenantId }: { tenantId: string }) {
         label="Ações (60d)"
         value={ops.proximosEventos}
         icon={<CalendarHeart className="h-5 w-5" />}
-        href="#agenda"
+        href="/admin/feminino?tab=agenda"
       />
     </KpiGrid>
   )
 }
 
-async function FemininoInboxELista({
+async function FemininoTabs({
+  tenantId,
+  tab,
+}: {
+  tenantId: string
+  tab: (typeof FEMININO_TABS)[number]
+}) {
+  const ops = await carregarDirecaoFeminino(tenantId)
+  const tabs: AdminTabItem[] = [
+    {
+      id: 'agenda',
+      label: 'Agenda',
+      icon: <CalendarHeart className={ICONE_TAB} />,
+      count: ops.lista.length,
+    },
+    {
+      id: 'pendencias',
+      label: 'Precisa de você',
+      icon: <AlertTriangle className={ICONE_TAB} />,
+      count: ops.pendencias.length,
+      countClass:
+        ops.pendencias.length > 0
+          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
+          : undefined,
+    },
+  ]
+
+  return <AdminPendingTabs tabs={tabs} basePath="/admin/feminino" activeId={tab} paramKey="tab" />
+}
+
+async function FemininoCorpo({
   tenantId,
   podeVincular,
+  tab,
 }: {
   tenantId: string
   podeVincular: boolean
+  tab: (typeof FEMININO_TABS)[number]
 }) {
   const ops = await carregarDirecaoFeminino(tenantId)
-  return (
-    <>
-      <DepartamentoSemanaOps
-        itens={ops.semana}
-        partidas={ops.partidasSemana}
-        semanaHref="/admin/eventos?vista=semana"
-        podeVincularPartida={podeVincular}
-        titulo="Semana do Feminino"
-      />
+  const { tabId, panelId } = adminTabIds('tab', tab)
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-          Precisa de você
-        </h2>
+  return (
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
+      {tab === 'agenda' ? (
+        <>
+          <MotionReveal>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Thin sobre Agenda e Comunidade. Detalhe de eventos abre na Agenda.
+            </p>
+          </MotionReveal>
+
+          <FemininoKpis tenantId={tenantId} />
+
+          <DepartamentoSemanaOps
+            itens={ops.semana}
+            partidas={ops.partidasSemana}
+            semanaHref="/admin/eventos?vista=semana"
+            podeVincularPartida={podeVincular}
+            titulo="Semana do Feminino"
+          />
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Agenda da frente
+            </h2>
+            <AdminEventosList
+              eventos={ops.lista}
+              emptyTitle="Nenhuma ação com projeto do Feminino"
+              emptyDescription="Crie o evento e vincule a um projeto deste departamento."
+              detailBasePath="/admin/feminino"
+            />
+          </section>
+        </>
+      ) : null}
+
+      {tab === 'pendencias' ? (
         <AdminInboxList
           itens={ops.pendencias}
           podeAgir={false}
           emptyTitle="Feminino em dia."
         />
-      </section>
-
-      <section id="agenda" className="scroll-mt-20 space-y-3">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-          Agenda da frente
-        </h2>
-        <AdminEventosList
-          eventos={ops.lista}
-          emptyTitle="Nenhuma ação com projeto do Feminino"
-          emptyDescription="Crie o evento e vincule a um projeto deste departamento."
-          detailBasePath="/admin/feminino"
-        />
-      </section>
-    </>
+      ) : null}
+    </div>
   )
 }
 
 async function FemininoHeaderLinks({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoFeminino(tenantId)
   return (
-    <Link
-      href={`/portal/departamentos/${ops.departamentoSlug}`}
-      className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-    >
-      <Users className="h-4 w-4" aria-hidden />
+    <AdminHeaderActionLink href={`/portal/departamentos/${ops.departamentoSlug}`} icon={Users}>
       Equipe no portal
-    </Link>
+    </AdminHeaderActionLink>
   )
 }
 
@@ -131,12 +177,17 @@ async function FemininoActions({
       partidas={partidas}
       projetos={projetos}
       temAfiliacao={Boolean(afiliacaoId)}
-      redirectTo="/admin/feminino"
+      departamentoSlug="feminino"
+        redirectTo="/admin/feminino"
     />
   )
 }
 
-export default async function AdminFemininoPage() {
+export default async function AdminFemininoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
@@ -161,6 +212,9 @@ export default async function AdminFemininoPage() {
   }
   if (!session.user?.id) redirect('/portal')
 
+  const sp = await searchParams
+  const tab = parseAcervoTab(sp.tab, FEMININO_TABS, 'agenda')
+
   return (
     <>
       <AdminPageHeader
@@ -172,40 +226,31 @@ export default async function AdminFemininoPage() {
             <Suspense fallback={null}>
               <FemininoHeaderLinks tenantId={tenant.id} />
             </Suspense>
-            <Link
-              href="/admin/eventos?vista=semana"
-              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              <CalendarRange className="h-4 w-4" aria-hidden />
+            <AdminHeaderActionLink href="/admin/eventos?vista=semana" icon={CalendarRange}>
               Agenda da semana
-            </Link>
+            </AdminHeaderActionLink>
             <Suspense fallback={null}>
               <FemininoActions tenantId={tenant.id} podeGerir={podeGerir} />
             </Suspense>
           </div>
         }
-      />
+      >
+        <Suspense fallback={<div className="h-9 w-full max-w-lg animate-pulse rounded-lg bg-[rgb(var(--border)_/_0.45)]" />}>
+          <FemininoTabs tenantId={tenant.id} tab={tab} />
+        </Suspense>
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <MotionReveal>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Thin sobre Agenda e Comunidade. Detalhe de eventos abre na Agenda.
-          </p>
-        </MotionReveal>
-
-        <Suspense fallback={<DirecaoKpisSkeleton cols={3} />}>
-          <FemininoKpis tenantId={tenant.id} />
-        </Suspense>
-
         <Suspense
           fallback={
             <div className="space-y-6">
+              <DirecaoKpisSkeleton cols={3} />
               <DirecaoInboxSkeleton />
               <DirecaoListaSkeleton />
             </div>
           }
         >
-          <FemininoInboxELista tenantId={tenant.id} podeVincular={podeVincular} />
+          <FemininoCorpo tenantId={tenant.id} podeVincular={podeVincular} tab={tab} />
         </Suspense>
       </div>
     </>

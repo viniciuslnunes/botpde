@@ -78,7 +78,7 @@ export default async function AdminLojaTicketDetalhePage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link
-            href="/admin/loja/tickets"
+            href="/admin/loja/atendimento?v=arquivo"
             className="mb-2 inline-flex items-center gap-1 text-sm text-[rgb(var(--foreground-muted))] hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />

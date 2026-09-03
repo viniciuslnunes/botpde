@@ -528,6 +528,7 @@ const paletaExtraidaSchema = z.object({
 const comentarioSchema = z.object({
   postId: z.string().min(1),
   conteudo: z.string().trim().min(1, 'Comentário é obrigatório').max(500),
+  parentId: z.string().uuid().optional(),
 })
 
 const editarComentarioSchema = z.object({
@@ -1243,6 +1244,7 @@ export interface ComentarioPostItem {
   id: string
   conteudo: string
   criadoEm: string
+  parentId: string | null
   autor: { id: string; nome: string | null; avatarUrl: string | null }
 }
 
@@ -1310,6 +1312,7 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     id: string
     conteudo: string
     criadoEm: Date
+    parentId: string | null
     autor: { id: string; nome: string | null; avatarUrl: string | null }
   }> = await db.comentario.findMany({
     // Comentário ocultado pela moderação some da thread, como o post oculto.
@@ -1323,6 +1326,7 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     id: c.id,
     conteudo: c.conteudo,
     criadoEm: c.criadoEm.toISOString(),
+    parentId: c.parentId,
     autor: c.autor,
   }))
 }
@@ -1330,8 +1334,9 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
 export async function comentarPost(
   postId: string,
   conteudo: string,
+  parentId?: string,
 ): Promise<ComentarioPostItem> {
-  const parsed = comentarioSchema.safeParse({ postId, conteudo })
+  const parsed = comentarioSchema.safeParse({ postId, conteudo, parentId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Comentário inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
@@ -1358,6 +1363,17 @@ export async function comentarPost(
     throw new Error('Post não encontrado')
   }
 
+  let parentAutorId: string | null = null
+  if (parsed.data.parentId) {
+    const pai: { id: string; postId: string; oculto: boolean; autorId: string } | null =
+      await db.comentario.findFirst({
+        where: { id: parsed.data.parentId, postId: post.id, oculto: false },
+        select: { id: true, postId: true, oculto: true, autorId: true },
+      })
+    if (!pai) throw new ExpectedError('Comentário não encontrado')
+    parentAutorId = pai.autorId
+  }
+
   const { session, viewerId, tenantId, afiliacaoId } = ctx
   const limiterKey = `comment:${tenantId ?? `nacional:${afiliacaoId}`}:${viewerId}`
   if (excedeuLimiteEngajamento(limiterKey)) {
@@ -1368,10 +1384,16 @@ export async function comentarPost(
   const notifTenantId = tenantId ?? post.tenantId
   const link = linkPostComunidade(post.id)
 
-  const comentario: { id: string; conteudo: string; criadoEm: Date } = await db.comentario.create({
-    data: { postId: post.id, autorId: viewerId, conteudo: parsed.data.conteudo },
-    select: { id: true, conteudo: true, criadoEm: true },
-  })
+  const comentario: { id: string; conteudo: string; criadoEm: Date; parentId: string | null } =
+    await db.comentario.create({
+      data: {
+        postId: post.id,
+        autorId: viewerId,
+        conteudo: parsed.data.conteudo,
+        parentId: parsed.data.parentId ?? null,
+      },
+      select: { id: true, conteudo: true, criadoEm: true, parentId: true },
+    })
 
   // Audit + notificações fora do caminho crítico (UI já é otimista).
   const corpoNotif = parsed.data.conteudo.slice(0, 140)
@@ -1392,7 +1414,18 @@ export async function comentarPost(
         })
         .catch(() => undefined)
     }
-    if (post.autorId !== viewerId) {
+    if (parentAutorId && parentAutorId !== viewerId) {
+      void notificarSafe({
+        userId: parentAutorId,
+        tenantId: notifTenantId,
+        tipo: 'NOVO_COMENTARIO',
+        titulo: 'Resposta no seu comentário',
+        corpo: corpoNotif,
+        link,
+        atorId: viewerId,
+      })
+    }
+    if (post.autorId !== viewerId && post.autorId !== parentAutorId) {
       void notificarSafe({
         userId: post.autorId,
         tenantId: notifTenantId,
@@ -1418,6 +1451,7 @@ export async function comentarPost(
     id: comentario.id,
     conteudo: comentario.conteudo,
     criadoEm: comentario.criadoEm.toISOString(),
+    parentId: comentario.parentId,
     autor: {
       id: viewerId,
       nome: session.user.name ?? null,
@@ -1443,9 +1477,10 @@ export async function editarComentario(
     postId: string
     conteudo: string
     criadoEm: Date
+    parentId: string | null
   } | null = await db.comentario.findFirst({
     where: { id: parsed.data.comentarioId, autorId: viewerId },
-    select: { id: true, postId: true, conteudo: true, criadoEm: true },
+    select: { id: true, postId: true, conteudo: true, criadoEm: true, parentId: true },
   })
   if (!existente) throw new Error('Comentário não encontrado')
 
@@ -1476,6 +1511,7 @@ export async function editarComentario(
     id: atualizado.id,
     conteudo: atualizado.conteudo,
     criadoEm: atualizado.criadoEm.toISOString(),
+    parentId: existente.parentId,
     autor: {
       id: viewerId,
       nome: session.user.name ?? null,

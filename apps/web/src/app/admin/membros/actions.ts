@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, Prisma } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, tenantIsAdministracaoSede } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { ExpectedError, isExpectedError } from '@/lib/expected-error'
 import {
@@ -50,9 +50,14 @@ import {
   PERMISSIONS,
   ReprovarMembroSchema,
 } from '@torcida/types'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 const ERRO_ESPELHO_MUTACAO =
   'Este registro é um espelho da Sede. Altere na unidade de origem.'
+
+async function espelhoBloqueiaMutacao(tenantId: string, espelhado: boolean): Promise<boolean> {
+  return espelhado && !(await tenantIsAdministracaoSede(tenantId))
+}
 
 /**
  * Decisão de admissão faz muitas idas ao banco em série (advisory locks,
@@ -440,6 +445,7 @@ export async function efetivarAreaPretendida(
     return { error: 'Não foi possível incluir na área. Tente novamente.' }
   }
 
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -826,6 +832,7 @@ export async function aprovarMembro(
   // Força recomputar contexto/caches compartilhados do portal (navbar + layout)
   // para refletir imediatamente `membro.status: APROVADO` no hard refresh.
   revalidatePath('/portal', 'layout')
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1151,6 +1158,7 @@ export async function reprovarMembro(
 
   invalidarCachesComunidadeFeed(origem.tenantId)
   revalidatePath('/portal', 'layout')
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1179,12 +1187,35 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
         select: membroDecisaoSelect,
       })
       if (!existente) throw new ExpectedError('Membro não encontrado.')
-      if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+      if (await espelhoBloqueiaMutacao(tenant.id, existente.espelhado)) {
+        throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+      }
 
-      await lockDecisaoAdmissaoTorcida(tx, tenant.id)
+      let origemId = membroId
+      let origemTenantId = tenant.id
+      let espelhoId: string | null = null
+
+      if (existente.espelhado) {
+        if (!existente.membroOrigemId) {
+          throw new ExpectedError('Espelho sem origem vinculada.')
+        }
+        const origem: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: existente.membroOrigemId },
+          select: membroDecisaoSelect,
+        })
+        if (!origem) throw new ExpectedError('Membro de origem não encontrado.')
+        if (origem.espelhado) throw new ExpectedError('Origem inválida.')
+        await assertOrigemDescendenteDaSede(tenant.id, origem.tenantId)
+        await lockDecisaoAdmissaoTorcida(tx, origem.tenantId)
+        origemId = origem.id
+        origemTenantId = origem.tenantId
+        espelhoId = existente.id
+      } else {
+        await lockDecisaoAdmissaoTorcida(tx, tenant.id)
+      }
 
       const atualizado = await tx.saasMembro.update({
-        where: { id: membroId, tenantId: tenant.id },
+        where: { id: origemId },
         data: {
           status: 'PENDENTE',
           aprovadoPorId: null,
@@ -1195,18 +1226,32 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
         select: membroDecisaoSelect,
       })
 
-      await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
-      const espelhoId = await sincronizarStatusEspelhoDaOrigem(tx, {
-        membroOrigemId: atualizado.id,
-        status: 'PENDENTE',
-        aprovadoPorId: null,
-        aprovadoPorNome: null,
-        aprovadoEm: null,
-      })
+      await limparMembershipDepartamentos(origemTenantId, atualizado.userId, tx)
+      if (!existente.espelhado) {
+        espelhoId = await sincronizarStatusEspelhoDaOrigem(tx, {
+          membroOrigemId: atualizado.id,
+          status: 'PENDENTE',
+          aprovadoPorId: null,
+          aprovadoPorNome: null,
+          aprovadoEm: null,
+        })
+      } else if (espelhoId) {
+        await tx.saasMembro.update({
+          where: { id: espelhoId },
+          data: {
+            status: 'PENDENTE',
+            aprovadoPorId: null,
+            aprovadoPorNome: null,
+            aprovadoEm: null,
+            ...REPROVACAO_LIMPA,
+          },
+        })
+        await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+      }
 
       return {
         origemId: atualizado.id,
-        origemTenantId: tenant.id,
+        origemTenantId,
         espelhoId,
       }
     }, TRANSACAO_DECISAO_MEMBRO_OPTS)
@@ -1253,6 +1298,7 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cadastro')
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1298,6 +1344,7 @@ export async function atualizarDadosLge(
   type LgeAntes = {
     id: string
     espelhado: boolean
+    membroOrigemId: string | null
     rg: string | null
     cpf: string | null
     filiacao: string | null
@@ -1311,6 +1358,7 @@ export async function atualizarDadosLge(
     select: {
       id: true,
       espelhado: true,
+      membroOrigemId: true,
       rg: true,
       cpf: true,
       filiacao: true,
@@ -1321,7 +1369,20 @@ export async function atualizarDadosLge(
     },
   })
   if (!existente) return { error: 'Membro não encontrado' }
-  if (existente.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
+  if (await espelhoBloqueiaMutacao(tenant.id, existente.espelhado)) {
+    return { error: ERRO_ESPELHO_MUTACAO }
+  }
+
+  const alvoId =
+    existente.espelhado && existente.membroOrigemId ? existente.membroOrigemId : existente.id
+
+  if (alvoId !== existente.id) {
+    const origem: { id: string } | null = await db.saasMembro.findFirst({
+      where: { id: alvoId, espelhado: false },
+      select: { id: true },
+    })
+    if (!origem) return { error: 'Membro de origem não encontrado' }
+  }
 
   if (data.planoAssociacaoId) {
     const plano: { id: string } | null = await db.planoAssociacao.findFirst({
@@ -1347,14 +1408,14 @@ export async function atualizarDadosLge(
   }
 
   await db.saasMembro.update({
-    where: { id: existente.id },
+    where: { id: alvoId },
     data: {
       ...dadosLge,
       planoAssociacaoId: data.planoAssociacaoId ?? null,
     },
   })
 
-  await propagarLgeParaEspelho(db, existente.id, dadosLge)
+  await propagarLgeParaEspelho(db, alvoId, dadosLge)
 
   await db.auditLog.create({
     data: {
@@ -1362,7 +1423,7 @@ export async function atualizarDadosLge(
       atorId: session.user.id,
       acao: 'MEMBRO_LGE_ATUALIZADO',
       entidade: 'SaasMembro',
-      entidadeId: existente.id,
+      entidadeId: alvoId,
       detalhes: {
         alteracoes: diffCamposMembro(
           {
@@ -1408,39 +1469,74 @@ export async function desligarMembro(
     userId: string
     desligadoEm: Date | null
     espelhado: boolean
+    membroOrigemId: string | null
   } | null =
     await db.saasMembro.findFirst({
       where: { id: parsed.data.membroId, tenantId: tenant.id },
-      select: { id: true, userId: true, desligadoEm: true, espelhado: true },
+      select: {
+        id: true,
+        userId: true,
+        desligadoEm: true,
+        espelhado: true,
+        membroOrigemId: true,
+      },
     })
   if (!membro) return { error: 'Membro não encontrado' }
-  if (membro.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
+  if (await espelhoBloqueiaMutacao(tenant.id, membro.espelhado)) {
+    return { error: ERRO_ESPELHO_MUTACAO }
+  }
   if (membro.desligadoEm) return { error: 'Membro já desligado' }
+
+  const alvoId =
+    membro.espelhado && membro.membroOrigemId
+      ? membro.membroOrigemId
+      : membro.id
+  const alvoRow: {
+    id: string
+    userId: string
+    desligadoEm: Date | null
+    espelhado: boolean
+    tenantId: string
+  } | null =
+    alvoId === membro.id
+      ? { ...membro, tenantId: tenant.id }
+      : await db.saasMembro.findFirst({
+          where: { id: alvoId, espelhado: false },
+          select: {
+            id: true,
+            userId: true,
+            desligadoEm: true,
+            espelhado: true,
+            tenantId: true,
+          },
+        })
+  if (!alvoRow) return { error: 'Membro de origem não encontrado' }
+  if (alvoRow.desligadoEm) return { error: 'Membro já desligado' }
 
   const { espelhoTenantId } = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.saasMembro.update({
-      where: { id: membro.id },
+      where: { id: alvoRow.id },
       data: {
         desligadoEm: new Date(),
         desligadoMotivo: parsed.data.motivo,
         desligadoPorId: session.user.id,
       },
     })
-    const limpeza = await limparMembershipDepartamentos(tenant.id, membro.userId, tx)
+    const limpeza = await limparMembershipDepartamentos(alvoRow.tenantId, alvoRow.userId, tx)
     const espelho: { tenantId: string; userId: string } | null =
       await tx.saasMembro.findUnique({
-        where: { membroOrigemId: membro.id },
+        where: { membroOrigemId: alvoRow.id },
         select: { tenantId: true, userId: true },
       })
     const limpezaEspelho = espelho
       ? await limparMembershipDepartamentos(espelho.tenantId, espelho.userId, tx)
       : null
-    await desligarEspelhoDaOrigem(tx, membro.id, parsed.data.motivo)
+    await desligarEspelhoDaOrigem(tx, alvoRow.id, parsed.data.motivo)
 
     // Desligamento revoga a carteirinha: o `numeroSocio` volta ao pool da torcida.
     const carteirinhas: CarteirinhaRevogada[] = []
     for (const alvo of [
-      { tenantId: tenant.id, userId: membro.userId },
+      { tenantId: alvoRow.tenantId, userId: alvoRow.userId },
       ...(espelho ? [{ tenantId: espelho.tenantId, userId: espelho.userId }] : []),
     ]) {
       const socio: CarteirinhaRevogada | null = await tx.saasSocio.findFirst({
@@ -1490,6 +1586,7 @@ export async function desligarMembro(
     invalidarCachesComunidadeFeed(espelhoTenantId)
   }
   invalidarCachesComunidadeFeed(tenant.id)
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1588,7 +1685,7 @@ export async function reatribuirSedeMembro(
     select: { id: true, sedeId: true, espelhado: true, sede: { select: { nome: true } } },
   })
   if (!membro) return { ok: false, error: 'Membro não encontrado.' }
-  if (membro.espelhado) {
+  if (await espelhoBloqueiaMutacao(tenant.id, membro.espelhado)) {
     return { ok: false, error: 'Registro espelhado — altere na unidade de origem.' }
   }
 
@@ -1632,6 +1729,7 @@ export async function reatribuirSedeMembro(
     },
   })
 
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1704,6 +1802,7 @@ export async function bloquearMembro(
     },
   })
 
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1737,6 +1836,7 @@ export async function desbloquearMembro(userId: string): Promise<{ error: string
     },
   })
 
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')
@@ -1769,6 +1869,7 @@ export async function apagarMembroDefinitivo(
 
   invalidarCachesComunidadeFeed(tenant.id)
   invalidatePermissionsCache(membro.userId, tenant.id)
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/torcedores')
   revalidatePath('/admin/membros')
   revalidatePath('/admin/socios')

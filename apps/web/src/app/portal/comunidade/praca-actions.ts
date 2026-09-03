@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import {
@@ -14,6 +15,8 @@ import {
   responderTopicoSchema,
   votarPracaSchema,
   comentarPracaSchema,
+  editarComentarioPracaSchema,
+  editarRespostaForumSchema,
   publicarArtigoSchema,
   publicarArtigoComposerSchema,
   publicarArtigoHistoriaSchema,
@@ -48,6 +51,7 @@ import {
   podeAprovarPracaNaHora,
   tenantModeracaoPraca,
   listarRespostasTopico,
+  listarComentariosPraca,
   resolverCanalElegivelNoticia,
 } from '@/lib/praca'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
@@ -486,6 +490,16 @@ export async function responderTopicoAction(formData: FormData): Promise<{ ok: t
 
     await assertTetoSinaisPraca(session.user.id, ancora)
 
+    if (parsed.data.parentId) {
+      const pai: { topicoId: string; oculto: boolean } | null = await db.forumResposta.findUnique({
+        where: { id: parsed.data.parentId },
+        select: { topicoId: true, oculto: true },
+      })
+      if (!pai || pai.oculto || pai.topicoId !== topico.id) {
+        return { error: 'Resposta não encontrada.' }
+      }
+    }
+
     await db.forumResposta.create({
       data: {
         topicoId: topico.id,
@@ -518,6 +532,7 @@ export type ForumRespostaFeedDto = {
   id: string
   conteudo: string
   criadoEm: string
+  parentId: string | null
   autor: { id: string; nome: string | null; avatarUrl: string | null }
 }
 
@@ -531,6 +546,7 @@ export async function listarRespostasTopicoFeed(
     id: r.id,
     conteudo: r.conteudo,
     criadoEm: r.criadoEm.toISOString(),
+    parentId: r.parentId,
     autor: {
       id: r.autor.id,
       nome: r.autor.nome,
@@ -539,12 +555,87 @@ export async function listarRespostasTopicoFeed(
   }))
 }
 
+export async function listarComentariosNoticiaFeed(
+  alvoTipo: 'NOTICIA' | 'ARTIGO',
+  alvoId: string,
+  escopoParam: string,
+): Promise<ForumRespostaFeedDto[]> {
+  const { session } = await contextoEscopo(escopoParam)
+  const rows = await listarComentariosPraca(alvoTipo, alvoId, session.user.id)
+  return rows.map((c) => ({
+    id: c.id,
+    conteudo: c.conteudo,
+    criadoEm: c.criadoEm.toISOString(),
+    parentId: c.parentId,
+    autor: {
+      id: c.autorId,
+      nome: c.autorNome,
+      avatarUrl: c.autorAvatarUrl,
+    },
+  }))
+}
+
+export async function comentarNoticiaFeed(
+  alvoTipo: 'NOTICIA' | 'ARTIGO',
+  alvoId: string,
+  conteudo: string,
+  escopoParam: string,
+  parentId?: string,
+): Promise<ForumRespostaFeedDto | { error: string }> {
+  const fd = new FormData()
+  fd.set('escopo', escopoParam)
+  fd.set('alvoTipo', alvoTipo)
+  fd.set('alvoId', alvoId)
+  fd.set('conteudo', conteudo)
+  if (parentId) fd.set('parentId', parentId)
+  const r = await comentarPracaAction(fd)
+  if ('error' in r) return r
+
+  try {
+    const { session } = await contextoEscopo(escopoParam)
+    return {
+      id: `tmp-${Date.now()}`,
+      conteudo: conteudo.trim(),
+      criadoEm: new Date().toISOString(),
+      parentId: parentId ?? null,
+      autor: {
+        id: session.user.id,
+        nome: session.user.name ?? null,
+        avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
+      },
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível comentar.' }
+  }
+}
+
+export async function votarNoticiaFeed(
+  alvoTipo: 'NOTICIA' | 'ARTIGO',
+  alvoId: string,
+  valor: 1 | -1 | 0,
+  escopoParam: string,
+): Promise<{ ok: true } | { error: string }> {
+  const fd = new FormData()
+  fd.set('escopo', escopoParam)
+  fd.set('alvoTipo', alvoTipo)
+  fd.set('alvoId', alvoId)
+  fd.set('valor', String(valor))
+  const r = await votarPracaAction(fd)
+  if ('error' in r) return r
+  return { ok: true }
+}
+
 export async function comentarTopicoFeed(
   topicoId: string,
   conteudo: string,
   escopoParam: string,
+  parentId?: string,
 ): Promise<ForumRespostaFeedDto | { error: string }> {
-  const parsed = responderTopicoSchema.safeParse({ topicoId, conteudo })
+  const parsed = responderTopicoSchema.safeParse({
+    topicoId,
+    conteudo,
+    parentId: parentId || undefined,
+  })
   if (!parsed.success) return { error: 'Resposta vazia.' }
 
   try {
@@ -562,14 +653,26 @@ export async function comentarTopicoFeed(
 
     await assertTetoSinaisPraca(session.user.id, ancora)
 
-    const resposta: { id: string; conteudo: string; criadoEm: Date } = await db.forumResposta.create({
-      data: {
-        topicoId: topico.id,
-        autorId: session.user.id,
-        conteudo: parsed.data.conteudo,
-      },
-      select: { id: true, conteudo: true, criadoEm: true },
-    })
+    if (parsed.data.parentId) {
+      const pai: { topicoId: string; oculto: boolean } | null = await db.forumResposta.findUnique({
+        where: { id: parsed.data.parentId },
+        select: { topicoId: true, oculto: true },
+      })
+      if (!pai || pai.oculto || pai.topicoId !== topico.id) {
+        return { error: 'Resposta não encontrada.' }
+      }
+    }
+
+    const resposta: { id: string; conteudo: string; criadoEm: Date; parentId: string | null } =
+      await db.forumResposta.create({
+        data: {
+          topicoId: topico.id,
+          autorId: session.user.id,
+          conteudo: parsed.data.conteudo,
+          parentId: parsed.data.parentId ?? null,
+        },
+        select: { id: true, conteudo: true, criadoEm: true, parentId: true },
+      })
     await db.forumTopico.update({
       where: { id: topico.id },
       data: { respostasCount: { increment: 1 } },
@@ -587,6 +690,7 @@ export async function comentarTopicoFeed(
       id: resposta.id,
       conteudo: resposta.conteudo,
       criadoEm: resposta.criadoEm.toISOString(),
+      parentId: resposta.parentId,
       autor: {
         id: session.user.id,
         nome: session.user.name ?? null,
@@ -896,13 +1000,12 @@ export async function comentarPracaAction(formData: FormData): Promise<{ ok: tru
     if (parsed.data.parentId) {
       const pai = await db.pracaComentario.findUnique({
         where: { id: parsed.data.parentId },
-        select: { alvoTipo: true, alvoId: true, parentId: true, oculto: true },
+        select: { alvoTipo: true, alvoId: true, oculto: true },
       })
       if (!pai || pai.oculto) return { error: 'Comentário não encontrado.' }
       if (pai.alvoTipo !== parsed.data.alvoTipo || pai.alvoId !== parsed.data.alvoId) {
         return { error: 'Resposta fora deste card.' }
       }
-      if (pai.parentId) return { error: 'Só é possível responder comentários de primeiro nível.' }
     }
 
     await db.pracaComentario.create({
@@ -918,6 +1021,280 @@ export async function comentarPracaAction(formData: FormData): Promise<{ ok: tru
     return { ok: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Não foi possível comentar.' }
+  }
+}
+
+export async function editarComentarioPraca(
+  comentarioId: string,
+  conteudo: string,
+  escopoParam: string,
+): Promise<ForumRespostaFeedDto | { error: string }> {
+  const parsed = editarComentarioPracaSchema.safeParse({ comentarioId, conteudo })
+  if (!parsed.success) return { error: 'Comentário inválido.' }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+    const existente: {
+      id: string
+      alvoTipo: 'ARTIGO' | 'NOTICIA' | 'TOPICO' | 'RESPOSTA' | 'COMENTARIO'
+      alvoId: string
+      parentId: string | null
+      oculto: boolean
+      criadoEm: Date
+    } | null = await db.pracaComentario.findFirst({
+      where: { id: parsed.data.comentarioId, autorId: session.user.id },
+      select: {
+        id: true,
+        alvoTipo: true,
+        alvoId: true,
+        parentId: true,
+        oculto: true,
+        criadoEm: true,
+      },
+    })
+    if (!existente || existente.oculto) return { error: 'Comentário não encontrado.' }
+    if (existente.alvoTipo !== 'ARTIGO' && existente.alvoTipo !== 'NOTICIA') {
+      return { error: 'Comentário inválido.' }
+    }
+    if (existente.alvoTipo === 'ARTIGO') {
+      const artigo = await db.artigoPortal.findUnique({
+        where: { id: existente.alvoId },
+        select: { tenantId: true },
+      })
+      if (!artigo || !podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+        return { error: 'Artigo fora deste canal.' }
+      }
+    }
+    if (existente.alvoTipo === 'NOTICIA' && escopo !== 'nacional') {
+      return { error: 'Comentário de imprensa só no portal do clube.' }
+    }
+
+    const atualizado: { id: string; conteudo: string; criadoEm: Date; parentId: string | null } =
+      await db.pracaComentario.update({
+        where: { id: existente.id },
+        data: { conteudo: parsed.data.conteudo },
+        select: { id: true, conteudo: true, criadoEm: true, parentId: true },
+      })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: ancora.tenantId,
+        atorId: session.user.id,
+        acao: 'PRACA_COMENTARIO_EDITADO',
+        entidade: 'PracaComentario',
+        entidadeId: atualizado.id,
+        detalhes: { alvoTipo: existente.alvoTipo, alvoId: existente.alvoId },
+      },
+    })
+
+    revalidatePath('/portal/comunidade/noticias')
+    revalidatePath(`/portal/comunidade/noticias/${existente.alvoId}`)
+
+    return {
+      id: atualizado.id,
+      conteudo: atualizado.conteudo,
+      criadoEm: atualizado.criadoEm.toISOString(),
+      parentId: atualizado.parentId,
+      autor: {
+        id: session.user.id,
+        nome: session.user.name ?? null,
+        avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
+      },
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível editar.' }
+  }
+}
+
+export async function excluirComentarioPraca(
+  comentarioId: string,
+  escopoParam: string,
+): Promise<{ ok: true } | { error: string }> {
+  const id = z.string().min(1).safeParse(comentarioId)
+  if (!id.success) return { error: 'Comentário inválido.' }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+    const existente: {
+      id: string
+      alvoTipo: 'ARTIGO' | 'NOTICIA' | 'TOPICO' | 'RESPOSTA' | 'COMENTARIO'
+      alvoId: string
+    } | null = await db.pracaComentario.findFirst({
+      where: { id: id.data, autorId: session.user.id },
+      select: { id: true, alvoTipo: true, alvoId: true },
+    })
+    if (!existente) return { error: 'Comentário não encontrado.' }
+    if (existente.alvoTipo !== 'ARTIGO' && existente.alvoTipo !== 'NOTICIA') {
+      return { error: 'Comentário inválido.' }
+    }
+    if (existente.alvoTipo === 'ARTIGO') {
+      const artigo = await db.artigoPortal.findUnique({
+        where: { id: existente.alvoId },
+        select: { tenantId: true },
+      })
+      if (!artigo || !podeVerArtigoNoEscopo(escopo, ancora, artigo.tenantId)) {
+        return { error: 'Artigo fora deste canal.' }
+      }
+    }
+    if (existente.alvoTipo === 'NOTICIA' && escopo !== 'nacional') {
+      return { error: 'Comentário de imprensa só no portal do clube.' }
+    }
+
+    await db.pracaComentario.delete({ where: { id: existente.id } })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: ancora.tenantId,
+        atorId: session.user.id,
+        acao: 'PRACA_COMENTARIO_EXCLUIDO',
+        entidade: 'PracaComentario',
+        entidadeId: existente.id,
+        detalhes: { alvoTipo: existente.alvoTipo, alvoId: existente.alvoId },
+      },
+    })
+
+    revalidatePath('/portal/comunidade/noticias')
+    revalidatePath(`/portal/comunidade/noticias/${existente.alvoId}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível excluir.' }
+  }
+}
+
+export async function editarRespostaForum(
+  respostaId: string,
+  conteudo: string,
+  escopoParam: string,
+): Promise<ForumRespostaFeedDto | { error: string }> {
+  const parsed = editarRespostaForumSchema.safeParse({ respostaId, conteudo })
+  if (!parsed.success) return { error: 'Resposta inválida.' }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+    const existente: {
+      id: string
+      topicoId: string
+      parentId: string | null
+      oculto: boolean
+      criadoEm: Date
+      topico: {
+        escopo: 'CLUBE' | 'TORCIDA'
+        tenantId: string | null
+        afiliacaoId: string | null
+        status: string
+      }
+    } | null = await db.forumResposta.findFirst({
+      where: { id: parsed.data.respostaId, autorId: session.user.id },
+      select: {
+        id: true,
+        topicoId: true,
+        parentId: true,
+        oculto: true,
+        criadoEm: true,
+        topico: { select: { escopo: true, tenantId: true, afiliacaoId: true, status: true } },
+      },
+    })
+    if (!existente || existente.oculto || existente.topico.status !== 'VISIVEL') {
+      return { error: 'Resposta não encontrada.' }
+    }
+    if (!podeVerTopicoNoEscopo(escopo, ancora, existente.topico)) {
+      return { error: 'Tópico fora deste canal.' }
+    }
+
+    const atualizado: { id: string; conteudo: string; criadoEm: Date; parentId: string | null } =
+      await db.forumResposta.update({
+        where: { id: existente.id },
+        data: { conteudo: parsed.data.conteudo },
+        select: { id: true, conteudo: true, criadoEm: true, parentId: true },
+      })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: ancora.tenantId,
+        atorId: session.user.id,
+        acao: 'FORUM_RESPOSTA_EDITADA',
+        entidade: 'ForumResposta',
+        entidadeId: atualizado.id,
+        detalhes: { topicoId: existente.topicoId },
+      },
+    })
+
+    revalidatePath(`/portal/comunidade/forum/${existente.topicoId}`)
+    revalidatePath('/portal/comunidade')
+
+    return {
+      id: atualizado.id,
+      conteudo: atualizado.conteudo,
+      criadoEm: atualizado.criadoEm.toISOString(),
+      parentId: atualizado.parentId,
+      autor: {
+        id: session.user.id,
+        nome: session.user.name ?? null,
+        avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
+      },
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível editar.' }
+  }
+}
+
+export async function excluirRespostaForum(
+  respostaId: string,
+  escopoParam: string,
+): Promise<{ ok: true } | { error: string }> {
+  const id = z.string().min(1).safeParse(respostaId)
+  if (!id.success) return { error: 'Resposta inválida.' }
+
+  try {
+    const { session, escopo, ancora } = await contextoEscopo(escopoParam)
+    const existente: {
+      id: string
+      topicoId: string
+      oculto: boolean
+      topico: {
+        escopo: 'CLUBE' | 'TORCIDA'
+        tenantId: string | null
+        afiliacaoId: string | null
+        status: string
+      }
+    } | null = await db.forumResposta.findFirst({
+      where: { id: id.data, autorId: session.user.id },
+      select: {
+        id: true,
+        topicoId: true,
+        oculto: true,
+        topico: { select: { escopo: true, tenantId: true, afiliacaoId: true, status: true } },
+      },
+    })
+    if (!existente) return { error: 'Resposta não encontrada.' }
+    if (!podeVerTopicoNoEscopo(escopo, ancora, existente.topico)) {
+      return { error: 'Tópico fora deste canal.' }
+    }
+
+    await db.forumResposta.delete({ where: { id: existente.id } })
+    if (!existente.oculto) {
+      await db.forumTopico.update({
+        where: { id: existente.topicoId },
+        data: { respostasCount: { decrement: 1 } },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        tenantId: ancora.tenantId,
+        atorId: session.user.id,
+        acao: 'FORUM_RESPOSTA_EXCLUIDA',
+        entidade: 'ForumResposta',
+        entidadeId: existente.id,
+        detalhes: { topicoId: existente.topicoId },
+      },
+    })
+
+    revalidatePath(`/portal/comunidade/forum/${existente.topicoId}`)
+    revalidatePath('/portal/comunidade')
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível excluir.' }
   }
 }
 

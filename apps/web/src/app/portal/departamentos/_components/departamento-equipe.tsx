@@ -1,19 +1,20 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useActionState, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { UserMinus, UserPlus } from 'lucide-react'
 import {
   adicionarMembroArea,
-  adicionarMembroAreaDepartamento,
   buscarCandidatosArea,
   removerMembroArea,
-  removerMembroAreaDepartamento,
   type ActionState,
 } from '@/app/portal/departamentos/actions'
 import { useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { AvatarFoto } from '@/components/media/avatar-foto'
 import { classeFocoCard, useFocoCard } from './departamento-foco'
+import { DepartamentoAreaMembroSecao } from '@/components/departamentos/departamento-area-membro'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 export type MembroEquipe = {
   userId: string
@@ -113,128 +114,18 @@ function PessoaCard({
         {action}
       </div>
 
-      {areas && areas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
-          {areasDaPessoa.map((a) => (
-            <span
-              key={a.id}
-              className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]"
-            >
-              {a.nome}
-              {podeGerirAreas && (
-                <RemoverDaAreaBotao
-                  departamentoId={departamentoId}
-                  slug={slug}
-                  areaId={a.id}
-                  areaNome={a.nome}
-                  targetUserId={membro.userId}
-                  personLabel={nome}
-                />
-              )}
-            </span>
-          ))}
-          {podeGerirAreas && areasDisponiveis.length > 0 && (
-            <AdicionarAreaSelect
-              departamentoId={departamentoId}
-              slug={slug}
-              targetUserId={membro.userId}
-              areasDisponiveis={areasDisponiveis}
-            />
-          )}
-        </div>
-      )}
+      {areas && areas.length > 0 ? (
+        <DepartamentoAreaMembroSecao
+          areasDaPessoa={areasDaPessoa}
+          areasDisponiveis={areasDisponiveis}
+          podeGerir={Boolean(podeGerirAreas)}
+          departamentoId={departamentoId}
+          slug={slug}
+          targetUserId={membro.userId}
+          personLabel={nome}
+        />
+      ) : null}
     </div>
-  )
-}
-
-function AdicionarAreaSelect({
-  departamentoId,
-  slug,
-  targetUserId,
-  areasDisponiveis,
-}: {
-  departamentoId: string
-  slug: string
-  targetUserId: string
-  areasDisponiveis: AreaFiltro[]
-}) {
-  const [areaId, setAreaId] = useState('')
-  const [state, action, pending] = useActionState(adicionarMembroAreaDepartamento, {} as ActionState)
-  useActionStateToast(state, pending, 'Incluído na área', { onSuccess: () => setAreaId('') })
-
-  return (
-    <form action={action} className="inline-flex items-center gap-1">
-      <input type="hidden" name="departamentoId" value={departamentoId} />
-      <input type="hidden" name="slug" value={slug} />
-      <input type="hidden" name="targetUserId" value={targetUserId} />
-      <input type="hidden" name="areaId" value={areaId} />
-      <select
-        value={areaId}
-        onChange={(e) => setAreaId(e.target.value)}
-        className="rounded-full border border-dashed border-[rgb(var(--border))] bg-transparent px-2 py-0.5 text-[10px] text-[rgb(var(--foreground-muted))] outline-none"
-      >
-        <option value="">+ área</option>
-        {areasDisponiveis.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.nome}
-          </option>
-        ))}
-      </select>
-      {areaId && (
-        <button
-          type="submit"
-          disabled={pending}
-          className="app-action rounded-full bg-[rgb(var(--primary))] px-2 py-0.5 text-[10px] font-medium text-primary-on disabled:opacity-50"
-        >
-          OK
-        </button>
-      )}
-    </form>
-  )
-}
-
-function RemoverDaAreaBotao({
-  departamentoId,
-  slug,
-  areaId,
-  areaNome,
-  targetUserId,
-  personLabel,
-}: {
-  departamentoId: string
-  slug: string
-  areaId: string
-  areaNome: string
-  targetUserId: string
-  personLabel: string
-}) {
-  const confirmAction = useConfirmAction()
-  return (
-    <button
-      type="button"
-      onClick={() =>
-        void confirmAction({
-          titulo: `Remover ${personLabel} de ${areaNome}?`,
-          descricao: 'A pessoa continua no departamento; só sai desta área.',
-          labelConfirmar: 'Remover',
-          variante: 'destructive',
-          cancelled: false,
-          run: async () => {
-            const fd = new FormData()
-            fd.set('areaId', areaId)
-            fd.set('departamentoId', departamentoId)
-            fd.set('slug', slug)
-            fd.set('targetUserId', targetUserId)
-            return removerMembroAreaDepartamento({}, fd)
-          },
-          success: `Removido de ${areaNome}`,
-        })
-      }
-      className="app-action -mr-1 rounded-full p-0.5 hover:text-red-600"
-      title="Remover da área"
-    >
-      ×
-    </button>
   )
 }
 
@@ -456,35 +347,29 @@ function AdicionarMembroForm({
   slug: string
 }) {
   const [q, setQ] = useState('')
-  /** Última busca concluída; o termo junto deriva "já buscou" e a lista visível. */
-  const [busca, setBusca] = useState<{
-    termo: string
-    itens: Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
-  }>({ termo: '', itens: [] })
-  const [pendingSearch, startSearch] = useTransition()
+  const [resultados, setResultados] = useState<
+    Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
+  >([])
+  const [ultimoTermo, setUltimoTermo] = useState('')
   const [state, action, pending] = useActionState(adicionarMembroArea, {} as ActionState)
   useActionStateToast(state, pending, 'Membro adicionado ao departamento')
 
-  const qBusca = q.trim().length >= 2 ? q.trim() : ''
-  const buscaConcluida = qBusca !== '' && busca.termo === qBusca
-  const candidatosVisiveis = buscaConcluida ? busca.itens : []
-  const buscou = buscaConcluida
+  async function buscarSocios(termo: string): Promise<ReactiveSearchOption[]> {
+    const rows = await buscarCandidatosArea(departamentoId, termo)
+    setResultados(rows)
+    setUltimoTermo(termo)
+    return rows.map((c) => ({
+      id: c.id,
+      label: c.nome?.trim() || c.email,
+      sublabel: c.nickname ? `@${c.nickname}` : c.email,
+      searchText: [c.nome, c.email, c.nickname].filter(Boolean).join(' '),
+      payload: c,
+    }))
+  }
 
-  useEffect(() => {
-    if (!qBusca) return
-    let cancelled = false
-    const t = setTimeout(() => {
-      startSearch(() => {
-        void buscarCandidatosArea(departamentoId, qBusca).then((rows) => {
-          if (!cancelled) setBusca({ termo: qBusca, itens: rows })
-        })
-      })
-    }, 280)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
-  }, [qBusca, departamentoId])
+  const qBusca = q.trim().length >= 2 ? q.trim() : ''
+  const candidatosVisiveis = ultimoTermo === qBusca && qBusca ? resultados : []
+  const buscou = ultimoTermo === qBusca && qBusca !== ''
 
   useEffect(() => {
     if (!state.ok) return
@@ -495,24 +380,27 @@ function AdicionarMembroForm({
 
   return (
     <div className="mt-3 space-y-3">
-      <label className="block">
-        <span className="sr-only">Buscar sócio</span>
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nome, e-mail ou @"
-          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-        />
-      </label>
-      {pendingSearch && qBusca && (
-        <p className="text-xs text-[rgb(var(--foreground-muted))]">Buscando…</p>
-      )}
-      {!pendingSearch && buscou && qBusca && candidatosVisiveis.length === 0 && (
+      <SearchFilterInput
+        value={q}
+        onChange={(next) => {
+          setQ(next)
+          if (next.trim().length < 2) {
+            setResultados([])
+            setUltimoTermo('')
+          }
+        }}
+        placeholder="Buscar por nome, e-mail ou @"
+        ariaLabel="Buscar sócio"
+        onSearch={buscarSocios}
+        onSelectSuggestion={(item) => setQ(item.label)}
+        minChars={2}
+        noResultsMessage="Nenhum sócio encontrado."
+      />
+      {buscou && qBusca && candidatosVisiveis.length === 0 ? (
         <p className="text-xs text-[rgb(var(--foreground-muted))]">
           Nenhum sócio encontrado para “{qBusca}”.
         </p>
-      )}
+      ) : null}
       {candidatosVisiveis.length > 0 && (
         <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))]">
           {candidatosVisiveis.map((c) => (
@@ -529,14 +417,15 @@ function AdicionarMembroForm({
                 <input type="hidden" name="departamentoId" value={departamentoId} />
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="targetUserId" value={c.id} />
-                <button
+                <AppButton
+                  variant="primary"
+                  icon={UserPlus}
                   type="submit"
                   disabled={pending}
-                  className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
+                  className="gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
                 >
-                  <UserPlus className="h-3.5 w-3.5" />
                   Incluir
-                </button>
+                </AppButton>
               </form>
             </li>
           ))}

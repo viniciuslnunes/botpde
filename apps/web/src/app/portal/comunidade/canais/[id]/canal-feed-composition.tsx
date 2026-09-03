@@ -3,22 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { m } from 'motion/react'
-import {
-  Bell,
-  BellOff,
-  Check,
-  Loader2,
-  LogOut,
-  MapPin,
-  MessageCircle,
-  MoreVertical,
-  Settings,
-  Shield,
-  UserMinus,
-  UserPlus,
-  Users,
-  X,
-} from 'lucide-react'
+import { Bell, BellOff, Check, Loader2, LogOut, MapPin, MessageCircle, MoreVertical, Save, Settings, Shield, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
 import { CONFIRMA_VINCULO_UNIDADE, CONFIRMA_VINCULO_AO_PEDIR_CANAL, CONFIRMA_TROCA_UNIDADE, CONFIRMA_DESVINCULO_UNIDADE, mensagemTravaVinculoUnidade } from '@torcida/types/associe-se'
@@ -56,6 +41,7 @@ import {
 } from '@/lib/canais-shared'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import { nomesEquivalentes } from '@/lib/torcida-labels'
+import { AppButton } from '@/components/ui/button'
 
 interface CurrentUser {
   id: string
@@ -381,7 +367,9 @@ export function CanalFeedComposition({
             className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
           >
                   {podeGerenciarAdmins && (
-                    <button
+                    <AppButton
+                      variant="none"
+                      icon={Settings}
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -390,9 +378,8 @@ export function CanalFeedComposition({
                       }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
-                      <Settings className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                       Configurações do canal
-                    </button>
+                    </AppButton>
                   )}
                   {canal.canalOficial && podeGerenciarMembros && (
                     <Link
@@ -406,7 +393,9 @@ export function CanalFeedComposition({
                     </Link>
                   )}
                   {(podeGerenciarAdmins || podeGerenciarMembros) && (
-                    <button
+                    <AppButton
+                      variant="none"
+                      icon={Shield}
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -415,12 +404,13 @@ export function CanalFeedComposition({
                       }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
-                      <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                       Gerenciar membros
-                    </button>
+                    </AppButton>
                   )}
                   {podeGerenciarPedidos && (
-                    <button
+                    <AppButton
+                      variant="none"
+                      icon={UserPlus}
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -429,16 +419,13 @@ export function CanalFeedComposition({
                       }}
                       className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
-                      <span className="flex items-center gap-2">
-                        <UserPlus className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                        Pedidos pendentes
-                      </span>
+                      Pedidos pendentes
                       {pedidosPendentesCount > 0 && (
                         <span className="rounded-full bg-[rgb(var(--color-primary))] px-1.5 py-0.5 text-[10px] font-bold text-[rgb(var(--color-primary-on))]">
                           {pedidosPendentesCount}
                         </span>
                       )}
-                    </button>
+                    </AppButton>
                   )}
                   {souMembro && (
                     <>
@@ -462,19 +449,22 @@ export function CanalFeedComposition({
                         )}
                       </button>
                       {!canal.ehCanalDepartamento ? (
-                        <button
+                        <AppButton
+                          variant="none"
+                          icon={LogOut}
                           type="button"
                           role="menuitem"
                           disabled={pending}
                           onClick={sair}
                           className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                         >
-                          <LogOut className="h-4 w-4" />
                           Sair do canal
-                        </button>
+                        </AppButton>
                       ) : null}
                       {canal.podeDesvincularUnidade ? (
-                        <button
+                        <AppButton
+                          variant="none"
+                          icon={UserMinus}
                           type="button"
                           role="menuitem"
                           disabled={pending}
@@ -484,9 +474,8 @@ export function CanalFeedComposition({
                           }}
                           className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                         >
-                          <UserMinus className="h-4 w-4" />
                           Desvincular desta unidade
-                        </button>
+                        </AppButton>
                       ) : canal.vinculoUnidadeLiberaEm ? (
                         <p className="px-4 py-2 text-xs leading-snug text-[rgb(var(--foreground-muted))]">
                           {mensagemTravaVinculoUnidade(canal.vinculoUnidadeLiberaEm)}
@@ -947,11 +936,7 @@ function PedidosCanalModal({
                         aria-label="Aprovar"
                         className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-success transition-colors hover:bg-[rgb(var(--color-success)_/_0.12)] disabled:opacity-50"
                       >
-                        {pending && pendingUserId === p.userId ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Check className="h-3.5 w-3.5" />
-                        )}
+                        <Check className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
@@ -1151,21 +1136,23 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
           </label>
 
           <div className="flex justify-end gap-2 pt-1">
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={onClose}
               className="rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
             >
               Cancelar
-            </button>
-            <button
+            </AppButton>
+            <AppButton
+              variant="primary"
+              icon={Save}
+              loading={pending || crop.busy}
               type="submit"
-              disabled={pending || crop.busy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
               Salvar
-            </button>
+            </AppButton>
           </div>
         </form>
       </m.div>

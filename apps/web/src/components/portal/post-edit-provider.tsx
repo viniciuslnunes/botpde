@@ -40,6 +40,7 @@ import { EmojiPicker } from './emoji-picker'
 import { ExpandableText } from './expandable-text'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
 import { PostMedia } from './post-media'
+import { AppButton } from '@/components/ui/button'
 
 const MAX_ANEXOS = 10
 const MAX_IMG_MB = 10
@@ -618,14 +619,15 @@ function PostMidiaEditor({ ctx }: { ctx: PostEditContextValue }) {
             ))}
           </AnimatePresence>
           {ctx.medias.length < MAX_ANEXOS && (
-            <button
+            <AppButton
+              variant="none"
+              icon={ImagePlus}
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--color-primary-fg))]"
             >
-              <ImagePlus className="h-5 w-5" />
               <span className="text-[11px] font-medium">Adicionar</span>
-            </button>
+            </AppButton>
           )}
         </div>
       )}

@@ -4,6 +4,8 @@ import {
   TIPO_FINANCEIRO_LABEL,
 } from '@torcida/types'
 import { DatePicker } from '@/components/ui/date-picker'
+import { AppButton } from '@/components/ui/button'
+import { Filter } from 'lucide-react'
 
 export type FinanceiroFiltroValues = {
   tipo?: string
@@ -92,12 +94,14 @@ export function FinanceiroFiltros({
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <AppButton
+          variant="primary"
+          icon={Filter}
           type="submit"
-          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-primary-on"
+          className="rounded-lg px-3 py-1.5 text-sm font-medium"
         >
           Filtrar
-        </button>
+        </AppButton>
         {hasAny && (
           <Link
             href={basePath}

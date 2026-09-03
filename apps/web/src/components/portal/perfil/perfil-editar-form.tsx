@@ -8,6 +8,7 @@ import { toast } from '@torcida/ui'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
 
 interface PerfilEditarFormProps {
   tenantId: string
@@ -415,7 +416,9 @@ export function PerfilEditarForm({
 
             {avatarMenu && displayAvatar && (
               <div className="absolute left-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg">
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Eye}
                   type="button"
                   onClick={() => {
                     setAvatarMenu(false)
@@ -423,9 +426,8 @@ export function PerfilEditarForm({
                   }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
                 >
-                  <Eye className="h-4 w-4" />
                   Ver imagem
-                </button>
+                </AppButton>
               </div>
             )}
           </div>
@@ -587,15 +589,17 @@ export function PerfilEditarForm({
         )}
       </div>
 
-      <button
+      <AppButton
+        variant="primary"
+        icon={Save}
+        loading={pending}
         type="button"
         disabled={pending || uploading !== null}
         onClick={salvar}
-        className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
       >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Salvar bio e privacidade
-      </button>
+      </AppButton>
     </section>
   )
 }

@@ -25,6 +25,7 @@ import { FinanceiroResumoCards } from '@/components/financeiro/financeiro-resumo
 import { FinanceiroFiltros } from '@/components/financeiro/financeiro-filtros'
 import { ExportarFinanceiroButton } from '@/components/financeiro/exportar-financeiro-button'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { listarEventosParaRateio } from '@/lib/financeiro-operacao'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Lançamentos — Financeiro' }
@@ -57,9 +58,10 @@ export default async function FinanceiroLancamentosPage({ searchParams }: Props)
 
   let rateio: RateioOpcoes | undefined
   if (podeGerir) {
-    const [departamentos, projetos]: [
+    const [departamentos, projetos, eventos]: [
       Array<{ id: string; nome: string; slug: string }>,
       Array<{ id: string; titulo: string; departamentoId: string }>,
+      Awaited<ReturnType<typeof listarEventosParaRateio>>,
     ] = await Promise.all([
       db.departamento.findMany({
         where: { tenantId: tenant.id },
@@ -72,12 +74,14 @@ export default async function FinanceiroLancamentosPage({ searchParams }: Props)
         take: 200,
         select: { id: true, titulo: true, departamentoId: true },
       }),
+      listarEventosParaRateio(tenant.id),
     ])
     rateio = {
       departamentos: departamentos
         .filter((d) => !isDepartamentoLegado(d))
         .map((d) => ({ id: d.id, nome: d.nome })),
       projetos,
+      eventos,
     }
   }
 

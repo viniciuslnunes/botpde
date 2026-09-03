@@ -10,6 +10,15 @@ import {
   type BarComandaAbertaPortal,
   type BarDebitoComandaPortal,
 } from '@/lib/bar-comanda'
+import { db } from '@torcida/db'
+import { getTurnoAbertoBar } from '@/lib/bar'
+import { montarQrComanda } from '@/lib/comanda-qr'
+import { montarQrVendaBar } from '@/lib/venda-bar-qr'
+import { BarCompraAntecipada } from '@/components/portal/bar/bar-compra-antecipada'
+import {
+  BarValesRetirada,
+  type ValeRetiradaBar,
+} from '@/components/portal/bar/bar-vales-retirada'
 import { serializeProdutoBar } from '@/lib/bar-serialize'
 import { BarCardapio } from '@/components/portal/bar/bar-cardapio'
 import { BarMinhaComanda } from '@/components/portal/bar/bar-minha-comanda'
@@ -37,6 +46,53 @@ export default async function PortalBarPage() {
     getComandaAbertaDoMembro(tenant.id, unidade.id, userId),
     listarDebitosComandaDoMembro(tenant.id, unidade.id, userId),
   ])
+
+  // Compra antecipada só existe com o caixa aberto: é o que garante que toda
+  // venda do portal nasce dentro de um turno e a conferência de caixa fecha.
+  const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
+
+  type VendaPortalRow = {
+    id: string
+    total: { toNumber(): number } | number
+    status: string
+    criadoEm: Date
+    itens: Array<{ produtoNome: string; quantidade: number; retiradoQtd: number }>
+  }
+  const compras: VendaPortalRow[] = await db.barVenda.findMany({
+    where: {
+      tenantId: tenant.id,
+      sedeId: unidade.id,
+      compradorUserId: userId,
+      origem: 'PORTAL',
+      retiradoEm: null,
+      status: { in: ['PENDENTE', 'PAGA'] },
+    },
+    select: {
+      id: true,
+      total: true,
+      status: true,
+      criadoEm: true,
+      itens: { select: { produtoNome: true, quantidade: true, retiradoQtd: true } },
+    },
+    orderBy: { criadoEm: 'desc' },
+    take: 10,
+  })
+
+  const vales: ValeRetiradaBar[] = compras.map((v) => ({
+    id: v.id,
+    total: typeof v.total === 'number' ? v.total : v.total.toNumber(),
+    criadoEm: v.criadoEm,
+    pago: v.status === 'PAGA',
+    // Mostra o que FALTA, não o que foi comprado: depois de uma retirada
+    // parcial, repetir a lista original faria o sócio pedir de novo o que já levou.
+    itens: v.itens
+      .map((i) => ({ nome: i.produtoNome, falta: Math.max(i.quantidade - i.retiradoQtd, 0) }))
+      .filter((i) => i.falta > 0)
+      .map((i) => `${i.nome} ×${i.falta}`)
+      .join(', '),
+    // Sem PIX confirmado não há vale: o QR só nasce quando o dinheiro entrou.
+    qr: v.status === 'PAGA' ? montarQrVendaBar(v.id) : null,
+  }))
 
   const categoriasAtivas = categorias
     .filter((c) => c.ativo)
@@ -76,10 +132,24 @@ export default async function PortalBarPage() {
 
       <MotionReveal index={1}>
         {/* Com comanda/débito: cards; senão: linha discreta (não card vazio barulhento). */}
-        <BarMinhaComanda comanda={comanda} debitos={debitos} />
+        <BarMinhaComanda
+          comanda={comanda}
+          debitos={debitos}
+          qrComanda={comanda ? montarQrComanda(comanda.id) : null}
+        />
       </MotionReveal>
 
       <MotionReveal index={2}>
+        <BarValesRetirada vales={vales} />
+      </MotionReveal>
+
+      {turno && (
+        <MotionReveal index={3}>
+          <BarCompraAntecipada produtos={itens} />
+        </MotionReveal>
+      )}
+
+      <MotionReveal index={4}>
         <BarCardapio produtos={itens} categorias={categoriasAtivas} />
       </MotionReveal>
     </div>

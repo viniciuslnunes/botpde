@@ -19,6 +19,7 @@ import {
 import { criarCobrancaPix } from '@/lib/pix-gateway'
 import { notificarSafe } from '@/lib/notificacoes'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 export type CobrancaActionState = {
   ok?: boolean
@@ -26,7 +27,8 @@ export type CobrancaActionState = {
   errors?: Record<string, string[]>
 }
 
-function revalidateCobrancas() {
+function revalidateCobrancas(tenantId: string) {
+  invalidateAdminDirecao(tenantId)
   revalidatePath('/admin/financeiro')
   revalidatePath('/admin/financeiro/cobrancas')
   revalidatePath('/portal/carteirinha')
@@ -113,7 +115,7 @@ export async function criarCobranca(
     link: `/portal/cobrancas/${cobranca.id}`,
   })
 
-  revalidateCobrancas()
+  revalidateCobrancas(tenant.id)
   return { ok: true }
 }
 
@@ -141,7 +143,7 @@ export async function baixarCobrancaManual(cobrancaId: string): Promise<Cobranca
     },
   })
 
-  revalidateCobrancas()
+  revalidateCobrancas(tenant.id)
   return { ok: true }
 }
 
@@ -178,7 +180,7 @@ export async function cancelarCobranca(cobrancaId: string): Promise<CobrancaActi
     },
   })
 
-  revalidateCobrancas()
+  revalidateCobrancas(tenant.id)
   return { ok: true }
 }
 
@@ -236,7 +238,7 @@ export async function gerarPixCobranca(cobrancaId: string): Promise<CobrancaActi
       },
     })
 
-    revalidateCobrancas()
+    revalidateCobrancas(tenant.id)
     return { ok: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Falha ao gerar Pix'

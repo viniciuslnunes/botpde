@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Crown, Loader2, MapPin, Search, X } from 'lucide-react'
+import { Building2, Crown, MapPin, Search } from 'lucide-react'
 import {
   PARAM_BUSCA,
   construirHrefListagem,
@@ -11,6 +11,8 @@ import {
 } from '@/lib/listagem'
 import { ocultosPreservados } from '@/lib/listagem/ui'
 import type { SugestaoLideranca } from '@/app/api/super-admin/liderancas/busca/route'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 const DEBOUNCE_MS = 280
 
@@ -131,7 +133,6 @@ export function LiderancasBuscaInteligente({
     raiz: raizId ?? undefined,
   }).filter((c) => c.nome !== PARAM_BUSCA && c.nome !== 'raiz')
 
-  const Icone = pendente || carregandoSugestoes ? Loader2 : Search
   const mostrarLista = aberto && q.trim().length >= 2
 
   return (
@@ -152,21 +153,10 @@ export function LiderancasBuscaInteligente({
         {ocultos.map((campo) => (
           <input key={campo.nome} type="hidden" name={campo.nome} value={campo.valor} />
         ))}
-        <Icone
-          className={[
-            'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2',
-            pendente || carregandoSugestoes
-              ? 'animate-spin text-[rgb(var(--color-primary-fg))]'
-              : 'text-[rgb(var(--foreground-muted))]',
-          ].join(' ')}
-          aria-hidden
-        />
-        <input
-          type="search"
+        <SearchFilterInput
           name={PARAM_BUSCA}
           value={q}
-          onChange={(e) => {
-            const next = e.target.value
+          onChange={(next) => {
             setQ(next)
             setAberto(true)
             if (next.trim() === '' && (params.q || raizId)) {
@@ -188,30 +178,20 @@ export function LiderancasBuscaInteligente({
               setAberto(false)
             }
           }}
+          onClear={limpar}
+          mostrarLimpar={Boolean(q || raizId)}
           placeholder={spec.buscaPlaceholder ?? 'Buscar…'}
-          aria-label={spec.buscaPlaceholder ?? 'Buscar lideranças'}
-          aria-autocomplete="list"
-          // Sem role explícito o input é `textbox`, que não suporta
-          // aria-expanded — o par input + listbox é um combobox.
-          role="combobox"
-          aria-controls={listId}
-          aria-expanded={mostrarLista}
-          autoComplete="off"
-          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary)_/_0.3)]"
+          ariaLabel={spec.buscaPlaceholder ?? 'Buscar lideranças'}
+          exibirDropdown={false}
+          loading={pendente || carregandoSugestoes}
+          listboxId={listId}
+          comboboxAberto={mostrarLista}
+          size="sm"
+          inputClassName="rounded-lg focus:ring-1 focus:ring-[rgb(var(--color-primary)_/_0.3)]"
         />
-        {(q || raizId) && (
-          <button
-            type="button"
-            onClick={limpar}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-            aria-label="Limpar busca"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <button type="submit" className="sr-only">
+        <AppButton variant="none" icon={Search} type="submit" className="sr-only">
           Buscar
-        </button>
+        </AppButton>
       </form>
 
       {mostrarLista && (

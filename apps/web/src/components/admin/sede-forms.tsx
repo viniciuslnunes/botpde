@@ -26,6 +26,7 @@ import { m } from 'motion/react'
 import { FieldError, Input, Select, Textarea, toast } from '@torcida/ui'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { AppModal, AppModalBody } from '@/components/ui/app-modal'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -944,11 +945,10 @@ function SedeLocalizacaoFields({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <FieldLabel>Buscar no mapa</FieldLabel>
-                  <Input
-                    type="search"
+                  <SearchFilterInput
                     value={mapSearch}
-                    onChange={(e) => {
-                      setMapSearch(e.target.value)
+                    onChange={(next) => {
+                      setMapSearch(next)
                       setSearchStatus('idle')
                     }}
                     onKeyDown={(e) => {
@@ -958,6 +958,10 @@ function SedeLocalizacaoFields({
                       }
                     }}
                     placeholder="Ex: PDE Cubatão, SP"
+                    ariaLabel="Buscar no mapa"
+                    exibirDropdown={false}
+                    loading={searchStatus === 'loading'}
+                    inputClassName="rounded-xl"
                   />
                 </div>
                 <AppButton

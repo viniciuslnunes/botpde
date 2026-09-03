@@ -5,11 +5,19 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MessagesSquare, Play } from 'lucide-react'
 import { faixaEngajamentoTopico, pctAprovacaoPraca, resumoDeCorpoForum } from '@torcida/types'
-import { formatRelative } from '@/lib/format-datetime'
+import { formatFeedPublicadoEm, formatRelative } from '@/lib/format-datetime'
 import { isVideoUrl } from '@/lib/comunidade-social'
 import { canOptimizeImageUrl, isDurableRemoteImageUrl } from '@/lib/optimizable-image'
+import { ForumFeedEngagement } from '@/components/portal/forum-feed-engagement'
 import { PracaOrigemBadge, FixadoBadge } from './praca-origem-badge'
+import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import type { ForumTopicoItem } from '@/lib/praca'
+
+interface CurrentUser {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+}
 
 function StatusChip({ status }: { status: ForumTopicoItem['status'] }) {
   if (status === 'PENDENTE') {
@@ -111,53 +119,74 @@ export function ForumTopicoRow({
   topico,
   href,
   posicao,
+  escopo,
+  currentUser,
 }: {
   topico: ForumTopicoItem
   href: string
   posicao?: number
+  escopo: EscopoComunidade
+  currentUser: CurrentUser
 }) {
   const faixa = faixaEngajamentoTopico(topico)
   const pct = pctAprovacaoPraca(topico.gostei, topico.naoGostei)
   const resumo = resumoDeCorpoForum(topico.titulo, topico.corpo, 240)
+  const publico = topico.status === 'VISIVEL'
+  const publicadoEmLabel = formatFeedPublicadoEm(topico.atualizadoEm)
 
   return (
-    <Link
-      href={href}
-      className="card-soft flex h-full min-w-0 items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-[border-color,box-shadow] hover:border-[rgb(var(--primary)_/_0.4)] hover:shadow-sm sm:gap-3.5 sm:p-3.5"
-    >
-      <Thumb urls={topico.midiaUrls} titulo={topico.titulo} posicao={posicao} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <PracaOrigemBadge origem="forum" />
-          <StatusChip status={topico.status} />
-          {topico.fixado ? <FixadoBadge /> : null}
-          {faixa === 'epico' ? (
-            <span className="text-[10px] font-semibold uppercase text-[rgb(var(--foreground-muted))]">
-              Épico
-            </span>
-          ) : null}
-          {faixa === 'lendario' ? (
-            <span className="text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
-              Lendário
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] text-balance">
-          {topico.titulo}
-        </p>
-        {resumo ? (
-          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[rgb(var(--foreground-muted))] text-pretty">
-            {resumo}
+    <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-3.5">
+      <Link
+        href={href}
+        className="flex min-w-0 items-start gap-3 transition-opacity hover:opacity-95 sm:gap-3.5"
+      >
+        <Thumb urls={topico.midiaUrls} titulo={topico.titulo} posicao={posicao} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <PracaOrigemBadge origem="forum" />
+            <StatusChip status={topico.status} />
+            {topico.fixado ? <FixadoBadge /> : null}
+            {faixa === 'epico' ? (
+              <span className="text-[10px] font-semibold uppercase text-[rgb(var(--foreground-muted))]">
+                Épico
+              </span>
+            ) : null}
+            {faixa === 'lendario' ? (
+              <span className="text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
+                Lendário
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] text-balance">
+            {topico.titulo}
           </p>
-        ) : null}
-        <p className="mt-2 text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
-          {topico.respostasCount} {topico.respostasCount === 1 ? 'resposta' : 'respostas'}
-          {pct !== null ? ` · ${pct}% positivo` : topico.gostei > 0 ? ` · ${topico.gostei} apoios` : ''}
-          {topico.autorNome ? ` · ${topico.autorNome}` : ''}
-          {' · '}
-          {formatRelative(topico.atualizadoEm)}
-        </p>
-      </div>
-    </Link>
+          {resumo ? (
+            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[rgb(var(--foreground-muted))] text-pretty">
+              {resumo}
+            </p>
+          ) : null}
+          <p className="mt-2 text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+            {topico.respostasCount} {topico.respostasCount === 1 ? 'resposta' : 'respostas'}
+            {pct !== null ? ` · ${pct}% positivo` : topico.gostei > 0 ? ` · ${topico.gostei} apoios` : ''}
+            {topico.autorNome ? ` · ${topico.autorNome}` : ''}
+            {' · '}
+            {formatRelative(topico.atualizadoEm)}
+          </p>
+        </div>
+      </Link>
+
+      {publico ? (
+        <ForumFeedEngagement
+          topicoId={topico.id}
+          escopo={escopo}
+          gostei={topico.gostei}
+          naoGostei={topico.naoGostei}
+          meuVoto={topico.meuVoto}
+          totalRespostas={topico.respostasCount}
+          currentUser={currentUser}
+          publicadoEm={publicadoEmLabel}
+        />
+      ) : null}
+    </article>
   )
 }

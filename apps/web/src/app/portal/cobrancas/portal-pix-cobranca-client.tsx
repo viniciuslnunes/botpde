@@ -1,10 +1,11 @@
 'use client'
 
 import { useTransition } from 'react'
-import { Loader2, Copy, CheckCircle2 } from 'lucide-react'
+import { Check, Copy, CheckCircle2 } from 'lucide-react'
 import { confirmarPixMock } from './actions'
 import { runPersistAction } from '@/lib/toast-action'
 import { useState } from 'react'
+import { AppButton } from '@/components/ui/button'
 
 export function PortalPixCobrancaClient({
   cobrancaId,
@@ -78,9 +79,12 @@ export function PortalPixCobrancaClient({
       )}
 
       {mock && (
-        <button
+        <AppButton
+          variant="primary"
+          icon={Check}
+          loading={pending}
           type="button"
-          disabled={pending}
+          block
           onClick={() =>
             startTransition(async () => {
               await runPersistAction(() => confirmarPixMock(cobrancaId), {
@@ -88,11 +92,9 @@ export function PortalPixCobrancaClient({
               })
             })
           }
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-primary-on disabled:opacity-60"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Já paguei (mock)
-        </button>
+        </AppButton>
       )}
     </div>
   )

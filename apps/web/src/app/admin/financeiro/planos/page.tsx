@@ -6,9 +6,12 @@ import {
   PERIODICIDADE_PLANO_LABEL,
   PERMISSIONS,
   resolverPeriodicidadesOnboarding,
+  parseFinanceiroCiclo,
 } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
 import { KpiGrid, StatCard } from '@/components/admin/ui'
+import { FinanceiroCicloForm } from '@/components/admin/financeiro-ciclo-form'
+import { carregarFinanceiroCicloTenant } from './ciclo-actions'
 import { AdminPlanosListaClient } from './admin-planos-lista-client'
 import { AdminOfertaOnboarding } from './admin-oferta-onboarding'
 import type { Metadata } from 'next'
@@ -38,11 +41,12 @@ export default async function PlanosAssociacaoAdminPage() {
     _count: { membros: number }
   }
 
-  const [planos, tenantOferta, gruposPeriodicidade, sociosComPlano]: [
+  const [planos, tenantOferta, gruposPeriodicidade, sociosComPlano, cicloFinanceiro]: [
     PlanoRow[],
     { periodicidadesOnboarding: PeriodicidadePlanoAssociacao[] } | null,
     { periodicidadePretendida: PeriodicidadePlanoAssociacao | null; _count: { _all: number } }[],
     number,
+    ReturnType<typeof parseFinanceiroCiclo>,
   ] = await Promise.all([
     db.planoAssociacao.findMany({
       where: { tenantId: tenant.id },
@@ -80,6 +84,7 @@ export default async function PlanosAssociacaoAdminPage() {
         planoAssociacaoId: { not: null },
       },
     }),
+    carregarFinanceiroCicloTenant(tenant.id),
   ])
 
   const periodicidadesGravadas = tenantOferta?.periodicidadesOnboarding ?? []
@@ -162,6 +167,8 @@ export default async function PlanosAssociacaoAdminPage() {
         linhas={linhasOferta}
         podeGerir={podeGerir}
       />
+
+      <FinanceiroCicloForm ciclo={cicloFinanceiro} somenteLeitura={!podeGerir} />
 
       {podeGerir ? null : (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">Somente leitura.</p>

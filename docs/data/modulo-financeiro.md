@@ -27,9 +27,15 @@
   (`resolverRateio` em `admin/financeiro/actions.ts`). Gasto realizado de
   um `Projeto` = soma das `DESPESA` com esse `projetoId` — ver
   `docs/data/modulo-departamentos.md` § projetos.
+- `eventoId?`, `sedeId?` (2026-09-02) — **rateio pela operação e pela unidade**.
+  Projeto responde pela campanha; evento responde pelo dia: é o que torna
+  "a caravana fechou no azul?" respondível (`resultadoDaOperacao` em
+  `lib/financeiro-operacao.ts`). A baixa de cobrança de vaga já carimba o
+  `eventoId`, então a arrecadação entra sozinha — só a despesa é digitada.
 - `criadoPorId`, `criadoEm`, `atualizadoEm`
 - Índices: `(tenantId, data)`, `(tenantId, tipo, data)`, `(tenantId, categoria)`,
-  `(tenantId, departamentoId, data)`, `(projetoId)`
+  `(tenantId, departamentoId, data)`, `(projetoId)`, `(eventoId)`,
+  `(tenantId, sedeId, data)`
 
 Enums:
 

@@ -26,6 +26,8 @@ function item(partial: Partial<NoticiaPracaItem> & Pick<NoticiaPracaItem, 'id' |
     autorNome: null,
     fonte: null,
     url: null,
+    meuVoto: null,
+    totalComentarios: 0,
     ...partial,
   }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Loader2, Rocket } from 'lucide-react'
+import { Loader2, Rocket, X, ClipboardCheck } from 'lucide-react'
 import { m, AnimatePresence } from 'motion/react'
 import { criarSolicitacaoManual, type SolicitacaoActionState } from '@/app/admin/(estrutura)/afiliacoes/afiliacao-actions'
 import {
@@ -20,6 +20,7 @@ import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
+import { AppButton } from '@/components/ui/button'
 
 /**
  * Mesma view do card do admin (`/admin/afiliacoes`) + o que só o Super Admin
@@ -324,14 +325,15 @@ function CriarManualForm({
       </div>
 
       <div className="flex items-center gap-3">
-        <button
+        <AppButton
+          variant="primary"
+          icon={ClipboardCheck}
+          loading={pending || uploading}
           type="submit"
           disabled={pending || uploading || !tenantId || !campos.cep.trim() || !campos.endereco.trim()}
-          className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-40"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Registrar
-        </button>
+        </AppButton>
         <Feedback state={state} />
       </div>
     </form>
@@ -382,14 +384,15 @@ function PromoverForm({ sedeId }: { sedeId: string }) {
 
   if (!aberto) {
     return (
-      <button
+      <AppButton
+        variant="primary"
+        icon={Rocket}
         type="button"
         onClick={() => setAberto(true)}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--color-primary-fg))]/40 px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary))]/10"
+        className="mt-2 gap-1.5 rounded-lg border border-[rgb(var(--color-primary-fg))]/40 px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] hover:/10"
       >
-        <Rocket className="h-3.5 w-3.5" />
         Promover a portal
-      </button>
+      </AppButton>
     )
   }
 
@@ -402,21 +405,25 @@ function PromoverForm({ sedeId }: { sedeId: string }) {
         placeholder="E-mail do owner (opcional)"
         className={`w-56 ${INPUT_CLASS_SM}`}
       />
-      <button
+      <AppButton
+        variant="primary"
+        icon={Rocket}
+        loading={pending}
         type="submit"
         disabled={pending}
-        className="btn-primary inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+        className="gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
       >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
         Promover
-      </button>
-      <button
+      </AppButton>
+      <AppButton
+        variant="none"
+        icon={X}
         type="button"
         onClick={() => setAberto(false)}
         className="text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
       >
         Cancelar
-      </button>
+      </AppButton>
       {state.message && (
         <span className={state.success ? 'text-xs text-success' : 'text-xs text-red-400'}>
           {state.message}

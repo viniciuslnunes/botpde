@@ -118,7 +118,7 @@ function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
               href={item.href}
               onClick={onNavigate}
               className={[
-                'app-action group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                'app-nav-link app-action group flex items-center gap-3 rounded-lg px-3 py-2 text-sm normal-case tracking-normal transition-colors',
                 active
                   ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                   : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -244,7 +244,7 @@ function SidebarBody({
             href="/super-admin"
             prefetch={false}
             onClick={onNavigate}
-            className="app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+            className="app-nav-link app-action flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
           >
             <Shield className="h-4 w-4" />
             Área Super Admin
@@ -253,7 +253,7 @@ function SidebarBody({
         <Link
           href="/portal/comunidade"
           onClick={onNavigate}
-          className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          className="app-nav-link app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
         >
           Voltar ao portal
         </Link>

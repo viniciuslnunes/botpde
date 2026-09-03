@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import type { AliancaTabId } from '@/lib/alianca-tabs'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, CircleSlash, Handshake, Search, X, XCircle } from 'lucide-react'
+import { Check, CircleSlash, Handshake, X, XCircle } from 'lucide-react'
 import {
   aceitarAlianca,
   cancelarProposta,
@@ -30,6 +30,7 @@ import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { adminTabIds } from '@/components/admin/ui/admin-tab-ids'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 interface TenantOption {
   id: string
@@ -623,18 +624,18 @@ export function AliancaForms({
             </div>
 
             <div className="space-y-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-                <input
-                  value={search}
-                  onChange={(event) => {
-                    setSearch(event.target.value)
-                    setSelectedTenantId(null)
-                  }}
-                  placeholder="Ex: Remo, Belém, remocada…"
-                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-                />
-              </div>
+              <SearchFilterInput
+                value={search}
+                onChange={(next) => {
+                  setSearch(next)
+                  setSelectedTenantId(null)
+                }}
+                placeholder="Ex: Remo, Belém, remocada…"
+                ariaLabel="Buscar torcida para propor aliança"
+                exibirDropdown={false}
+                size="sm"
+                inputClassName="rounded-lg"
+              />
 
               {searchNeedle && tenantSuggestions.length === 0 && (
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">Nenhuma torcida encontrada.</p>

@@ -40,7 +40,7 @@ const GATILHO =
   'app-touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary)_/_0.35)]'
 
 const ITEM =
-  'app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50'
+  'app-touch-target flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium uppercase tracking-wide hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50'
 
 /**
  * Menu de ações da linha — gatilho só de ícone, painel no `body` para não ser

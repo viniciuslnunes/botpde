@@ -8,6 +8,7 @@ import {
   registrarRealizadoProjeto,
 } from '@/app/portal/departamentos/projetos-actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { DepartamentoOpcaoPicker } from '@/components/departamentos/departamento-opcao-picker'
 import { AppButton } from '@/components/ui/button'
 import { ClipboardCheck } from 'lucide-react'
 
@@ -65,19 +66,14 @@ export function ProjetoAcoesInline({
       <label className="sr-only" htmlFor={`status-${projetoId}`}>
         Status
       </label>
-      <select
-        id={`status-${projetoId}`}
+      <DepartamentoOpcaoPicker
+        opcoes={STATUS_PROJETOS.map((s) => ({ id: s, nome: labelStatusProjeto(s) }))}
         value={status}
+        onChange={mudarStatus}
         disabled={pending}
-        onChange={(e) => mudarStatus(e.target.value)}
-        className="app-action max-w-[9.5rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs text-[rgb(var(--foreground))]"
-      >
-        {STATUS_PROJETOS.map((s) => (
-          <option key={s} value={s}>
-            {labelStatusProjeto(s)}
-          </option>
-        ))}
-      </select>
+        ariaLabel="Status do projeto"
+        menuAriaLabel="Status disponíveis"
+      />
       {metaQuantidade != null ? (
         registrando ? (
           <div className="flex items-center gap-1">

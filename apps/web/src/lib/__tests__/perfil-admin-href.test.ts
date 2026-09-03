@@ -73,7 +73,7 @@ describe('hrefAdminPessoa', () => {
     ).toBe('/admin/socios?status=aguardando&q=Caio+Aguiar')
   })
 
-  it('sócio com carteirinha abre Emitidas (todos) — validade não esconde o registro', () => {
+  it('sócio com carteirinha abre Emitidas — validade não esconde o registro', () => {
     expect(
       hrefAdminPessoa({
         ...base,
@@ -83,7 +83,7 @@ describe('hrefAdminPessoa', () => {
         temCarteirinha: true,
         nome: 'Caio Aguiar',
       }),
-    ).toBe('/admin/socios?status=todos&q=Caio+Aguiar')
+    ).toBe('/admin/socios?status=emitidas&q=Caio+Aguiar')
   })
 
   it('ficha vence super-admin: a operação é na torcida, não na plataforma', () => {
@@ -143,7 +143,7 @@ describe('abaSociosAdmin', () => {
   })
 
   it('com carteirinha → emitidas, mesmo se o status faltar', () => {
-    expect(abaSociosAdmin({ temCarteirinha: true })).toBe('todos')
+    expect(abaSociosAdmin({ temCarteirinha: true })).toBe('emitidas')
   })
 })
 

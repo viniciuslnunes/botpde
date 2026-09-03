@@ -78,12 +78,13 @@ export const membroDetalheSelect = {
   criadoEm: true,
   atualizadoEm: true,
   espelhado: true,
+  membroOrigemId: true,
   aprovadoNaUnidadeTenantId: true,
   importacaoId: true,
   user: { select: { email: true, avatarUrl: true } },
   departamento: { select: { id: true, nome: true } },
   departamentoSede: { select: { nome: true } },
-  sede: { select: { nome: true } },
+  sede: { select: { nome: true, tipo: true } },
 } as const
 
 export type MembroDetalheRow = {
@@ -136,12 +137,13 @@ export type MembroDetalheRow = {
   criadoEm: Date
   atualizadoEm: Date | null
   espelhado: boolean
+  membroOrigemId: string | null
   aprovadoNaUnidadeTenantId: string | null
   importacaoId: string | null
   user: { email: string | null; avatarUrl: string | null }
   departamento: { id: string; nome: string } | null
   departamentoSede: { nome: string } | null
-  sede: { nome: string } | null
+  sede: { nome: string; tipo: string } | null
 }
 
 export function mapToAdminMembroItem(
@@ -155,6 +157,8 @@ export function mapToAdminMembroItem(
     origemCanal?: OrigemCanal | null
     /** Áreas já em vigor deste usuário neste tenant (`getAreasEfetivadasPorUser`). */
     areasEfetivadas?: Set<string>
+    /** Área na unidade territorial (ver `resolverDepartamentoUnidadeNome`). */
+    departamentoUnidadeNome?: string | null
   },
 ): AdminMembroItem {
   const isSocio = membro.tipo === 'SOCIO'
@@ -191,6 +195,7 @@ export function mapToAdminMembroItem(
     idade: membro.idade,
     departamentoNome: membro.departamento?.nome ?? null,
     departamentoSedeNome: membro.departamentoSede?.nome ?? null,
+    departamentoUnidadeNome: opts?.departamentoUnidadeNome ?? null,
     // Sem `areasEfetivadas` a tela não calculou — fica undefined e a UI não
     // oferece a ação, em vez de assumir "pendente" e mostrar botão fantasma.
     areaPendenteEfetivacao:

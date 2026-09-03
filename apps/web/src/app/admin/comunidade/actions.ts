@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidateComunicadosCache } from '@/lib/comunidade'
-import { notificarComunicado } from '@/lib/notificacoes-routing'
-import { PERMISSIONS } from '@torcida/types'
+import { notificarComunicado, notificarComunicadoSegmentado } from '@/lib/notificacoes-routing'
+import { ComunicadoAudienciaSchema, PERMISSIONS, parseComunicadoAudiencia, type ComunicadoAudiencia } from '@torcida/types'
 import { z } from 'zod'
 import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath, midiasComEmbedDoTexto } from '@/lib/social-embed'
@@ -199,7 +199,9 @@ async function publicarComunicadoENotificar(opts: {
   corpo: string
   prioridade: PrioridadeComunicado
   midias?: string[]
+  audiencia?: ComunicadoAudiencia
 }): Promise<{ id: string }> {
+  const audiencia = parseComunicadoAudiencia(opts.audiencia)
   const comunicado = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const criado = await tx.announcement.create({
       data: {
@@ -208,6 +210,7 @@ async function publicarComunicadoENotificar(opts: {
         titulo: opts.titulo,
         corpo: opts.corpo,
         prioridade: opts.prioridade,
+        audiencia,
       },
     })
     await tx.post.create({
@@ -238,9 +241,9 @@ async function publicarComunicadoENotificar(opts: {
 
   const urgente = opts.prioridade === 'URGENTE'
   const importante = opts.prioridade === 'IMPORTANTE'
-  await notificarComunicado({
+  const destino = {
     tenantId: opts.tenantId,
-    tipo: urgente ? 'COMUNICADO_URGENTE' : 'COMUNICADO_NOVO',
+    tipo: urgente ? ('COMUNICADO_URGENTE' as const) : ('COMUNICADO_NOVO' as const),
     titulo: urgente
       ? `Urgente: ${opts.titulo}`
       : importante
@@ -250,7 +253,12 @@ async function publicarComunicadoENotificar(opts: {
     link: '/portal/comunidade',
     atorId: opts.autorId,
     excetoUserId: opts.autorId,
-  })
+  }
+  if (audiencia.escopo === 'TODOS') {
+    await notificarComunicado(destino)
+  } else {
+    await notificarComunicadoSegmentado(destino, audiencia)
+  }
 
   invalidateComunicadosCache(opts.tenantId)
   revalidatePath('/admin/comunidade')
@@ -307,6 +315,7 @@ const comunicadoComposerSchema = z.object({
   corpo: z.string().min(1, 'Conteúdo é obrigatório').max(4000),
   prioridade: z.enum(['NORMAL', 'IMPORTANTE', 'URGENTE']),
   midias: z.array(midiaUrlSchema).max(10, 'Máximo de 10 anexos').default([]),
+  audiencia: ComunicadoAudienciaSchema.optional(),
 })
 
 export type ComunicadoComposerState = {
@@ -326,6 +335,17 @@ function parseMidiasComunicado(raw: FormDataEntryValue | null): unknown {
   }
 }
 
+function parseAudienciaComunicado(raw: FormDataEntryValue | null): ComunicadoAudiencia | undefined {
+  if (typeof raw !== 'string' || raw.trim() === '') return undefined
+  try {
+    const json: unknown = JSON.parse(raw)
+    const parsed = ComunicadoAudienciaSchema.safeParse(json)
+    return parsed.success ? parsed.data : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** Publica um comunicado a partir do composer rico (`FeedComposer` modo `comunicado`). */
 export async function publicarComunicadoComposer(
   _prev: ComunicadoComposerState,
@@ -338,13 +358,14 @@ export async function publicarComunicadoComposer(
     corpo: formData.get('conteudo'),
     prioridade: formData.get('prioridade'),
     midias: parseMidiasComunicado(formData.get('midias')),
+    audiencia: parseAudienciaComunicado(formData.get('audiencia')),
   })
 
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, corpo, prioridade, midias } = parsed.data
+  const { titulo, corpo, prioridade, midias, audiencia } = parsed.data
 
   const criado = await publicarComunicadoENotificar({
     tenantId: tenant.id,
@@ -353,6 +374,7 @@ export async function publicarComunicadoComposer(
     corpo,
     prioridade,
     midias,
+    audiencia,
   })
 
   return { success: true, token: criado.id }
@@ -432,9 +454,11 @@ async function atualizarComunicadoEPost(opts: {
   corpo: string
   prioridade: PrioridadeComunicado
   midias: string[]
+  audiencia?: ComunicadoAudiencia
 }): Promise<void> {
   const agora = new Date()
   const midiaUrls = midiasComEmbedDoTexto(opts.corpo, opts.midias)
+  const audiencia = parseComunicadoAudiencia(opts.audiencia)
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const atualizado = await tx.announcement.update({
@@ -443,6 +467,7 @@ async function atualizarComunicadoEPost(opts: {
         titulo: opts.titulo,
         corpo: opts.corpo,
         prioridade: opts.prioridade,
+        audiencia,
         publicadoEm: agora,
       },
       select: { fixado: true },
@@ -513,13 +538,14 @@ export async function atualizarComunicadoComposer(
     corpo: formData.get('conteudo'),
     prioridade: formData.get('prioridade'),
     midias: parseMidiasComunicado(formData.get('midias')),
+    audiencia: parseAudienciaComunicado(formData.get('audiencia')),
   })
 
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, corpo, prioridade, midias } = parsed.data
+  const { titulo, corpo, prioridade, midias, audiencia } = parsed.data
 
   await atualizarComunicadoEPost({
     tenantId: tenant.id,
@@ -529,6 +555,7 @@ export async function atualizarComunicadoComposer(
     corpo,
     prioridade,
     midias,
+    audiencia,
   })
 
   return { success: true, token: comunicadoId }

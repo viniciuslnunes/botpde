@@ -53,11 +53,30 @@ Função pura: `wherePracaNoEscopo` em `packages/types/src/portal-noticias-forum
   recência 72h, Wilson da aprovação, respostas, voto líquido com negativo 2×,
   mídia, pin). Recentes / Mais vistos continuam como recorte. `?ordem=populares`
   mapeia para `em_alta`.
-  No feed Descobrir: **Concordo** / **Discordo** (`PracaVoto` +1/−1) e **Responder**
-  (`ForumResposta`) no próprio card — não usa o coração de curtida do post.
-  Sem `revalidatePath` do feed (overlay). Clique em título/hora ou **Ver no fórum**
-  abre o tópico para a thread completa.
-- Artigo e notícia: comentário nosso + voto no **card**; texto da matéria continua no veículo.
+  No feed Descobrir **e** nas listagens de Notícias/Fórum: **Concordo** / **Discordo**
+  (`PracaVoto` +1/−1) e **Responder** no próprio card — inclusive resposta em cima de
+  outra resposta. Sem `revalidatePath` do feed (overlay). Clique em título/hora ou
+  **Ver no fórum** abre o tópico para a thread completa.
+- Artigo e notícia: comentário nosso + voto no **card** (módulo Notícias e praça);
+  texto da matéria continua no veículo.
+  Qualquer comentário aceita várias respostas (`PracaComentario.parentId`). Visual:
+  **Responder · N respostas ∨** na mesma linha (`ComentarioRespostasBloco`), lista
+  achatada sob a raiz e composer embutido na thread — sem escada de indentação.
+- **Editar / excluir o próprio comentário (2026-09-03):** menu ⋯ na linha, via o
+  mesmo `ComentarioMenu` do post da Comunidade — a superfície muda, o componente
+  não. Actions: `editarComentarioPraca`/`excluirComentarioPraca` (notícia e artigo)
+  e `editarRespostaForum`/`excluirRespostaForum` (tópico). **A dona da regra é a
+  action, não a UI**: o `findFirst` filtra por `autorId: session.user.id` (por isso
+  não existe "editar comentário dos outros" nem para quem modera — moderação é
+  ocultar, não reescrever), reconfere o escopo com `podeVerArtigoNoEscopo` /
+  `podeVerTopicoNoEscopo`, grava `AuditLog` (`PRACA_COMENTARIO_EDITADO|EXCLUIDO`,
+  `FORUM_RESPOSTA_EDITADA|EXCLUIDA`) e revalida as rotas. Resposta recusada
+  (`oculto`) não abre o menu. Excluir resposta de fórum decrementa
+  `ForumTopico.respostasCount` só quando ela contava.
+  Onde a lista é estado de cliente (feed/reel), o componente atualiza local e
+  **reparenta os órfãos** (`parentId → null`, mesma regra de
+  `montarArvoreComentarios`); onde vem de RSC (detalhe da praça e do tópico), é
+  `router.refresh()`.
 - Ranking de pessoas (limiar 5 pontos) e janela de 7 dias; **não** concede RBAC.
 - Teto de 40 sinais baratos (tópico, resposta, voto emitido) por 7 dias no canal.
 - Faixa épico/lendário é rótulo de volume, não cargo.

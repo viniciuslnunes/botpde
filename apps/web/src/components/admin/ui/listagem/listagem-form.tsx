@@ -20,9 +20,21 @@ import {
 
 const PendenteContext = createContext(false)
 
+type NotificarCampoFn = (name: string, value: string) => void
+
+const NotificarCampoContext = createContext<NotificarCampoFn | null>(null)
+
 /** `true` enquanto a navegação disparada pelo form está em voo. */
 export function useListagemFormPendente(): boolean {
   return useContext(PendenteContext)
+}
+
+/**
+ * Dispara o debounce/navegação do `ListagemForm` pai quando o campo é
+ * controlado (ex.: `SearchFilterInput`) e não emite `input` nativo.
+ */
+export function useListagemFormNotificarCampo(): NotificarCampoFn | null {
+  return useContext(NotificarCampoContext)
 }
 
 export interface ListagemFormProps {
@@ -106,6 +118,13 @@ export function ListagemForm({
     navegar()
   }
 
+  function notificarCampo(name: string, value: string) {
+    overrideRef.current = { ...overrideRef.current, [name]: value }
+    const vazio = value.trim() === ''
+    agendar(!vazio ? debounceMs : 0)
+  }
+  const notificarCampoRef = useLatestRef(notificarCampo)
+
   function handleAuto(event: { target: EventTarget | null }) {
     const alvo = event.target
     if (alvo instanceof HTMLInputElement && alvo.name) {
@@ -125,17 +144,19 @@ export function ListagemForm({
 
   return (
     <PendenteContext.Provider value={pendente}>
-      <form
-        ref={formRef}
-        method="GET"
-        action={action}
-        aria-label={ariaLabel}
-        className={className}
-        onSubmit={handleSubmit}
-        onInput={auto ? handleAuto : undefined}
-      >
-        {children}
-      </form>
+      <NotificarCampoContext.Provider value={(name, value) => notificarCampoRef.current(name, value)}>
+        <form
+          ref={formRef}
+          method="GET"
+          action={action}
+          aria-label={ariaLabel}
+          className={className}
+          onSubmit={handleSubmit}
+          onInput={auto ? handleAuto : undefined}
+        >
+          {children}
+        </form>
+      </NotificarCampoContext.Provider>
     </PendenteContext.Provider>
   )
 }

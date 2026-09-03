@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useId, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { AlertTriangle, Check, CheckCircle2, CreditCard, Loader2, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react'
@@ -26,6 +26,15 @@ import {
   formatTelefoneListagem,
 } from '@/lib/admin-listagem-format'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
+
+export type EstagioSocio = 'solicitacao' | 'aguardando' | 'ativo' | 'vencendo' | 'vencido'
+
+export interface SocioTodosItem {
+  detalhe: AdminMembroItem
+  estagio: EstagioSocio
+  socio?: SocioEmitidoItem
+}
 
 export interface SocioEmitidoItem {
   id: string
@@ -142,6 +151,10 @@ export function EmitirCarteirinhaModal({
     title: 'Nova carteirinha',
     enabled: open,
   })
+
+  useEffect(() => {
+    if (open) firstFieldRef.current?.focus()
+  }, [open])
   const { confirmDiscard } = useUnsavedChangesContext()
 
   async function closeForm() {
@@ -173,7 +186,6 @@ export function EmitirCarteirinhaModal({
     })
   }
 
-  const idFiltro = `${formIds}-filtro`
   const idNome = `${formIds}-nome`
   const idValidade = `${formIds}-validade`
   const q = filtro.trim().toLowerCase()
@@ -218,12 +230,9 @@ export function EmitirCarteirinhaModal({
           <input type="hidden" name="userId" value={userId} />
 
           <div>
-            <label
-              htmlFor={idFiltro}
-              className="block text-sm font-medium text-[rgb(var(--foreground))]"
-            >
+            <p className="block text-sm font-medium text-[rgb(var(--foreground))]">
               Membro
-            </label>
+            </p>
             {selecionado && (
               <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
                 Selecionado:{' '}
@@ -238,16 +247,15 @@ export function EmitirCarteirinhaModal({
                   : ''}
               </p>
             )}
-            <input
-              ref={firstFieldRef}
-              id={idFiltro}
-              type="search"
+            <SearchFilterInput
               value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
+              onChange={setFiltro}
               placeholder="Buscar por nome, cidade ou telefone…"
-              autoComplete="off"
-              autoFocus={open}
-              className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              ariaLabel="Membro"
+              exibirDropdown={false}
+              inputRef={firstFieldRef}
+              inputClassName="mt-1.5 rounded-lg"
+              className="mt-0"
             />
             <ul
               role="listbox"
@@ -396,6 +404,47 @@ export function EmitirCarteirinhaModal({
   )
 }
 
+
+function EstagioSocioBadge({ estagio }: { estagio: EstagioSocio }) {
+  const config: Record<
+    EstagioSocio,
+    { label: string; className: string }
+  > = {
+    solicitacao: {
+      label: 'Solicitação',
+      className:
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
+    },
+    aguardando: {
+      label: 'Aguardando emissão',
+      className:
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
+    },
+    ativo: {
+      label: 'Ativo',
+      className:
+        'bg-[rgb(var(--color-success)_/_0.16)] text-[rgb(var(--color-success-fg))]',
+    },
+    vencendo: {
+      label: 'Vencendo',
+      className:
+        'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
+    },
+    vencido: {
+      label: 'Vencido',
+      className:
+        'bg-[rgb(var(--color-danger)_/_0.16)] text-[rgb(var(--color-danger-fg))]',
+    },
+  }
+  const item = config[estagio]
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${item.className}`}
+    >
+      {item.label}
+    </span>
+  )
+}
 
 function ValidadeStatus({ socio }: { socio: SocioEmitidoItem }) {
   return (
@@ -558,6 +607,7 @@ function EmitirLinhaButton({
 }
 
 export function AdminSociosClient({
+  todosItens,
   socios,
   elegiveis,
   elegiveisModal,
@@ -577,6 +627,8 @@ export function AdminSociosClient({
   temFiltroAtivo,
   proximoNumero,
 }: {
+  /** Visão unificada — todo o funil de sócio. */
+  todosItens: SocioTodosItem[]
   socios: SocioEmitidoItem[]
   elegiveis: MembroElegivelItem[]
   /** Opções do select de emissão (cap server-side). */
@@ -586,6 +638,7 @@ export function AdminSociosClient({
   /** Tabela de aprovação reusada de membros (server monta o cabecalho). */
   solicitacoesTabela: ReactNode
   contagens: {
+    todos: number
     emitidas: number
     ativos: number
     vencendo: number
@@ -615,6 +668,7 @@ export function AdminSociosClient({
   const [selecionado, setSelecionado] = useState<AdminMembroItem | null>(null)
   const fecharDetalhe = useCallback(() => setSelecionado(null), [])
 
+  const isTodos = statusFiltro === 'todos'
   const isAguardando = statusFiltro === 'aguardando'
   const isSolicitacoes = statusFiltro === 'solicitacoes'
 
@@ -628,6 +682,7 @@ export function AdminSociosClient({
   }
 
   const tabs = [
+    { key: 'todos', label: 'Todos', count: contagens.todos },
     {
       key: 'solicitacoes',
       label: 'Solicitações',
@@ -642,7 +697,7 @@ export function AdminSociosClient({
       countClass:
         'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
     },
-    { key: 'todos', label: 'Emitidas', count: contagens.emitidas },
+    { key: 'emitidas', label: 'Emitidas', count: contagens.emitidas },
     { key: 'ativos', label: 'Ativos', count: contagens.ativos },
     {
       key: 'vencendo',
@@ -664,54 +719,6 @@ export function AdminSociosClient({
     <>
       <AdminPageHeader
         title="Sócios"
-        description={
-          <span className="tabular-nums">
-            {contagens.emitidas} carteirinha
-            {contagens.emitidas !== 1 ? 's' : ''} emitida
-            {contagens.emitidas !== 1 ? 's' : ''}
-            {contagens.solicitacoes > 0 && (
-              <>
-                {' '}
-                ·{' '}
-                <span className="font-medium text-warning">
-                  {contagens.solicitacoes} solicitaç
-                  {contagens.solicitacoes !== 1 ? 'ões' : 'ão'}
-                </span>
-              </>
-            )}
-            {contagens.aguardando > 0 && (
-              <>
-                {' '}
-                ·{' '}
-                <span className="font-medium text-warning">
-                  {contagens.aguardando} aguardando emissão
-                </span>
-              </>
-            )}
-            {contagens.vencendo > 0 && (
-              <>
-                {' '}
-                ·{' '}
-                <span className="font-medium text-warning">
-                  {contagens.vencendo} próximo
-                  {contagens.vencendo !== 1 ? 's' : ''} de inadimplência
-                  {' '}
-                  (≤30 dias)
-                </span>
-              </>
-            )}
-            {contagens.vencidos > 0 && (
-              <>
-                {' '}
-                ·{' '}
-                <span className="font-medium text-danger">
-                  {contagens.vencidos} inadimplente
-                  {contagens.vencidos !== 1 ? 's' : ''}
-                </span>
-              </>
-            )}
-          </span>
-        }
         actions={
           podeEmitir && !isSolicitacoes ? (
             <AppButton
@@ -748,7 +755,181 @@ export function AdminSociosClient({
 
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
-          {isSolicitacoes ? (
+          {isTodos ? (
+            todosItens.length === 0 ? (
+              <MotionEmptyState
+                icon={
+                  <Users className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
+                }
+                title={
+                  temFiltroAtivo ? 'Nenhum sócio encontrado' : 'Nenhum sócio cadastrado'
+                }
+                description={
+                  temFiltroAtivo
+                    ? 'Tente outro termo de busca ou limpe os filtros.'
+                    : 'Solicitações, emissões e carteirinhas aparecem aqui.'
+                }
+                className="flex flex-col items-center justify-center py-16 text-center"
+              />
+            ) : (
+              <MotionReveal index={0}>
+                <ul className="space-y-2 md:hidden">
+                  {todosItens.map(({ detalhe, estagio, socio }) => (
+                    <li
+                      key={detalhe.id}
+                      className="cursor-pointer rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                      onClick={() => abrirDetalhe(detalhe)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          abrirDetalhe(detalhe)
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Ver detalhes de ${detalhe.nome}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar url={detalhe.avatarUrl} nome={detalhe.nome} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-[rgb(var(--foreground))]">
+                              {detalhe.nome}
+                            </p>
+                            <EstagioSocioBadge estagio={estagio} />
+                          </div>
+                          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                            {[
+                              detalhe.numeroAssociado?.trim()
+                                ? `nº ${detalhe.numeroAssociado.trim()}`
+                                : socio?.numeroLabel
+                                  ? `nº ${socio.numeroLabel}`
+                                  : null,
+                              formatCaixaAltaListagem(detalhe.departamentoNome),
+                              formatCaixaAltaListagem(detalhe.cidade),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || '—'}
+                          </p>
+                          {socio ? (
+                            <div className="mt-2">
+                              <ValidadeStatus socio={socio} />
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] md:block">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+                        {cabecalho}
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[rgb(var(--border))]">
+                      {todosItens.map(({ detalhe, estagio, socio }) => (
+                        <tr
+                          key={detalhe.id}
+                          className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                          onClick={() => abrirDetalhe(detalhe)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              abrirDetalhe(detalhe)
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Ver detalhes de ${detalhe.nome}`}
+                        >
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
+                              {socio?.numeroLabel ??
+                                (detalhe.numeroAssociado?.trim() || '—')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar url={detalhe.avatarUrl} nome={detalhe.nome} />
+                              <div className="min-w-0">
+                                <p className="font-medium text-[rgb(var(--foreground))]">
+                                  {detalhe.nome}
+                                </p>
+                                <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                                  {formatTelefoneListagem(detalhe.telefone) ?? '—'}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-3 sm:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {formatCaixaAltaListagem(detalhe.departamentoNome) ?? '—'}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {formatCaixaAltaListagem(detalhe.sedeNome) ?? '—'}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {formatCaixaAltaListagem(detalhe.departamentoUnidadeNome) ??
+                                '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <MembroOrigemCell membro={detalhe} />
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {formatCaixaAltaListagem(detalhe.cidade) ?? '—'}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 xl:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {detalhe.criadoEmLabel}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 sm:table-cell">
+                            <EstagioSocioBadge estagio={estagio} />
+                          </td>
+                          <td
+                            className="px-4 py-3 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            {estagio === 'aguardando' && podeEmitir ? (
+                              <AppButton
+                                variant="primary"
+                                icon={Plus}
+                                type="button"
+                                onClick={() => abrirEmit(detalhe.userId)}
+                                className="gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                              >
+                                Emitir
+                              </AppButton>
+                            ) : socio && podeEmitir ? (
+                              <SocioActions socio={socio} />
+                            ) : (
+                              <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                                —
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </MotionReveal>
+            )
+          ) : isSolicitacoes ? (
             solicitacoes.length === 0 ? (
               <MotionEmptyState
                 icon={
@@ -983,7 +1164,7 @@ export function AdminSociosClient({
               title={
                 temFiltroAtivo
                   ? 'Nenhuma carteirinha encontrada'
-                  : statusFiltro === 'todos'
+                  : statusFiltro === 'emitidas'
                     ? 'Nenhuma carteirinha emitida'
                     : 'Nenhuma carteirinha nesta categoria'
               }

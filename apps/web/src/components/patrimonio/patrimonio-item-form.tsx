@@ -16,6 +16,8 @@ import { ImageUploadField } from '@/components/media/image-upload-field'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { toastFromAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 const CATEGORIAS = Object.keys(CATEGORIA_PATRIMONIO_LABEL)
 const STATUS = Object.keys(STATUS_PATRIMONIO_LABEL)
@@ -335,13 +337,15 @@ export function PatrimonioItemForm({
           </p>
         )}
         {onCancel ? (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Cancelar
-          </button>
+          </AppButton>
         ) : null}
         <button
           type="submit"

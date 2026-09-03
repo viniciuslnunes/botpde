@@ -92,7 +92,7 @@ async function fetchDirecaoLoja(tenantId: string): Promise<LojaOpsResumo> {
       id: `ped-${ped.id}`,
       titulo: `Pedido de ${nome}`,
       detalhe: `R$ ${valor.toFixed(2).replace('.', ',')} · aguardando confirmação`,
-      href: `/admin/loja/pedidos`,
+      href: '/admin/loja/pedidos?status=PENDENTE',
       tom: 'warning',
       sla: slaLabel(ped.criadoEm, { agora, modo: 'idade' }),
       acao: { tipo: 'confirmar_pedido', pedidoId: ped.id, label: 'Confirmar' },
@@ -114,7 +114,7 @@ async function fetchDirecaoLoja(tenantId: string): Promise<LojaOpsResumo> {
       id: 'tickets-abertos',
       titulo: `${ticketsAbertos} ticket${ticketsAbertos === 1 ? '' : 's'} aberto${ticketsAbertos === 1 ? '' : 's'}`,
       detalhe: 'Atendimento de pedido ainda em andamento.',
-      href: '/admin/loja/tickets?filtro=abertos',
+      href: '/admin/loja/atendimento',
       tom: 'warning',
     })
   }

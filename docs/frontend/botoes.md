@@ -42,6 +42,8 @@ Cancelar, Confirmar. Inclui link que age como botão (`AppButtonLink`).
 |------|---------|
 | Aba (`role="tab"`) | navegação; já tem tratamento próprio (`AdminModuleTabs`) |
 | Chip / segmented control | é estado, não ação — `Membro \| Gestor` |
+| Nav da topbar / sidebar | navegação — use `.app-nav-link` (`normal-case`) |
+| Menu do usuário (dropdown) | mesmo tratamento — `.app-nav-link` |
 | Disclosure (`aria-expanded`) | o rótulo é o título da seção, e o chevron já diz o que o clique faz |
 | Botão de ícone puro | não há rótulo para transformar |
 | Rótulo dinâmico | `MARIA SILVA`, `SÃO PAULO/SP` lê como grito |
@@ -110,10 +112,10 @@ próxima tela escolhe outro para a mesma coisa.
 pnpm --filter @torcida/web lint:botoes
 ```
 
-Roda no CI. Cobre só as áreas de `AREAS_COBERTAS` (hoje `components/admin` e
-`app/admin`) — assim trava regressão no que já está migrado sem falhar por
-causa do passivo ainda não tocado. **Ao migrar uma área, acrescente o prefixo
-lá.** Testes: `src/lib/__tests__/lint-botoes.test.ts`.
+Roda no CI. Cobre todo o `src` (`AREAS_COBERTAS = ['']`). A caixa alta vem de
+três camadas: utilitário `uppercase` no `AppButton`, `.app-btn` / `.app-action`
+em `globals.css`, e `:is(button,a).btn-primary`. Testes:
+`src/lib/__tests__/lint-botoes.test.ts`.
 
 Falso positivo que a heurística não tem como resolver (card clicável, trilho
 vertical) se suprime no código, com o motivo escrito:

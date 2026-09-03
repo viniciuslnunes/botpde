@@ -1,7 +1,16 @@
 /**
  * Checklist leve do barracão (Carnaval) — sem ERP de escola de samba.
- * Persistência: Departamento.meta.barracao.items[id] = { done, note? }
+ * Persistência: `Departamento.meta.barracao` via primitiva `procedimento.js`.
  */
+
+import {
+  mergeProcedimentoRecordItem,
+  procedimentoItemsFromCatalog,
+  procedimentoProgress,
+  toggleProcedimentoRecord,
+} from './procedimento.js'
+
+export const BARRACAO_PATH = 'barracao'
 
 /** @typedef {{ id: string, label: string }} BarracaoItemDef */
 
@@ -20,17 +29,13 @@ export const BARRACAO_CHECKLIST = Object.freeze([
  * @returns {Record<string, { done: boolean, note?: string }>}
  */
 export function barracaoItemsFromMeta(meta) {
-  if (!meta || typeof meta !== 'object') return {}
-  const barracao = /** @type {{ barracao?: { items?: unknown } }} */ (meta).barracao
-  if (!barracao?.items || typeof barracao.items !== 'object') return {}
+  const items = procedimentoItemsFromCatalog(meta, BARRACAO_PATH, BARRACAO_CHECKLIST)
   /** @type {Record<string, { done: boolean, note?: string }>} */
   const out = {}
-  for (const [id, raw] of Object.entries(barracao.items)) {
-    if (!raw || typeof raw !== 'object') continue
-    const row = /** @type {{ done?: unknown, note?: unknown }} */ (raw)
-    out[id] = {
-      done: Boolean(row.done),
-      ...(typeof row.note === 'string' && row.note.trim() ? { note: row.note.trim() } : {}),
+  for (const item of items) {
+    out[item.id] = {
+      done: item.done,
+      ...(item.note ? { note: item.note } : {}),
     }
   }
   return out
@@ -43,22 +48,7 @@ export function barracaoItemsFromMeta(meta) {
  * @returns {object}
  */
 export function mergeBarracaoItem(meta, itemId, done) {
-  const base =
-    meta && typeof meta === 'object' ? { .../** @type {Record<string, unknown>} */ (meta) } : {}
-  const prevBarracao =
-    base.barracao && typeof base.barracao === 'object'
-      ? { .../** @type {Record<string, unknown>} */ (base.barracao) }
-      : {}
-  const prevItems =
-    prevBarracao.items && typeof prevBarracao.items === 'object'
-      ? { .../** @type {Record<string, unknown>} */ (prevBarracao.items) }
-      : {}
-  const prevItem =
-    prevItems[itemId] && typeof prevItems[itemId] === 'object'
-      ? { .../** @type {Record<string, unknown>} */ (prevItems[itemId]) }
-      : {}
-  prevItems[itemId] = { ...prevItem, done }
-  return { ...base, barracao: { ...prevBarracao, items: prevItems } }
+  return toggleProcedimentoRecord(meta, BARRACAO_PATH, itemId, done)
 }
 
 /**
@@ -66,12 +56,7 @@ export function mergeBarracaoItem(meta, itemId, done) {
  * @returns {{ total: number, done: number }}
  */
 export function barracaoProgress(meta) {
-  const items = barracaoItemsFromMeta(meta)
-  let done = 0
-  for (const def of BARRACAO_CHECKLIST) {
-    if (items[def.id]?.done) done += 1
-  }
-  return { total: BARRACAO_CHECKLIST.length, done }
+  return procedimentoProgress(procedimentoItemsFromCatalog(meta, BARRACAO_PATH, BARRACAO_CHECKLIST))
 }
 
 /**
@@ -128,3 +113,6 @@ export function mergeDesfileEm(meta, desfileEmIso) {
   }
   return { ...base, desfileEm: String(desfileEmIso).trim() }
 }
+
+// Reexport para quem precisa de nota no barracão (futuro).
+export { mergeProcedimentoRecordItem as mergeBarracaoItemNota }

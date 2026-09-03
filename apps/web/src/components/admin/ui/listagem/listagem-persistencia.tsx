@@ -14,11 +14,12 @@ export interface ListagemPersistenciaProps {
   listagemId: string
   basePath: string
   /**
-   * Nomes dos params que pertencem ao contrato da listagem (busca, ordenação,
-   * paginação e filtros do spec). Só eles entram no snapshot — params de outra
-   * natureza (aba, seção, período de gráfico) continuam sendo da URL.
+   * Params do contrato presentes na URL — a URL sempre ganha do snapshot.
+   * Inclui abas efêmeras (`?status=`) para link/notificação não ser sobrescrito.
    */
   paramsDoContrato: readonly string[]
+  /** Recorte persistível (contrato menos abas efêmeras do spec). */
+  paramsPersistiveis: readonly string[]
   /**
    * Discriminador do escopo — normalmente o `tenantId`. Sem ele, o filtro de
    * unidade salvo numa torcida seria reaplicado em outra e a lista abriria
@@ -58,6 +59,7 @@ export function ListagemPersistencia({
   listagemId,
   basePath,
   paramsDoContrato,
+  paramsPersistiveis,
   escopoChave,
 }: ListagemPersistenciaProps) {
   const router = useRouter()
@@ -68,7 +70,7 @@ export function ListagemPersistencia({
     const chave = `${PREFIXO}${escopoChave}:${listagemId}`
     const atuais = new URLSearchParams(searchParams.toString())
     const urlTemContrato = urlTemParamContrato(atuais, paramsDoContrato)
-    const serializado = snapshotContratoListagem(atuais, paramsDoContrato).toString()
+    const serializado = snapshotContratoListagem(atuais, paramsPersistiveis).toString()
 
     if (!restaurado.current) {
       restaurado.current = true
@@ -81,7 +83,7 @@ export function ListagemPersistencia({
           // Modo privativo / storage bloqueado: segue sem persistência.
         }
         if (salvo) {
-          const destino = aplicarSnapshotListagem(atuais, salvo, paramsDoContrato)
+          const destino = aplicarSnapshotListagem(atuais, salvo, paramsPersistiveis)
           const qs = destino.toString()
           if (qs) {
             router.replace(`${basePath}?${qs}`, { scroll: false })
@@ -110,7 +112,7 @@ export function ListagemPersistencia({
         if (!salvo) return
         const limpo = snapshotContratoListagem(
           new URLSearchParams(salvo),
-          paramsDoContrato,
+          paramsPersistiveis,
         ).toString()
         if (limpo) window.localStorage.setItem(chave, limpo)
         else window.localStorage.removeItem(chave)
@@ -118,7 +120,15 @@ export function ListagemPersistencia({
     } catch {
       // Idem: persistência é conveniência, nunca requisito.
     }
-  }, [searchParams, basePath, listagemId, paramsDoContrato, router, escopoChave])
+  }, [
+    searchParams,
+    basePath,
+    listagemId,
+    paramsDoContrato,
+    paramsPersistiveis,
+    router,
+    escopoChave,
+  ])
 
   return null
 }

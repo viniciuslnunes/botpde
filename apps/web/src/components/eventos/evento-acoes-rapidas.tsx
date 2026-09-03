@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { CalendarPlus, Check, Copy, Share2 } from 'lucide-react'
 import { buildEventoIcs, downloadIcsFile } from '@/lib/evento-ics'
+import { AppButton } from '@/components/ui/button'
 
 export function EventoAcoesRapidas({
   eventoId,
@@ -46,14 +47,15 @@ export function EventoAcoesRapidas({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <button
+      <AppButton
+        variant="none"
+        icon={CalendarPlus}
         type="button"
         onClick={baixarIcs}
         className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
       >
-        <CalendarPlus className="h-3.5 w-3.5" />
         Adicionar ao calendário
-      </button>
+      </AppButton>
       <button
         type="button"
         onClick={() => void copiarLink()}

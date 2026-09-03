@@ -210,6 +210,12 @@ export function paramsDoContrato(spec: ListagemSpec): string[] {
   return nomes
 }
 
+/** Contrato menos params efêmeros do spec — o que entra no snapshot persistido. */
+export function paramsDoContratoPersistivel(spec: ListagemSpec): string[] {
+  const ephemeros = new Set(spec.paramsEphemeros ?? [])
+  return paramsDoContrato(spec).filter((nome) => !ephemeros.has(nome))
+}
+
 /** Hrefs das opções de itens por página. */
 export function montarOpcoesPorPagina(
   spec: ListagemSpec,

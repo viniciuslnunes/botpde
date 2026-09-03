@@ -4,6 +4,7 @@ import { destinoInternoSeguro } from '@/lib/callback-url'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { EntrarSenhaForm } from './entrar-senha-form'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Entrar' }
 
@@ -79,13 +80,14 @@ export default async function EntrarPage({
                   await signIn('discord', { redirectTo: destino })
                 }}
               >
-                <button
+                <AppButton
+                  variant="none"
+                  icon={DiscordIcon}
                   type="submit"
                   className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#4752c4] hover:shadow-md active:scale-[0.98]"
                 >
-                  <DiscordIcon />
                   Continuar com Discord
-                </button>
+                </AppButton>
               </form>
 
               {/* Divisor */}
@@ -102,13 +104,14 @@ export default async function EntrarPage({
                   await signIn('google', { redirectTo: destino })
                 }}
               >
-                <button
+                <AppButton
+                  variant="none"
+                  icon={GoogleIcon}
                   type="submit"
                   className="flex w-full items-center justify-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-4 py-3 text-sm font-semibold text-[rgb(var(--foreground))] shadow-sm transition-all hover:bg-[rgb(var(--background-subtle))] hover:shadow-md active:scale-[0.98]"
                 >
-                  <GoogleIcon />
                   Continuar com Google
-                </button>
+                </AppButton>
               </form>
 
               {/* Divisor */}

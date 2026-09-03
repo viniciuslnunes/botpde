@@ -101,6 +101,16 @@ const lancamentoCampos = {
     .trim()
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  /**
+   * Rateio pela operação: o fretamento da caravana, o gasto da festa. É o que
+   * torna "a caravana fechou no azul?" respondível — projeto responde pela
+   * campanha, evento responde pelo dia.
+   */
+  eventoId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
 }
 
 export const CriarLancamentoSchema = z.object(lancamentoCampos)

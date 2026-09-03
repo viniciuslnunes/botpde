@@ -30,6 +30,7 @@ import {
   type CalendarParts,
 } from '@/lib/format-datetime'
 import { fadeUp, springSnappy } from '@/lib/motion-presets'
+import { AppButton } from '@/components/ui/button'
 
 export type AgendaCalItem = {
   id: string
@@ -240,13 +241,15 @@ function DiaDetalhe({
         </div>
         <div className="flex items-center gap-0.5">
           {!isHoje && (
-            <button
+            <AppButton
+              variant="none"
+              icon={CalendarDays}
               type="button"
               onClick={onHoje}
               className="mr-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--surface))]"
             >
               Hoje
-            </button>
+            </AppButton>
           )}
           {onPrevDia && (
             <button type="button" onClick={onPrevDia} className={iconBtn} aria-label="Dia anterior">
@@ -287,13 +290,15 @@ function DiaDetalhe({
                   Nada marcado neste dia.
                 </p>
                 {proximoDia && (
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={CalendarDays}
                     type="button"
                     onClick={() => onIrParaDia(proximoDia)}
                     className="app-touch-line mt-2 text-xs font-semibold text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Ir para o próximo evento
-                  </button>
+                  </AppButton>
                 )}
               </div>
             ) : (
@@ -383,14 +388,16 @@ function NavChrome({
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <button
+        <AppButton
+          variant="none"
+          icon={CalendarDays}
           type="button"
           onClick={onHoje}
           disabled={pending}
           className="app-touch-target h-9 rounded-xl border border-[rgb(var(--border))] px-3 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
         >
           Hoje
-        </button>
+        </AppButton>
         <button
           type="button"
           onClick={onNext}

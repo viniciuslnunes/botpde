@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m } from 'motion/react'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import {
   compareCalendarParts,
   formatDateOnlyIso,
@@ -22,6 +22,7 @@ import {
 } from '@/lib/format-datetime'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import { useHidratado } from '@/lib/use-hidratado'
+import { AppButton } from '@/components/ui/button'
 
 const MESES_CURTOS = [
   'Jan',
@@ -383,7 +384,9 @@ export function DatePicker({
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-2.5">
-                <button
+                <AppButton
+                  variant="none"
+                  icon={RotateCcw}
                   type="button"
                   onClick={() => {
                     emit(null)
@@ -392,8 +395,10 @@ export function DatePicker({
                   className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
                 >
                   Limpar
-                </button>
-                <button
+                </AppButton>
+                <AppButton
+                  variant="none"
+                  icon={CalendarDays}
                   type="button"
                   disabled={!hojeDisponivel}
                   onClick={() => {
@@ -403,7 +408,7 @@ export function DatePicker({
                   className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Hoje
-                </button>
+                </AppButton>
               </div>
             </m.div>
             ) : null}

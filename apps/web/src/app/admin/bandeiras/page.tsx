@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CalendarRange, Flag, History, ShieldAlert, Timer, Wrench } from 'lucide-react'
 import { PERMISSIONS, resolverEscopoPatrimonio } from '@torcida/types'
@@ -14,6 +13,7 @@ import { MarcarDanoEmprestimoForm } from '@/components/patrimonio/marcar-dano-em
 import {
   AdminInboxList,
   AdminPageHeader,
+  AdminHeaderActionLink,
   AdminPendingTabs,
   adminTabIds,
   DirecaoInboxSkeleton,
@@ -251,20 +251,16 @@ export default async function AdminBandeirasPage({
         icon={<Flag className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/admin/eventos?vista=semana"
-              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              <CalendarRange className="h-4 w-4" aria-hidden />
+            <AdminHeaderActionLink href="/admin/eventos?vista=semana" icon={CalendarRange}>
               Escala da semana
-            </Link>
-            <Link
+            </AdminHeaderActionLink>
+            <AdminHeaderActionLink
               href="/portal/patrimonio?categoria=BANDEIRA&status=MANUTENCAO"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+              icon={Wrench}
+              variant="ghost"
             >
-              <Wrench className="h-4 w-4" aria-hidden />
               Em conserto
-            </Link>
+            </AdminHeaderActionLink>
           </div>
         }
       >

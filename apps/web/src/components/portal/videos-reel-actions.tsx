@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   Bookmark,
@@ -21,9 +21,22 @@ import {
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
+import { ComentarioMenu } from '@/components/portal/comentario-menu'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { linkPostComunidade, type TipoReacaoSocial } from '@/lib/comunidade-social'
 import { popoverPanel, reactionPop, springSnappy } from '@/lib/motion-presets'
+import {
+  achatarRespostasDaArvore,
+  contarRespostasNaArvore,
+  montarArvoreComentarios,
+  type NoComentario,
+} from '@/lib/comentario-thread'
+import { AppButton } from '@/components/ui/button'
+import {
+  ComentarioComposerInline,
+  ComentarioRespostasBloco,
+  comentarioEstaNaThread,
+} from '@/components/portal/comentario-respostas-bloco'
 
 interface CurrentUser {
   id: string
@@ -47,6 +60,158 @@ function formatCount(n: number): string {
   return `${Math.round(n / 1000)} mil`
 }
 
+const btnResponderReel =
+  'app-touch-line inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
+
+function LinhaRespostaReel({
+  comentario,
+  currentUserId,
+  onResponder,
+  onEditado,
+  onExcluido,
+}: {
+  comentario: ComentarioPostItem
+  currentUserId: string
+  onResponder: (c: ComentarioPostItem) => void
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+}) {
+  const persistido = !comentario.id.startsWith('tmp-')
+  const proprio = comentario.autor.id === currentUserId
+  const autorLabel = proprio ? 'Você' : (comentario.autor.nome ?? 'Membro')
+  const conteudo = (
+    <PostConteudoRich
+      conteudo={comentario.conteudo}
+      className="text-sm text-[rgb(var(--foreground))]"
+    />
+  )
+
+  return (
+    <div className="flex gap-2.5 py-2.5 pr-3">
+      <Avatar nome={comentario.autor.nome} avatarUrl={comentario.autor.avatarUrl} size="xs" />
+      <div className="min-w-0 flex-1">
+        {proprio && persistido ? (
+          <ComentarioMenu
+            comentarioId={comentario.id}
+            conteudoInicial={comentario.conteudo}
+            autorLabel={autorLabel}
+            variant="bare"
+            onEditado={(next) => onEditado(comentario.id, next)}
+            onExcluido={() => onExcluido(comentario.id)}
+          >
+            {conteudo}
+          </ComentarioMenu>
+        ) : (
+          <>
+            <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
+            {conteudo}
+          </>
+        )}
+        {persistido ? (
+          <AppButton
+            variant="none"
+            icon={MessageCircle}
+            type="button"
+            onClick={() => onResponder(comentario)}
+            className={btnResponderReel}
+          >
+            Responder
+          </AppButton>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function LinhaComentarioReel({
+  no,
+  currentUserId,
+  onResponder,
+  respondendoA,
+  composer,
+  onEditado,
+  onExcluido,
+}: {
+  no: NoComentario<ComentarioPostItem>
+  currentUserId: string
+  onResponder: (c: ComentarioPostItem) => void
+  respondendoA: string | null
+  composer: ReactNode
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+}) {
+  const c = no.comentario
+  const persistido = !c.id.startsWith('tmp-')
+  const proprio = c.autor.id === currentUserId
+  const autorLabel = proprio ? 'Você' : (c.autor.nome ?? 'Membro')
+  const totalRespostas = contarRespostasNaArvore(no)
+  const respostas = achatarRespostasDaArvore(no)
+  const naThread = comentarioEstaNaThread(
+    c.id,
+    respostas.map((r) => r.id),
+    respondendoA,
+  )
+  const conteudo = (
+    <PostConteudoRich conteudo={c.conteudo} className="text-sm text-[rgb(var(--foreground))]" />
+  )
+
+  return (
+    <div>
+      <div className="flex gap-2.5">
+        <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
+        <div className="min-w-0 flex-1">
+          {proprio && persistido ? (
+            <ComentarioMenu
+              comentarioId={c.id}
+              conteudoInicial={c.conteudo}
+              autorLabel={autorLabel}
+              variant="bare"
+              onEditado={(next) => onEditado(c.id, next)}
+              onExcluido={() => onExcluido(c.id)}
+            >
+              {conteudo}
+            </ComentarioMenu>
+          ) : (
+            <>
+              <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
+              {conteudo}
+            </>
+          )}
+          <ComentarioRespostasBloco
+            total={totalRespostas}
+            forcarAberto={naThread}
+            acaoResponder={
+              persistido ? (
+                <AppButton
+                  variant="none"
+                  icon={MessageCircle}
+                  type="button"
+                  onClick={() => onResponder(c)}
+                  className={btnResponderReel}
+                >
+                  Responder
+                </AppButton>
+              ) : null
+            }
+            composer={composer}
+          >
+            {respostas.map((r) => (
+              <LinhaRespostaReel
+                key={r.id}
+                comentario={r}
+                currentUserId={currentUserId}
+                onResponder={onResponder}
+                onEditado={onEditado}
+                onExcluido={onExcluido}
+              />
+            ))}
+          </ComentarioRespostasBloco>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function VideosReelActions({
   postId,
   totalReacoes,
@@ -63,6 +228,7 @@ export function VideosReelActions({
   const [comentarios, setComentarios] = useState<ComentarioPostItem[]>([])
   const [carregando, setCarregando] = useState(false)
   const [texto, setTexto] = useState('')
+  const [respondendoA, setRespondendoA] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
   const carregadosRef = useRef(false)
@@ -115,6 +281,23 @@ export function VideosReelActions({
     }
   }, [likePulse, aplicarLike])
 
+  const arvore = montarArvoreComentarios(comentarios)
+  const respondendoComentario = respondendoA
+    ? comentarios.find((c) => c.id === respondendoA) ?? null
+    : null
+
+  function iniciarResposta(alvo: ComentarioPostItem) {
+    const nome = alvo.autor.nome?.trim() || 'Membro'
+    setRespondendoA(alvo.id)
+    setTexto(`@${nome} `)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
+  function cancelarResposta() {
+    setRespondendoA(null)
+    setTexto('')
+  }
+
   async function abrirComentarios() {
     setSheetOpen(true)
     if (carregadosRef.current) {
@@ -138,11 +321,13 @@ export function VideosReelActions({
     e.preventDefault()
     const conteudo = texto.trim()
     if (!conteudo || pending) return
+    const parentId = respondendoA
     const tempId = `tmp-${Date.now()}`
     const otimista: ComentarioPostItem = {
       id: tempId,
       conteudo,
       criadoEm: new Date().toISOString(),
+      parentId,
       autor: {
         id: currentUser.id,
         nome: currentUser.nome,
@@ -152,15 +337,17 @@ export function VideosReelActions({
     setComentarios((prev) => [...prev, otimista])
     setTotalC((n) => n + 1)
     setTexto('')
+    setRespondendoA(null)
     startTransition(async () => {
       try {
-        const salvoComentario = await comentarPost(postId, conteudo)
+        const salvoComentario = await comentarPost(postId, conteudo, parentId ?? undefined)
         setComentarios((prev) => prev.map((c) => (c.id === tempId ? salvoComentario : c)))
         carregadosRef.current = true
       } catch (err) {
         setComentarios((prev) => prev.filter((c) => c.id !== tempId))
         setTotalC((n) => Math.max(0, n - 1))
         setTexto(conteudo)
+        if (parentId) setRespondendoA(parentId)
         toast.error(err instanceof Error ? err.message : 'Não foi possível comentar.')
       }
     })
@@ -316,54 +503,88 @@ export function VideosReelActions({
                     Seja o primeiro a comentar.
                   </p>
                 )}
-                {comentarios.map((c) => (
-                  <div key={c.id} className="flex gap-2.5">
-                    <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
-                        {c.autor.nome ?? 'Membro'}
-                      </p>
-                      <PostConteudoRich
-                        conteudo={c.conteudo}
-                        className="text-sm text-[rgb(var(--foreground))]"
-                      />
-                    </div>
-                  </div>
-                ))}
+                {arvore.map((no) => {
+                  const flat = achatarRespostasDaArvore(no)
+                  const naThread = comentarioEstaNaThread(
+                    no.comentario.id,
+                    flat.map((r) => r.id),
+                    respondendoA,
+                  )
+                  return (
+                    <LinhaComentarioReel
+                      key={no.comentario.id}
+                      no={no}
+                      currentUserId={currentUser.id}
+                      onResponder={iniciarResposta}
+                      respondendoA={respondendoA}
+                      onEditado={(id, conteudo) => {
+                        setComentarios((prev) =>
+                          prev.map((item) => (item.id === id ? { ...item, conteudo } : item)),
+                        )
+                      }}
+                      onExcluido={(id) => {
+                        setComentarios((prev) =>
+                          prev
+                            .filter((item) => item.id !== id)
+                            .map((item) =>
+                              item.parentId === id ? { ...item, parentId: null } : item,
+                            ),
+                        )
+                        setTotalC((n) => Math.max(0, n - 1))
+                        setRespondendoA((atual) => (atual === id ? null : atual))
+                      }}
+                      composer={
+                        naThread && respondendoComentario ? (
+                          <ComentarioComposerInline
+                            valor={texto}
+                            onChange={setTexto}
+                            onSubmit={enviarComentario}
+                            onCancelar={cancelarResposta}
+                            respondendoANome={respondendoComentario.autor.nome ?? 'Membro'}
+                            pending={pending}
+                            maxLength={500}
+                          />
+                        ) : null
+                      }
+                    />
+                  )
+                })}
               </div>
 
-              <form
-                onSubmit={enviarComentario}
-                className="flex items-center gap-2 border-t border-[rgb(var(--border))] px-3 py-2"
-              >
-                <Avatar
-                  nome={currentUser.nome}
-                  avatarUrl={currentUser.avatarUrl}
-                  size="xs"
-                />
-                <input
-                  ref={inputRef}
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  placeholder="Adicione um comentário…"
-                  maxLength={500}
-                  className="min-w-0 flex-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
-                />
-                <m.button
-                  type="submit"
-                  disabled={pending || !texto.trim()}
-                  whileTap={{ scale: 0.92 }}
-                  transition={springSnappy}
-                  aria-label="Enviar comentário"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-on))] disabled:opacity-40"
+              {!respondendoA ? (
+                <form
+                  onSubmit={enviarComentario}
+                  className="flex items-center gap-2 border-t border-[rgb(var(--border))] px-3 py-2"
                 >
-                  {pending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </m.button>
-              </form>
+                  <Avatar
+                    nome={currentUser.nome}
+                    avatarUrl={currentUser.avatarUrl}
+                    size="xs"
+                  />
+                  <input
+                    ref={inputRef}
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    placeholder="Adicione um comentário…"
+                    maxLength={500}
+                    className="min-w-0 flex-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+                  />
+                  <m.button
+                    type="submit"
+                    disabled={pending || !texto.trim()}
+                    whileTap={{ scale: 0.92 }}
+                    transition={springSnappy}
+                    aria-label="Enviar comentário"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-on))] disabled:opacity-40"
+                  >
+                    {pending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </m.button>
+                </form>
+              ) : null}
             </m.div>
           </>
         )}

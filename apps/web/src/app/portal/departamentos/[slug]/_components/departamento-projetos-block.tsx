@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { CalendarRange, Plus, Repeat, Target, Users, Wallet } from 'lucide-react'
+import { CalendarRange, ClipboardCheck, Pencil, Plus, Repeat, Save, Target, Users, Wallet, X } from 'lucide-react'
 import {
   atualizarProjeto,
   atualizarStatusProjeto,
@@ -26,6 +26,9 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { toast } from '@torcida/ui/services/toast'
 import { classeFocoCard, useFocoCard } from '../../_components/departamento-foco'
+import { DepartamentoOpcaoPicker } from '@/components/departamentos/departamento-opcao-picker'
+import { ProjetoProgressoMetrica } from '@/components/departamentos/projeto-progresso-metrica'
+import { AppButton } from '@/components/ui/button'
 
 /** Tudo já serializado no server — nunca `Decimal`/`Date` cruzando a fronteira. */
 export type ProjetoResumo = {
@@ -73,24 +76,6 @@ function StatusChip({ status }: { status: string }) {
     >
       {labelStatusProjeto(status)}
     </span>
-  )
-}
-
-function BarraProgresso({ percentual, alerta }: { percentual: number; alerta?: boolean }) {
-  return (
-    <div
-      className="h-1.5 w-full overflow-hidden rounded-full bg-[rgb(var(--background-subtle))]"
-      role="presentation"
-    >
-      <div
-        className={
-          alerta
-            ? 'h-full rounded-full bg-[rgb(var(--color-danger-fg))]'
-            : 'h-full rounded-full bg-[rgb(var(--primary))]'
-        }
-        style={{ width: `${Math.min(100, percentual)}%` }}
-      />
-    </div>
   )
 }
 
@@ -184,14 +169,15 @@ export function DepartamentoProjetosBlock({
                 onDone={() => setCriando(false)}
               />
             ) : (
-              <button
+              <AppButton
+                variant="primary"
+                icon={Plus}
                 type="button"
                 onClick={() => setCriando(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on transition-opacity hover:opacity-90"
+                className="gap-1.5 rounded-lg px-3 py-2 text-sm font-medium"
               >
-                <Plus className="h-4 w-4" aria-hidden />
                 Novo projeto
-              </button>
+              </AppButton>
             )}
           </div>
         )}
@@ -263,14 +249,15 @@ export function DepartamentoProjetosBlock({
             onDone={() => setCriando(false)}
           />
         ) : (
-          <button
+          <AppButton
+            variant="none"
+            icon={Plus}
             type="button"
             onClick={() => setCriando(true)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
           >
-            <Plus className="h-4 w-4" aria-hidden />
             Novo projeto
-          </button>
+          </AppButton>
         ))}
     </div>
   )
@@ -323,6 +310,15 @@ export function DepartamentoProjetoCard({
 
   const meta = progressoMeta(projeto.realizadoQuantidade, projeto.metaQuantidade)
   const orcamento = saudeOrcamento(projeto.gastoRealizado, projeto.orcamentoPrevisto)
+  const metaEmRisco =
+    meta != null && meta < 50 && (projeto.status === 'ATIVO' || projeto.status === 'PLANEJADO')
+  const metaLabel =
+    meta != null && projeto.metaQuantidade != null
+      ? `${numero.format(projeto.realizadoQuantidade)} de ${numero.format(projeto.metaQuantidade)}${projeto.metaUnidade ? ` ${projeto.metaUnidade}` : ''}`
+      : null
+  const orcamentoLabel = orcamento
+    ? `${moeda.format(projeto.gastoRealizado)} de ${moeda.format(projeto.orcamentoPrevisto ?? 0)}`
+    : null
 
   function mudarStatus(status: string) {
     startTransition(async () => {
@@ -408,58 +404,27 @@ export function DepartamentoProjetoCard({
         </ul>
       )}
 
-      <div className="mt-3 space-y-2">
-        {projeto.metaQuantidade != null && meta != null ? (
-          <div>
-            <p className="flex items-center justify-between text-[11px] text-[rgb(var(--foreground-muted))]">
-              <span className="inline-flex items-center gap-1">
-                <Target className="h-3.5 w-3.5" aria-hidden />
-                {numero.format(projeto.realizadoQuantidade)} de{' '}
-                {numero.format(projeto.metaQuantidade)}
-                {projeto.metaUnidade ? ` ${projeto.metaUnidade}` : ''}
-              </span>
-              <span className="font-medium text-[rgb(var(--foreground))]">{meta}%</span>
-            </p>
-            <div className="mt-1">
-              <BarraProgresso percentual={meta} />
-            </div>
-          </div>
-        ) : (
-          <p className="flex items-center gap-1 text-[11px] text-[rgb(var(--foreground-muted))]">
-            <Target className="h-3.5 w-3.5" aria-hidden />
-            Sem meta declarada
-          </p>
-        )}
-
-        {orcamento ? (
-          <div>
-            <p className="flex items-center justify-between text-[11px] text-[rgb(var(--foreground-muted))]">
-              <span className="inline-flex items-center gap-1">
-                <Wallet className="h-3.5 w-3.5" aria-hidden />
-                {moeda.format(projeto.gastoRealizado)} de{' '}
-                {moeda.format(projeto.orcamentoPrevisto ?? 0)}
-              </span>
-              <span
-                className={
-                  orcamento.estourou
-                    ? 'font-medium text-[rgb(var(--color-danger-fg))]'
-                    : 'font-medium text-[rgb(var(--foreground))]'
-                }
-              >
-                {orcamento.percentual}%
-              </span>
-            </p>
-            <div className="mt-1">
-              <BarraProgresso percentual={orcamento.percentual} alerta={orcamento.estourou} />
-            </div>
-          </div>
-        ) : projeto.gastoRealizado > 0 ? (
-          <p className="flex items-center gap-1 text-[11px] text-[rgb(var(--foreground-muted))]">
-            <Wallet className="h-3.5 w-3.5" aria-hidden />
-            {moeda.format(projeto.gastoRealizado)} lançados · sem orçamento previsto
-          </p>
-        ) : null}
+      <div className="mt-3 flex flex-col gap-2">
+        <ProjetoProgressoMetrica
+          variant="meta"
+          percentual={meta}
+          label={metaLabel}
+          emRisco={metaEmRisco}
+        />
+        <ProjetoProgressoMetrica
+          variant="orcamento"
+          percentual={orcamento?.percentual ?? null}
+          label={orcamentoLabel}
+          estourou={orcamento?.estourou}
+        />
       </div>
+
+      {!orcamento && projeto.gastoRealizado > 0 ? (
+        <p className="mt-2 flex items-center gap-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+          <Wallet className="h-3.5 w-3.5" aria-hidden />
+          {moeda.format(projeto.gastoRealizado)} lançados · sem orçamento previsto
+        </p>
+      ) : null}
 
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[rgb(var(--foreground-muted))]">
         {projeto.responsavelNome && <span>Responsável: {projeto.responsavelNome}</span>}
@@ -472,40 +437,36 @@ export function DepartamentoProjetoCard({
 
       {podeGerir && (
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-          <button
+          <AppButton
+            variant="none"
+            icon={Pencil}
             type="button"
             onClick={() => setEditando(true)}
             className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
             Editar
-          </button>
+          </AppButton>
 
           {projeto.metaQuantidade != null && (
-            <button
+            <AppButton
+              variant="none"
+              icon={ClipboardCheck}
               type="button"
               onClick={() => setRegistrando((v) => !v)}
               className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
               Registrar alcance
-            </button>
+            </AppButton>
           )}
 
-          <label className="sr-only" htmlFor={`status-${projeto.id}`}>
-            Status do projeto
-          </label>
-          <select
-            id={`status-${projeto.id}`}
+          <DepartamentoOpcaoPicker
+            opcoes={STATUS_PROJETOS.map((s) => ({ id: s, nome: labelStatusProjeto(s) }))}
             value={projeto.status}
+            onChange={mudarStatus}
             disabled={pending}
-            onChange={(e) => mudarStatus(e.target.value)}
-            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
-          >
-            {STATUS_PROJETOS.map((s) => (
-              <option key={s} value={s}>
-                {labelStatusProjeto(s)}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Status do projeto"
+            menuAriaLabel="Status disponíveis"
+          />
         </div>
       )}
 
@@ -562,20 +523,24 @@ function RealizadoForm({
           className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm text-[rgb(var(--foreground))]"
         />
       </div>
-      <button
+      <AppButton
+        variant="primary"
+        icon={Save}
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-primary-on disabled:opacity-60"
+        className="rounded-lg px-3 py-1.5 text-xs font-medium"
       >
         Salvar
-      </button>
-      <button
+      </AppButton>
+      <AppButton
+        variant="none"
+        icon={X}
         type="button"
         onClick={onDone}
         className="rounded-lg px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
       >
         Cancelar
-      </button>
+      </AppButton>
     </form>
   )
 }
@@ -594,6 +559,7 @@ export function DepartamentoProjetoForm({
   onDone: () => void
 }) {
   const editando = Boolean(projeto)
+  const [areaId, setAreaId] = useState(projeto?.areaId ?? '')
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     editando ? atualizarProjeto : criarProjeto,
     {},
@@ -680,14 +646,18 @@ export function DepartamentoProjetoForm({
           <label className={rotulo} htmlFor="areaId">
             Área
           </label>
-          <select id="areaId" name="areaId" defaultValue={projeto?.areaId ?? ''} className={campo}>
-            <option value="">Departamento inteiro</option>
-            {areas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nome}
-              </option>
-            ))}
-          </select>
+          <div className="mt-1">
+            <DepartamentoOpcaoPicker
+              name="areaId"
+              opcoes={areas}
+              value={areaId}
+              onChange={setAreaId}
+              vazio={{ id: '', nome: 'Departamento inteiro' }}
+              ariaLabel="Área do projeto"
+              menuAriaLabel="Áreas do departamento"
+              size="md"
+            />
+          </div>
         </div>
       </div>
 
@@ -785,13 +755,15 @@ export function DepartamentoProjetoForm({
         >
           {editando ? 'Salvar' : 'Criar projeto'}
         </button>
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={onDone}
           className="rounded-lg px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
         >
           Cancelar
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -818,13 +790,14 @@ export function DepartamentoProjetoCriar({
     )
   }
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={Plus}
       type="button"
       onClick={() => setCriando(true)}
       className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
     >
-      <Plus className="h-4 w-4" aria-hidden />
       Novo projeto
-    </button>
+    </AppButton>
   )
 }

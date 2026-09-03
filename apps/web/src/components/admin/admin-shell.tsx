@@ -169,7 +169,7 @@ function AdminTopbar({
             <button
               type="button"
               onClick={() => setUserDropOpen((v) => !v)}
-              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+              className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
             >
               {userAvatar ? (
                 canOptimizeImageUrl(userAvatar) ? (
@@ -205,7 +205,8 @@ function AdminTopbar({
                 <Link
                   href="/portal/perfil"
                   onClick={() => setUserDropOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  data-cursor-action=""
+                  className="app-nav-link app-action flex items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                 >
                   <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                   Meu Perfil
@@ -213,7 +214,8 @@ function AdminTopbar({
                 <Link
                   href="/portal/comunidade"
                   onClick={() => setUserDropOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  data-cursor-action=""
+                  className="app-nav-link app-action flex items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                 >
                   <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                   Voltar ao portal
@@ -223,7 +225,8 @@ function AdminTopbar({
                     href="/super-admin"
                     prefetch={false}
                     onClick={() => setUserDropOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                    data-cursor-action=""
+                    className="app-nav-link app-action flex items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >
                     <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                     Área Super Admin
@@ -238,9 +241,10 @@ function AdminTopbar({
                 <AppButton
                   variant="none"
                   icon={LogOut}
+                  textoOriginal
                   type="button"
                   onClick={() => signOut({ callbackUrl: '/entrar' })}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                  className="app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                 >
                   Sair
                 </AppButton>

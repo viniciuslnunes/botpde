@@ -16,6 +16,7 @@ import type {
   BarMargemResumo,
   BarVendasResumo,
 } from '@/lib/bar'
+import { carregarPrevisaoBar } from '@/lib/bar-previsao'
 import {
   diasDoPeriodo,
   PERIODO_LABEL,
@@ -125,6 +126,85 @@ async function BarInsights({ tenantId, sedeId }: { tenantId: string; sedeId: str
   )
 }
 
+async function BarPrevisaoJogo({ tenantId, sedeId }: { tenantId: string; sedeId: string }) {
+  const previsao = await carregarPrevisaoBar(tenantId, sedeId)
+
+  if (previsao.jogosBase === 0) {
+    return (
+      <InsightSection
+        title="Previsão para o próximo jogo"
+        description="Estimativa com base nos últimos jogos com venda no bar no mesmo dia do evento."
+      >
+        <div className="sm:col-span-2 lg:col-span-3">
+          <MotionEmptyState
+            title="Sem histórico de jogo"
+            description="Vincule eventos a partidas e registre vendas no dia do jogo para gerar a previsão."
+          />
+        </div>
+      </InsightSection>
+    )
+  }
+
+  return (
+    <InsightSection
+      title="Previsão para o próximo jogo"
+      description={
+        previsao.proximaPartida
+          ? `Média dos últimos ${previsao.jogosBase} jogos — próximo: vs ${previsao.proximaPartida.adversario}.`
+          : `Média dos últimos ${previsao.jogosBase} jogos com movimento no bar.`
+      }
+    >
+      {previsao.ruptura.length > 0 ? (
+        <StatCard
+          label="Risco de ruptura"
+          value={previsao.ruptura.length}
+          tone="warning"
+          badge="itens abaixo da previsão"
+          badgeTone="default"
+          href="/admin/bar/estoque"
+        />
+      ) : (
+        <StatCard label="Risco de ruptura" value={0} tone="success" />
+      )}
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Itens mais demandados
+        </h3>
+        {previsao.itens.length === 0 ? (
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">Sem produtos recorrentes no histórico.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {previsao.itens.slice(0, 6).map((item) => (
+              <li key={item.produtoId} className="flex items-center justify-between gap-3">
+                <span className="truncate text-[rgb(var(--foreground))]">{item.nome}</span>
+                <span className="shrink-0 tabular-nums text-[rgb(var(--foreground-muted))]">
+                  ~{item.mediaUnidades} un.
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {previsao.ruptura.length > 0 ? (
+        <div className="rounded-2xl border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.08)] p-4 sm:p-5">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-warning-fg))]">
+            Repor antes do jogo
+          </h3>
+          <ul className="space-y-1.5 text-sm text-[rgb(var(--foreground))]">
+            {previsao.ruptura.map((item) => (
+              <li key={item.produtoId}>
+                {item.nome}: faltam ~{item.falta} (estoque {item.estoque})
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </InsightSection>
+  )
+}
+
 export default async function AdminBarDesempenhoPage() {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
@@ -187,6 +267,10 @@ export default async function AdminBarDesempenhoPage() {
 
       <Suspense fallback={<InsightsSkeleton />}>
         <BarInsights tenantId={tenant.id} sedeId={unidade.id} />
+      </Suspense>
+
+      <Suspense fallback={<InsightsSkeleton />}>
+        <BarPrevisaoJogo tenantId={tenant.id} sedeId={unidade.id} />
       </Suspense>
     </>
   )

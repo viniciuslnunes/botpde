@@ -245,6 +245,10 @@ export async function baixarCobrancaComoPaga(input: {
           descricao: cob.descricao,
           data: new Date(),
           observacao: `Baixa ${input.metodo} — cobrança ${cob.id}`,
+          // Vaga paga é receita DAQUELA operação: sem isto, a arrecadação da
+          // caravana entrava no caixa solta e o resultado da viagem nunca
+          // fechava contra o custo do fretamento.
+          eventoId: cob.eventoId ?? null,
           criadoPorId: input.atorId,
         },
         select: { id: true },

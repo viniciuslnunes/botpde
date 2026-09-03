@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { MotionRevealOnce } from '@/components/motion/motion-reveal-once'
@@ -58,6 +58,12 @@ type ComunidadeFeedInfiniteProps = {
   seedFromSsr?: boolean
   podeCompartilhar?: boolean
   contextoComunidadeNome?: string | null
+  /**
+   * Conteúdo acima da lista (ex.: faixa «Na praça»). Fica *abaixo* do
+   * indicador de atualização — no Nacional a praça não pode empurrar o
+   * "Atualizando publicações…" para fora da 1ª dobra.
+   */
+  header?: ReactNode
 }
 
 function filtroAceitaPublicacao(
@@ -91,6 +97,7 @@ function ComunidadeFeedInfiniteView({
   seedFromSsr = true,
   podeCompartilhar = true,
   contextoComunidadeNome = null,
+  header = null,
 }: ComunidadeFeedInfiniteProps) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
   const isNacional = escopo === 'nacional'
@@ -140,7 +147,7 @@ function ComunidadeFeedInfiniteView({
 
   const { pullProgress, isPullRefreshing, triggerRefresh } = useFeedPullRefresh(refreshTopo)
 
-  const showRefreshIndicator = isPullRefreshing || pullProgress > 0.08
+  const showRefreshIndicator = isPullRefreshing || pullProgress > 0.08 || loadingMore
 
   useFeedStream(() => {
     if (!isComunidadeFeedNearTop()) return
@@ -216,6 +223,14 @@ function ComunidadeFeedInfiniteView({
   useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
+    // Re-observa quando `hasMore`/tamanho mudam: o IO só notifica *transição*
+    // de interseção. Na CN o sentinel já nasce dentro do rootMargin (página
+    // curta / praça acima) enquanto `hasNextPage` ainda é false; quando a 1ª
+    // página chega ele continua intersectando e o callback nunca dispara de
+    // novo — o scroll infinito morre sem pedir `cursor=`. Nos murais de canal
+    // a 1ª página costuma empurrar o sentinel para fora da margem, então o
+    // próximo scroll reentra e mascara o bug.
+    if (!pageInfo.hasMore) return
 
     const obs = new IntersectionObserver(
       (entries) => {
@@ -227,15 +242,17 @@ function ComunidadeFeedInfiniteView({
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [loadMoreRef])
+  }, [loadMoreRef, pageInfo.hasMore, posts.length])
 
   return (
     <>
       <FeedRefreshIndicator
-        visible={pullProgress > 0.08}
-        refreshing={isPullRefreshing}
-        pullProgress={pullProgress}
+        visible={pullProgress > 0.08 || loadingMore}
+        refreshing={isPullRefreshing || loadingMore}
+        pullProgress={loadingMore && !isPullRefreshing ? 1 : pullProgress}
       />
+
+      {header}
 
       <section id="comunidade-feed-posts">
         {posts.length === 0 && loadingInicial ? (

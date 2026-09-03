@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
+import { barDisponivelNoPortal } from '@/lib/bar'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import {
   resolverBrandPorEscopo,
@@ -74,6 +75,12 @@ export default async function PortalLayout({
           where: { userId: session.user.id, tenantId: ctx.tenant.id },
         })
       : 0
+
+  // Bar na navbar é contextual: só com turno de caixa aberto na unidade do
+  // membro. Sem caixa aberto não há o que comprar — e é isso que garante que
+  // toda compra antecipada nasça dentro de um turno (ver portal/bar/actions.ts).
+  const barAberto: boolean =
+    ctx.modo === 'torcida' ? await barDisponivelNoPortal(ctx.tenant.id, session.user.id) : false
 
   // Modo nacional (torcedor global sem tenant real) herda a cor/design do
   // tenant sintético da Comunidade Nacional do clube em vez do roxo de fábrica.
@@ -172,6 +179,7 @@ export default async function PortalLayout({
       brandCanal={brandCanal}
       associeSe={associeSe}
       isSuperAdmin={isSuperAdmin}
+      barAberto={barAberto}
     />
   )
 

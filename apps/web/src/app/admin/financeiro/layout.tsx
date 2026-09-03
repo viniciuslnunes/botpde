@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Compass, CreditCard, ListChecks, Plus, Receipt, TrendingUp, Wallet } from 'lucide-react'
+import { Compass, CreditCard, ExternalLink, ListChecks, Plus, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
-import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader, AdminHeaderActionLink } from '@/components/admin/ui'
 
 const ICONE = 'h-4 w-4 shrink-0'
 
@@ -51,12 +50,9 @@ export default async function FinanceiroModuloLayout({ children }: { children: R
         }
         icon={<Wallet className="h-5 w-5" />}
         actions={
-          <Link
-            href="/portal/financeiro"
-            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-          >
+          <AdminHeaderActionLink href="/portal/financeiro" icon={ExternalLink}>
             Ver no portal
-          </Link>
+          </AdminHeaderActionLink>
         }
       >
         <AdminModuleTabBar tabs={tabs} />

@@ -14,6 +14,7 @@ import {
   notificarLancamentoFinanceiroAvulso,
   reconciliarLancamentoFinanceiroAvulso,
 } from '@/lib/financeiro-notificacoes'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 export type LancamentoState = {
   ok?: boolean
@@ -21,7 +22,8 @@ export type LancamentoState = {
   errors?: Record<string, string[]>
 }
 
-function revalidateFinanceiro() {
+function revalidateFinanceiro(tenantId: string) {
+  invalidateAdminDirecao(tenantId)
   revalidatePath('/admin/financeiro')
   revalidatePath('/admin/financeiro/lancamentos')
   revalidatePath('/portal/financeiro')
@@ -40,6 +42,7 @@ function formToLancamentoPayload(formData: FormData) {
     observacao: formData.get('observacao') ?? undefined,
     departamentoId: formData.get('departamentoId') ?? undefined,
     projetoId: formData.get('projetoId') ?? undefined,
+    eventoId: formData.get('eventoId') ?? undefined,
   }
 }
 
@@ -52,8 +55,26 @@ async function resolverRateio(
   tenantId: string,
   departamentoId: string | undefined,
   projetoId: string | undefined,
-): Promise<{ departamentoId: string | null; projetoId: string | null } | { erro: string }> {
-  if (!departamentoId && !projetoId) return { departamentoId: null, projetoId: null }
+  eventoId?: string | undefined,
+): Promise<
+  | { departamentoId: string | null; projetoId: string | null; eventoId: string | null }
+  | { erro: string }
+> {
+  // A operação é validada sempre — pendurar gasto no evento de outra torcida
+  // seria o mesmo furo do departamento.
+  let eventoResolvido: string | null = null
+  if (eventoId) {
+    const evento: { id: string } | null = await db.evento.findFirst({
+      where: { id: eventoId, tenantId },
+      select: { id: true },
+    })
+    if (!evento) return { erro: 'Operação não encontrada nesta torcida' }
+    eventoResolvido = evento.id
+  }
+
+  if (!departamentoId && !projetoId) {
+    return { departamentoId: null, projetoId: null, eventoId: eventoResolvido }
+  }
 
   let deptoResolvido: string | null = null
   if (departamentoId) {
@@ -65,7 +86,9 @@ async function resolverRateio(
     deptoResolvido = depto.id
   }
 
-  if (!projetoId) return { departamentoId: deptoResolvido, projetoId: null }
+  if (!projetoId) {
+    return { departamentoId: deptoResolvido, projetoId: null, eventoId: eventoResolvido }
+  }
 
   const projeto: { id: string; departamentoId: string } | null = await db.projeto.findFirst({
     where: { id: projetoId, tenantId },
@@ -78,7 +101,11 @@ async function resolverRateio(
 
   // Projeto sem departamento explícito herda o do próprio projeto — o rateio
   // por área continua correto sem o operador precisar preencher duas vezes.
-  return { departamentoId: deptoResolvido ?? projeto.departamentoId, projetoId: projeto.id }
+  return {
+    departamentoId: deptoResolvido ?? projeto.departamentoId,
+    projetoId: projeto.id,
+    eventoId: eventoResolvido,
+  }
 }
 
 export async function criarLancamentoFinanceiro(
@@ -92,12 +119,21 @@ export async function criarLancamentoFinanceiro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { tipo, categoria, valor, descricao, data, observacao, departamentoId, projetoId } =
-    parsed.data
+  const {
+    tipo,
+    categoria,
+    valor,
+    descricao,
+    data,
+    observacao,
+    departamentoId,
+    projetoId,
+    eventoId,
+  } = parsed.data
   const dataComp = parseDataCompetencia(data)
   if (!dataComp) return { errors: { data: ['Data inválida'] } }
 
-  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId)
+  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId, eventoId)
   if ('erro' in rateio) return { error: rateio.erro }
 
   const created = await db.financeiroLancamento.create({
@@ -111,6 +147,7 @@ export async function criarLancamentoFinanceiro(
       observacao: observacao ?? null,
       departamentoId: rateio.departamentoId,
       projetoId: rateio.projetoId,
+      eventoId: rateio.eventoId,
       criadoPorId: session.user.id!,
     },
     select: { id: true },
@@ -130,6 +167,7 @@ export async function criarLancamentoFinanceiro(
         data,
         departamentoId: rateio.departamentoId,
         projetoId: rateio.projetoId,
+        eventoId: rateio.eventoId,
       },
     },
   })
@@ -144,7 +182,7 @@ export async function criarLancamentoFinanceiro(
     atorId: session.user.id,
   })
 
-  revalidateFinanceiro()
+  revalidateFinanceiro(tenant.id)
   return { ok: true }
 }
 
@@ -162,8 +200,18 @@ export async function editarLancamentoFinanceiro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { id, tipo, categoria, valor, descricao, data, observacao, departamentoId, projetoId } =
-    parsed.data
+  const {
+    id,
+    tipo,
+    categoria,
+    valor,
+    descricao,
+    data,
+    observacao,
+    departamentoId,
+    projetoId,
+    eventoId,
+  } = parsed.data
   const dataComp = parseDataCompetencia(data)
   if (!dataComp) return { errors: { data: ['Data inválida'] } }
 
@@ -174,7 +222,7 @@ export async function editarLancamentoFinanceiro(
     })
   if (!existente) return { error: 'Lançamento não encontrado' }
 
-  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId)
+  const rateio = await resolverRateio(tenant.id, departamentoId, projetoId, eventoId)
   if ('erro' in rateio) return { error: rateio.erro }
 
   await db.financeiroLancamento.update({
@@ -188,6 +236,7 @@ export async function editarLancamentoFinanceiro(
       observacao: observacao ?? null,
       departamentoId: rateio.departamentoId,
       projetoId: rateio.projetoId,
+      eventoId: rateio.eventoId,
     },
   })
 
@@ -205,6 +254,7 @@ export async function editarLancamentoFinanceiro(
         data,
         departamentoId: rateio.departamentoId,
         projetoId: rateio.projetoId,
+        eventoId: rateio.eventoId,
       },
     },
   })
@@ -214,7 +264,7 @@ export async function editarLancamentoFinanceiro(
     await reconciliarLancamentoFinanceiroAvulso(tenant.id, existente.id, existente.departamentoId)
   }
 
-  revalidateFinanceiro()
+  revalidateFinanceiro(tenant.id)
   return { ok: true }
 }
 
@@ -269,7 +319,7 @@ export async function excluirLancamentoFinanceiro(lancamentoId: string): Promise
     existente.departamentoId,
   )
 
-  revalidateFinanceiro()
+  revalidateFinanceiro(tenant.id)
   return { ok: true }
 }
 

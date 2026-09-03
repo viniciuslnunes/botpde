@@ -1,10 +1,7 @@
 import { type ReactNode, Suspense } from 'react'
-import { Inbox, Layers, Target, UserPlus, Users } from 'lucide-react'
-import {
-  hrefHomeDepartamento,
-  missionDepartamento,
-  rotuloAreaDepartamento,
-} from '@torcida/types'
+import { Inbox, Layers, MessageSquare, Target, UserPlus, Users } from 'lucide-react'
+import { hrefHomeDepartamento, missionDepartamento, rotuloAreaDepartamento, PERMISSIONS, hasPermission } from '@torcida/types'
+import { db } from '@torcida/db'
 import { getDepartamentoContexto } from './_lib/contexto'
 import { carregarContagensCockpit, carregarPedidosArea } from './_lib/carregar-cockpit'
 import { rotuloTabPainel } from './_lib/tabs'
@@ -31,6 +28,8 @@ export default async function DepartamentoSlugLayout({
     departamento: depto,
     capability,
     isAtuacao,
+    isSuperAdmin,
+    permissoesEfetivas,
     podeGerirEquipe,
     podeAprovarArea,
     areas,
@@ -40,14 +39,23 @@ export default async function DepartamentoSlugLayout({
   const panel = capability?.portalPanel ?? 'generico'
   const temFila = panel === 'diretoria' && podeAprovarArea
   const temPedidos = isGestor && podeAprovarArea
+  const temAtendimentoLoja =
+    depto.slug === 'materiais-loja' &&
+    (isSuperAdmin || hasPermission(permissoesEfetivas, PERMISSIONS.STORE_VIEW_ORDERS))
 
-  const [contagens, pedidosArea] = await Promise.all([
+  const [contagens, pedidosArea, ticketsAbertos]: [Awaited<ReturnType<typeof carregarContagensCockpit>>, Awaited<ReturnType<typeof carregarPedidosArea>>, number] =
+    await Promise.all([
     carregarContagensCockpit({
       tenantId: tenant.id,
       departamentoId: depto.id,
       temFila,
     }),
     temPedidos ? carregarPedidosArea({ tenantId: tenant.id, departamentoId: depto.id }) : [],
+    temAtendimentoLoja
+      ? db.saasPedidoTicket.count({
+          where: { tenantId: tenant.id, status: { in: ['ABERTO', 'ATENDENDO'] } },
+        })
+      : Promise.resolve(0),
   ])
 
   const moduloLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
@@ -102,6 +110,18 @@ export default async function DepartamentoSlugLayout({
             count: pedidosArea.length,
             countClass: 'bg-[rgb(var(--color-warning)_/_0.16)] text-[rgb(var(--color-warning-fg))]',
             href: hrefHomeDepartamento(depto.slug, 'pedidos'),
+          },
+        ]
+      : []),
+    ...(temAtendimentoLoja
+      ? [
+          {
+            id: 'atendimento' as const,
+            label: 'Atendimento',
+            icon: <MessageSquare className={ICONE_TAB} />,
+            count: ticketsAbertos > 0 ? ticketsAbertos : undefined,
+            countClass: 'bg-[rgb(var(--color-info)_/_0.16)] text-[rgb(var(--color-info-fg))]',
+            href: hrefHomeDepartamento(depto.slug, 'atendimento'),
           },
         ]
       : []),

@@ -8,6 +8,7 @@ import {
   tagAdminDirecao,
 } from '@/lib/admin-direcao-cache'
 import { slaLabel, type AdminInboxItem } from '@/lib/admin-inbox'
+import { listarCargasNaoDevolvidas } from '@/lib/carga-operacao'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const ATRASO_DIAS = 7
@@ -44,6 +45,20 @@ async function fetchDirecaoPatrimonio(tenantId: string): Promise<PatrimonioOpsRe
       href: '/admin/patrimonio',
       tom: dias >= 14 ? 'danger' : 'warning',
       sla,
+    })
+  }
+
+  // O que saiu para uma operação já encerrada e não voltou: a conferência de
+  // retorno é a metade que faltava na custódia com foto.
+  const cargasAbertas = await listarCargasNaoDevolvidas(tenantId, { agora, limite: 4 })
+  for (const c of cargasAbertas) {
+    pendencias.push({
+      id: `carga-${c.eventoId}`,
+      titulo: `${c.itens} item(ns) sem voltar · ${c.titulo}`,
+      detalhe: 'A operação já passou — confira o retorno do material.',
+      href: `/admin/eventos/${c.eventoId}`,
+      tom: 'danger',
+      sla: slaLabel(c.data, { agora, modo: 'idade' }),
     })
   }
 

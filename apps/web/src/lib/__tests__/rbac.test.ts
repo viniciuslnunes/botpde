@@ -527,6 +527,7 @@ describe('filterMenuByPermissions com OR', () => {
           'estrutura',
           'torcedores',
           'socios',
+          'portaria',
           'eventos',
           'loja',
           'comunidade',

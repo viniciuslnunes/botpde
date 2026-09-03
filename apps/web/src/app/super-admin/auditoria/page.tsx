@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ScrollText } from 'lucide-react'
+import { Filter, ScrollText } from 'lucide-react'
 import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
@@ -10,6 +10,7 @@ import { TableShell } from '@/components/admin/ui/table-shell'
 import { TablePagination } from '@/components/admin/ui/table-pagination'
 import { buildAdminHref } from '@/lib/admin-href'
 import { labelAcaoAuditoria, labelEntidadeAuditoria } from '@/lib/audit-labels'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Auditoria — Super Admin' }
 
@@ -186,9 +187,9 @@ export default async function AuditoriaPlataformaPage({
           </div>
 
           <div className="mt-4 flex items-center gap-3">
-            <button type="submit" className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90">
+            <AppButton variant="primary" icon={Filter} type="submit" className="rounded-lg px-4 py-2 text-sm font-semibold">
               Filtrar
-            </button>
+            </AppButton>
             <a
               href="/super-admin/auditoria"
               className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--surface-raised))]"

@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { m } from 'motion/react'
-import { Package } from 'lucide-react'
+import { Package, QrCode } from 'lucide-react'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { QrCodeVisual } from '@/components/ui/qr-code'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { staggerContainer, staggerItem, springSnappy } from '@/lib/motion-presets'
 
@@ -20,6 +21,12 @@ export interface PedidoListItem {
   lojaNome: string
   conversaId: string | null
   ticketStatus: string | null
+  /**
+   * Payload do QR de retirada. Só vem em pedido de RETIRADA ainda não
+   * entregue — pedido de envio e pedido já retirado não têm o que mostrar no
+   * balcão.
+   */
+  qrRetirada: string | null
 }
 
 interface LojaPedidosListProps {
@@ -62,6 +69,27 @@ function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
                 ? 'Ver conversa do pedido'
                 : 'Conversar sobre o pedido'}
             </Link>
+          )}
+
+          {/* Disclosure: um QR grande em cada card empurraria a lista inteira
+              para baixo, e quem está em casa não precisa dele aberto. */}
+          {pedido.qrRetirada && (
+            <details className="mt-3 group">
+              <summary className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-[rgb(var(--primary))]">
+                <QrCode className="h-4 w-4" aria-hidden />
+                Mostrar QR de retirada
+              </summary>
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <QrCodeVisual
+                  value={pedido.qrRetirada}
+                  size={180}
+                  label="QR de retirada do pedido"
+                />
+                <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
+                  Mostre no balcão da sede para retirar.
+                </p>
+              </div>
+            </details>
           )}
         </div>
       </div>

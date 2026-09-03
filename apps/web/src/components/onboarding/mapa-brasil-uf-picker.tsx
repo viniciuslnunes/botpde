@@ -19,6 +19,7 @@ import {
   regiaoDaUf,
   type RegiaoBrasilId,
 } from '@/lib/regioes-brasil'
+import { AppButton } from '@/components/ui/button'
 
 const VIEWBOX_FULL = '0 0 450 460'
 
@@ -126,24 +127,26 @@ export function MapaBrasilUfPicker({ ufSelecionada, onUfSelecionar, className = 
           </div>
           <div className="flex shrink-0 gap-2">
             {ufSelecionada ? (
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={limparTudo}
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
               >
-                <X className="h-3.5 w-3.5" aria-hidden />
                 Limpar
-              </button>
+              </AppButton>
             ) : null}
             {zoomAtivo ? (
-              <button
+              <AppButton
+                variant="none"
+                icon={ZoomOut}
                 type="button"
                 onClick={limparTudo}
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
               >
-                <ZoomOut className="h-3.5 w-3.5" aria-hidden />
                 Ver Brasil
-              </button>
+              </AppButton>
             ) : null}
           </div>
         </div>

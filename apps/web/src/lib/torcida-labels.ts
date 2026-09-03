@@ -7,6 +7,8 @@ export type TorcidaOpcao = {
   slug: string
   nome: string
   corPrimaria: string
+  /** Escudo/logo da torcida (Design ou registro conhecido). */
+  logoUrl: string | null
   /** FK do clube (`Afiliacao`) — filtro do switcher em cascata. */
   afiliacaoId: string | null
   /** Clube (afiliação), para distinguir homônimas — ex. várias "Camisa 12". */
@@ -21,6 +23,8 @@ export type ClubeOpcao = {
   nome: string
   apelido: string | null
   estado: string | null
+  /** Escudo do clube (`Afiliacao.escudoUrl`). */
+  logoUrl: string | null
 }
 
 /** Unidade da worktree (Sede Caso A ou tenant Caso B) para o 3º select. */
@@ -34,6 +38,8 @@ export type UnidadeOpcao = {
   cidade: string | null
   depth: number
   origem: 'sede' | 'tenant'
+  /** Foto da unidade ou logo do portal, conforme origem. */
+  logoUrl: string | null
 }
 
 const TIPO_UNIDADE_LABEL: Record<string, string> = {

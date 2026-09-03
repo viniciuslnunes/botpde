@@ -210,7 +210,9 @@ type TorcidaRowComAfiliacao = {
   slug: string
   nome: string
   corPrimaria: string
+  logoUrl: string | null
   afiliacaoId: string | null
+  torcidaConhecida: { logoUrl: string | null } | null
   afiliacao: { nome: string; apelido: string | null; estado: string | null } | null
 }
 
@@ -220,6 +222,7 @@ function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
     slug: row.slug,
     nome: formatNomeTorcida(row.nome),
     corPrimaria: row.corPrimaria,
+    logoUrl: row.torcidaConhecida?.logoUrl ?? row.logoUrl,
     afiliacaoId: row.afiliacaoId,
     clubeNome: row.afiliacao ? nomeExibicaoAfiliacao(row.afiliacao) || null : null,
     clubeUf: row.afiliacao?.estado ?? null,
@@ -231,7 +234,9 @@ const TORCIDA_SELECAO_SELECT = {
   slug: true,
   nome: true,
   corPrimaria: true,
+  logoUrl: true,
   afiliacaoId: true,
+  torcidaConhecida: { select: { logoUrl: true } },
   afiliacao: { select: { nome: true, apelido: true, estado: true } },
 } as const
 
@@ -303,7 +308,7 @@ export const listarTorcidasParaSelecaoSemente = cache(
   async function listarTorcidasParaSelecaoSemente(
     slugAtual?: string | null,
   ): Promise<TorcidaOpcao[]> {
-    const semente = await unstable_cache(fetchSementeTorcidas, ['torcidas-selecao-semente'], {
+    const semente = await unstable_cache(fetchSementeTorcidas, ['torcidas-selecao-semente-v2'], {
       revalidate: 300,
       tags: [TORCIDAS_SELECAO_CACHE_TAG],
     })()
@@ -384,6 +389,7 @@ type ClubeRow = {
   nome: string
   apelido: string | null
   estado: string | null
+  escudoUrl: string | null
 }
 
 async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
@@ -391,7 +397,7 @@ async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
     where: {
       tenants: { some: { ativo: true, sintetico: false } },
     },
-    select: { id: true, nome: true, apelido: true, estado: true },
+    select: { id: true, nome: true, apelido: true, estado: true, escudoUrl: true },
     orderBy: { nome: 'asc' },
   })
   return rows.map((r) => ({
@@ -399,6 +405,7 @@ async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
     nome: formatNomeAfiliacao(r.nome),
     apelido: r.apelido ? formatNomeAfiliacao(r.apelido) : null,
     estado: r.estado,
+    logoUrl: r.escudoUrl,
   }))
 }
 
@@ -406,7 +413,7 @@ async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
 export const listarClubesParaSelecao = cache(async function listarClubesParaSelecao(): Promise<
   ClubeOpcao[]
 > {
-  return unstable_cache(fetchClubesParaSelecao, ['clubes-para-selecao'], {
+  return unstable_cache(fetchClubesParaSelecao, ['clubes-para-selecao-v2'], {
     revalidate: 300,
     tags: [CLUBES_SELECAO_CACHE_TAG, TORCIDAS_SELECAO_CACHE_TAG],
   })()

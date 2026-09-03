@@ -130,6 +130,15 @@ export const AtualizarPatrimonioItemSchema = z
 export const AbrirEmprestimoPatrimonioSchema = z.object({
   itemId: z.string().uuid('Item inválido'),
   fotoSaidaUrl: z.string().url('Foto da retirada obrigatória').max(2000),
+  /**
+   * Operação para a qual o item está saindo. Opcional (saída avulsa continua
+   * válida), mas é o que permite conferir o retorno depois do jogo.
+   */
+  eventoId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
   observacao: z
     .string()
     .trim()

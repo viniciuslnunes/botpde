@@ -5,12 +5,16 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   Cake,
   CalendarDays,
+  Check,
+  ChevronDown,
+  Globe2,
   ImageIcon,
   Landmark,
   Link2,
   Loader2,
   MessageSquareText,
   Play,
+  Users,
   Video,
   X,
 } from 'lucide-react'
@@ -34,6 +38,7 @@ import {
 import { PostMedia } from '@/components/portal/post-media'
 import { publicarNaMemoriaDoDia } from '../actions'
 import { MemoriaVinculoPicker, type MemoriaVinculoItem } from './memoria-vinculo-picker'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   diaIso: string
@@ -41,7 +46,6 @@ type Props = {
   eventos?: MemoriaEventoDia[]
   posts?: MemoriaPostDia[]
   podeGerirAcervo?: boolean
-  diaVazio?: boolean
   iniciarAberto?: boolean
   seed?: string | null
 }
@@ -102,6 +106,21 @@ const EVENTO_TIPO: Record<MemoriaEventoDia['tipo'], string> = {
   ENSAIO: 'Ensaio',
 }
 
+const VISIBILIDADE_MEMORIA = [
+  {
+    value: 'PUBLICO' as const,
+    label: 'Público',
+    descricao: 'Comunidade e torcedores do clube',
+    Icon: Globe2,
+  },
+  {
+    value: 'TENANT' as const,
+    label: 'Só a unidade',
+    descricao: 'Membros aprovados desta unidade',
+    Icon: Users,
+  },
+]
+
 function modoInicialDeSeed(seed: string | null | undefined, podeGerir: boolean): ModoChip {
   if (!seed || !podeGerir) return MEMORIA_INTENCAO.FATO
   if (/^anivers[aá]rio\s*:/i.test(seed)) return MEMORIA_INTENCAO.ANIVERSARIO
@@ -147,12 +166,11 @@ export function MemoriaComposer({
   eventos = [],
   posts = [],
   podeGerirAcervo = false,
-  diaVazio = false,
   iniciarAberto = false,
   seed = null,
 }: Props) {
   const atrasado = diaValidoParaFatoAtrasado(diaIso, hojeIso)
-  const [aberto, setAberto] = useState(diaVazio || iniciarAberto || Boolean(seed))
+  const [aberto, setAberto] = useState(iniciarAberto || Boolean(seed))
   const [modo, setModo] = useState<ModoChip>(() => modoInicialDeSeed(seed, podeGerirAcervo))
   const [texto, setTexto] = useState(seed ?? '')
   const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT'>('PUBLICO')
@@ -164,6 +182,10 @@ export function MemoriaComposer({
   const fileDrag = useFileDragOver()
   const fotoRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (iniciarAberto) setAberto(true)
+  }, [iniciarAberto])
 
   useEffect(() => {
     if (seed) {
@@ -341,7 +363,12 @@ export function MemoriaComposer({
 
   return (
     <section
-      className="relative rounded-2xl border border-dashed border-[rgb(var(--border))] p-4"
+      className={[
+        'relative rounded-2xl border border-dashed transition-colors',
+        aberto
+          ? 'border-[rgb(var(--border))] p-4'
+          : 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.05)] p-3 hover:border-[rgb(var(--color-primary)_/_0.65)] hover:bg-[rgb(var(--color-primary)_/_0.08)]',
+      ].join(' ')}
       onDragEnter={modoRelato ? fileDrag.onDragEnter : undefined}
       onDragOver={modoRelato ? fileDrag.onDragOver : undefined}
       onDragLeave={modoRelato ? fileDrag.onDragLeave : undefined}
@@ -381,7 +408,8 @@ export function MemoriaComposer({
       {aberto ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[rgb(var(--foreground))]">
+            <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-[rgb(var(--foreground))]">
+              <Link2 className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--color-primary-fg))]" aria-hidden />
               {titulo}
             </p>
             {(texto.trim() || finalMidias.length > 0) && (
@@ -572,30 +600,84 @@ export function MemoriaComposer({
           )}
 
           {entrada.intencao === MEMORIA_INTENCAO.FATO && !bloqueadoGestao && (
-            <fieldset className="flex flex-wrap gap-3 text-sm">
-              <legend className="sr-only">Quem vê</legend>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="memoria-vis"
-                  checked={visibilidade === 'PUBLICO'}
-                  onChange={() => setVisibilidade('PUBLICO')}
-                />
-                Público
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="memoria-vis"
-                  checked={visibilidade === 'TENANT'}
-                  onChange={() => setVisibilidade('TENANT')}
-                />
-                Só a unidade
-              </label>
+            <fieldset className="space-y-2">
+              <legend className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Quem vê
+              </legend>
+              <div
+                role="radiogroup"
+                aria-label="Quem vê este relato"
+                className="flex flex-wrap gap-2"
+              >
+                {VISIBILIDADE_MEMORIA.map((opcao) => {
+                  const selecionada = visibilidade === opcao.value
+                  const Icon = opcao.Icon
+                  return (
+                    <button
+                      key={opcao.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selecionada}
+                      disabled={pending}
+                      onClick={() => setVisibilidade(opcao.value)}
+                      className={[
+                        'app-touch-target inline-flex w-fit max-w-full items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.45)]',
+                        selecionada
+                          ? 'border-[rgb(var(--color-primary)_/_0.5)] bg-[rgb(var(--color-primary)_/_0.1)] shadow-[inset_0_0_0_1px_rgb(var(--color-primary)_/_0.15)]'
+                          : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.28)] hover:bg-[rgb(var(--background-subtle))]',
+                        pending ? 'opacity-60' : '',
+                      ].join(' ')}
+                    >
+                      <span
+                        className={[
+                          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                          selecionada
+                            ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                            : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                        ].join(' ')}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className={[
+                            'block text-sm font-semibold',
+                            selecionada
+                              ? 'text-[rgb(var(--color-primary-fg))]'
+                              : 'text-[rgb(var(--foreground))]',
+                          ].join(' ')}
+                        >
+                          {opcao.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-snug text-[rgb(var(--foreground-muted))] whitespace-nowrap">
+                          {opcao.descricao}
+                        </span>
+                      </span>
+                      {selecionada ? (
+                        <Check
+                          className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                          aria-hidden
+                        />
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
             </fieldset>
           )}
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <AppButton
+              variant="none"
+              icon={X}
+              type="button"
+              disabled={pending}
+              onClick={() => setAberto(false)}
+              className="app-action rounded-xl px-4 text-sm text-[rgb(var(--foreground-muted))]"
+            >
+              Cancelar
+            </AppButton>
             {bloqueadoEvento ? (
               <Link
                 href="/portal/eventos"
@@ -613,23 +695,32 @@ export function MemoriaComposer({
                 {pending || enviandoMidia ? 'Enviando…' : rotuloEnviar}
               </button>
             )}
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setAberto(false)}
-              className="app-action rounded-xl px-4 text-sm text-[rgb(var(--foreground-muted))]"
-            >
-              Cancelar
-            </button>
           </div>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setAberto(true)}
-          className="app-action font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--color-primary-fg))]"
+          aria-expanded={false}
+          className="app-action group flex w-full min-w-0 items-center gap-2.5 rounded-xl text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary)_/_0.45)] sm:gap-3"
         >
-          {titulo}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--color-primary)_/_0.3)] bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))] transition-colors group-hover:bg-[rgb(var(--color-primary)_/_0.18)]">
+            <Link2 className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--color-primary-fg))]">
+              {titulo}
+            </span>
+            <span className="mt-0.5 block text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+              {atrasado
+                ? 'Relatar o que rolou — texto, foto, vídeo ou link'
+                : 'Publicar relato, marco ou aniversário'}
+            </span>
+          </span>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))] opacity-70 transition-opacity group-hover:opacity-100"
+            aria-hidden
+          />
         </button>
       )}
     </section>

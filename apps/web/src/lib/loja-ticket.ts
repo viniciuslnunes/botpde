@@ -55,6 +55,7 @@ export type TicketFilaItem = TicketLite & {
     id: string
     status: string
     total: unknown
+    cupomCodigo: string | null
     modalidadeEntrega: string
     criadoEm: Date
     user: { id: string; nome: string | null; email: string | null }
@@ -442,6 +443,7 @@ const FILA_INCLUDE = {
       id: true,
       status: true,
       total: true,
+      cupomCodigo: true,
       modalidadeEntrega: true,
       criadoEm: true,
       user: { select: { id: true, nome: true, email: true } },
@@ -474,6 +476,43 @@ export async function listarHistoricoTickets(
     select: { ...TICKET_SELECT, ...FILA_INCLUDE },
   })
   return rows
+}
+
+export type KanbanTickets = {
+  abertos: TicketFilaItem[]
+  atendendo: TicketFilaItem[]
+  fechados: TicketFilaItem[]
+}
+
+/** Colunas do quadro Kanban — abertos, em atendimento e concluídos recentes. */
+export async function listarKanbanTickets(
+  tenantId: string,
+  opts?: { fechadosTake?: number },
+): Promise<KanbanTickets> {
+  const fechadosTake = opts?.fechadosTake ?? 15
+  const select = { ...TICKET_SELECT, ...FILA_INCLUDE } as const
+
+  const [abertos, atendendo, fechados]: [TicketFilaItem[], TicketFilaItem[], TicketFilaItem[]] =
+    await Promise.all([
+      db.saasPedidoTicket.findMany({
+        where: { tenantId, status: 'ABERTO' },
+        orderBy: { abertoEm: 'asc' },
+        select,
+      }),
+      db.saasPedidoTicket.findMany({
+        where: { tenantId, status: 'ATENDENDO' },
+        orderBy: { atendidoEm: 'asc' },
+        select,
+      }),
+      db.saasPedidoTicket.findMany({
+        where: { tenantId, status: 'FECHADO' },
+        orderBy: { fechadoEm: 'desc' },
+        take: fechadosTake,
+        select,
+      }),
+    ])
+
+  return { abertos, atendendo, fechados }
 }
 
 export type ArquivoTicketsFiltro = 'todos' | 'abertos' | 'fechados'

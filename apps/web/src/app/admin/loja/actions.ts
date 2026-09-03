@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertPermission, assertAnyPermission } from '@/lib/authz'
 import { garantirLancamentoFinanceiroPedido } from '@/lib/loja-financeiro'
+import { aplicarStatusPedido, type StatusPedidoLoja } from '@/lib/loja-pedido-status'
 import { atenderTicket, fecharTicket, fecharTicketPorStatusPedido } from '@/lib/loja-ticket'
 import { notificarSafe, reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import {
@@ -16,6 +17,7 @@ import {
   slugify,
   chaveTamanho,
 } from '@torcida/types'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 // ── Schema produto admin ──────────────────────────────────────────────────────
 
@@ -131,6 +133,7 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
       },
     })
 
+    invalidateAdminDirecao(tenant.id)
     revalidatePath('/admin/loja')
     return { success: true }
   } catch (e) {
@@ -186,6 +189,7 @@ export async function editarProduto(
       },
     })
 
+    invalidateAdminDirecao(tenant.id)
     revalidatePath('/admin/loja')
     revalidatePath(`/admin/loja/${id}`)
     return { success: true }
@@ -206,6 +210,7 @@ export async function alterarStatusProduto(id: string, ativo: boolean) {
       entidadeId: id,
     },
   })
+  invalidateAdminDirecao(tenant.id)
   revalidatePath('/admin/loja')
 }
 
@@ -340,127 +345,18 @@ export async function atualizarStatusPedido(
     const status = formData.get('status') as string
     const validos = ['PENDENTE', 'CONFIRMADO', 'CANCELADO', 'ENTREGUE']
     if (!validos.includes(status)) return { error: 'Status inválido' }
+    if (!session.user.id) return { error: 'Sessão inválida' }
 
-    const pedido: {
-      status: string
-      total: Prisma.Decimal
-      financeiroLancamentoId: string | null
-      userId: string
-      itens: Array<{ produtoNome: string; quantidade: number }>
-    } | null = await db.saasPedido.findFirst({
-      where: { id, tenantId: tenant.id },
-      select: {
-        status: true,
-        total: true,
-        financeiroLancamentoId: true,
-        userId: true,
-        itens: { select: { produtoNome: true, quantidade: true } },
-      },
+    // A transição mora em `lib/loja-pedido-status.ts` porque a retirada por QR
+    // chega ao mesmo desfecho por outro caminho — estoque, financeiro, ticket e
+    // notificação não podem existir em duas cópias.
+    const r = await aplicarStatusPedido({
+      pedidoId: id,
+      statusNovo: status as StatusPedidoLoja,
+      tenantId: tenant.id,
+      atorId: session.user.id,
     })
-    if (!pedido) return { error: 'Pedido não encontrado' }
-
-    const statusNovo = status as 'PENDENTE' | 'CONFIRMADO' | 'CANCELADO' | 'ENTREGUE'
-
-    await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      if (statusNovo === 'CANCELADO' && pedido.status !== 'CANCELADO') {
-        await restaurarEstoquePedido(id, tx)
-      }
-
-      await tx.saasPedido.update({
-        where: { id, tenantId: tenant.id },
-        data: { status: statusNovo },
-      })
-
-      // CONFIRMADO / ENTREGUE = pedido “pago” operacional (sem gateway ainda).
-      if (
-        (statusNovo === 'CONFIRMADO' || statusNovo === 'ENTREGUE') &&
-        !pedido.financeiroLancamentoId &&
-        session.user.id
-      ) {
-        const resumoItens = pedido.itens.map((i) => `${i.produtoNome} ×${i.quantidade}`).join(', ')
-        await garantirLancamentoFinanceiroPedido(tx, {
-          tenantId: tenant.id,
-          pedidoId: id,
-          total: pedido.total,
-          atorId: session.user.id,
-          itensResumo: resumoItens,
-        })
-      }
-    })
-
-    await db.auditLog.create({
-      data: {
-        tenantId: tenant.id,
-        atorId: session.user.id,
-        acao: 'PEDIDO_STATUS_ATUALIZADO',
-        entidade: 'SaasPedido',
-        entidadeId: id,
-        detalhes: { status: statusNovo },
-      },
-    })
-
-    if (session.user.id) {
-      try {
-        const ticketFechado = await fecharTicketPorStatusPedido(id, statusNovo, session.user.id)
-        if (ticketFechado?.motivoFecho) {
-          await db.auditLog.create({
-            data: {
-              tenantId: tenant.id,
-              atorId: session.user.id,
-              acao: 'PEDIDO_TICKET_FECHADO',
-              entidade: 'SaasPedidoTicket',
-              entidadeId: ticketFechado.id,
-              detalhes: {
-                pedidoId: id,
-                motivo: ticketFechado.motivoFecho,
-                via: 'status_pedido',
-              },
-            },
-          })
-        }
-      } catch {
-        // Status do pedido já gravado — falha no fecho do ticket não reverte.
-      }
-    }
-
-    if (statusNovo !== pedido.status) {
-      const notificacaoPorStatus: Partial<
-        Record<
-          typeof statusNovo,
-          { tipo: 'PEDIDO_CONFIRMADO' | 'PEDIDO_CANCELADO' | 'PEDIDO_ENTREGUE'; titulo: string }
-        >
-      > = {
-        CONFIRMADO: { tipo: 'PEDIDO_CONFIRMADO', titulo: 'Pedido confirmado' },
-        CANCELADO: { tipo: 'PEDIDO_CANCELADO', titulo: 'Pedido cancelado' },
-        ENTREGUE: { tipo: 'PEDIDO_ENTREGUE', titulo: 'Pedido entregue' },
-      }
-      const notificacao = notificacaoPorStatus[statusNovo]
-      if (notificacao) {
-        await reconciliarNotificacoesDoEvento(tenant.id, {
-          tipo: 'PEDIDO_RECEBIDO',
-          atorId: pedido.userId,
-        })
-        await notificarSafe({
-          userId: pedido.userId,
-          tenantId: tenant.id,
-          tipo: notificacao.tipo,
-          titulo: notificacao.titulo,
-          link: '/portal/loja/pedidos',
-          atorId: session.user.id,
-        })
-      }
-    }
-
-    revalidatePath('/admin/loja/pedidos')
-    revalidatePath('/admin/loja/tickets')
-    revalidatePath('/admin/loja')
-    revalidatePath('/admin/loja/produtos')
-    revalidatePath('/portal/loja/pedidos')
-    revalidatePath('/portal/mensagens')
-    revalidatePath('/admin/financeiro')
-    revalidatePath('/portal/financeiro')
-    revalidatePath('/portal/balanco')
-    return { success: true }
+    return r.ok ? { success: true } : { error: r.error }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao atualizar pedido' }
   }
@@ -500,9 +396,12 @@ export async function atenderTicketPedido(ticketId: string): Promise<TicketActio
       },
     })
 
+    invalidateAdminDirecao(tenant.id)
     revalidatePath('/admin/loja/pedidos')
-    revalidatePath('/admin/loja/tickets')
+    revalidatePath('/admin/loja/atendimento')
+    revalidatePath('/admin/loja')
     revalidatePath('/portal/mensagens')
+    revalidatePath('/portal/departamentos/materiais-loja')
     return { success: true, conversaId: ticket.conversaId }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao atender ticket' }
@@ -537,12 +436,14 @@ export async function fecharTicketPedido(ticketId: string): Promise<TicketAction
       },
     })
 
+    invalidateAdminDirecao(tenant.id)
     revalidatePath('/admin/loja/pedidos')
-    revalidatePath('/admin/loja/tickets')
+    revalidatePath('/admin/loja/atendimento')
     revalidatePath('/admin/loja')
     revalidatePath('/admin/loja/produtos')
     revalidatePath('/portal/loja/pedidos')
     revalidatePath('/portal/mensagens')
+    revalidatePath('/portal/departamentos/materiais-loja')
     return { success: true, conversaId: ticket.conversaId }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao fechar ticket' }

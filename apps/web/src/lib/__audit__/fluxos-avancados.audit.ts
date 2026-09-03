@@ -342,6 +342,212 @@ describe('fluxo: lotação, lista de espera e promoção automática', () => {
   })
 })
 
+describe('fluxo: embarque por trecho com QR rotativo (ida e volta)', () => {
+  /**
+   * Exercita o caminho que só o banco real prova: `tsc` **não** valida payload
+   * de escrita, então campo ou enum errados num `create` passam limpos na
+   * compilação. Aqui as duas tabelas novas são escritas de verdade.
+   *
+   * A invariante mais cara é a última: **a volta não sobrescreve o
+   * `checkedInAt` da ida**. Se ela quebrar, a hora do embarque real vira a hora
+   * do retorno e o relatório de presença passa a mentir sem avisar.
+   */
+  it('respeita porta fechada, janela, trecho e não deixa a volta apagar a ida', async () => {
+    const AREA = 'eventos/embarque-qr'
+    const tenant = await tenantPorSlug(SLUG_PRINCIPAL)
+    if (!tenant) return
+
+    const { PERMISSIONS } = await import('@torcida/types')
+    const gestor = await atorComPermissao(tenant.id, PERMISSIONS.EVENTS_MANAGE)
+    if (!gestor) {
+      alerta(AREA, `Ninguém com events:manage em ${tenant.slug} — embarque não exercitado`)
+      return
+    }
+    const [passageiro, penetra] = await membrosAprovados(tenant.id, 2, { excluir: [gestor] })
+    if (!passageiro) {
+      alerta(AREA, `Sem membro aprovado distinto do gestor em ${tenant.slug}`)
+      return
+    }
+
+    const evento: { id: string } = await db.evento.create({
+      data: {
+        tenantId: tenant.id,
+        titulo: `${MARCA} embarque ida e volta`,
+        tipo: 'CARAVANA',
+        data: new Date(Date.now() + 2 * 24 * 3600_000),
+      },
+      select: { id: true },
+    })
+    aoDesfazer(`remover evento de embarque ${evento.id}`, async () => {
+      await db.eventoCheckin.deleteMany({ where: { eventoId: evento.id } })
+      await db.eventoRsvp.deleteMany({ where: { eventoId: evento.id } })
+      await db.auditLog.deleteMany({
+        where: { tenantId: tenant.id, entidadeId: evento.id },
+      })
+      await db.evento.delete({ where: { id: evento.id } })
+    })
+
+    await db.eventoRsvp.create({
+      data: { eventoId: evento.id, userId: passageiro, status: 'CONFIRMADO' },
+    })
+
+    const { montarQrEmbarque } = await import('@/lib/embarque-qr')
+    const { confirmarEmbarquePorQr } = await import('@/app/embarque/actions')
+    const { abrirEmbarque, encerrarEmbarque, obterEstadoPainelEmbarque } = await import(
+      '@/app/admin/eventos/actions'
+    )
+
+    /** Roda o auto-embarque como o passageiro e devolve o código da decisão. */
+    const escanear = (userId: string, payload: string) =>
+      comoUsuario(userId, async () => {
+        const r = await confirmarEmbarquePorQr(payload)
+        return r.ok ? 'OK' : r.codigo
+      })
+
+    // 1. Porta fechada — o QR existe mas não vale.
+    const fechado = await escanear(passageiro, montarQrEmbarque(evento.id, 'IDA').payload)
+    if (fechado === 'EMBARQUE_FECHADO') {
+      ok(AREA, 'Sem trecho aberto, o auto-embarque é recusado (ninguém embarca dias antes)')
+    } else {
+      erro(AREA, `Porta fechada devia recusar com EMBARQUE_FECHADO, veio "${fechado}"`)
+    }
+
+    // 2. Gestor abre a ida.
+    const abriu = await comoUsuario(gestor, () => tentativa(() => abrirEmbarque(evento.id, 'IDA')))
+    if (!abriu.ok) {
+      erro(AREA, `Abrir embarque falhou: "${abriu.erro}"`)
+      return
+    }
+
+    // 3. QR de dez janelas atrás não vale mais — é o que mata o print no grupo.
+    const expirado = await escanear(
+      passageiro,
+      montarQrEmbarque(evento.id, 'IDA', Date.now() - 5 * 60_000).payload,
+    )
+    if (expirado === 'QR_EXPIRADO') {
+      ok(AREA, 'QR fora da janela é recusado — print compartilhado morre sozinho')
+    } else {
+      erro(AREA, `QR velho devia dar QR_EXPIRADO, veio "${expirado}"`)
+    }
+
+    // 4. QR da volta enquanto a ida está aberta.
+    const trocado = await escanear(passageiro, montarQrEmbarque(evento.id, 'VOLTA').payload)
+    if (trocado === 'TRECHO_DIVERGENTE') {
+      ok(AREA, 'QR de outro trecho é recusado com o trecho aberto')
+    } else {
+      erro(AREA, `QR de trecho errado devia dar TRECHO_DIVERGENTE, veio "${trocado}"`)
+    }
+
+    // 5. Embarque de verdade, pelo QR que o painel está exibindo agora.
+    const estado = await comoUsuario(gestor, () => obterEstadoPainelEmbarque(evento.id))
+    if (!estado.qr) {
+      erro(AREA, 'Painel não devolveu QR com o trecho aberto')
+      return
+    }
+    const embarcou = await escanear(passageiro, estado.qr.payload)
+    if (embarcou !== 'OK') {
+      erro(AREA, `Auto-embarque do confirmado falhou com "${embarcou}"`)
+      return
+    }
+
+    const ida: { metodo: string; registradoPorId: string | null } | null =
+      await db.eventoCheckin.findUnique({
+        where: {
+          eventoId_userId_trecho: { eventoId: evento.id, userId: passageiro, trecho: 'IDA' },
+        },
+        select: { metodo: true, registradoPorId: true },
+      })
+    if (ida?.metodo === 'QR_EVENTO' && ida.registradoPorId === null) {
+      ok(AREA, 'Ledger gravou a IDA como QR_EVENTO sem registrador (auto-embarque)')
+    } else {
+      erro(AREA, `EventoCheckin da ida saiu errado: ${JSON.stringify(ida)}`)
+    }
+
+    const aposIda: { checkedInAt: Date | null } | null = await db.eventoRsvp.findUnique({
+      where: { eventoId_userId: { eventoId: evento.id, userId: passageiro } },
+      select: { checkedInAt: true },
+    })
+    if (aposIda?.checkedInAt) ok(AREA, 'IDA materializou `checkedInAt` no RSVP')
+    else erro(AREA, 'IDA não materializou `checkedInAt` — KPIs e CSV ficariam cegos')
+
+    // 6. Segunda leitura do mesmo trecho.
+    const repetido = await escanear(passageiro, estado.qr.payload)
+    if (repetido === 'JA_EMBARCADO') ok(AREA, 'Segunda leitura do mesmo trecho é idempotente')
+    else erro(AREA, `Releitura devia dar JA_EMBARCADO, veio "${repetido}"`)
+
+    // 7. Quem não confirmou não se auto-embarca (walk-in é só pelo gestor).
+    if (penetra) {
+      const semRsvp = await escanear(penetra, estado.qr.payload)
+      if (semRsvp === 'SEM_RSVP') {
+        ok(AREA, 'Sem RSVP confirmado o auto-embarque é recusado — walk-in passa pelo gestor')
+      } else {
+        erro(AREA, `Membro sem RSVP devia dar SEM_RSVP, veio "${semRsvp}"`)
+      }
+    }
+
+    // 8. A volta é outro trecho — e NÃO pode mexer no carimbo da ida.
+    const abriuVolta = await comoUsuario(gestor, () =>
+      tentativa(() => abrirEmbarque(evento.id, 'VOLTA')),
+    )
+    if (!abriuVolta.ok) {
+      erro(AREA, `Abrir a volta falhou: "${abriuVolta.erro}"`)
+      return
+    }
+    const estadoVolta = await comoUsuario(gestor, () => obterEstadoPainelEmbarque(evento.id))
+    const voltou = await escanear(passageiro, estadoVolta.qr!.payload)
+    if (voltou !== 'OK') {
+      erro(AREA, `Embarque na volta falhou com "${voltou}"`)
+      return
+    }
+
+    const temVolta: { id: string } | null = await db.eventoCheckin.findUnique({
+      where: {
+        eventoId_userId_trecho: { eventoId: evento.id, userId: passageiro, trecho: 'VOLTA' },
+      },
+      select: { id: true },
+    })
+    const aposVolta: { checkedInAt: Date | null } | null = await db.eventoRsvp.findUnique({
+      where: { eventoId_userId: { eventoId: evento.id, userId: passageiro } },
+      select: { checkedInAt: true },
+    })
+    if (!temVolta) {
+      erro(AREA, 'Volta não gravou linha no ledger')
+    } else if (aposVolta?.checkedInAt?.getTime() !== aposIda?.checkedInAt?.getTime()) {
+      erro(
+        AREA,
+        'A VOLTA sobrescreveu `checkedInAt` da IDA — a hora do embarque real foi perdida',
+      )
+    } else {
+      ok(AREA, 'Volta gravou no ledger sem tocar no `checkedInAt` da ida')
+    }
+
+    // 9. Encerrar fecha a porta de novo.
+    const encerrou = await comoUsuario(gestor, () =>
+      tentativa(() => encerrarEmbarque(evento.id)),
+    )
+    if (!encerrou.ok) {
+      erro(AREA, `Encerrar embarque falhou: "${encerrou.erro}"`)
+      return
+    }
+    const depoisDeFechar = await escanear(passageiro, estadoVolta.qr!.payload)
+    if (depoisDeFechar === 'EMBARQUE_FECHADO') {
+      ok(AREA, 'Encerrado o embarque, o QR para de valer na hora')
+    } else {
+      erro(AREA, `Após encerrar devia dar EMBARQUE_FECHADO, veio "${depoisDeFechar}"`)
+    }
+
+    const trilha: number = await db.auditLog.count({
+      where: {
+        tenantId: tenant.id,
+        entidadeId: evento.id,
+        acao: { in: ['EVENTO_EMBARQUE_ABRIR', 'EVENTO_EMBARQUE_ENCERRAR', 'EVENTO_EMBARQUE_AUTO'] },
+      },
+    })
+    if (trilha >= 4) ok(AREA, `Embarque deixou trilha de auditoria (${trilha} registros)`)
+    else erro(AREA, `Trilha de auditoria do embarque incompleta: ${trilha} registros`)
+  })
+})
+
 // ═════════════════════════════════════════════════════════════════════════
 // B. BAR — o dinheiro que volta (estorno, fiado, caixa)
 // ═════════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, startTransition } from 'react
 import { createPortal } from 'react-dom'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, m } from 'motion/react'
-import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
+import { MessageSquarePlus, MessagesSquare, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida } from '@torcida/types'
 import {
@@ -25,6 +25,7 @@ import {
   staggerItem,
 } from '@/lib/motion-presets'
 import { Avatar } from './avatar'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 const MensagemThread = dynamic(
   () => import('./mensagem-thread').then((mod) => mod.MensagemThread),
@@ -175,7 +176,15 @@ export function MensagensShell({
         ].join(' ')}
       >
         <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
-          <h2 className="portal-display text-sm text-[rgb(var(--foreground))]">Conversas</h2>
+          <h2
+            className={
+              embedded
+                ? 'text-sm font-semibold uppercase text-[rgb(var(--foreground))]'
+                : 'portal-display text-sm text-[rgb(var(--foreground))]'
+            }
+          >
+            Conversas
+          </h2>
           <div className="flex gap-1">
             <button
               type="button"
@@ -402,11 +411,17 @@ function NovaConversaModal({
   const [mounted, setMounted] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
   const chipsRef = useRef<HTMLDivElement>(null)
+  const buscaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMounted(true), 0)
     return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    buscaInputRef.current?.focus()
+  }, [mounted])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -655,20 +670,24 @@ function NovaConversaModal({
             )}
 
             <div className="shrink-0 space-y-2 px-4 pb-2 pt-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  autoFocus
-                  placeholder={
-                    tipo === 'grupo'
-                      ? 'Buscar na rede ou na torcida'
-                      : 'Buscar membro pelo nome'
-                  }
-                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-                />
-              </div>
+              <SearchFilterInput
+                value={busca}
+                onChange={setBusca}
+                placeholder={
+                  tipo === 'grupo'
+                    ? 'Buscar na rede ou na torcida'
+                    : 'Buscar membro pelo nome'
+                }
+                ariaLabel={
+                  tipo === 'grupo'
+                    ? 'Buscar na rede ou na torcida'
+                    : 'Buscar membro pelo nome'
+                }
+                exibirDropdown={false}
+                loading={buscando}
+                inputRef={buscaInputRef}
+                inputClassName="rounded-xl bg-[rgb(var(--background-subtle))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+              />
               {tipo === 'grupo' && (
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">
                   Sócios fora da sua rede ou torcida não entram em grupos — use DM com

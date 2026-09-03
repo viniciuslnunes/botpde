@@ -24,8 +24,15 @@ const CI = process.argv.includes('--ci')
 /**
  * Areas ja migradas para `AppButton`. So estas sao cobradas.
  * Ao migrar uma area nova, acrescente o prefixo aqui.
+ *
+ * `''` = o `src` inteiro. A primeira rodada cobriu so `components/admin` e
+ * `app/admin`, e isso se mostrou um recorte ERRADO: tela de admin usa
+ * componente que mora em `components/eventos`, `components/portal`,
+ * `components/financeiro`… O botao "Novo evento" do admin ficou de fora
+ * porque o arquivo dele nao esta sob `app/admin`. Caminho de pasta nao e
+ * proxy confiavel para area do produto — dai a cobertura total.
  */
-const AREAS_COBERTAS = ['components/admin', 'app/admin']
+const AREAS_COBERTAS = ['']
 
 /**
  * Icone canonico por acao — mantem "Excluir" com o mesmo simbolo nas 40
@@ -79,6 +86,19 @@ const ICONE_POR_ACAO = [
   [/^(documentos?)/i, 'FileText'],
   [/^(associa)/i, 'IdCard'],
   [/^(agora n[aã]o|depois|mais tarde)/i, 'Clock'],
+  // Vocabulario do portal — comunidade, grupos, agenda, moderacao.
+  [/^(tentar|repetir)/i, 'RotateCcw'],
+  [/^(ocultar|esconder)/i, 'EyeOff'],
+  [/^(fixar|desafixar)/i, 'Pin'],
+  [/^(hoje|ir para)/i, 'CalendarDays'],
+  [/^(pedir|solicitar)/i, 'MailQuestion'],
+  [/^(revogar|retirar)/i, 'UserMinus'],
+  [/^(tornar|promover)/i, 'ShieldCheck'],
+  [/^(usar|escolher|selecionar)/i, 'Check'],
+  [/^(declarar)/i, 'Gavel'],
+  [/^(permitir|autorizar)/i, 'Check'],
+  [/^(aparecer|participar)/i, 'UserCheck'],
+  [/^(pagar)/i, 'Wallet'],
   // Rotulo que ja usa '+' como icone textual — vira Plus de verdade.
   [/^\+\s/, 'Plus'],
 ]
@@ -158,11 +178,55 @@ function fimDaAbertura(texto, ini) {
 }
 
 /**
+ * Troca o conteudo de comentario e de string por espacos, PRESERVANDO os
+ * indices (mesmo comprimento). Sem isto o lint acusa um `<button>` citado
+ * dentro de um JSDoc — aconteceu em `components/ui/scroll-rail.tsx`, cuja
+ * doc explica que "as setas sao `<button>` e nao podem morar dentro de um
+ * `role=tablist`". Nao ha botao ali; ha prosa.
+ */
+function mascarar(texto) {
+  const out = texto.split('')
+  let i = 0
+  const branco = (ini, fim) => {
+    for (let k = ini; k < fim && k < out.length; k++) if (out[k] !== '\n') out[k] = ' '
+  }
+  while (i < texto.length) {
+    const dois = texto.slice(i, i + 2)
+    if (dois === '/*') {
+      const fim = texto.indexOf('*/', i + 2)
+      const ate = fim === -1 ? texto.length : fim + 2
+      branco(i, ate)
+      i = ate
+      continue
+    }
+    if (dois === '//') {
+      const fim = texto.indexOf('\n', i)
+      const ate = fim === -1 ? texto.length : fim
+      branco(i, ate)
+      i = ate
+      continue
+    }
+    const c = texto[i]
+    if (c === "'" || c === '"' || c === '`') {
+      let j = i + 1
+      while (j < texto.length && !(texto[j] === c && texto.charCodeAt(j - 1) !== BARRA_INVERTIDA)) j++
+      branco(i + 1, j)
+      i = j + 1
+      continue
+    }
+    i++
+  }
+  return out.join('')
+}
+
+/**
  * Extrai `<button ...>...</button>` respeitando aninhamento. Regex sozinha
  * casa o `</button>` errado quando ha botao dentro de botao (acontece em
  * card com acao secundaria), entao o corte e feito contando abertura.
  */
-function botoesDe(texto) {
+function botoesDe(textoReal) {
+  // Procura na versao mascarada (indices identicos), corta no texto real.
+  const texto = mascarar(textoReal)
   const achados = []
   const abre = /<button\b/g
   let m
@@ -182,7 +246,8 @@ function botoesDe(texto) {
       else nivel++
       cursor = at + 8
     }
-    achados.push({ ini, corpoIni: i + 1 - ini, bloco: texto.slice(ini, cursor + 1) })
+    // O bloco sai do texto REAL: a mascara serve para localizar, nao para ler.
+    achados.push({ ini, corpoIni: i + 1 - ini, bloco: textoReal.slice(ini, cursor + 1) })
   }
   return achados
 }

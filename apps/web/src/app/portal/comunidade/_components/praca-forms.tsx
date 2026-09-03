@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   aplicarVotoPracaLocal,
@@ -53,9 +53,19 @@ export function CriarTopicoForm({ escopo }: { escopo: EscopoComunidade }) {
 export function ResponderTopicoForm({
   escopo,
   topicoId,
+  parentId,
+  placeholder = 'Deixe sua resposta',
+  compacto = false,
+  onEnviado,
+  onCancelar,
 }: {
   escopo: EscopoComunidade
   topicoId: string
+  parentId?: string
+  placeholder?: string
+  compacto?: boolean
+  onEnviado?: () => void
+  onCancelar?: () => void
 }) {
   const formRef = useRef<HTMLFormElement>(null)
   const router = useRouter()
@@ -64,10 +74,18 @@ export function ResponderTopicoForm({
   return (
     <form
       ref={formRef}
-      className="space-y-2"
+      className={[
+        'space-y-2',
+        parentId
+          ? 'rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-2.5'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       action={(fd) => {
         fd.set('escopo', escopo)
         fd.set('topicoId', topicoId)
+        if (parentId) fd.set('parentId', parentId)
         start(async () => {
           const r = await responderTopicoAction(fd)
           if ('error' in r) {
@@ -75,13 +93,39 @@ export function ResponderTopicoForm({
             return
           }
           formRef.current?.reset()
-          toast.success('Resposta publicada.')
+          toast.success(parentId ? 'Resposta na thread.' : 'Resposta publicada.')
+          onEnviado?.()
           router.refresh()
         })
       }}
     >
-      <textarea name="conteudo" required rows={4} maxLength={8000} placeholder="Deixe sua resposta" className={campoClass()} />
-      <button type="submit" disabled={pending} className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50">
+      {parentId && onCancelar ? (
+        <div className="flex items-center justify-between gap-2 px-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          <span>Respondendo na thread</span>
+          <button
+            type="button"
+            onClick={onCancelar}
+            aria-label="Cancelar resposta"
+            className="app-touch-target inline-flex rounded-lg p-1 hover:bg-[rgb(var(--surface))]"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+      <textarea
+        name="conteudo"
+        required
+        rows={compacto ? 2 : 4}
+        maxLength={8000}
+        placeholder={placeholder}
+        className={campoClass()}
+        autoFocus={Boolean(parentId)}
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="app-action rounded-xl bg-[rgb(var(--primary))] px-4 text-sm font-semibold text-primary-on disabled:opacity-50"
+      >
         {pending ? 'Enviando…' : 'Responder'}
       </button>
     </form>
@@ -137,7 +181,7 @@ export function VotarPracaBotoes({
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <button
         type="button"
         disabled={pending}
@@ -145,7 +189,7 @@ export function VotarPracaBotoes({
         aria-pressed={voto === 1}
         aria-label={voto === 1 ? 'Remover concordância' : 'Concordo'}
         className={[
-          'app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium disabled:opacity-50',
+          'app-touch-target inline-flex items-center gap-1 rounded-lg px-2 text-xs font-medium disabled:opacity-50',
           voto === 1
             ? 'text-[rgb(var(--color-primary-fg))]'
             : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -155,7 +199,7 @@ export function VotarPracaBotoes({
         Concordo
       </button>
       <span
-        className="min-w-8 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]"
+        className="min-w-7 px-1 text-center text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]"
         aria-label={`${apoios} de saldo no tópico`}
       >
         {apoios}
@@ -167,7 +211,7 @@ export function VotarPracaBotoes({
         aria-pressed={voto === -1}
         aria-label={voto === -1 ? 'Remover discordância' : 'Discordo'}
         className={[
-          'app-touch-target inline-flex items-center gap-1 rounded-lg px-3 text-xs font-medium disabled:opacity-50',
+          'app-touch-target inline-flex items-center gap-1 rounded-lg px-2 text-xs font-medium disabled:opacity-50',
           voto === -1
             ? 'text-[rgb(var(--foreground))]'
             : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',

@@ -12,8 +12,16 @@ import {
   rotuloCategoriaNoticia,
 } from '@/lib/noticias-feed-layout'
 import { NoticiasRelacionadosLinks } from './noticias-relacionados-links'
+import { NoticiasPracaFeedEngagement } from '@/components/portal/noticias-praca-feed-engagement'
+import { formatFeedPublicadoEm } from '@/lib/format-datetime'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import type { NoticiaPracaItem } from '@/lib/praca'
+
+interface CurrentUser {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+}
 
 export function NoticiasArtigoCard({
   item,
@@ -24,6 +32,7 @@ export function NoticiasArtigoCard({
   posicao,
   variant = 'lista',
   sufixo,
+  currentUser,
 }: {
   item: NoticiaPracaItem
   href: string
@@ -34,6 +43,7 @@ export function NoticiasArtigoCard({
   /** `lista` = linha horizontal estilo portal esportivo; `card` = legado empilhado. */
   variant?: 'lista' | 'card'
   sufixo?: string
+  currentUser?: CurrentUser
 }) {
   if (variant === 'card') {
     return (
@@ -44,6 +54,7 @@ export function NoticiasArtigoCard({
         podeGerir={podeGerir}
         userId={userId}
         posicao={posicao}
+        currentUser={currentUser}
       />
     )
   }
@@ -51,56 +62,80 @@ export function NoticiasArtigoCard({
   const capa = capaNoticia(item)
   const resumo = resumoNoticia(item)
   const categoria = rotuloCategoriaNoticia(item)
+  const alvoTipo = item.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO'
+  const publicadoEmLabel = formatFeedPublicadoEm(item.publicadoEm ?? item.criadoEm)
 
   return (
     <article className="group relative py-4">
-      <Link href={href} className="flex gap-4 sm:gap-5">
-        <div className="relative h-[5.5rem] w-[8.25rem] shrink-0 overflow-hidden rounded-xl sm:h-[6.5rem] sm:w-[9.75rem]">
+      <div className="flex gap-4 sm:gap-5">
+        <Link
+          href={href}
+          className="relative h-[5.5rem] w-[8.25rem] shrink-0 overflow-hidden rounded-xl sm:h-[6.5rem] sm:w-[9.75rem]"
+        >
           <NoticiasCapaThumb
             url={capa}
             alt=""
             fill
             sizes="(max-width: 640px) 132px, 156px"
           />
-        </div>
+        </Link>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {posicao != null ? (
-              <span className="text-xs font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
-                {posicao}
-              </span>
-            ) : null}
-            {item.fixado ? <FixadoBadge /> : null}
-            <span className="text-xs lowercase text-[rgb(var(--foreground-muted))]">{categoria}</span>
-          </div>
+          <Link href={href} className="block min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {posicao != null ? (
+                <span className="text-xs font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
+                  {posicao}
+                </span>
+              ) : null}
+              {item.fixado ? <FixadoBadge /> : null}
+              <span className="text-xs lowercase text-[rgb(var(--foreground-muted))]">{categoria}</span>
+            </div>
 
-          <h3 className="mt-1 text-base font-bold leading-snug text-[rgb(var(--color-primary-fg))] transition-colors group-hover:underline sm:text-lg">
-            {item.titulo}
-          </h3>
+            <h3 className="mt-1 text-base font-bold leading-snug text-[rgb(var(--color-primary-fg))] transition-colors group-hover:underline sm:text-lg">
+              {item.titulo}
+            </h3>
+          </Link>
 
           {sufixo ? (
             <NoticiasRelacionadosLinks itens={item.relacionados} sufixo={sufixo} />
           ) : null}
 
-          {resumo ? (
-            <p className="mt-1.5 hidden text-sm leading-relaxed text-[rgb(var(--color-primary-fg)_/_0.82)] sm:line-clamp-2">
-              <span className="mr-1.5 text-[rgb(var(--color-primary-fg))]" aria-hidden>
-                •
-              </span>
-              {resumo}
-            </p>
-          ) : null}
+          <Link href={href} className="block min-w-0">
+            {resumo ? (
+              <p className="mt-1.5 hidden text-sm leading-relaxed text-[rgb(var(--color-primary-fg)_/_0.82)] sm:line-clamp-2">
+                <span className="mr-1.5 text-[rgb(var(--color-primary-fg))]" aria-hidden>
+                  •
+                </span>
+                {resumo}
+              </p>
+            ) : null}
 
-          <p className="mt-2 flex flex-wrap items-center gap-x-3 text-xs text-[rgb(var(--foreground-muted))]">
-            <span>{formatMetaNoticia(item)}</span>
-            <span className="inline-flex items-center gap-1">
-              <Eye className="h-3 w-3" aria-hidden />
-              {item.visitas}
-            </span>
-          </p>
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 text-xs text-[rgb(var(--foreground-muted))]">
+              <span>{formatMetaNoticia(item)}</span>
+              <span className="inline-flex items-center gap-1">
+                <Eye className="h-3 w-3" aria-hidden />
+                {item.visitas}
+              </span>
+            </p>
+          </Link>
         </div>
-      </Link>
+      </div>
+
+      {currentUser ? (
+        <NoticiasPracaFeedEngagement
+          alvoTipo={alvoTipo}
+          alvoId={item.id}
+          escopo={escopo}
+          href={href}
+          gostei={item.gostei}
+          naoGostei={item.naoGostei}
+          meuVoto={item.meuVoto}
+          totalComentarios={item.totalComentarios}
+          currentUser={currentUser}
+          publicadoEm={publicadoEmLabel}
+        />
+      ) : null}
 
       <NoticiasArtigoGerir
         item={item}
@@ -121,6 +156,7 @@ function NoticiasArtigoCardEmpilhado({
   podeGerir,
   userId,
   posicao,
+  currentUser,
 }: {
   item: NoticiaPracaItem
   href: string
@@ -128,9 +164,12 @@ function NoticiasArtigoCardEmpilhado({
   podeGerir: boolean
   userId: string
   posicao?: number
+  currentUser?: CurrentUser
 }) {
   const capa = capaNoticia(item)
   const resumo = resumoNoticia(item)
+  const alvoTipo = item.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO'
+  const publicadoEmLabel = formatFeedPublicadoEm(item.publicadoEm ?? item.criadoEm)
 
   return (
     <article
@@ -175,6 +214,21 @@ function NoticiasArtigoCardEmpilhado({
       </Link>
 
       <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{formatMetaNoticia(item)}</p>
+
+      {currentUser ? (
+        <NoticiasPracaFeedEngagement
+          alvoTipo={alvoTipo}
+          alvoId={item.id}
+          escopo={escopo}
+          href={href}
+          gostei={item.gostei}
+          naoGostei={item.naoGostei}
+          meuVoto={item.meuVoto}
+          totalComentarios={item.totalComentarios}
+          currentUser={currentUser}
+          publicadoEm={publicadoEmLabel}
+        />
+      ) : null}
     </article>
   )
 }

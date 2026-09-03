@@ -1837,8 +1837,14 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
                 visibilidade: 'PUBLICO',
                 oculto: false,
                 ...escopoFeedSemConversa,
-                ...cursorTorcidaWhere,
-                OR: orFeedNacionalDescobrir(seguindoAprovados),
+                // `buildCursorWhere` também devolve `{ OR: [...] }`. Espalhar
+                // os dois no mesmo nível apaga o cursor — a página 2+ repete a
+                // primeira e o infinite scroll da CN trava (o mural de canal
+                // já guarda os dois ORs no AND; ver getPostsDoCanal).
+                AND: [
+                  { OR: orFeedNacionalDescobrir(seguindoAprovados) },
+                  ...(cursorTorcidaWhere ? [cursorTorcidaWhere] : []),
+                ],
               },
               orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
               take: take + 1,

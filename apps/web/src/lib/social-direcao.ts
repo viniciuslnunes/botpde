@@ -93,7 +93,7 @@ async function fetchDirecaoSocial(
     _count: { rsvps: number }
   }
 
-  const [projetos, proximos, eventosSemProjeto]: [ProjetoRow[], EventoRow[], number] =
+  const [projetos, proximos, eventosSemDono]: [ProjetoRow[], EventoRow[], number] =
     await Promise.all([
       db.projeto.findMany({
         where: {
@@ -109,7 +109,12 @@ async function fetchDirecaoSocial(
         where: {
           tenantId,
           data: { gte: agora, lte: horizonte },
-          projeto: { departamentoId: depto.id },
+          // Dono operacional OU herança do projeto: evento avulso da frente
+          // (ensaio, escala) deixou de ficar órfão do hub.
+          OR: [
+            { departamentoId: depto.id },
+            { projeto: { departamentoId: depto.id } },
+          ],
         },
         orderBy: { data: 'asc' },
         take: 40,
@@ -133,6 +138,7 @@ async function fetchDirecaoSocial(
           tenantId,
           tipo: 'GERAL',
           data: { gte: agora, lte: horizonte },
+          departamentoId: null,
           projetoId: null,
         },
       }),
@@ -214,11 +220,11 @@ async function fetchDirecaoSocial(
     })
   }
 
-  if (proximos.length === 0 && eventosSemProjeto > 0) {
+  if (proximos.length === 0 && eventosSemDono > 0) {
     pendencias.push({
-      id: 'eventos-sem-projeto',
-      titulo: `${eventosSemProjeto} evento${eventosSemProjeto === 1 ? '' : 's'} geral${eventosSemProjeto === 1 ? '' : 'is'} sem projeto`,
-      detalhe: 'Vincule à campanha do Social para acompanhar por aqui.',
+      id: 'eventos-sem-dono',
+      titulo: `${eventosSemDono} evento${eventosSemDono === 1 ? '' : 's'} geral${eventosSemDono === 1 ? '' : 'is'} sem departamento`,
+      detalhe: 'Defina o departamento responsável para acompanhar por aqui.',
       href: '/admin/eventos?tipo=GERAL',
       tom: 'default',
     })

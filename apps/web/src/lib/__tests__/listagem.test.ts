@@ -28,12 +28,13 @@ import {
   tokensDaBusca,
   type ListagemWhere,
 } from '@/lib/listagem/query'
-import { montarChips, montarFiltroUI, paramsDoContrato } from '@/lib/listagem/ui'
+import { montarChips, montarFiltroUI, paramsDoContrato, paramsDoContratoPersistivel } from '@/lib/listagem/ui'
 import {
   LISTAGEM_ACESSOS_PESSOAS,
   LISTAGEM_MEMBROS,
   LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SUPER_ADMIN_SETUP,
+  LISTAGEM_TORCEDORES,
   LISTAGENS,
 } from '@/lib/listagem/specs'
 
@@ -628,5 +629,35 @@ describe('snapshot da listagem (persistência)', () => {
     expect(urlTemParamContrato(new URLSearchParams('q=Ana'), contrato)).toBe(true)
     expect(urlTemParamContrato(new URLSearchParams(), contrato)).toBe(false)
     expect(urlTemParamContrato(new URLSearchParams('q='), contrato)).toBe(false)
+  })
+
+  it('aba status de Torcedores não entra no snapshot — menu abre em Todos', () => {
+    const persistivel = paramsDoContratoPersistivel(LISTAGEM_TORCEDORES)
+    expect(persistivel).not.toContain('status')
+    expect(paramsDoContrato(LISTAGEM_TORCEDORES)).toContain('status')
+
+    const snapshot = snapshotContratoListagem(
+      new URLSearchParams('status=PENDENTE&sort=nome&dir=asc'),
+      persistivel,
+    )
+    expect(snapshot.get('status')).toBeNull()
+    expect(snapshot.get('sort')).toBe('nome')
+
+    const destino = aplicarSnapshotListagem(
+      new URLSearchParams(),
+      'status=PENDENTE&sort=nome',
+      persistivel,
+    )
+    expect(destino.get('status')).toBeNull()
+    expect(destino.get('sort')).toBe('nome')
+
+    // Link/notificação com ?status= explícito não é sobrescrito pelo restore.
+    const comAba = aplicarSnapshotListagem(
+      new URLSearchParams('status=PENDENTE'),
+      'sort=nome',
+      persistivel,
+    )
+    expect(comAba.get('status')).toBe('PENDENTE')
+    expect(comAba.get('sort')).toBe('nome')
   })
 })

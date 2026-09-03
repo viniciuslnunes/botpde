@@ -1,16 +1,19 @@
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
+import { useCallback, useRef, useState, useTransition, type ReactNode } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { ChevronDown, ChevronUp, Loader2, MessageSquare, MessagesSquare, Send } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, MessageSquare, MessagesSquare, RotateCcw, Send } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   aplicarVotoPracaLocal,
   contagemExibidaVotoPraca,
   proximoVotoPraca,
+  FORUM_CORPO_MAX,
 } from '@torcida/types/portal-noticias-forum'
 import {
   comentarTopicoFeed,
+  editarRespostaForum,
+  excluirRespostaForum,
   listarRespostasTopicoFeed,
   votarTopicoFeed,
   type ForumRespostaFeedDto,
@@ -21,7 +24,20 @@ import { linkTopicoForum } from '@/lib/comunidade-social'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { Avatar } from './avatar'
+import { ComentarioMenu } from './comentario-menu'
 import { PostConteudoRich } from './post-conteudo-rich'
+import { AppButton } from '@/components/ui/button'
+import {
+  ComentarioComposerInline,
+  ComentarioRespostasBloco,
+  comentarioEstaNaThread,
+} from '@/components/portal/comentario-respostas-bloco'
+import {
+  achatarRespostasDaArvore,
+  contarRespostasNaArvore,
+  montarArvoreComentarios,
+  type NoComentario,
+} from '@/lib/comentario-thread'
 
 interface CurrentUser {
   id: string
@@ -31,6 +47,184 @@ interface CurrentUser {
 
 type VotoTopico = 1 | -1 | null
 
+const btnResponderClass =
+  'app-touch-line inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
+
+function LinhaRespostaForumFeed({
+  comentario,
+  currentUserId,
+  escopo,
+  onResponder,
+  onEditado,
+  onExcluido,
+}: {
+  comentario: ForumRespostaFeedDto
+  currentUserId: string
+  escopo: EscopoComunidade
+  onResponder: (c: ForumRespostaFeedDto) => void
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+}) {
+  const persistido = !comentario.id.startsWith('tmp-')
+  const proprio = comentario.autor.id === currentUserId
+  const autorLabel = proprio ? 'Você' : (comentario.autor.nome ?? 'Alguém')
+  const conteudo = (
+    <PostConteudoRich
+      conteudo={comentario.conteudo}
+      className="text-sm text-[rgb(var(--foreground))]"
+    />
+  )
+
+  return (
+    <div className="flex items-start gap-2.5 py-2.5">
+      <Avatar nome={comentario.autor.nome} avatarUrl={comentario.autor.avatarUrl} size="xs" />
+      <div className="min-w-0 flex-1">
+        {proprio && persistido ? (
+          <ComentarioMenu
+            comentarioId={comentario.id}
+            conteudoInicial={comentario.conteudo}
+            autorLabel={autorLabel}
+            variant="bare"
+            comMencoes={false}
+            maxLength={FORUM_CORPO_MAX}
+            editarAction={async (id, next) => {
+              const r = await editarRespostaForum(id, next, escopo)
+              if ('error' in r) throw new Error(r.error)
+              return r.conteudo
+            }}
+            excluirAction={async (id) => {
+              const r = await excluirRespostaForum(id, escopo)
+              if ('error' in r) throw new Error(r.error)
+            }}
+            onEditado={(next) => onEditado(comentario.id, next)}
+            onExcluido={() => onExcluido(comentario.id)}
+          >
+            {conteudo}
+          </ComentarioMenu>
+        ) : (
+          <>
+            <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
+            {conteudo}
+          </>
+        )}
+        {persistido ? (
+          <AppButton
+            variant="none"
+            icon={MessageSquare}
+            type="button"
+            onClick={() => onResponder(comentario)}
+            className={btnResponderClass}
+          >
+            Responder
+          </AppButton>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function LinhaTopicoForumFeed({
+  no,
+  currentUserId,
+  escopo,
+  onResponder,
+  respondendoA,
+  composer,
+  onEditado,
+  onExcluido,
+}: {
+  no: NoComentario<ForumRespostaFeedDto>
+  currentUserId: string
+  escopo: EscopoComunidade
+  onResponder: (c: ForumRespostaFeedDto) => void
+  respondendoA: string | null
+  composer: ReactNode
+  onEditado: (id: string, conteudo: string) => void
+  onExcluido: (id: string) => void
+}) {
+  const c = no.comentario
+  const persistido = !c.id.startsWith('tmp-')
+  const proprio = c.autor.id === currentUserId
+  const autorLabel = proprio ? 'Você' : (c.autor.nome ?? 'Alguém')
+  const totalRespostas = contarRespostasNaArvore(no)
+  const respostas = achatarRespostasDaArvore(no)
+  const naThread = comentarioEstaNaThread(
+    c.id,
+    respostas.map((r) => r.id),
+    respondendoA,
+  )
+  const conteudo = (
+    <PostConteudoRich conteudo={c.conteudo} className="text-sm text-[rgb(var(--foreground))]" />
+  )
+
+  return (
+    <div>
+      <m.div variants={menuItemStagger} className="flex items-start gap-2">
+        <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
+        <div className="min-w-0 flex-1">
+          {proprio && persistido ? (
+            <ComentarioMenu
+              comentarioId={c.id}
+              conteudoInicial={c.conteudo}
+              autorLabel={autorLabel}
+              comMencoes={false}
+              maxLength={FORUM_CORPO_MAX}
+              editarAction={async (id, next) => {
+                const r = await editarRespostaForum(id, next, escopo)
+                if ('error' in r) throw new Error(r.error)
+                return r.conteudo
+              }}
+              excluirAction={async (id) => {
+                const r = await excluirRespostaForum(id, escopo)
+                if ('error' in r) throw new Error(r.error)
+              }}
+              onEditado={(next) => onEditado(c.id, next)}
+              onExcluido={() => onExcluido(c.id)}
+            >
+              {conteudo}
+            </ComentarioMenu>
+          ) : (
+            <div className="rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
+              <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
+              {conteudo}
+            </div>
+          )}
+          <ComentarioRespostasBloco
+            total={totalRespostas}
+            forcarAberto={naThread}
+            acaoResponder={
+              persistido ? (
+                <AppButton
+                  variant="none"
+                  icon={MessageSquare}
+                  type="button"
+                  onClick={() => onResponder(c)}
+                  className={btnResponderClass}
+                >
+                  Responder
+                </AppButton>
+              ) : null
+            }
+            composer={composer}
+          >
+            {respostas.map((r) => (
+              <LinhaRespostaForumFeed
+                key={r.id}
+                comentario={r}
+                currentUserId={currentUserId}
+                escopo={escopo}
+                onResponder={onResponder}
+                onEditado={onEditado}
+                onExcluido={onExcluido}
+              />
+            ))}
+          </ComentarioRespostasBloco>
+        </div>
+      </m.div>
+    </div>
+  )
+}
+
 export function ForumFeedEngagement({
   topicoId,
   escopo,
@@ -39,6 +233,7 @@ export function ForumFeedEngagement({
   meuVoto,
   totalRespostas,
   currentUser,
+  publicadoEm,
 }: {
   topicoId: string
   escopo: EscopoComunidade
@@ -47,6 +242,7 @@ export function ForumFeedEngagement({
   meuVoto: VotoTopico
   totalRespostas: number
   currentUser: CurrentUser
+  publicadoEm: string
 }) {
   const [voto, setVoto] = useState<VotoTopico>(meuVoto)
   const [totalGostei, setTotalGostei] = useState(gostei)
@@ -57,6 +253,7 @@ export function ForumFeedEngagement({
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [texto, setTexto] = useState('')
+  const [respondendoA, setRespondendoA] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const operador = useModoOperador()
   const carregadasRef = useRef(false)
@@ -109,24 +306,47 @@ export function ForumFeedEngagement({
     if (next) void carregar()
   }
 
+  const arvore = montarArvoreComentarios(respostas)
+  const respondendoComentario = respondendoA
+    ? respostas.find((c) => c.id === respondendoA) ?? null
+    : null
+
+  function cancelarResposta() {
+    setRespondendoA(null)
+    setTexto('')
+  }
+
+  function iniciarResposta(alvo: ForumRespostaFeedDto) {
+    const nome = alvo.autor.nome?.trim() || 'Alguém'
+    setRespondendoA(alvo.id)
+    setTexto(`@${nome} `)
+    setAbertos(true)
+    void carregar()
+  }
+
   function enviar(e: React.FormEvent) {
     e.preventDefault()
     const conteudo = texto.trim()
     if (!conteudo || operador) return
+    const parentId = respondendoA
     const tmp: ForumRespostaFeedDto = {
       id: `tmp-${Date.now()}`,
       conteudo,
       criadoEm: new Date().toISOString(),
+      parentId,
       autor: currentUser,
     }
     setRespostas((prev) => [...prev, tmp])
     setTotalC((n) => n + 1)
     setTexto('')
+    setRespondendoA(null)
     startTransition(async () => {
-      const r = await comentarTopicoFeed(topicoId, conteudo, escopo)
+      const r = await comentarTopicoFeed(topicoId, conteudo, escopo, parentId ?? undefined)
       if ('error' in r) {
         setRespostas((prev) => prev.filter((x) => x.id !== tmp.id))
         setTotalC((n) => Math.max(0, n - 1))
+        setTexto(conteudo)
+        if (parentId) setRespondendoA(parentId)
         toast.error(r.error)
         return
       }
@@ -140,21 +360,23 @@ export function ForumFeedEngagement({
   const mostrarSecao = abertos || respostas.length > 0 || carregando
 
   return (
-    <div className="mt-1.5">
-      <AnimatePresence>
-        {totalC > 0 && (
-          <m.div
-            key="contagens"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={springSnappy}
-            className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]"
-          >
-            <span>{totalC} {totalC === 1 ? 'resposta' : 'respostas'}</span>
-          </m.div>
-        )}
-      </AnimatePresence>
+    <div className="mt-4">
+      <div className="flex items-center gap-3 pb-1 text-xs text-[rgb(var(--foreground-muted))]">
+        <AnimatePresence>
+          {totalC > 0 && (
+            <m.div
+              key="contagens"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={springSnappy}
+            >
+              <span>{totalC} {totalC === 1 ? 'resposta' : 'respostas'}</span>
+            </m.div>
+          )}
+        </AnimatePresence>
+        <time className="ml-auto shrink-0 tabular-nums">{publicadoEm}</time>
+      </div>
 
       <div className="flex items-center gap-0.5 border-t border-[rgb(var(--border))] pt-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-0.5">
@@ -256,7 +478,9 @@ export function ForumFeedEngagement({
             {!carregando && erro && respostas.length === 0 && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
                 <span>{erro}</span>
-                <button
+                <AppButton
+                  variant="none"
+                  icon={RotateCcw}
                   type="button"
                   onClick={() => {
                     carregadasRef.current = false
@@ -265,31 +489,56 @@ export function ForumFeedEngagement({
                   className="app-touch-target rounded-lg px-2 py-1 font-semibold text-[rgb(var(--color-primary))]"
                 >
                   Tentar de novo
-                </button>
+                </AppButton>
               </div>
             )}
             <m.div layout className="space-y-3">
-              {respostas.map((c, i) => (
-                <m.div
-                  key={c.id}
-                  custom={i}
-                  variants={menuItemStagger}
-                  className="flex items-start gap-2"
-                >
-                  <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
-                  <div className="min-w-0 flex-1 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
-                    <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
-                      {c.autor.id === currentUser.id ? 'Você' : (c.autor.nome ?? 'Alguém')}
-                    </p>
-                    <PostConteudoRich
-                      conteudo={c.conteudo}
-                      className="text-sm text-[rgb(var(--foreground))]"
-                    />
-                  </div>
-                </m.div>
-              ))}
+              {arvore.map((no) => {
+                const flat = achatarRespostasDaArvore(no)
+                const naThread = comentarioEstaNaThread(
+                  no.comentario.id,
+                  flat.map((r) => r.id),
+                  respondendoA,
+                )
+                return (
+                  <LinhaTopicoForumFeed
+                    key={no.comentario.id}
+                    no={no}
+                    currentUserId={currentUser.id}
+                    escopo={escopo}
+                    onResponder={iniciarResposta}
+                    respondendoA={respondendoA}
+                    onEditado={(id, conteudo) => {
+                      setRespostas((prev) =>
+                        prev.map((item) => (item.id === id ? { ...item, conteudo } : item)),
+                      )
+                    }}
+                    onExcluido={(id) => {
+                      setRespostas((prev) =>
+                        prev
+                          .filter((item) => item.id !== id)
+                          .map((item) => (item.parentId === id ? { ...item, parentId: null } : item)),
+                      )
+                      setTotalC((n) => Math.max(0, n - 1))
+                      setRespondendoA((atual) => (atual === id ? null : atual))
+                    }}
+                    composer={
+                      !operador && naThread && respondendoComentario ? (
+                        <ComentarioComposerInline
+                          valor={texto}
+                          onChange={setTexto}
+                          onSubmit={enviar}
+                          onCancelar={cancelarResposta}
+                          respondendoANome={respondendoComentario.autor.nome ?? 'Alguém'}
+                          pending={pending}
+                        />
+                      ) : null
+                    }
+                  />
+                )
+              })}
             </m.div>
-            {!operador && (
+            {!operador && !respondendoA && (
               <form onSubmit={enviar} className="flex min-w-0 items-center gap-2">
                 <input
                   ref={inputRef}

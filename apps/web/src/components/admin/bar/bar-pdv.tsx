@@ -5,7 +5,7 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import { ArrowLeft, Banknote, Beer, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard, Eye, LayoutGrid, Loader2, Minus, NotebookPen, PanelLeftClose, PanelLeftOpen, Play, Plus, QrCode, ReceiptText, RotateCcw, Save, Search, Trash2, Unlock, X } from 'lucide-react'
+import { ArrowLeft, Banknote, Beer, Check, CheckCircle2, ChevronDown, Clock, Copy, CreditCard, Eye, LayoutGrid, Loader2, Minus, NotebookPen, PanelLeftClose, PanelLeftOpen, Play, Plus, QrCode, ReceiptText, RotateCcw, Save, Trash2, Unlock, X } from 'lucide-react'
 import {
   LIMITE_COMANDA_PADRAO,
   METODO_PAGAMENTO_BAR_LABEL,
@@ -30,8 +30,11 @@ import {
   liberarLimiteComandaBar,
   removerLancamentoComandaBar,
 } from '@/app/admin/bar/comanda-actions'
+import { BarComandaScan } from '@/components/admin/bar/bar-comanda-scan'
+import { BarRetiradaScan } from '@/components/admin/bar/bar-retirada-scan'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { DatePicker } from '@/components/ui/date-picker'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { cartItemExit, springSnappy } from '@/lib/motion-presets'
@@ -1090,6 +1093,24 @@ export function BarPdv({
             </AppButton>
           </div>
         )}
+
+        {painelModo === 'comanda' && comandas.length > 0 && (
+          <div className="mt-1.5">
+            <BarComandaScan
+              idsAbertos={comandas.map((c) => c.id)}
+              onSelecionar={(id) => {
+                setComandaIdAtiva(id)
+                setErro(null)
+              }}
+            />
+          </div>
+        )}
+
+        {turnoAberto && (
+          <div className="mt-2">
+            <BarRetiradaScan />
+          </div>
+        )}
       </div>
 
       {modoComanda && comandaAtiva && (
@@ -1759,17 +1780,14 @@ export function BarPdv({
             {/* Cardápio */}
             <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
               <div className="shrink-0 space-y-3 px-4 py-3.5">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-                  <input
-                    type="search"
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    placeholder="Pesquisar produto aqui…"
-                    aria-label="Pesquisar produto"
-                    className="h-11 w-full rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] pl-10 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary)_/_0.5)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
-                  />
-                </div>
+                <SearchFilterInput
+                  value={busca}
+                  onChange={setBusca}
+                  placeholder="Pesquisar produto aqui…"
+                  ariaLabel="Pesquisar produto"
+                  exibirDropdown={false}
+                  inputClassName="h-11 rounded-2xl bg-[rgb(var(--background-subtle))] pl-10 focus:border-[rgb(var(--color-primary)_/_0.5)] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.2)]"
+                />
 
                 <div className="flex gap-2 overflow-x-auto pb-0.5">
                   <button

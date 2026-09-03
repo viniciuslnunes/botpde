@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
 import { isTenantRestrito } from './isolamento'
+import type { DonoOperacionalOption } from './evento-dono'
 
 /**
  * Ancestrais cuja Sede liberou o recurso para as unidades (loja/agenda).
@@ -173,6 +174,36 @@ export const listarEventosDaUnidade = cache(async function listarEventosDaUnidad
     local: r.local,
     rsvps: r._count.rsvps,
   }))
+})
+
+/**
+ * Departamentos do tenant (com as frentes ativas) para escolher o dono
+ * operacional do evento. Leitura barata e cacheada por request — o formulário
+ * de criar/editar é a única superfície que a consome.
+ */
+export const listarDonosOperacionais = cache(async function listarDonosOperacionais(
+  tenantId: string,
+): Promise<DonoOperacionalOption[]> {
+  const rows: Array<{
+    id: string
+    nome: string
+    slug: string
+    areas: Array<{ id: string; nome: string }>
+  }> = await db.departamento.findMany({
+    where: { tenantId },
+    orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+    select: {
+      id: true,
+      nome: true,
+      slug: true,
+      areas: {
+        where: { ativa: true },
+        orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+        select: { id: true, nome: true },
+      },
+    },
+  })
+  return rows.map((d) => ({ id: d.id, nome: d.nome, slug: d.slug, areas: d.areas }))
 })
 
 /** Label relativa para o próximo evento (Hoje / Amanhã / Em N dias). */

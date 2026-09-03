@@ -43,7 +43,7 @@ const ROTAS = [
   { nome: '21-admin-patrimonio', path: '/admin/patrimonio' },
   { nome: '22-admin-relatorios', path: '/admin/relatorios' },
   { nome: '23-admin-acessos', path: '/admin/acessos' },
-  { nome: '24-admin-loja-tickets', path: '/admin/loja/tickets' },
+  { nome: '24-admin-loja-tickets', path: '/admin/loja/atendimento?v=arquivo' },
   { nome: '25-admin-moderacao', path: '/admin/comunidade/moderacao' },
 ] as const
 

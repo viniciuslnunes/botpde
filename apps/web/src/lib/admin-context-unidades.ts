@@ -3,6 +3,12 @@ import { formatNomeTorcida } from '@torcida/types'
 import { getAncestorTenantIds, getTorcidaWorktree } from '@/lib/hierarquia'
 import type { UnidadeOpcao } from '@/lib/torcida-labels'
 
+function logoTenantRow(
+  row: { logoUrl: string | null; torcidaConhecida: { logoUrl: string | null } | null },
+): string | null {
+  return row.torcidaConhecida?.logoUrl ?? row.logoUrl
+}
+
 /**
  * Worktree da raiz organizacional do tenant ativo, com slugs para o 3º select
  * do switcher de super-admin.
@@ -13,9 +19,19 @@ export async function listarUnidadesParaSelecao(tenantId: string): Promise<Unida
   const worktree = await getTorcidaWorktree(rootTenantId)
 
   if (worktree.length === 0) {
-    const root: { slug: string; nome: string } | null = await db.tenant.findUnique({
+    const root: {
+      slug: string
+      nome: string
+      logoUrl: string | null
+      torcidaConhecida: { logoUrl: string | null } | null
+    } | null = await db.tenant.findUnique({
       where: { id: rootTenantId },
-      select: { slug: true, nome: true },
+      select: {
+        slug: true,
+        nome: true,
+        logoUrl: true,
+        torcidaConhecida: { select: { logoUrl: true } },
+      },
     })
     if (!root) return []
     return [
@@ -29,21 +45,55 @@ export async function listarUnidadesParaSelecao(tenantId: string): Promise<Unida
         cidade: null,
         depth: 0,
         origem: 'tenant',
+        logoUrl: logoTenantRow(root),
       },
     ]
   }
 
   const tenantIds = Array.from(new Set(worktree.map((n) => n.tenantId)))
-  const tenants: { id: string; slug: string }[] = await db.tenant.findMany({
-    where: { id: { in: tenantIds } },
-    select: { id: true, slug: true },
-  })
+  const sedeIds = Array.from(
+    new Set(worktree.map((n) => n.sedeId).filter((id): id is string => Boolean(id))),
+  )
+
+  const [tenants, sedes]: [
+    Array<{
+      id: string
+      slug: string
+      logoUrl: string | null
+      torcidaConhecida: { logoUrl: string | null } | null
+    }>,
+    Array<{ id: string; fotoUrl: string | null }>,
+  ] = await Promise.all([
+    db.tenant.findMany({
+      where: { id: { in: tenantIds } },
+      select: {
+        id: true,
+        slug: true,
+        logoUrl: true,
+        torcidaConhecida: { select: { logoUrl: true } },
+      },
+    }),
+    sedeIds.length > 0
+      ? db.sede.findMany({
+          where: { id: { in: sedeIds } },
+          select: { id: true, fotoUrl: true },
+        })
+      : Promise.resolve([]),
+  ])
+
   const slugPorId = new Map(tenants.map((t) => [t.id, t.slug]))
+  const logoTenantPorId = new Map(tenants.map((t) => [t.id, logoTenantRow(t)]))
+  const fotoSedePorId = new Map(sedes.map((s) => [s.id, s.fotoUrl]))
 
   const opcoes: UnidadeOpcao[] = []
   for (const n of worktree) {
     const slug = slugPorId.get(n.tenantId)
     if (!slug) continue
+    const logoTenant = logoTenantPorId.get(n.tenantId) ?? null
+    const logoUrl =
+      n.origem === 'sede' && n.sedeId
+        ? (fotoSedePorId.get(n.sedeId) ?? logoTenant)
+        : logoTenant
     opcoes.push({
       id: n.key,
       sedeId: n.sedeId,
@@ -55,6 +105,7 @@ export async function listarUnidadesParaSelecao(tenantId: string): Promise<Unida
       cidade: n.cidade,
       depth: n.depth,
       origem: n.origem,
+      logoUrl,
     })
   }
   return opcoes

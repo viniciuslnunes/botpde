@@ -26,6 +26,8 @@ import {
   Siren,
   Megaphone,
   Newspaper,
+  IdCard,
+  Building2,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -35,6 +37,8 @@ import {
   ARTIGO_TITULO_MAX,
   ARTIGO_CORPO_MAX,
   tituloDeConteudoForum,
+  labelComunicadoAudiencia,
+  type ComunicadoAudiencia,
 } from '@torcida/types'
 import {
   publicarPost,
@@ -78,6 +82,7 @@ import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib
 import { useUnsavedChanges, useOptionalUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { useConfirmDialog } from '@/lib/confirm-action'
 import { useMediaQuery } from '@/lib/use-media-query'
+import { AppButton } from '@/components/ui/button'
 
 const INITIAL_STATE: PublicarPostState = {}
 const INITIAL_COMUNICADO_STATE: ComunicadoComposerState = {}
@@ -87,6 +92,7 @@ const MAX_IMG_MB = 10
 const MAX_VIDEO_MB = 100
 
 type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+type AudienciaEscopo = ComunicadoAudiencia['escopo']
 
 const PRIORIDADE_OPCOES: Array<{
   value: Prioridade
@@ -97,6 +103,19 @@ const PRIORIDADE_OPCOES: Array<{
   { value: 'NORMAL', label: 'Normal', descricao: 'Aviso do dia a dia', Icon: Info },
   { value: 'IMPORTANTE', label: 'Importante', descricao: 'Merece destaque', Icon: AlertTriangle },
   { value: 'URGENTE', label: 'Urgente', descricao: 'Notifica a torcida na hora', Icon: Siren },
+]
+
+const AUDIENCIA_OPCOES: Array<{
+  value: AudienciaEscopo
+  label: string
+  descricao: string
+  Icon: LucideIcon
+}> = [
+  { value: 'TODOS', label: 'Todos os membros', descricao: 'Fan-out para a torcida inteira', Icon: Users },
+  { value: 'SOCIOS', label: 'Só sócios', descricao: 'Quem tem vínculo de associado', Icon: IdCard },
+  { value: 'TORCEDORES', label: 'Só torcedores', descricao: 'Sem carteirinha de sócio', Icon: Globe2 },
+  { value: 'ADIMPLENTES', label: 'Só adimplentes', descricao: 'Sócios em dia com a contribuição', Icon: Check },
+  { value: 'DEPARTAMENTO', label: 'Um departamento', descricao: 'Membros da área escolhida', Icon: Building2 },
 ]
 
 type VisibilidadePost = 'PUBLICO' | 'TENANT' | 'PRIVADO'
@@ -203,6 +222,8 @@ interface FeedComposerProps {
    * em vez de publicar um novo). Mutuamente exclusivo com `canal` / `nacional`.
    */
   comunicado?: boolean | ComunicadoEdicaoAlvo
+  /** Departamentos do tenant — necessário para audiência segmentada em comunicados. */
+  departamentosComunicado?: Array<{ id: string; nome: string }>
 }
 
 export function FeedComposer({
@@ -223,6 +244,7 @@ export function FeedComposer({
   autorBadges,
   comunicado = false,
   noticia,
+  departamentosComunicado = [],
 }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
@@ -250,6 +272,7 @@ export function FeedComposer({
       autorBadges={autorBadges}
       comunicado={comunicado}
       noticia={noticia}
+      departamentosComunicado={departamentosComunicado}
     />
   )
 }
@@ -271,6 +294,7 @@ function FeedComposerActive({
   autorBadges,
   comunicado = false,
   noticia,
+  departamentosComunicado = [],
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const router = useRouter()
   const optimisticIdRef = useRef<string | null>(null)
@@ -493,6 +517,7 @@ function FeedComposerActive({
       forumFilaAprovacao={forumFilaAprovacao}
       comunicado={comunicado}
       noticia={noticia}
+      departamentosComunicado={departamentosComunicado}
       onPrependOtimista={registrarPrependOtimista}
       serverError={
         state.message ??
@@ -608,6 +633,7 @@ function ComposerBody({
   forumFilaAprovacao = false,
   comunicado = false,
   noticia,
+  departamentosComunicado = [],
   onPrependOtimista,
 }: {
   userId: string
@@ -641,6 +667,7 @@ function ComposerBody({
   forumFilaAprovacao?: boolean
   comunicado?: boolean | ComunicadoEdicaoAlvo
   noticia?: EscopoComunidade
+  departamentosComunicado?: Array<{ id: string; nome: string }>
   onPrependOtimista: (opts: {
     conteudo: string
     midiaUrls: string[]
@@ -667,6 +694,11 @@ function ComposerBody({
   const [texto, setTexto] = useState(comunicadoEdicao?.corpo ?? '')
   const [titulo, setTitulo] = useState(comunicadoEdicao?.titulo ?? '')
   const [prioridade, setPrioridade] = useState<Prioridade>(comunicadoEdicao?.prioridade ?? 'NORMAL')
+  const [audienciaEscopo, setAudienciaEscopo] = useState<AudienciaEscopo>('TODOS')
+  const [audienciaDepartamentoId, setAudienciaDepartamentoId] = useState(
+    () => departamentosComunicado[0]?.id ?? '',
+  )
+  const [audienciaOpen, setAudienciaOpen] = useState(false)
   const [mencoes, setMencoes] = useState<MencaoParsed[]>([])
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
@@ -697,6 +729,7 @@ function ComposerBody({
   const stickerDesktopRef = useRef<HTMLDivElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
   const alcanceRef = useRef<HTMLDivElement>(null)
+  const audienciaRef = useRef<HTMLDivElement>(null)
   // O gatilho "+" só existe abaixo de `sm` (o container é `sm:hidden`). Antes
   // isso era medido lendo o DOM no render (`getClientRects()` da ref), que é
   // acesso a ref durante o render e ainda erra no primeiro paint. A condição
@@ -772,8 +805,21 @@ function ComposerBody({
     PRIORIDADE_OPCOES.find((opcao) => opcao.value === prioridade) ?? PRIORIDADE_OPCOES[0]!
   const PrioridadeIcon = opcaoPrioridadeAtual.Icon
 
+  const audienciaAtual: ComunicadoAudiencia =
+    audienciaEscopo === 'DEPARTAMENTO' && audienciaDepartamentoId
+      ? { escopo: 'DEPARTAMENTO', departamentoId: audienciaDepartamentoId }
+      : { escopo: audienciaEscopo }
+  const opcaoAudienciaAtual =
+    AUDIENCIA_OPCOES.find((opcao) => opcao.value === audienciaEscopo) ?? AUDIENCIA_OPCOES[0]!
+  const AudienciaIcon = opcaoAudienciaAtual.Icon
+  const audienciaLabel =
+    audienciaEscopo === 'DEPARTAMENTO' && audienciaDepartamentoId
+      ? departamentosComunicado.find((d) => d.id === audienciaDepartamentoId)?.nome ??
+        labelComunicadoAudiencia(audienciaAtual)
+      : labelComunicadoAudiencia(audienciaAtual)
+
   const popoverAberto =
-    alcanceOpen || emojiOpen || stickerOpen || extrasOpen || mencaoQuery !== null
+    alcanceOpen || audienciaOpen || emojiOpen || stickerOpen || extrasOpen || mencaoQuery !== null
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -872,6 +918,11 @@ function ComposerBody({
     if (comunicado) {
       fd.set('titulo', titulo.trim())
       fd.set('prioridade', prioridade)
+      const audiencia: ComunicadoAudiencia =
+        audienciaEscopo === 'DEPARTAMENTO' && audienciaDepartamentoId
+          ? { escopo: 'DEPARTAMENTO', departamentoId: audienciaDepartamentoId }
+          : { escopo: audienciaEscopo }
+      fd.set('audiencia', JSON.stringify(audiencia))
       startTransition(() => {
         comunicadoAction(fd)
       })
@@ -933,6 +984,7 @@ function ComposerBody({
         target instanceof Element && Boolean(target.closest('[data-anchored-popover]'))
       if (!extrasRef.current?.contains(target) && !inPortal) setExtrasOpen(false)
       if (!alcanceRef.current?.contains(target) && !inPortal) setAlcanceOpen(false)
+      if (!audienciaRef.current?.contains(target) && !inPortal) setAudienciaOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -1261,13 +1313,15 @@ function ComposerBody({
             />
           ))}
           {opcoes.length < 6 && (
-            <button
+            <AppButton
+              variant="none"
+              icon={Plus}
               type="button"
               onClick={() => setOpcoes((prev) => [...prev, ''])}
               className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               + Adicionar opção
-            </button>
+            </AppButton>
           )}
             </div>
           </m.div>
@@ -1710,6 +1764,129 @@ function ComposerBody({
 
             <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
               {comunicado ? (
+                <>
+                <div ref={audienciaRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAudienciaOpen((v) => !v)
+                      setAlcanceOpen(false)
+                      setExtrasOpen(false)
+                      setEmojiOpen(false)
+                      setStickerOpen(false)
+                    }}
+                    aria-label="Audiência do comunicado"
+                    aria-expanded={audienciaOpen}
+                    aria-haspopup="listbox"
+                    className={[
+                      'inline-flex h-9 max-w-[13rem] items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-2.5 pr-2 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color]',
+                      'hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)]',
+                      audienciaOpen ? 'border-[rgb(var(--color-primary))] ring-2 ring-[rgb(var(--color-primary)_/_0.25)]' : '',
+                    ].join(' ')}
+                  >
+                    <AudienciaIcon
+                      aria-hidden
+                      className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                    />
+                    <span className="min-w-0 truncate">{audienciaLabel}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className={[
+                        'h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform',
+                        audienciaOpen ? 'rotate-180' : '',
+                      ].join(' ')}
+                    />
+                  </button>
+                  <AnimatePresence>
+                    {audienciaOpen && (
+                      <AnchoredPopover
+                        open
+                        anchorRef={audienciaRef}
+                        placement="bottom-end"
+                        offset={8}
+                        minWidth={248}
+                        zIndex={60}
+                      >
+                        <m.div
+                          key="audiencia-menu"
+                          role="listbox"
+                          aria-label="Audiência do comunicado"
+                          variants={popoverPanel}
+                          initial="hidden"
+                          animate="show"
+                          exit="exit"
+                          transition={springGentle}
+                          className="card-soft min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                        >
+                          {AUDIENCIA_OPCOES.map((opcao, index) => {
+                            const selecionada = opcao.value === audienciaEscopo
+                            const Icon = opcao.Icon
+                            return (
+                              <m.button
+                                key={opcao.value}
+                                type="button"
+                                role="option"
+                                aria-selected={selecionada}
+                                custom={index}
+                                variants={menuItemStagger}
+                                initial="hidden"
+                                animate="show"
+                                onClick={() => {
+                                  setAudienciaEscopo(opcao.value)
+                                  if (opcao.value !== 'DEPARTAMENTO') setAudienciaOpen(false)
+                                }}
+                                className={[
+                                  'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                                  selecionada ? 'bg-[rgb(var(--color-primary)_/_0.08)]' : '',
+                                ].join(' ')}
+                              >
+                                <Icon
+                                  aria-hidden
+                                  className={[
+                                    'mt-0.5 h-4 w-4 shrink-0',
+                                    selecionada
+                                      ? 'text-[rgb(var(--color-primary-fg))]'
+                                      : 'text-[rgb(var(--foreground-muted))]',
+                                  ].join(' ')}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-sm font-medium">{opcao.label}</span>
+                                  <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                                    {opcao.descricao}
+                                  </span>
+                                </span>
+                                {selecionada ? (
+                                  <Check
+                                    aria-hidden
+                                    className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                                  />
+                                ) : null}
+                              </m.button>
+                            )
+                          })}
+                          {audienciaEscopo === 'DEPARTAMENTO' && departamentosComunicado.length > 0 ? (
+                            <div className="border-t border-[rgb(var(--border))] px-3 py-2">
+                              <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                                Departamento
+                                <select
+                                  value={audienciaDepartamentoId}
+                                  onChange={(e) => setAudienciaDepartamentoId(e.target.value)}
+                                  className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-2 text-sm"
+                                >
+                                  {departamentosComunicado.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.nome}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          ) : null}
+                        </m.div>
+                      </AnchoredPopover>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <div ref={alcanceRef} className="relative">
                   <button
                     type="button"
@@ -1822,6 +1999,7 @@ function ComposerBody({
                     )}
                   </AnimatePresence>
                 </div>
+                </>
               ) : canal ? (
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para membros do canal
@@ -1957,13 +2135,15 @@ function ComposerBody({
                   </AnimatePresence>
                 </div>
               )}
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={() => void handleCancelar()}
                 className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
               >
                 Cancelar
-              </button>
+              </AppButton>
               <button
                 type="submit"
                 disabled={!podePublicar}

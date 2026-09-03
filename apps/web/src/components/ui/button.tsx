@@ -1,7 +1,18 @@
 import Link from 'next/link'
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { ComponentPropsWithoutRef, ComponentType, ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
+
+/**
+ * Ícone do botão. Aceita `LucideIcon` (o caso normal) **e** componente de
+ * ícone escrito à mão — as marcas de terceiros (Discord, Google no `/entrar`)
+ * e os ícones próprios do produto não vêm do lucide, e tipar como `LucideIcon`
+ * deixava `() => JSX.Element` de fora. Props opcionais porque um ícone local
+ * pode ignorá-las.
+ */
+export type AppButtonIcon = ComponentType<{
+  className?: string
+  'aria-hidden'?: boolean
+}>
 
 /**
  * Botão de ação do produto — UPPERCASE + ícone à esquerda.
@@ -90,9 +101,9 @@ type PropsBase = {
 type PropsComRotulo = PropsBase & {
   children: ReactNode
   /** Ícone lucide da ação — Plus para criar, Trash2 para excluir, etc. */
-  icon: LucideIcon
+  icon: AppButtonIcon
   /** Ícone à direita, para avanço/afordância (ChevronRight, ExternalLink). */
-  iconRight?: LucideIcon
+  iconRight?: AppButtonIcon
   iconOnly?: never
   'aria-label'?: string
 }
@@ -100,7 +111,7 @@ type PropsComRotulo = PropsBase & {
 /** Botão de ícone puro: sem rótulo, então exige `aria-label`. */
 type PropsIconeOnly = PropsBase & {
   children?: never
-  icon: LucideIcon
+  icon: AppButtonIcon
   iconRight?: never
   iconOnly: true
   'aria-label': string
@@ -118,8 +129,8 @@ export type AppButtonProps = (PropsComRotulo | PropsIconeOnly) &
 */
 type PropsNormalizadas = PropsBase & {
   children?: ReactNode
-  icon: LucideIcon
-  iconRight?: LucideIcon
+  icon: AppButtonIcon
+  iconRight?: AppButtonIcon
   iconOnly?: boolean
 }
 
@@ -130,6 +141,10 @@ function montarClasses(p: PropsBase & { iconOnly?: boolean }, extra?: string): s
   const legado = p.variant === 'none'
   return [
     'app-btn app-action',
+    // Utilitario explicito: garante uppercase mesmo se `@layer components`
+    // perder na cascata contra classes do call-site. Quem escapa e
+    // `textoOriginal` (nome de socio, titulo vindo do banco).
+    p.textoOriginal ? 'normal-case tracking-normal' : 'uppercase [letter-spacing:0.04em]',
     legado ? '' : CLASSE_TAMANHO[p.size ?? 'md'],
     CLASSE_VARIANTE[p.variant ?? 'primary'],
     // Ícone puro não tem rótulo para respirar: vira quadrado e perde o

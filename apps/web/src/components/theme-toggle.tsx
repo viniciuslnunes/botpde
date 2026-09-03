@@ -22,8 +22,8 @@ export function ThemeToggle({ variant = 'icon' }: ThemeToggleProps) {
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         className={
           variant === 'dropdown'
-            ? 'app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
-            : 'app-action flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
+            ? 'app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
+            : 'app-nav-link app-action flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
         }
       >
         <Icon className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />

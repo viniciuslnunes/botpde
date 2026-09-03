@@ -69,7 +69,7 @@ export function SuperAdminNav({
             href={href}
             onClick={onNavigate}
             className={[
-              'app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+              'app-nav-link app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm normal-case tracking-normal transition-colors',
               active
                 ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                 : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',

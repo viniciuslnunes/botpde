@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, ArchiveRestore, Loader2, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Loader2, Trash2, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { alternarSituacaoClubeAction, excluirClubeAction } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 interface Props {
   clubeId: string
@@ -76,7 +77,9 @@ export function ClubeSituacaoAcoes({ clubeId, nome, ativo, podeExcluir, motivoBl
       </button>
 
       {!confirmando ? (
-        <button
+        <AppButton
+          variant="none"
+          icon={Trash2}
           type="button"
           onClick={() => setConfirmando(true)}
           disabled={!podeExcluir || pendente}
@@ -87,9 +90,8 @@ export function ClubeSituacaoAcoes({ clubeId, nome, ativo, podeExcluir, motivoBl
           }
           className={`${BOTAO} border-[rgb(var(--color-danger)_/_0.4)] text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.08)]`}
         >
-          <Trash2 className="h-4 w-4" aria-hidden />
           Excluir
-        </button>
+        </AppButton>
       ) : (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[rgb(var(--color-danger)_/_0.4)] bg-[rgb(var(--color-danger)_/_0.06)] p-2">
           <label className="text-xs text-[rgb(var(--color-danger-fg))]">
@@ -101,16 +103,20 @@ export function ClubeSituacaoAcoes({ clubeId, nome, ativo, podeExcluir, motivoBl
               autoFocus
             />
           </label>
-          <button
+          <AppButton
+            variant="none"
+            icon={Trash2}
+            loading={pendente}
             type="button"
             onClick={excluir}
             disabled={pendente || confirmacao.trim().toLowerCase() !== nome.trim().toLowerCase()}
             className={`${BOTAO} border-transparent bg-[rgb(var(--color-danger))] text-white hover:opacity-90`}
           >
-            {pendente ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             Excluir definitivamente
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={() => {
               setConfirmando(false)
@@ -119,7 +125,7 @@ export function ClubeSituacaoAcoes({ clubeId, nome, ativo, podeExcluir, motivoBl
             className={`${BOTAO} text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]`}
           >
             Cancelar
-          </button>
+          </AppButton>
         </div>
       )}
     </div>

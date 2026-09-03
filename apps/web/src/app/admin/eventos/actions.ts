@@ -1,6 +1,7 @@
 'use server'
 
 import { randomUUID } from 'crypto'
+import { z } from 'zod'
 import { db } from '@torcida/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -11,7 +12,14 @@ import {
   temValorVaga,
   deveBloquearCheckInSemPagamento,
 } from '@torcida/types'
+import type { TrechoEmbarque } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
+import {
+  contarEmbarquePorTrecho,
+  gravarCheckinEmbarque,
+  resolverTrechoParaRegistro,
+} from '@/lib/embarque'
+import { montarQrEmbarque } from '@/lib/embarque-qr'
 import { listarOcorrenciasFuturasSerie, parseEscopoSerie } from '@/lib/eventos-serie'
 import { resolvePartidaIdFromForm } from '@/app/admin/partidas/actions'
 import { carregarCobrancasVagaEvento } from '@/lib/eventos-tipo'
@@ -19,6 +27,8 @@ import { notificarInscritosEvento, notificarCheckInEvento } from '@/lib/eventos-
 import { linksEventoParaReconciliar } from '@/lib/eventos-admin-href'
 import { reconciliarNotificacoesDoEvento } from '@/lib/notificacoes'
 import { registrarSinalConfiancaSafe } from '@/lib/confianca'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
+import { parseDonoValor, type DonoOperacional } from '@/lib/evento-dono'
 
 export type EventoState = {
   ok?: boolean
@@ -26,7 +36,8 @@ export type EventoState = {
   message?: string
 }
 
-function revalidateEventoPaths(eventoId?: string, tipo?: string) {
+function revalidateEventoPaths(tenantId: string, eventoId?: string, tipo?: string) {
+  revalidateDirecao(tenantId)
   revalidatePath('/admin/eventos')
   revalidatePath('/portal/eventos')
   revalidatePath('/portal/caravanas')
@@ -40,6 +51,15 @@ function revalidateEventoPaths(eventoId?: string, tipo?: string) {
   }
   if (tipo === 'CARAVANA') revalidatePath('/portal/departamentos/caravanas')
   if (tipo === 'ENSAIO') revalidatePath('/portal/departamentos/bateria')
+}
+
+/**
+ * Posto de comando de quem depende deste evento (Caravanas, Bateria, Social…)
+ * conta pendências em cache curto — sem isto, criar/mexer num evento só
+ * aparece no hub vizinho depois do TTL.
+ */
+function revalidateDirecao(tenantId: string) {
+  invalidateAdminDirecao(tenantId)
 }
 
 function formToEvento(formData: FormData) {
@@ -58,6 +78,8 @@ function formToEvento(formData: FormData) {
     recorrenciasSemanas: formData.get('recorrenciasSemanas') || 0,
     partidaId: formData.get('partidaId') || null,
     projetoId: formData.get('projetoId') || undefined,
+    donoOperacional: formData.get('donoOperacional') || undefined,
+    departamentoSlug: formData.get('departamentoSlug') || undefined,
     checkInExigePagamento: formData.get('checkInExigePagamento'),
   }
 }
@@ -69,14 +91,76 @@ function formToEvento(formData: FormData) {
 async function resolverProjetoEvento(
   tenantId: string,
   projetoId: string | undefined,
-): Promise<{ projetoId: string | null } | { erro: string }> {
-  if (!projetoId) return { projetoId: null }
-  const projeto: { id: string } | null = await db.projeto.findFirst({
-    where: { id: projetoId, tenantId },
+): Promise<
+  | { projetoId: string | null; departamentoId: string | null; areaId: string | null }
+  | { erro: string }
+> {
+  if (!projetoId) return { projetoId: null, departamentoId: null, areaId: null }
+  const projeto: { id: string; departamentoId: string; areaId: string | null } | null =
+    await db.projeto.findFirst({
+      where: { id: projetoId, tenantId },
+      select: { id: true, departamentoId: true, areaId: true },
+    })
+  if (!projeto) return { erro: 'Projeto não encontrado nesta torcida' }
+  return {
+    projetoId: projeto.id,
+    departamentoId: projeto.departamentoId,
+    areaId: projeto.areaId,
+  }
+}
+
+/**
+ * Dono operacional do evento, na ordem em que a informação é mais confiável:
+ * escolha explícita no formulário → hub thin de onde a criação partiu →
+ * herança do projeto. Sem nada disso, o evento é da torcida (nulo).
+ *
+ * Valida contra o tenant como `resolverProjetoEvento`: departamento tem de ser
+ * daqui, e a área tem de ser daquele departamento — senão a frente de um
+ * departamento apareceria pendurada em outro.
+ */
+async function resolverDonoEvento(
+  tenantId: string,
+  input: {
+    donoOperacional?: string
+    departamentoSlug?: string
+    heranca: { departamentoId: string | null; areaId: string | null }
+  },
+): Promise<DonoOperacional | { erro: string }> {
+  const escolhido = parseDonoValor(input.donoOperacional)
+
+  let departamentoId = escolhido.departamentoId
+  let areaId = escolhido.areaId
+
+  if (!departamentoId && input.departamentoSlug) {
+    const doHub: { id: string } | null = await db.departamento.findFirst({
+      where: { tenantId, slug: input.departamentoSlug },
+      select: { id: true },
+    })
+    if (doHub) departamentoId = doHub.id
+  }
+
+  if (!departamentoId) {
+    departamentoId = input.heranca.departamentoId
+    areaId = input.heranca.areaId
+  }
+
+  if (!departamentoId) return { departamentoId: null, areaId: null }
+
+  const depto: { id: string } | null = await db.departamento.findFirst({
+    where: { id: departamentoId, tenantId },
     select: { id: true },
   })
-  if (!projeto) return { erro: 'Projeto não encontrado nesta torcida' }
-  return { projetoId: projeto.id }
+  if (!depto) return { erro: 'Departamento não encontrado nesta torcida' }
+
+  if (areaId) {
+    const area: { id: string } | null = await db.departamentoArea.findFirst({
+      where: { id: areaId, tenantId, departamentoId: depto.id },
+      select: { id: true },
+    })
+    if (!area) return { erro: 'Área não pertence a este departamento' }
+  }
+
+  return { departamentoId: depto.id, areaId: areaId ?? null }
 }
 
 export async function criarEvento(
@@ -107,6 +191,8 @@ export async function criarEvento(
     lng,
     recorrenciasSemanas,
     projetoId: projetoIdRaw,
+    donoOperacional,
+    departamentoSlug,
     checkInExigePagamento,
   } = parsed.data
   const dataComp = new Date(data)
@@ -125,6 +211,14 @@ export async function criarEvento(
   const projetoRes = await resolverProjetoEvento(tenant.id, projetoIdRaw)
   if ('erro' in projetoRes) return { errors: { projetoId: [projetoRes.erro] } }
   const projetoId = projetoRes.projetoId
+
+  const donoRes = await resolverDonoEvento(tenant.id, {
+    donoOperacional,
+    departamentoSlug,
+    heranca: { departamentoId: projetoRes.departamentoId, areaId: projetoRes.areaId },
+  })
+  if ('erro' in donoRes) return { errors: { donoOperacional: [donoRes.erro] } }
+  const { departamentoId, areaId } = donoRes
 
   const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
   if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
@@ -154,6 +248,8 @@ export async function criarEvento(
     serieId,
     partidaId,
     projetoId,
+    departamentoId,
+    areaId,
     valorVaga: valorVagaFinal,
     checkInExigePagamento:
       tipo === 'CARAVANA' && valorVagaFinal != null && Boolean(checkInExigePagamento),
@@ -180,6 +276,8 @@ export async function criarEvento(
           serieId,
           partidaId,
           projetoId,
+          departamentoId,
+          areaId,
           serie: serieId ? { indice: criados.length, total: datas.length } : null,
         },
       },
@@ -187,7 +285,7 @@ export async function criarEvento(
   }
 
   const primeiro = criados[0]!
-  revalidateEventoPaths(primeiro.id, primeiro.tipo)
+  revalidateEventoPaths(tenant.id, primeiro.id, primeiro.tipo)
   const redirectTo = formData.get('redirectTo')
   if (typeof redirectTo === 'string' && redirectTo.startsWith('/admin')) {
     redirect(`/admin/eventos/${primeiro.id}`)
@@ -207,8 +305,23 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade, lat, lng, projetoId: projetoIdRaw, checkInExigePagamento } =
-    parsed.data
+  const {
+    titulo,
+    descricao,
+    data,
+    local,
+    fotoUrl,
+    tipo,
+    valorVaga,
+    sedeId,
+    capacidade,
+    lat,
+    lng,
+    projetoId: projetoIdRaw,
+    donoOperacional,
+    departamentoSlug,
+    checkInExigePagamento,
+  } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -242,6 +355,14 @@ export async function editarEvento(
   if ('erro' in projetoRes) return { errors: { projetoId: [projetoRes.erro] } }
   const projetoId = projetoRes.projetoId
 
+  const donoRes = await resolverDonoEvento(tenant.id, {
+    donoOperacional,
+    departamentoSlug,
+    heranca: { departamentoId: projetoRes.departamentoId, areaId: projetoRes.areaId },
+  })
+  if ('erro' in donoRes) return { errors: { donoOperacional: [donoRes.erro] } }
+  const { departamentoId, areaId } = donoRes
+
   const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
   if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
   const partidaId = partidaRes.partidaId
@@ -260,6 +381,8 @@ export async function editarEvento(
     lng: lng ?? null,
     partidaId,
     projetoId,
+    departamentoId,
+    areaId,
     valorVaga: valorVagaFinal,
     checkInExigePagamento:
       tipo === 'CARAVANA' && valorVagaFinal != null && Boolean(checkInExigePagamento),
@@ -306,6 +429,8 @@ export async function editarEvento(
         serieId: existing.serieId,
         partidaId,
         projetoId,
+        departamentoId,
+        areaId,
         afetados,
       },
     },
@@ -330,7 +455,7 @@ export async function editarEvento(
   }
 
   const redirectTo = formData.get('redirectTo')
-  revalidateEventoPaths(eventoId, tipo)
+  revalidateEventoPaths(tenant.id, eventoId, tipo)
   if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
     redirect(redirectTo)
   }
@@ -355,6 +480,7 @@ export async function registrarCheckIn(
     titulo: string
     valorVaga: { toNumber(): number } | number | null
     checkInExigePagamento: boolean
+    embarqueTrechoAtivo: TrechoEmbarque | null
   } | null = await db.evento.findUnique({
     where: { id: eventoId },
     select: {
@@ -363,9 +489,12 @@ export async function registrarCheckIn(
       titulo: true,
       valorVaga: true,
       checkInExigePagamento: true,
+      embarqueTrechoAtivo: true,
     },
   })
   if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado.')
+
+  const { trecho, materializaPresenca } = resolverTrechoParaRegistro(evento.embarqueTrechoAtivo)
 
   const valorVagaNum =
     evento.valorVaga == null
@@ -412,15 +541,26 @@ export async function registrarCheckIn(
 
   const rsvpCheckin: { id: string } = await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId } },
-    update: { checkedInAt: new Date(), checkedInPorId: session.user.id },
+    update: materializaPresenca
+      ? { checkedInAt: new Date(), checkedInPorId: session.user.id }
+      : {},
     create: {
       eventoId,
       userId,
       status: 'CONFIRMADO',
-      checkedInAt: new Date(),
-      checkedInPorId: session.user.id,
+      checkedInAt: materializaPresenca ? new Date() : null,
+      checkedInPorId: materializaPresenca ? session.user.id : null,
     },
     select: { id: true },
+  })
+
+  await gravarCheckinEmbarque({
+    eventoId,
+    userId,
+    trecho,
+    metodo: 'MANUAL',
+    registradoPorId: session.user.id,
+    override: Boolean(opts?.override),
   })
 
   await db.auditLog.create({
@@ -432,6 +572,7 @@ export async function registrarCheckIn(
       entidadeId: eventoId,
       detalhes: {
         userId,
+        trecho,
         pagamentoStatus,
         aviso: aviso ?? null,
         override: Boolean(opts?.override),
@@ -439,13 +580,17 @@ export async function registrarCheckIn(
     },
   })
 
-  registrarSinalConfiancaSafe({
-    userId,
-    tenantId: tenant.id,
-    sinal: 'CHECKIN',
-    origemId: rsvpCheckin.id,
-  })
-  if (!jaEmbarcado) {
+  // Confiança e notificação seguem colados na IDA: a volta é o mesmo
+  // comparecimento, contá-la de novo pagaria duas vezes pelo mesmo jogo.
+  if (materializaPresenca) {
+    registrarSinalConfiancaSafe({
+      userId,
+      tenantId: tenant.id,
+      sinal: 'CHECKIN',
+      origemId: rsvpCheckin.id,
+    })
+  }
+  if (!jaEmbarcado && materializaPresenca) {
     await notificarCheckInEvento({
       tenantId: tenant.id,
       eventoId,
@@ -455,7 +600,7 @@ export async function registrarCheckIn(
     })
   }
 
-  revalidateEventoPaths(eventoId, evento.tipo)
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
   return aviso ? { ok: true, aviso } : { ok: true }
 }
 
@@ -497,6 +642,7 @@ export async function registrarCheckInPorQr(
     titulo: string
     valorVaga: { toNumber(): number } | number | null
     checkInExigePagamento: boolean
+    embarqueTrechoAtivo: TrechoEmbarque | null
   } | null = await db.evento.findUnique({
     where: { id: eventoId },
     select: {
@@ -505,11 +651,14 @@ export async function registrarCheckInPorQr(
       titulo: true,
       valorVaga: true,
       checkInExigePagamento: true,
+      embarqueTrechoAtivo: true,
     },
   })
   if (!evento || evento.tenantId !== tenant.id) {
     return { ok: false, error: 'Evento não encontrado' }
   }
+
+  const { trecho, materializaPresenca } = resolverTrechoParaRegistro(evento.embarqueTrechoAtivo)
 
   const valorVagaNum =
     evento.valorVaga == null
@@ -552,15 +701,25 @@ export async function registrarCheckInPorQr(
 
   const rsvpQrRow: { id: string } = await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId: socio.userId } },
-    update: { checkedInAt: new Date(), checkedInPorId: session.user.id, status: 'CONFIRMADO' },
+    update: materializaPresenca
+      ? { checkedInAt: new Date(), checkedInPorId: session.user.id, status: 'CONFIRMADO' }
+      : { status: 'CONFIRMADO' },
     create: {
       eventoId,
       userId: socio.userId,
       status: 'CONFIRMADO',
-      checkedInAt: new Date(),
-      checkedInPorId: session.user.id,
+      checkedInAt: materializaPresenca ? new Date() : null,
+      checkedInPorId: materializaPresenca ? session.user.id : null,
     },
     select: { id: true },
+  })
+
+  await gravarCheckinEmbarque({
+    eventoId,
+    userId: socio.userId,
+    trecho,
+    metodo: 'QR_CARTEIRINHA',
+    registradoPorId: session.user.id,
   })
 
   await db.auditLog.create({
@@ -573,19 +732,22 @@ export async function registrarCheckInPorQr(
       detalhes: {
         userId: socio.userId,
         nome: socio.nome,
+        trecho,
         pagamentoStatus,
         aviso: aviso ?? null,
       },
     },
   })
 
-  registrarSinalConfiancaSafe({
-    userId: socio.userId,
-    tenantId: tenant.id,
-    sinal: 'CHECKIN',
-    origemId: rsvpQrRow.id,
-  })
-  if (!jaEmbarcadoQr) {
+  if (materializaPresenca) {
+    registrarSinalConfiancaSafe({
+      userId: socio.userId,
+      tenantId: tenant.id,
+      sinal: 'CHECKIN',
+      origemId: rsvpQrRow.id,
+    })
+  }
+  if (!jaEmbarcadoQr && materializaPresenca) {
     await notificarCheckInEvento({
       tenantId: tenant.id,
       eventoId,
@@ -595,8 +757,151 @@ export async function registrarCheckInPorQr(
     })
   }
 
-  revalidateEventoPaths(eventoId, evento.tipo)
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
   return aviso ? { ok: true, nome: socio.nome, aviso } : { ok: true, nome: socio.nome }
+}
+
+const TrechoEmbarqueSchema = z.enum(['IDA', 'VOLTA'])
+
+/** Estado que o painel de embarque do gestor consome a cada ciclo. */
+export type EstadoPainelEmbarque = {
+  trechoAtivo: TrechoEmbarque | null
+  abertoEm: string | null
+  qr: { payload: string; expiraEm: number; janelaSegundos: number } | null
+  contagem: Record<TrechoEmbarque, number>
+  confirmados: number
+}
+
+async function carregarEstadoPainel(
+  eventoId: string,
+  tenantId: string,
+): Promise<EstadoPainelEmbarque> {
+  const evento: {
+    embarqueTrechoAtivo: TrechoEmbarque | null
+    embarqueAbertoEm: Date | null
+  } | null = await db.evento.findFirst({
+    where: { id: eventoId, tenantId },
+    select: { embarqueTrechoAtivo: true, embarqueAbertoEm: true },
+  })
+  if (!evento) throw new Error('Evento não encontrado.')
+
+  const [contagem, confirmados] = await Promise.all([
+    contarEmbarquePorTrecho(eventoId),
+    db.eventoRsvp.count({ where: { eventoId, status: 'CONFIRMADO' } }),
+  ])
+
+  return {
+    trechoAtivo: evento.embarqueTrechoAtivo,
+    abertoEm: evento.embarqueAbertoEm?.toISOString() ?? null,
+    qr: evento.embarqueTrechoAtivo ? montarQrEmbarque(eventoId, evento.embarqueTrechoAtivo) : null,
+    contagem,
+    confirmados,
+  }
+}
+
+/**
+ * Estado do painel + QR da janela atual.
+ *
+ * O QR é **derivado do relógio**, não guardado: cada chamada devolve o código
+ * válido agora e o instante em que ele vira. O painel repete a chamada porque
+ * o código expira, não porque algo mudou no banco.
+ */
+export async function obterEstadoPainelEmbarque(eventoId: string): Promise<EstadoPainelEmbarque> {
+  const { tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+  return carregarEstadoPainel(eventoId, tenant.id)
+}
+
+/**
+ * Abre a porta do ônibus para um trecho. Enquanto não houver trecho aberto, o
+ * QR do evento não existe e ninguém consegue se auto-embarcar — é o que
+ * impede alguém de "embarcar" três dias antes da viagem.
+ *
+ * Abrir um trecho fecha o outro: não se embarca a ida e a volta ao mesmo
+ * tempo, e deixar os dois abertos faria o contador do painel mentir.
+ */
+export async function abrirEmbarque(
+  eventoId: string,
+  trechoRaw: string,
+): Promise<{ ok: true; estado: EstadoPainelEmbarque } | { ok: false; error: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+
+  const parsed = TrechoEmbarqueSchema.safeParse(trechoRaw)
+  if (!parsed.success) return { ok: false, error: 'Trecho inválido.' }
+  const trecho = parsed.data
+
+  const evento: { id: string; tipo: string } | null = await db.evento.findFirst({
+    where: { id: eventoId, tenantId: tenant.id },
+    select: { id: true, tipo: true },
+  })
+  if (!evento) return { ok: false, error: 'Evento não encontrado.' }
+
+  await db.evento.update({
+    where: { id: eventoId },
+    data: {
+      embarqueTrechoAtivo: trecho,
+      embarqueAbertoEm: new Date(),
+      embarqueAbertoPorId: session.user.id,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_EMBARQUE_ABRIR',
+      entidade: 'Evento',
+      entidadeId: eventoId,
+      detalhes: { trecho },
+    },
+  })
+
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
+  return { ok: true, estado: await carregarEstadoPainel(eventoId, tenant.id) }
+}
+
+/**
+ * Encerra o embarque em curso — o botão que responde "posso ir embora?".
+ * A partir daqui o QR para de valer e quem ficou para trás só entra por
+ * check-in manual.
+ */
+export async function encerrarEmbarque(
+  eventoId: string,
+): Promise<{ ok: true; estado: EstadoPainelEmbarque } | { ok: false; error: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+
+  const evento: { id: string; tipo: string; embarqueTrechoAtivo: TrechoEmbarque | null } | null =
+    await db.evento.findFirst({
+      where: { id: eventoId, tenantId: tenant.id },
+      select: { id: true, tipo: true, embarqueTrechoAtivo: true },
+    })
+  if (!evento) return { ok: false, error: 'Evento não encontrado.' }
+  if (!evento.embarqueTrechoAtivo) {
+    return { ok: false, error: 'Não há embarque aberto neste evento.' }
+  }
+
+  await db.evento.update({
+    where: { id: eventoId },
+    data: { embarqueTrechoAtivo: null, embarqueAbertoEm: null, embarqueAbertoPorId: null },
+  })
+
+  const contagem = await contarEmbarquePorTrecho(eventoId)
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_EMBARQUE_ENCERRAR',
+      entidade: 'Evento',
+      entidadeId: eventoId,
+      detalhes: {
+        trecho: evento.embarqueTrechoAtivo,
+        embarcados: contagem[evento.embarqueTrechoAtivo],
+      },
+    },
+  })
+
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
+  return { ok: true, estado: await carregarEstadoPainel(eventoId, tenant.id) }
 }
 
 export async function promoverDaListaEspera(
@@ -685,7 +990,7 @@ export async function promoverDaListaEspera(
     atorId: session.user.id,
   })
 
-  revalidateEventoPaths(eventoId, evento.tipo)
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
   return { ok: true }
 }
 
@@ -765,7 +1070,7 @@ export async function excluirEvento(
     },
   })
 
-  revalidateEventoPaths(eventoId, existing.tipo)
+  revalidateEventoPaths(tenant.id, eventoId, existing.tipo)
 }
 
 /**
@@ -829,7 +1134,7 @@ export async function vincularEventoAPartida(
     },
   })
 
-  revalidateEventoPaths(eventoId, evento.tipo)
+  revalidateEventoPaths(tenant.id, eventoId, evento.tipo)
   revalidatePath('/admin/caravanas')
   revalidatePath('/admin/bateria')
   revalidatePath('/admin/social')

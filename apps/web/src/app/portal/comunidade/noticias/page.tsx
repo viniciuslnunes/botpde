@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { Newspaper, Plus } from 'lucide-react'
 import { parseOrdemNoticia } from '@torcida/types'
+import { AppButtonLink } from '@/components/ui/button'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import { ComunidadeNoticiasComposerSection } from '../_components/comunidade-noticias-composer-section'
 import { NoticiasFeedShell } from '../_components/noticias-feed'
@@ -52,12 +52,20 @@ export default async function NoticiasPracaPage({
   const hrefEnviarVideo = `/portal/comunidade/noticias${qs({ ordem, criar: '1', foco: 'video' })}`
 
   const [itens, avatarUrl, jogos] = await Promise.all([
-    criando ? Promise.resolve([]) : listarNoticiasDaPraca(escopo, ancora, ordem),
-    criando ? getAvatarAtualDoUsuario(session.user.id) : Promise.resolve(null),
+    criando
+      ? Promise.resolve([])
+      : listarNoticiasDaPraca(escopo, ancora, ordem, { userId: session.user.id }),
+    getAvatarAtualDoUsuario(session.user.id),
     criando
       ? Promise.resolve({ proximos: [], recentes: [] })
-      : carregarJogosNoticiasFeed(ancora.afiliacaoId, ctx.afiliacao?.nome ?? null),
+      : carregarJogosNoticiasFeed(ancora.afiliacaoId),
   ])
+
+  const currentUser = {
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl,
+  }
 
   const composerNome =
     ctx.modo === 'torcida'
@@ -80,14 +88,15 @@ export default async function NoticiasPracaPage({
         voltarHref={criando ? hrefMural : `/portal/comunidade${sufixo}`}
         acao={
           publicacao.pode && tenantId && !criando ? (
-            <Link
+            <AppButtonLink
               href={hrefCriar}
+              variant="primary"
+              icon={Plus}
               aria-label="Criar notícia"
-              className="app-action inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[rgb(var(--color-primary))] px-3 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+              className="shrink-0 whitespace-nowrap rounded-xl shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
             >
-              <Plus className="h-4 w-4" aria-hidden />
-              <span>Criar notícia</span>
-            </Link>
+              Criar notícia
+            </AppButtonLink>
           ) : null
         }
       />
@@ -136,6 +145,7 @@ export default async function NoticiasPracaPage({
               escopo={escopo}
               podeGerir={publicacao.oficial}
               userId={session.user.id}
+              currentUser={currentUser}
               ordem={ordem}
               jogos={jogos}
               podeEnviarVideo={publicacao.pode}

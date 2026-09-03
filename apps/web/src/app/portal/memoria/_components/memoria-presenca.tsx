@@ -6,6 +6,8 @@ import { toast } from '@torcida/ui'
 import { alternarMemoriaPresenca } from '../actions'
 import { MemoriaFoto } from './memoria-foto'
 import type { MemoriaPresenca } from '../_lib/carregar-memoria'
+import { AppButton } from '@/components/ui/button'
+import { UserCheck } from 'lucide-react'
 
 type Props = {
   presenca: MemoriaPresenca
@@ -74,14 +76,16 @@ export function MemoriaPresencaBloco({ presenca, destaque = false }: Props) {
       {presenca.viewerCheckIn && !presenca.viewerOptIn && (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
           Você estava.{' '}
-          <button
+          <AppButton
+            variant="none"
+            icon={UserCheck}
             type="button"
             disabled={pending}
             onClick={aparecer}
             className="app-touch-line font-medium text-[rgb(var(--color-primary-fg))] disabled:opacity-60"
           >
             Aparecer neste dia?
-          </button>{' '}
+          </AppButton>{' '}
           <Link
             href={`/portal/comunidade/perfil/${presenca.viewerUserId}?aba=sobre`}
             className="app-touch-line text-[rgb(var(--foreground-muted))]"

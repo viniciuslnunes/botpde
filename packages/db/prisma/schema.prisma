@@ -237,6 +237,9 @@ model Tenant {
   /// Default false — presidente liga em Transparência. Só a raiz SEDE consome.
   memoriaAliados Boolean @default(false) @map("memoria_aliados")
 
+  /// Ciclo de cobrança recorrente + régua por cron (`financeiro-ciclo.js`).
+  financeiroCiclo Json? @map("financeiro_ciclo")
+
 
 
   // Tenant sintético: container de posts de torcedores globais do clube
@@ -301,6 +304,12 @@ model Tenant {
   sedes             Sede[]
 
   eventos           Evento[]
+
+  eventosEscala     EventoEscala[]
+
+  caravanaVeiculos  CaravanaVeiculo[]
+
+  portariaEntradas  PortariaEntrada[]
 
   roles             Role[]
 
@@ -565,6 +574,18 @@ model User {
 
   eventosRsvp          EventoRsvp[]
 
+  eventosCheckin       EventoCheckin[]
+
+  eventosEscala        EventoEscala[]       @relation("EventoEscalaUser")
+
+  eventosEscalaConvocados EventoEscala[]    @relation("EventoEscalaConvocadoPor")
+
+  caravanaVeiculos     CaravanaVeiculo[]    @relation("CaravanaVeiculoResponsavel")
+
+  portariaEntradas     PortariaEntrada[]    @relation("PortariaEntradaVisitante")
+
+  portariaRegistradas  PortariaEntrada[]    @relation("PortariaEntradaOperador")
+
   sedesResponsavel     Sede[]               @relation("SedeResponsavel")
 
   posts                Post[]
@@ -671,6 +692,8 @@ model User {
   barCaixaTurnosFechados       BarCaixaTurno[]        @relation("BarCaixaTurnoFechadoPor")
 
   barVendasEstornadas          BarVenda[]             @relation("BarVendaEstornadoPor")
+
+  barVendasCompradas           BarVenda[]             @relation("BarVendaComprador")
 
   barFiadosDevidos             BarFiado[]             @relation("BarFiadoDevedor")
 
@@ -925,6 +948,9 @@ model Departamento {
 
   projetos Projeto[]
 
+  /// Eventos que este departamento opera (dono operacional, ≠ projeto).
+  eventos  Evento[] @relation("EventoDepartamento")
+
   lancamentos FinanceiroLancamento[] @relation("FinanceiroLancamentoDepartamento")
 
   roles    Role[]
@@ -1081,6 +1107,12 @@ model DepartamentoArea {
   membros  DepartamentoAreaMembro[]
 
   projetos Projeto[]
+
+  /// Eventos operados por esta frente (escala de jogo, barracão, ensaio).
+  eventos  Evento[] @relation("EventoArea")
+
+  /// Postos da escala atribuídos a esta frente.
+  escalas  EventoEscala[] @relation("EventoEscalaArea")
 
   patrimonioItens PatrimonioItem[]
 
@@ -1741,6 +1773,45 @@ model SaasSocio {
 
 }
 
+/// Ledger de entrada na sede física. Distinto de `EventoCheckin` (presença em
+/// evento) e de `/carteirinha/validar` (validação pública sem registro).
+/// Histórico permanente; visitante sem carteirinha entra com `metodo: MANUAL`.
+model PortariaEntrada {
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Unidade física onde a entrada foi registrada. Null = sede principal.
+  sedeId String? @map("sede_id")
+
+  sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+
+  /// Associado identificado pela carteirinha. Null em visitante avulso.
+  userId String? @map("user_id")
+
+  user   User?   @relation("PortariaEntradaVisitante", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Nome avulso quando não há carteirinha (metodo MANUAL).
+  visitanteNome String? @map("visitante_nome")
+
+  metodo MetodoPortariaEntrada
+
+  registradoPorId String @map("registrado_por_id")
+
+  registradoPor   User   @relation("PortariaEntradaOperador", fields: [registradoPorId], references: [id])
+
+  observacao String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, criadoEm])
+  @@index([tenantId, userId, criadoEm])
+
+  @@map("saas_portaria_entradas")
+}
+
 
 
 // ─── PLANOS DE ASSOCIAÇÃO + COBRANÇAS (não confundir com Tenant.plano SaaS) ───
@@ -2072,6 +2143,9 @@ model Sede {
 
   membros SaasMembro[]
 
+  /// Caixa desta unidade — receita e despesa rateadas por sede.
+  lancamentosFinanceiros FinanceiroLancamento[]
+
   barCategorias           BarCategoria[]
 
   barProdutos             BarProduto[]
@@ -2085,6 +2159,8 @@ model Sede {
   barFiados               BarFiado[]
 
   barComandas             BarComanda[]
+
+  portariaEntradas        PortariaEntrada[]
 
 
   @@index([tenantId])
@@ -2340,6 +2416,16 @@ model Evento {
   /// é bloqueado (gestor pode override). Default false = avisa e permite.
   checkInExigePagamento Boolean @default(false) @map("check_in_exige_pagamento")
 
+  /// Trecho com embarque ABERTO agora (o gestor abre e encerra na porta).
+  /// Null = nenhum embarque em curso: o QR do evento não valida e o
+  /// auto-embarque do sócio é recusado. Só um trecho por vez — não se
+  /// embarca a ida e a volta ao mesmo tempo.
+  embarqueTrechoAtivo TrechoEmbarque? @map("embarque_trecho_ativo")
+
+  embarqueAbertoEm    DateTime?       @map("embarque_aberto_em")
+
+  embarqueAbertoPorId String?         @map("embarque_aberto_por_id")
+
   /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
 
   capacidade Int?
@@ -2356,6 +2442,19 @@ model Evento {
 
   projeto   Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
 
+  /// Departamento responsável pela OPERAÇÃO do evento — quem escala, monta e
+  /// responde por ele. Distinto de `projetoId`, que é prestação de contas:
+  /// ensaio avulso tem dono e não tem projeto. Nulo = evento da torcida.
+  departamentoId String?       @map("departamento_id")
+
+  departamento   Departamento? @relation("EventoDepartamento", fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  /// Frente dentro do departamento (Escala de jogo, Barracão). Nulo = o
+  /// departamento inteiro responde. Como em Projeto, área NÃO concede permissão.
+  areaId String?           @map("area_id")
+
+  area   DepartamentoArea? @relation("EventoArea", fields: [areaId], references: [id], onDelete: SetNull)
+
 
 
   criadoPorId      String?  @map("criado_por_id")
@@ -2368,6 +2467,17 @@ model Evento {
 
   rsvps     EventoRsvp[]
 
+  checkins  EventoCheckin[]
+
+  escalas   EventoEscala[]
+
+  lancamentos FinanceiroLancamento[]
+
+  /// Material que saiu para esta operação (carga do dia).
+  emprestimos PatrimonioEmprestimo[]
+
+  veiculos    CaravanaVeiculo[]
+
   salas     SalaReuniao[]
 
   posts     Post[]
@@ -2375,6 +2485,9 @@ model Evento {
   memoriaFatos MemoriaFato[]
 
   cobrancas CobrancaAssociacao[]
+
+  /// Procedimento pré-embarque (caravana) e extensões leves — sem tabela paralela.
+  meta Json?
 
 
 
@@ -2391,6 +2504,11 @@ model Evento {
   @@index([tenantId, tipo, data])
 
   @@index([projetoId])
+
+  // Hub thin do departamento: "meus eventos" na janela de tempo.
+  @@index([tenantId, departamentoId, data])
+
+  @@index([areaId])
 
   @@map("saas_eventos")
 
@@ -2422,6 +2540,13 @@ model EventoRsvp {
 
   checkedInPorId String?   @map("checked_in_por_id")
 
+  /// Veículo em que a pessoa embarca (caravana com mais de um ônibus). Mora
+  /// aqui, e não numa tabela de passageiros, porque o unique (evento, pessoa)
+  /// já garante o que a operação exige: uma pessoa, um ônibus.
+  veiculoId String?          @map("veiculo_id")
+
+  veiculo   CaravanaVeiculo? @relation(fields: [veiculoId], references: [id], onDelete: SetNull)
+
 
 
   evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
@@ -2434,11 +2559,205 @@ model EventoRsvp {
 
   @@index([eventoId, status, criadoEm])
 
+  // Lista de embarque por ônibus.
+  @@index([veiculoId])
+
   @@map("saas_evento_rsvps")
 
 }
 
+/// Ledger de embarque: um registro por pessoa POR TRECHO (ida, volta), com
+/// como e por quem foi registrado. `EventoRsvp.checkedInAt` continua sendo o
+/// valor materializado do trecho de IDA — KPIs, CSV e Confiança leem de lá.
+/// Mesmo padrão de `ConfiancaEvento` (ledger) + saldo materializado.
+model EventoCheckin {
+  id       String @id @default(uuid())
 
+  eventoId String @map("evento_id")
+
+  evento   Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  userId   String @map("user_id")
+
+  user     User   @relation(fields: [userId], references: [id])
+
+  trecho   TrechoEmbarque
+
+  metodo   MetodoCheckin
+
+  /// Quem registrou. Null = auto-embarque: o próprio sócio escaneou o QR do
+  /// evento. Preenchido quando um gestor bipou a carteirinha ou marcou na mão.
+  registradoPorId String? @map("registrado_por_id")
+
+  /// Gestor liberou apesar da vaga não estar paga (só no check-in manual).
+  override Boolean @default(false)
+
+  /// Onde o aparelho estava no embarque. Gravado desde já para a fase 2
+  /// (geofence); hoje ninguém bloqueia por isso.
+  lat Float?
+
+  lng Float?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([eventoId, userId, trecho])
+
+  @@index([eventoId, trecho, criadoEm])
+
+  @@map("saas_evento_checkins")
+}
+
+/// Quem TRABALHA na operação — não confundir com `EventoRsvp`, que é quem vai.
+/// Motorista, porta do ônibus, bandeirão, caixa do bar e cobertura são postos
+/// com nome e responsável; até aqui isso vivia no WhatsApp, e sem eles não há
+/// como medir cobertura, falta nem substituição.
+///
+/// Como área e projeto, escala é accountability e **não concede permissão**.
+/// A presença de quem foi escalado continua sendo lida de `EventoRsvp`
+/// (`checkedInAt`) — uma verdade só sobre comparecimento.
+model EventoEscala {
+
+  id       String @id @default(cuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  eventoId String @map("evento_id")
+
+  evento   Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+
+  user   User   @relation("EventoEscalaUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  funcao FuncaoEscala
+
+  status StatusEscala @default(CONVOCADO)
+
+  /// Frente do departamento que responde por este posto (naipe da bateria,
+  /// turma do bandeirão). Nula = o departamento dono do evento responde.
+  areaId String?           @map("area_id")
+
+  area   DepartamentoArea? @relation("EventoEscalaArea", fields: [areaId], references: [id], onDelete: SetNull)
+
+  /// Detalhe do posto ("surdo 3", "ônibus 2", "portão B").
+  observacao String?
+
+  convocadoPorId String? @map("convocado_por_id")
+
+  convocadoPor   User?   @relation("EventoEscalaConvocadoPor", fields: [convocadoPorId], references: [id], onDelete: SetNull)
+
+  /// Quando a pessoa aceitou ou recusou — silêncio perto do evento é pendência.
+  respondidoEm DateTime? @map("respondido_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  /// Uma pessoa ocupa um posto por operação: dois postos dobrariam a cobertura
+  /// e esconderiam o buraco que a escala existe para mostrar.
+  @@unique([eventoId, userId])
+
+  @@index([tenantId, eventoId])
+
+  @@index([userId, status])
+
+  @@index([areaId])
+
+  @@map("saas_evento_escalas")
+
+}
+
+/// Postos canônicos da operação de uma organizada. Enum (e não texto livre)
+/// porque cobertura por função é o KPI: "faltam dois repiques" só existe se
+/// duas escalas diferentes contarem para o mesmo posto.
+enum FuncaoEscala {
+  /// Responde pela operação inteira. Toda operação deveria ter uma.
+  COORDENACAO
+  /// Porta do ônibus: lista, conferência, contagem.
+  EMBARQUE
+  /// Dirige ou responde pelo veículo perante a empresa de fretamento.
+  CONDUCAO
+  /// Carregar, montar e guardar bandeirão e faixas.
+  BANDEIRA
+  /// Ritmista escalado (o naipe vai em `observacao` ou na área).
+  BATERIA
+  /// Caixa e atendimento do bar no dia.
+  BAR
+  /// Porta da sede e controle de acesso.
+  PORTARIA
+  /// Acolhimento e apoio a quem chega (frente do Feminino).
+  ACOLHIMENTO
+  /// Registro do dia: foto, vídeo, redes.
+  COBERTURA
+  /// Posto sem categoria própria — descrever em `observacao`.
+  APOIO
+}
+
+enum StatusEscala {
+  CONVOCADO
+  ACEITO
+  RECUSADO
+  /// Saiu da escala e alguém assumiu — o histórico permanece.
+  SUBSTITUIDO
+}
+
+/// Ônibus (ou van) de uma caravana. A operação real é multi-veículo e
+/// multi-ponto: havia uma lotação só, e a lista nominal por ônibus — que a
+/// empresa de fretamento pede e que serve de prova de organização sob a LGE
+/// art. 178 §§ 5º e 6º (a torcida responde pelo trajeto de ida e volta) — não
+/// existia em lugar nenhum.
+model CaravanaVeiculo {
+
+  id       String @id @default(cuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  eventoId String @map("evento_id")
+
+  evento   Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  /// Como a torcida chama o veículo no dia ("Ônibus 1", "Van da Baixada").
+  identificacao String
+
+  placa   String?
+
+  /// Empresa de fretamento — quem responde pelo veículo perante a ANTT.
+  empresa String?
+
+  capacidade Int
+
+  /// Quem responde por este ônibus na estrada (não é permissão).
+  responsavelId String? @map("responsavel_id")
+
+  responsavel   User?   @relation("CaravanaVeiculoResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  /// Ponto e horário de embarque deste veículo — a caravana sai de vários
+  /// lugares, e o horário do ônibus 2 não é o do ônibus 1.
+  pontoEmbarque   String?   @map("ponto_embarque")
+
+  horarioEmbarque DateTime? @map("horario_embarque")
+
+  observacao String?
+
+  criadoPorId String? @map("criado_por_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  passageiros EventoRsvp[]
+
+  @@unique([eventoId, identificacao])
+
+  @@index([tenantId, eventoId])
+
+  @@map("saas_caravana_veiculos")
+
+}
 
 enum RsvpStatus {
 
@@ -2460,6 +2779,31 @@ enum TipoEvento {
 
   ENSAIO
 
+}
+
+/// Perna da viagem. A caravana embarca duas vezes e o motorista precisa
+/// fechar a porta sabendo quem está dentro nas duas.
+enum TrechoEmbarque {
+  IDA
+
+  VOLTA
+}
+
+/// Como o embarque foi registrado. `QR_EVENTO` = o sócio escaneou o QR
+/// rotativo exibido pelo gestor; `QR_CARTEIRINHA` = o gestor bipou a
+/// carteirinha do sócio; `MANUAL` = marcado na lista.
+enum MetodoCheckin {
+  QR_EVENTO
+
+  QR_CARTEIRINHA
+
+  MANUAL
+}
+
+enum MetodoPortariaEntrada {
+  QR_CARTEIRINHA
+
+  MANUAL
 }
 
 
@@ -3066,6 +3410,10 @@ model Announcement {
   corpo      String
 
   prioridade PrioridadeComunicado @default(NORMAL)
+
+  /// Segmentação do fan-out. Null = todos os membros aprovados (legado).
+  /// Formato validado em `comunicado-audiencia.js`.
+  audiencia Json? @map("audiencia")
 
   fixado     Boolean              @default(false)
 
@@ -4017,6 +4365,8 @@ model Comentario {
 
   autorId   String   @map("autor_id")
 
+  parentId  String?  @map("parent_id")
+
   conteudo  String
 
   /// Ocultado por decisao de moderacao — some das listagens e da contagem.
@@ -4030,9 +4380,15 @@ model Comentario {
 
   autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
 
+  parent  Comentario?  @relation("ComentarioThread", fields: [parentId], references: [id], onDelete: SetNull)
+
+  replies Comentario[] @relation("ComentarioThread")
+
 
 
   @@index([postId, criadoEm])
+
+  @@index([parentId, criadoEm])
 
   @@map("saas_comentarios")
 
@@ -4612,6 +4968,8 @@ enum TipoNotificacao {
   DESIGN_ATUALIZADO
 
   EVENTO_CHECKIN
+  ESCALA_CONVOCADO
+  ESCALA_RESPONDIDA
 
   BRECHO_INTERESSE
 
@@ -5840,6 +6198,20 @@ model FinanceiroLancamento {
 
   projeto        Projeto?      @relation(fields: [projetoId], references: [id], onDelete: SetNull)
 
+  /// Rateio pela OPERAÇÃO: o fretamento da caravana, o gasto da festa, a
+  /// venda do bar naquele jogo. Projeto responde "quanto a campanha custou";
+  /// evento responde "a caravana fechou no azul?" — que é a pergunta que o
+  /// livro-caixa sozinho nunca soube responder.
+  eventoId       String?       @map("evento_id")
+
+  evento         Evento?       @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
+  /// Unidade onde o dinheiro entrou ou saiu (sede, subsede, PDE). Nulo = da
+  /// torcida, sem unidade. O bar já nasce com unidade; o resto é opcional.
+  sedeId         String?       @map("sede_id")
+
+  sede           Sede?         @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+
 
 
   criadoPorId String   @map("criado_por_id")
@@ -5861,6 +6233,11 @@ model FinanceiroLancamento {
   @@index([tenantId, departamentoId, data])
 
   @@index([projetoId])
+
+  // Resultado da operação e caixa por unidade.
+  @@index([eventoId])
+
+  @@index([tenantId, sedeId, data])
 
   @@map("saas_financeiro_lancamentos")
 
@@ -6004,6 +6381,12 @@ model PatrimonioEmprestimo {
 
   status StatusPatrimonioEmprestimo @default(ABERTO)
 
+  /// Operação para a qual o item saiu (jogo, ensaio, festa). Responde "o que
+  /// vai para domingo" e, depois, "voltou tudo?". Nulo = saída avulsa.
+  eventoId String? @map("evento_id")
+
+  evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
   /// Obrigatória na retirada.
   fotoSaidaUrl String @map("foto_saida_url")
 
@@ -6021,6 +6404,9 @@ model PatrimonioEmprestimo {
   devolvidoEm  DateTime? @map("devolvido_em")
 
   @@index([tenantId, status, abertoEm])
+
+  // Carga da operação: o que saiu para aquele evento.
+  @@index([eventoId, status])
 
   @@index([itemId, status])
 
@@ -6242,6 +6628,23 @@ model BarVenda {
 
   operador   User   @relation("BarVendaOperador", fields: [operadorId], references: [id], onDelete: Cascade)
 
+  /// De onde a venda nasceu. `PORTAL` = compra antecipada pelo sócio, que ainda
+  /// precisa ser retirada no balcão; `PDV` = balcão, entregue na hora.
+  origem OrigemVendaBar @default(PDV) @map("origem")
+
+  /// Quem comprou pelo portal. Null no balcão — lá o comprador é anônimo para o
+  /// sistema. Distinto de `operadorId`, que na venda antecipada é o operador de
+  /// plantão (dono do turno), porque é ele quem responde pela entrega.
+  compradorUserId String? @map("comprador_user_id")
+
+  comprador       User?   @relation("BarVendaComprador", fields: [compradorUserId], references: [id], onDelete: SetNull)
+
+  /// Entrega no balcão. `PAGA` diz que o dinheiro entrou, não que a mercadoria
+  /// saiu — mesma distinção de RSVP × embarque e de pedido × retirada.
+  retiradoEm    DateTime? @map("retirado_em")
+
+  retiradoPorId String?   @map("retirado_por_id")
+
 
 
   subtotal Decimal @db.Decimal(10, 2)
@@ -6335,6 +6738,12 @@ model BarVendaItem {
   produtoNome String  @map("produto_nome")
 
   quantidade  Int
+
+  /// Quanto deste item já saiu do balcão (compra antecipada). Permite retirada
+  /// parcial — comprou 4, levou 2 e voltou depois. `BarVenda.retiradoEm` só é
+  /// carimbado quando **todos** os itens chegam a `retiradoQtd == quantidade`.
+  /// Sempre 0 em venda de PDV, que é entregue na hora.
+  retiradoQtd Int @default(0) @map("retirado_qtd")
 
   precoUnit   Decimal @map("preco_unit") @db.Decimal(10, 2)
 
@@ -6493,6 +6902,15 @@ enum StatusVendaBar {
 
   ESTORNADA
 }
+
+/// De onde a venda do bar nasceu. `PORTAL` é a compra antecipada — o sócio paga
+/// pelo celular e retira no balcão, o que só existe com turno aberto.
+enum OrigemVendaBar {
+  PDV
+
+  PORTAL
+}
+
 
 
 

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Copy, Printer } from 'lucide-react'
+import { AppButton } from '@/components/ui/button'
 
 export function BalancoAcoes({ textoResumo }: { textoResumo: string }) {
   const [pending, startTransition] = useTransition()
@@ -30,14 +31,15 @@ export function BalancoAcoes({ textoResumo }: { textoResumo: string }) {
         <Copy className="h-3.5 w-3.5" />
         {copiado ? 'Copiado' : 'Copiar resumo'}
       </button>
-      <button
+      <AppButton
+        variant="none"
+        icon={Printer}
         type="button"
         onClick={() => window.print()}
         className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
       >
-        <Printer className="h-3.5 w-3.5" />
         Imprimir / salvar PDF
-      </button>
+      </AppButton>
     </div>
   )
 }

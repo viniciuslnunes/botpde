@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { Beer, Boxes, CupSoda, ReceiptText, Store, TrendingUp } from 'lucide-react'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
@@ -8,7 +7,7 @@ import { assertAnyPermission } from '@/lib/authz'
 import { montarTabsModulo, permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { getTurnoAbertoBar, resolveUnidadeBar } from '@/lib/bar'
 import type { BarUnidadeLite } from '@/lib/bar'
-import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader } from '@/components/admin/ui'
+import { AdminModuleTabBar, AdminModuleTabs, AdminPageHeader, AdminHeaderActionLink } from '@/components/admin/ui'
 
 function rotuloTipo(tipo: BarUnidadeLite['tipo']): string {
   if (tipo === 'SEDE') return 'Sede'
@@ -67,18 +66,13 @@ export default async function BarModuloLayout({ children }: { children: ReactNod
         description={`${rotuloTipo(unidade.tipo)} · ${unidade.nome}`}
         icon={<Beer className="h-5 w-5" />}
         actions={
-          <Link
+          <AdminHeaderActionLink
             href="/admin/bar/pdv"
-            className={[
-              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-opacity',
-              turno
-                ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] hover:opacity-90'
-                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-            ].join(' ')}
+            icon={Store}
+            variant={turno ? 'primary' : 'outline'}
           >
-            <Store className="h-4 w-4" />
             {turno ? 'Abrir PDV' : 'PDV (turno fechado)'}
-          </Link>
+          </AdminHeaderActionLink>
         }
       >
         <AdminModuleTabBar tabs={tabs} />

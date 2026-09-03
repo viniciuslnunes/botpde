@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ArrowLeft, Crosshair, Loader2, Search, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Crosshair, MapPin, RotateCcw } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { SedeExplorerCard } from '@/components/portal/sede-explorer-card'
 import { SedeExplorerDetail } from '@/components/portal/sede-explorer-detail'
@@ -20,6 +20,8 @@ import {
   normalizarTexto,
   type LocalizacaoOnboarding,
 } from '@/lib/onboarding-unidade'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 type FiltroTipo = 'TODAS' | SedeTipo
 
@@ -202,6 +204,17 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
     return c
   }, [sedes])
 
+  const sugestoesBusca = useMemo((): ReactiveSearchOption[] => {
+    return sedes.map((sede) => ({
+      id: sede.id,
+      label: sede.nome,
+      sublabel: [TIPO_LABEL[sede.tipo], sede.cidade, sede.estado].filter(Boolean).join(' · '),
+      searchText: [sede.nome, sede.endereco, sede.cidade, sede.estado, sede.responsavel]
+        .filter(Boolean)
+        .join(' '),
+    }))
+  }, [sedes])
+
   const filtradas = useMemo(() => {
     const q = normalizarTexto(buscaDeferred)
     let list = sedes.filter((s) => {
@@ -278,14 +291,15 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
         {selected ? (
           <>
             <div className="flex items-center justify-between gap-2">
-              <button
+              <AppButton
+                variant="none"
+                icon={ArrowLeft}
                 type="button"
                 onClick={() => selecionar(null)}
                 className="portal-chip -ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
                 Voltar à lista
-              </button>
+              </AppButton>
               <span className="portal-kicker text-[rgb(var(--foreground-muted))]">
                 Detalhe
               </span>
@@ -302,27 +316,19 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
         ) : (
           <>
             <div className="space-y-2.5">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-                <input
-                  type="search"
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por nome, cidade ou endereço"
-                  aria-label="Buscar sedes"
-                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2.5 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
-                />
-                {busca && (
-                  <button
-                    type="button"
-                    onClick={() => setBusca('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-                    aria-label="Limpar busca"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+              <SearchFilterInput
+                value={busca}
+                onChange={setBusca}
+                placeholder="Buscar por nome, cidade ou endereço"
+                ariaLabel="Buscar sedes"
+                suggestions={sugestoesBusca}
+                onSelectSuggestion={(item) => {
+                  setBusca(item.label)
+                  selecionar(item.id)
+                }}
+                minChars={1}
+                fallbackIcon={MapPin}
+              />
 
               <div
                 className="flex flex-wrap items-center gap-1.5"
@@ -356,7 +362,10 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                <AppButton
+                  variant="none"
+                  icon={Crosshair}
+                  loading={geoStatus === 'loading'}
                   type="button"
                   onClick={pedirLocalizacao}
                   disabled={geoStatus === 'loading'}
@@ -367,13 +376,8 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                       : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.5)]'
                   }`}
                 >
-                  {geoStatus === 'loading' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Crosshair className="h-3.5 w-3.5" />
-                  )}
                   {localizacao ? 'Perto de mim · ativo' : 'Perto de mim'}
-                </button>
+                </AppButton>
                 {localizacao && (
                   <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                     Ordenado por proximidade
@@ -415,7 +419,9 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                   <p className="text-sm text-[rgb(var(--foreground-muted))]">
                     Nenhuma sede encontrada com esses filtros.
                   </p>
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={RotateCcw}
                     type="button"
                     onClick={() => {
                       setBusca('')
@@ -424,7 +430,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                     className="mt-2 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Limpar filtros
-                  </button>
+                  </AppButton>
                 </div>
               ) : (
                 <ul className="space-y-2">

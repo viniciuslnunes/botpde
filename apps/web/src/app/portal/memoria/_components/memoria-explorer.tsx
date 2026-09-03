@@ -419,7 +419,6 @@ function PainelDia({
           eventos={dia.eventos}
           posts={dia.posts}
           podeGerirAcervo={podeGerirAcervo}
-          diaVazio={!temConteudo}
           iniciarAberto={composerAberto}
           seed={composerSeed}
         />

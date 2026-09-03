@@ -27,6 +27,7 @@ export const ROTA_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
   PATRIMONIO_RESPONSAVEL_DEFINIDO: '/admin/patrimonio?tab=pendencias',
   EVENTO_RSVP: '/admin/eventos',
   EVENTO_DIA_GESTOR: '/admin/eventos',
+  ESCALA_RESPONDIDA: '/admin/eventos',
   PEDIDO_RECEBIDO: '/admin/loja/pedidos',
   BRECHO_DENUNCIA: '/admin/loja/brecho',
   SOLICITACAO_UNIDADE_CRIADA: '/admin/afiliacoes',

@@ -8,6 +8,7 @@ import { AppModal, AppModalBody } from '@/components/ui/app-modal'
 import { collapsePanel, springGentle, springSnappy } from '@/lib/motion-presets'
 import { denunciarPracaAction } from '../praca-actions'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import { AppButton } from '@/components/ui/button'
 
 export type AlvoDenunciaPraca = 'FORUM_TOPICO' | 'FORUM_RESPOSTA' | 'PRACA_COMENTARIO'
 
@@ -119,13 +120,15 @@ export function PracaDenunciaModal({
             </m.p>
           </AppModalBody>
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
-            <button
+            <AppButton
+              variant="primary"
+              icon={X}
               type="button"
               onClick={onFechar}
-              className="app-action rounded-lg bg-[rgb(var(--primary))] px-3.5 text-sm font-semibold text-primary-on"
+              className="rounded-lg px-3.5 text-sm font-semibold"
             >
               Fechar
-            </button>
+            </AppButton>
           </div>
         </>
       ) : (
@@ -206,14 +209,16 @@ export function PracaDenunciaModal({
           </AppModalBody>
 
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5">
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={fechar}
               disabled={pending}
               className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
             >
               Cancelar
-            </button>
+            </AppButton>
             <m.button
               type="button"
               onClick={enviar}
@@ -252,16 +257,20 @@ export function PracaDenunciarBotao({
 
   return (
     <>
-      <button
+      <AppButton
+        variant="none"
+        icon={Flag}
         type="button"
         onClick={() => setAberto(true)}
         className={[
           'app-touch-line text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-red-600',
           className ?? '',
-        ].join(' ')}
+        ]
+          .filter(Boolean)
+          .join(' ')}
       >
         Denunciar
-      </button>
+      </AppButton>
       {aberto && (
         <PracaDenunciaModal
           aberto={aberto}

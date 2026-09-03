@@ -40,6 +40,7 @@ export function AdminMembroLgeForm({
   podeDesligar,
   desligadoEm,
   espelhado,
+  isAdministracaoSede = false,
   aprovadoNaUnidadeNome,
   canEdit = false,
 }: {
@@ -56,8 +57,9 @@ export function AdminMembroLgeForm({
   planos: PlanoOption[]
   podeDesligar: boolean
   desligadoEm: Date | null
-  /** Espelho na Sede — LGE só leitura; edite na unidade de origem. */
+  /** Espelho na Sede — LGE só leitura nas unidades. */
   espelhado?: boolean
+  isAdministracaoSede?: boolean
   aprovadoNaUnidadeNome?: string | null
   /** `members:approve` — quem só vê o cadastro não altera RG/CPF. */
   canEdit?: boolean
@@ -80,12 +82,13 @@ export function AdminMembroLgeForm({
   }, [dismissState.ok])
 
   const via = aprovadoNaUnidadeNome?.trim()
+  const espelhoSoLeitura = Boolean(espelhado && !isAdministracaoSede)
   const campoSomenteLeitura =
     'mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]'
   const cpfExibicao = formatCpfAdmin(initial.cpf) ?? initial.cpf
   const rgExibicao = formatRg(initial.rg) ?? initial.rg
 
-  if (espelhado || !canEdit) {
+  if (espelhoSoLeitura || !canEdit) {
     const planoNome =
       planos.find((p) => p.id === initial.planoAssociacaoId)?.nome ?? null
     return (
@@ -94,7 +97,7 @@ export function AdminMembroLgeForm({
           Dados LGE (Lei 14.597/2023)
         </h2>
         <p className="text-xs text-[rgb(var(--foreground-muted))]">
-          {espelhado
+          {espelhoSoLeitura
             ? via
               ? `Registro espelhado — aprovado via ${via}. Edite na unidade de origem.`
               : 'Registro espelhado — edite na unidade de origem.'

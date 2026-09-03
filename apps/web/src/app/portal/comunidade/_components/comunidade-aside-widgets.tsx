@@ -45,7 +45,7 @@ export async function ComunidadeAsideWidgets({
       {noticias.length > 0 && (
         <MotionReveal index={widgetIndex++}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase text-[rgb(var(--foreground))]">
               <Newspaper className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
               Do seu time
             </h2>
@@ -69,7 +69,7 @@ export async function ComunidadeAsideWidgets({
             </div>
             <Link
               href="/portal/comunidade/noticias?escopo=nacional"
-              className="mt-3 inline-flex text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              className="mt-3 flex w-full cursor-pointer items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
             >
               Ver todas
             </Link>
@@ -80,7 +80,7 @@ export async function ComunidadeAsideWidgets({
       {hashtags.length > 0 && (
         <MotionReveal index={widgetIndex++}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase text-[rgb(var(--foreground))]">
               <Hash className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
               Hashtags em alta
             </h2>
@@ -104,7 +104,7 @@ export async function ComunidadeAsideWidgets({
       {sugestoes.length > 0 && (
         <MotionReveal index={widgetIndex++}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase text-[rgb(var(--foreground))]">
               <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
               Para seguir
             </h2>

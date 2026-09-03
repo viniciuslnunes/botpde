@@ -102,6 +102,9 @@ export type NoticiaPracaItem = {
   autorNome: string | null
   fonte: string | null
   url: string | null
+  /** Voto do viewer no card (listagem / engajamento inline). */
+  meuVoto: 1 | -1 | null
+  totalComentarios: number
 }
 
 export type ForumTopicoStatus = 'PENDENTE' | 'VISIVEL' | 'REJEITADO' | 'OCULTO' | 'REMOVIDO'
@@ -122,17 +125,34 @@ export type ForumTopicoItem = {
   atualizadoEm: Date
   autorId: string
   autorNome: string | null
+  meuVoto: 1 | -1 | null
 }
 
-export type PracaFeedCard = {
-  kind: 'noticia' | 'artigo' | 'topico'
-  origem: 'imprensa' | 'oficial' | 'verificada' | 'forum'
+/** Card de notícia/artigo na faixa «Na praça» — mesmo padrão visual dos tópicos no feed. */
+export type PracaNoticiaFeedItem = {
+  kind: 'noticia' | 'artigo'
+  origem: 'imprensa' | 'oficial' | 'verificada'
   id: string
   titulo: string
+  resumo: string | null
+  midiaUrls: string[]
   href: string
-  meta: string
   criadoEm: Date
+  fixado: boolean
+  gostei: number
+  naoGostei: number
+  meuVoto: 1 | -1 | null
+  totalComentarios: number
+  fonte: string | null
+  autor: {
+    id: string | null
+    nome: string | null
+    avatarUrl: string | null
+  }
 }
+
+/** @deprecated Use PracaNoticiaFeedItem */
+export type PracaFeedCard = PracaNoticiaFeedItem
 
 type ArtigoRow = {
   id: string
@@ -285,6 +305,8 @@ function mapArtigoParaItem(a: ArtigoListRow): NoticiaPracaItem {
     autorNome: a.autor.nome,
     fonte: null,
     url: null,
+    meuVoto: null,
+    totalComentarios: 0,
   }
 }
 
@@ -311,6 +333,8 @@ function mapImprensaParaItem(n: ImprensaListRow): NoticiaPracaItem {
     autorNome: null,
     fonte: n.fonte,
     url: n.url,
+    meuVoto: null,
+    totalComentarios: 0,
   }
 }
 
@@ -336,7 +360,10 @@ export async function listarNoticiasDaPraca(
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
   ordem: 'em_alta' | 'acessados' | 'recentes' = 'acessados',
+  opts: { userId?: string } = {},
 ): Promise<NoticiaPracaItem[]> {
+  let itens: NoticiaPracaItem[] = []
+
   if (escopo === 'nacional' && ancora.afiliacaoId) {
     const noticias: ImprensaListRow[] = await db.noticia.findMany({
       where: { afiliacaoId: ancora.afiliacaoId, status: 'APROVADA' },
@@ -353,32 +380,73 @@ export async function listarNoticiasDaPraca(
         visitas: true,
       },
     })
-    return ordenarNoticiasPraca(noticias.map(mapImprensaParaItem), ordem).slice(0, 50)
+    const votosPorId = await agregarVotosNoticiaPraca(noticias.map((n) => n.id))
+    itens = ordenarNoticiasPraca(
+      noticias.map((n) => {
+        const mapped = mapImprensaParaItem(n)
+        const votos = votosPorId.get(n.id) ?? { gostei: 0, naoGostei: 0 }
+        return { ...mapped, gostei: votos.gostei, naoGostei: votos.naoGostei }
+      }),
+      ordem,
+    ).slice(0, 50)
+  } else if (ancora.tenantId) {
+    const artigos: ArtigoListRow[] = await db.artigoPortal.findMany({
+      where: { tenantId: ancora.tenantId, status: 'PUBLICADO' },
+      take: 80,
+      select: {
+        id: true,
+        titulo: true,
+        resumo: true,
+        midiaUrls: true,
+        capaUrl: true,
+        blocos: true,
+        origem: true,
+        publicadoEm: true,
+        criadoEm: true,
+        visitas: true,
+        gostei: true,
+        naoGostei: true,
+        fixado: true,
+        autorId: true,
+        autor: { select: { nome: true } },
+      },
+    })
+    itens = ordenarNoticiasPraca(artigos.map(mapArtigoParaItem), ordem).slice(0, 50)
   }
 
-  if (!ancora.tenantId) return []
-  const artigos: ArtigoListRow[] = await db.artigoPortal.findMany({
-    where: { tenantId: ancora.tenantId, status: 'PUBLICADO' },
-    take: 80,
-    select: {
-      id: true,
-      titulo: true,
-      resumo: true,
-      midiaUrls: true,
-      capaUrl: true,
-      blocos: true,
-      origem: true,
-      publicadoEm: true,
-      criadoEm: true,
-      visitas: true,
-      gostei: true,
-      naoGostei: true,
-      fixado: true,
-      autorId: true,
-      autor: { select: { nome: true } },
-    },
+  if (itens.length === 0) return []
+
+  const paresComentario = itens.map((c) => ({
+    alvoTipo: (c.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO') as 'NOTICIA' | 'ARTIGO',
+    alvoId: c.id,
+  }))
+  const comentariosPorChave = await contarComentariosPraca(paresComentario)
+
+  let votosViewer = new Map<string, 1 | -1>()
+  if (opts.userId) {
+    const votos: { alvoTipo: string; alvoId: string; valor: number }[] = await db.pracaVoto.findMany({
+      where: {
+        userId: opts.userId,
+        alvoTipo: { in: ['NOTICIA', 'ARTIGO'] },
+        alvoId: { in: itens.map((c) => c.id) },
+      },
+      select: { alvoTipo: true, alvoId: true, valor: true },
+    })
+    votosViewer = new Map(
+      votos
+        .filter((v) => v.valor === 1 || v.valor === -1)
+        .map((v) => [`${v.alvoTipo}:${v.alvoId}`, v.valor as 1 | -1]),
+    )
+  }
+
+  return itens.map((c) => {
+    const alvoTipo = c.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO'
+    return {
+      ...c,
+      totalComentarios: comentariosPorChave.get(`${alvoTipo}:${c.id}`) ?? 0,
+      meuVoto: votosViewer.get(`${alvoTipo}:${c.id}`) ?? null,
+    }
   })
-  return ordenarNoticiasPraca(artigos.map(mapArtigoParaItem), ordem).slice(0, 50)
 }
 
 type TopicoRow = {
@@ -451,6 +519,7 @@ export async function listarTopicos(
     atualizadoEm: t.atualizadoEm,
     autorId: t.autorId,
     autorNome: t.autor.nome,
+    meuVoto: null as 1 | -1 | null,
   }))
   const ranked =
     ordem === 'em_alta'
@@ -461,7 +530,25 @@ export async function listarTopicos(
           if (sa !== sb) return sa - sb
           return 0
         })
-  return ranked.slice(0, 50)
+  const fatia = ranked.slice(0, 50)
+  if (!opts.userId || fatia.length === 0) return fatia
+
+  const votos: { alvoId: string; valor: number }[] = await db.pracaVoto.findMany({
+    where: {
+      userId: opts.userId,
+      alvoTipo: 'TOPICO',
+      alvoId: { in: fatia.map((t) => t.id) },
+    },
+    select: { alvoId: true, valor: true },
+  })
+  const votoPorId = new Map(votos.map((v) => [v.alvoId, v.valor]))
+  return fatia.map((t) => ({
+    ...t,
+    meuVoto:
+      votoPorId.get(t.id) === 1 || votoPorId.get(t.id) === -1
+        ? (votoPorId.get(t.id) as 1 | -1)
+        : null,
+  }))
 }
 
 export type TopicoParaFeed = {
@@ -568,6 +655,7 @@ export type ForumRespostaFeedItem = {
   id: string
   conteudo: string
   criadoEm: Date
+  parentId: string | null
   autor: { id: string; nome: string | null; avatarUrl: string | null }
 }
 
@@ -593,15 +681,17 @@ export async function listarRespostasTopico(
     id: string
     conteudo: string
     criadoEm: Date
+    parentId: string | null
     autor: { id: string; nome: string | null; avatarUrl: string | null }
   }[] = await db.forumResposta.findMany({
-    where: { topicoId, oculto: false, parentId: null },
+    where: { topicoId, oculto: false },
     orderBy: { criadoEm: 'asc' },
-    take: 40,
+    take: 80,
     select: {
       id: true,
       conteudo: true,
       criadoEm: true,
+      parentId: true,
       autor: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
@@ -609,34 +699,92 @@ export async function listarRespostasTopico(
     id: r.id,
     conteudo: r.conteudo,
     criadoEm: r.criadoEm,
+    parentId: r.parentId,
     autor: r.autor,
   }))
+}
+
+async function agregarVotosNoticiaPraca(
+  ids: string[],
+): Promise<Map<string, { gostei: number; naoGostei: number }>> {
+  if (ids.length === 0) return new Map()
+  const votos: { alvoId: string; valor: number }[] = await db.pracaVoto.findMany({
+    where: { alvoTipo: 'NOTICIA', alvoId: { in: ids } },
+    select: { alvoId: true, valor: true },
+  })
+  const map = new Map<string, { gostei: number; naoGostei: number }>()
+  for (const v of votos) {
+    const cur = map.get(v.alvoId) ?? { gostei: 0, naoGostei: 0 }
+    if (v.valor === 1) cur.gostei += 1
+    else if (v.valor === -1) cur.naoGostei += 1
+    map.set(v.alvoId, cur)
+  }
+  return map
+}
+
+async function contarComentariosPraca(
+  pares: Array<{ alvoTipo: 'NOTICIA' | 'ARTIGO'; alvoId: string }>,
+): Promise<Map<string, number>> {
+  if (pares.length === 0) return new Map()
+  const ids = pares.map((p) => p.alvoId)
+  const rows: { alvoTipo: 'NOTICIA' | 'ARTIGO'; alvoId: string; _count: { id: number } }[] =
+    await db.pracaComentario.groupBy({
+      by: ['alvoTipo', 'alvoId'],
+      where: { alvoId: { in: ids }, oculto: false },
+      _count: { id: true },
+    })
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    map.set(`${r.alvoTipo}:${r.alvoId}`, r._count.id)
+  }
+  return map
 }
 
 export async function getPracaFeedCards(
   escopo: EscopoComunidade,
   ancora: AncoraPraca,
-): Promise<PracaFeedCard[]> {
+  opts: { userId?: string } = {},
+): Promise<PracaNoticiaFeedItem[]> {
   const sufixo = sufixoEscopoPraca(escopo)
-  const cards: PracaFeedCard[] = []
+  const cards: PracaNoticiaFeedItem[] = []
 
   if (escopo === 'nacional' && ancora.afiliacaoId) {
-    const noticias: Pick<Noticia, 'id' | 'titulo' | 'fonte' | 'publicadoEm' | 'criadoEm'>[] =
-      await db.noticia.findMany({
-        where: { afiliacaoId: ancora.afiliacaoId, status: 'APROVADA' },
-        orderBy: { publicadoEm: 'desc' },
-        take: 6,
-        select: { id: true, titulo: true, fonte: true, publicadoEm: true, criadoEm: true },
-      })
+    const noticias: ImprensaListRow[] = await db.noticia.findMany({
+      where: { afiliacaoId: ancora.afiliacaoId, status: 'APROVADA' },
+      orderBy: { publicadoEm: 'desc' },
+      take: 6,
+      select: {
+        id: true,
+        titulo: true,
+        resumo: true,
+        fonte: true,
+        url: true,
+        embedThumbnail: true,
+        publicadoEm: true,
+        criadoEm: true,
+        visitas: true,
+      },
+    })
+    const votosPorId = await agregarVotosNoticiaPraca(noticias.map((n) => n.id))
     for (const n of noticias) {
+      const mapped = mapImprensaParaItem(n)
+      const votos = votosPorId.get(n.id) ?? { gostei: 0, naoGostei: 0 }
       cards.push({
         kind: 'noticia',
         origem: 'imprensa',
         id: n.id,
-        titulo: n.titulo,
+        titulo: mapped.titulo,
+        resumo: mapped.resumo,
+        midiaUrls: mapped.midiaUrls,
         href: `/portal/comunidade/noticias/${n.id}${sufixo}`,
-        meta: n.fonte,
-        criadoEm: n.publicadoEm ?? n.criadoEm,
+        criadoEm: mapped.publicadoEm ?? mapped.criadoEm,
+        fixado: false,
+        gostei: votos.gostei,
+        naoGostei: votos.naoGostei,
+        meuVoto: null,
+        totalComentarios: 0,
+        fonte: mapped.fonte,
+        autor: { id: null, nome: mapped.fonte, avatarUrl: null },
       })
     }
   }
@@ -644,27 +792,90 @@ export async function getPracaFeedCards(
   const where = wherePracaNoEscopo(escopo, ancora)
 
   if (escopo !== 'nacional' && ancora.tenantId) {
-    const artigos: Pick<ArtigoPortal, 'id' | 'titulo' | 'origem' | 'publicadoEm' | 'criadoEm'>[] =
-      await db.artigoPortal.findMany({
-        where: where.artigos,
-        orderBy: { publicadoEm: 'desc' },
-        take: 6,
-        select: { id: true, titulo: true, origem: true, publicadoEm: true, criadoEm: true },
-      })
+    const artigos: (ArtigoListRow & {
+      autor: { nome: string | null; avatarUrl: string | null }
+    })[] = await db.artigoPortal.findMany({
+      where: where.artigos,
+      orderBy: { publicadoEm: 'desc' },
+      take: 6,
+      select: {
+        id: true,
+        titulo: true,
+        resumo: true,
+        midiaUrls: true,
+        capaUrl: true,
+        blocos: true,
+        origem: true,
+        publicadoEm: true,
+        criadoEm: true,
+        visitas: true,
+        gostei: true,
+        naoGostei: true,
+        fixado: true,
+        autorId: true,
+        autor: { select: { nome: true, avatarUrl: true } },
+      },
+    })
     for (const a of artigos) {
+      const mapped = mapArtigoParaItem(a)
       cards.push({
         kind: 'artigo',
-        origem: a.origem === 'OFICIAL' ? 'oficial' : 'verificada',
+        origem: mapped.origem,
         id: a.id,
-        titulo: a.titulo,
+        titulo: mapped.titulo,
+        resumo: mapped.resumo,
+        midiaUrls: mapped.midiaUrls,
         href: `/portal/comunidade/noticias/${a.id}${sufixo}`,
-        meta: a.origem === 'OFICIAL' ? 'Oficial' : 'Fonte verificada',
-        criadoEm: a.publicadoEm ?? a.criadoEm,
+        criadoEm: mapped.publicadoEm ?? mapped.criadoEm,
+        fixado: mapped.fixado,
+        gostei: mapped.gostei,
+        naoGostei: mapped.naoGostei,
+        meuVoto: null,
+        totalComentarios: 0,
+        fonte: null,
+        autor: {
+          id: mapped.autorId,
+          nome: mapped.autorNome,
+          avatarUrl: a.autor.avatarUrl,
+        },
       })
     }
   }
 
-  return ordenarCardsPraca(cards).slice(0, 8)
+  const ordenados = ordenarCardsPraca(cards).slice(0, 8)
+  if (ordenados.length === 0) return []
+
+  const paresComentario = ordenados.map((c) => ({
+    alvoTipo: (c.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO') as 'NOTICIA' | 'ARTIGO',
+    alvoId: c.id,
+  }))
+  const comentariosPorChave = await contarComentariosPraca(paresComentario)
+
+  let votosViewer = new Map<string, 1 | -1>()
+  if (opts.userId) {
+    const votos: { alvoTipo: string; alvoId: string; valor: number }[] = await db.pracaVoto.findMany({
+      where: {
+        userId: opts.userId,
+        alvoTipo: { in: ['NOTICIA', 'ARTIGO'] },
+        alvoId: { in: ordenados.map((c) => c.id) },
+      },
+      select: { alvoTipo: true, alvoId: true, valor: true },
+    })
+    votosViewer = new Map(
+      votos
+        .filter((v) => v.valor === 1 || v.valor === -1)
+        .map((v) => [`${v.alvoTipo}:${v.alvoId}`, v.valor as 1 | -1]),
+    )
+  }
+
+  return ordenados.map((c) => {
+    const alvoTipo = c.kind === 'noticia' ? 'NOTICIA' : 'ARTIGO'
+    return {
+      ...c,
+      totalComentarios: comentariosPorChave.get(`${alvoTipo}:${c.id}`) ?? 0,
+      meuVoto: votosViewer.get(`${alvoTipo}:${c.id}`) ?? null,
+    }
+  })
 }
 
 export { podeVerArtigoNoEscopo, podeVerTopicoNoEscopo }
@@ -883,6 +1094,7 @@ export type ForumRespostaItem = {
   criadoEm: Date
   autorId: string
   autorNome: string | null
+  parentId: string | null
   oculto: boolean
 }
 
@@ -926,6 +1138,7 @@ export async function getTopicoDetalhe(
         criadoEm: Date
         oculto: boolean
         autorId: string
+        parentId: string | null
         autor: { nome: string | null }
       }[]
     } | null,
@@ -953,15 +1166,16 @@ export async function getTopicoDetalhe(
         afiliacaoId: true,
         autor: { select: { nome: true, nickname: true, avatarUrl: true } },
         respostas: {
-          where: viewer.podeModerar ? { parentId: null } : { oculto: false, parentId: null },
+          where: viewer.podeModerar ? undefined : { oculto: false },
           orderBy: { criadoEm: 'asc' },
-          take: 80,
+          take: 200,
           select: {
             id: true,
             conteudo: true,
             criadoEm: true,
             oculto: true,
             autorId: true,
+            parentId: true,
             autor: { select: { nome: true } },
           },
         },
@@ -1014,6 +1228,7 @@ export async function getTopicoDetalhe(
       criadoEm: r.criadoEm,
       autorId: r.autorId,
       autorNome: r.autor.nome,
+      parentId: r.parentId,
       oculto: r.oculto,
     })),
   }

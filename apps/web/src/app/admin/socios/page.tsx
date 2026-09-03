@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { db, type Prisma } from '@torcida/db'
-import { assertAnyPermission } from '@/lib/authz'
+import { assertAnyPermission, tenantIsAdministracaoSede } from '@/lib/authz'
+import { carregarDepartamentoUnidadePorMembro } from '@/lib/admin-membro-espelho'
 import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { alertasRecrutamentoCrossTenant } from '@/lib/membro-alertas-cross-tenant'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
@@ -35,6 +36,7 @@ import {
   LISTAGEM_SOCIOS_AGUARDANDO,
   LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SOCIOS_SOLICITACOES,
+  LISTAGEM_SOCIOS_TODOS,
 } from '@/lib/listagem/specs'
 import {
   montarOrderByListagem,
@@ -43,8 +45,9 @@ import {
   resumirPaginacao,
   type ListagemWhere,
 } from '@/lib/listagem/query'
+import { buscaEmitidasSocios } from '@/lib/listagem/socios-busca'
 import type { OpcoesDinamicas } from '@/lib/listagem/ui'
-import { AdminSociosClient } from './admin-socios-client'
+import { AdminSociosClient, type SocioTodosItem } from './admin-socios-client'
 import { AdminMembrosTable } from '@/app/admin/membros/admin-membros-client'
 import { SincronizarNumerosAviso } from './sincronizar-numeros-aviso'
 import { sugerirProximoNumeroAssociado } from '@/lib/membros-sede'
@@ -53,14 +56,22 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Sócios — Admin' }
 
-type StatusFiltro = 'solicitacoes' | 'aguardando' | 'todos' | 'ativos' | 'vencendo' | 'vencidos'
+type StatusFiltro =
+  | 'todos'
+  | 'solicitacoes'
+  | 'aguardando'
+  | 'emitidas'
+  | 'ativos'
+  | 'vencendo'
+  | 'vencidos'
 
 function parseStatus(raw: string): StatusFiltro | '' {
   if (
+    raw === 'todos' ||
     raw === 'solicitacoes' ||
     raw === 'PENDENTE' ||
     raw === 'aguardando' ||
-    raw === 'todos' ||
+    raw === 'emitidas' ||
     raw === 'ativos' ||
     raw === 'vencendo' ||
     raw === 'vencidos'
@@ -68,6 +79,19 @@ function parseStatus(raw: string): StatusFiltro | '' {
     return raw === 'PENDENTE' ? 'solicitacoes' : raw
   }
   return ''
+}
+
+function resolverEstagioSocio(
+  status: string,
+  validade: Date | null | undefined,
+  now: Date,
+  em30dias: Date,
+): SocioTodosItem['estagio'] {
+  if (status === 'PENDENTE') return 'solicitacao'
+  if (!validade) return 'aguardando'
+  if (validade < now) return 'vencido'
+  if (validade < em30dias) return 'vencendo'
+  return 'ativo'
 }
 
 /** Nº exibido = o do recrutamento; fallback no sequencial legado da carteirinha. */
@@ -90,41 +114,6 @@ async function resolverNomesUnidade(
     select: { id: true, nome: true },
   })
   return new Map(rows.map((u) => [u.id, formatNomeTorcida(u.nome)]))
-}
-
-/**
- * Busca em emitidas: `numeroSocio` é Int (não cabe em `contains` do contrato) e
- * o nº do recrutamento mora em SaasMembro. Monta o OR completo da busca livre
- * aqui e zera `q` no parse usado pelo where padrão.
- */
-function buscaEmitidas(
-  termo: string,
-  tenantId: string,
-): ListagemWhere | null {
-  const q = termo.trim()
-  if (!q) return null
-  const or: ListagemWhere[] = [
-    { nome: { contains: q, mode: 'insensitive' } },
-  ]
-  if (/^\d+$/.test(q)) {
-    const n = parseInt(q, 10)
-    or.push({ numeroSocio: n })
-    or.push({
-      user: {
-        membros: {
-          some: {
-            tenantId,
-            tipo: 'SOCIO',
-            OR: [
-              { numeroAssociado: q },
-              { numeroAssociado: String(n) },
-            ],
-          },
-        },
-      },
-    })
-  }
-  return { OR: or }
 }
 
 export default async function SociosPage({
@@ -188,6 +177,12 @@ export default async function SociosPage({
     status: 'PENDENTE',
   }
 
+  const todosBase: Prisma.SaasMembroWhereInput = {
+    tenantId: tenant.id,
+    tipo: 'SOCIO',
+    status: { in: ['PENDENTE', 'APROVADO'] },
+  }
+
   const [emitidas, ativos, vencendo, vencidos, aguardando, solicitacoesCount] =
     await Promise.all([
       db.saasSocio.count({ where: { tenantId: tenant.id } }),
@@ -217,22 +212,19 @@ export default async function SociosPage({
   }
 
   const statusRaw = parseStatus(texto('status'))
-  const statusFiltro: StatusFiltro =
-    statusRaw ||
-    (solicitacoesCount > 0
-      ? 'solicitacoes'
-      : aguardando > 0 && emitidas === 0
-        ? 'aguardando'
-        : 'todos')
+  const statusFiltro: StatusFiltro = statusRaw || 'todos'
+  const isTodos = statusFiltro === 'todos'
   const isAguardando = statusFiltro === 'aguardando'
   const isSolicitacoes = statusFiltro === 'solicitacoes'
 
   // Três modelos/contratos. A aba status decide qual.
-  const SPEC: ListagemSpec = isSolicitacoes
-    ? LISTAGEM_SOCIOS_SOLICITACOES
-    : isAguardando
-      ? LISTAGEM_SOCIOS_AGUARDANDO
-      : LISTAGEM_SOCIOS_EMITIDAS
+  const SPEC: ListagemSpec = isTodos
+    ? LISTAGEM_SOCIOS_TODOS
+    : isSolicitacoes
+      ? LISTAGEM_SOCIOS_SOLICITACOES
+      : isAguardando
+        ? LISTAGEM_SOCIOS_AGUARDANDO
+        : LISTAGEM_SOCIOS_EMITIDAS
   const listagem = parseListagemParams(params, SPEC)
   // Sempre gravar `status` na URL — inclusive `todos` (Emitidas). Omitir
   // colidia com o default inteligente da página (sem status → Solicitações
@@ -241,12 +233,17 @@ export default async function SociosPage({
     status: statusFiltro,
   }
 
-  const sedesOpts: { id: string; nome: string; tipo: string }[] =
-    await db.sede.findMany({
+  const [sedesOpts, isAdministracaoSede]: [
+    { id: string; nome: string; tipo: string }[],
+    boolean,
+  ] = await Promise.all([
+    db.sede.findMany({
       where: { tenantId: tenant.id, ativa: true },
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
       select: { id: true, nome: true, tipo: true },
-    })
+    }),
+    tenantIsAdministracaoSede(tenant.id),
+  ])
 
   const dinamicas: OpcoesDinamicas = {
     sede: [
@@ -270,12 +267,116 @@ export default async function SociosPage({
   let socios: SocioRow[] = []
   let elegiveisDetalhe: MembroDetalheRow[] = []
   const solicitacoesItens: AdminMembroItem[] = []
+  const todosItens: SocioTodosItem[] = []
   let totalLista = 0
   const numeroAssociadoPorUserId = new Map<string, string | null>()
   const detalhePorUserId = new Map<string, AdminMembroItem>()
   let numerosDessincronizados = 0
 
-  if (isSolicitacoes) {
+  if (isTodos) {
+    type MembroComSocio = MembroDetalheRow & {
+      user: MembroDetalheRow['user'] & {
+        socios: { id: string; numeroSocio: number; validade: Date; nome: string }[]
+      }
+    }
+
+    const where: Prisma.SaasMembroWhereInput = montarWhereListagem(SPEC, listagem, {
+      escopo: { tenantId: tenant.id },
+      extra: [todosBase],
+    })
+
+    const [rows, total]: [MembroComSocio[], number] = await Promise.all([
+      db.saasMembro.findMany({
+        where,
+        select: {
+          ...membroDetalheSelect,
+          user: {
+            select: {
+              email: true,
+              avatarUrl: true,
+              socios: {
+                where: { tenantId: tenant.id },
+                select: { id: true, numeroSocio: true, validade: true, nome: true },
+                take: 1,
+              },
+            },
+          },
+        },
+        orderBy: montarOrderByListagem(SPEC, listagem),
+        ...montarPaginacao(listagem),
+      }) as Promise<MembroComSocio[]>,
+      db.saasMembro.count({ where }),
+    ])
+    totalLista = total
+
+    const userIds = rows.map((m) => m.userId)
+    const membroIds = rows.map((m) => m.id)
+    const [alertasCross, resumoRecrutamento, nomesUnidade, areasEfetivadas]: [
+      Awaited<ReturnType<typeof alertasRecrutamentoCrossTenant>>,
+      Awaited<ReturnType<typeof carregarResumoRecrutamento>>,
+      Map<string, string>,
+      Map<string, Set<string>>,
+    ] = await Promise.all([
+      alertasRecrutamentoCrossTenant(tenant.id, userIds),
+      carregarResumoRecrutamento(tenant.id, membroIds),
+      resolverNomesUnidade(rows.map((m) => m.aprovadoNaUnidadeTenantId)),
+      getAreasEfetivadasPorUser(tenant.id, userIds),
+    ])
+    const { userIdsComRivalSocio, reprovacoesRivalPorUser: reprovacoesOutraTorcidaPorUser } =
+      alertasCross
+    const { tentativasPorMembro, motivoReprovacaoPorMembro, origemCanalPorMembro } =
+      resumoRecrutamento
+
+    const departamentoUnidadePorMembro = await carregarDepartamentoUnidadePorMembro(
+      db,
+      rows,
+      isAdministracaoSede,
+    )
+
+    for (const m of rows) {
+      const carteirinha = m.user.socios[0] ?? null
+      const detalhe = mapToAdminMembroItem(m, {
+        aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
+          ? (nomesUnidade.get(m.aprovadoNaUnidadeTenantId) ?? null)
+          : null,
+        alertaRivalSocio: userIdsComRivalSocio.has(m.userId),
+        reprovacoesOutraTorcida: reprovacoesOutraTorcidaPorUser.get(m.userId),
+        tentativas: tentativasPorMembro.get(m.id) ?? 1,
+        ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(m.id),
+        origemCanal: origemCanalPorMembro.get(m.id) ?? null,
+        areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
+        departamentoUnidadeNome: departamentoUnidadePorMembro.get(m.id) ?? null,
+      })
+      detalhePorUserId.set(m.userId, detalhe)
+
+      const estagio = resolverEstagioSocio(
+        m.status,
+        carteirinha?.validade,
+        now,
+        em30dias,
+      )
+      const socioEmitido =
+        carteirinha && estagio !== 'solicitacao' && estagio !== 'aguardando'
+          ? {
+              id: carteirinha.id,
+              userId: m.userId,
+              numeroSocio: carteirinha.numeroSocio,
+              numeroLabel: labelNumeroSocio(m.numeroAssociado, carteirinha.numeroSocio),
+              nome: carteirinha.nome,
+              validadeIso: carteirinha.validade.toISOString().split('T')[0] ?? '',
+              validadeLabel: carteirinha.validade.toLocaleDateString('pt-BR'),
+              email: m.user.email,
+              departamentoNome: detalhe.departamentoNome ?? null,
+              avatarUrl: m.user.avatarUrl,
+              vencida: carteirinha.validade < now,
+              vencendo: carteirinha.validade > now && carteirinha.validade < em30dias,
+              detalhe,
+            }
+          : undefined
+
+      todosItens.push({ detalhe, estagio, socio: socioEmitido })
+    }
+  } else if (isSolicitacoes) {
     const where: Prisma.SaasMembroWhereInput = montarWhereListagem(
       SPEC,
       listagem,
@@ -314,6 +415,12 @@ export default async function SociosPage({
     const { tentativasPorMembro, motivoReprovacaoPorMembro, origemCanalPorMembro } =
       resumoRecrutamento
 
+    const departamentoUnidadePorMembro = await carregarDepartamentoUnidadePorMembro(
+      db,
+      rows,
+      isAdministracaoSede,
+    )
+
     for (const m of rows) {
       const item = mapToAdminMembroItem(m, {
         aprovadoNaUnidadeNome: m.aprovadoNaUnidadeTenantId
@@ -325,6 +432,7 @@ export default async function SociosPage({
         ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(m.id),
         origemCanal: origemCanalPorMembro.get(m.id) ?? null,
         areasEfetivadas: areasEfetivadas.get(m.userId) ?? new Set<string>(),
+        departamentoUnidadeNome: departamentoUnidadePorMembro.get(m.id) ?? null,
       })
       solicitacoesItens.push(item)
       detalhePorUserId.set(m.userId, item)
@@ -381,7 +489,7 @@ export default async function SociosPage({
     // Busca numérica/nome montada à mão — zera `q` no contrato para não
     // AND-ar com o contains de nome sozinho.
     const listagemSemQ: ListagemParams = { ...listagem, q: '' }
-    const buscaExtra = buscaEmitidas(listagem.q, tenant.id)
+    const buscaExtra = buscaEmitidasSocios(listagem.q, tenant.id)
 
     const where: Prisma.SaasSocioWhereInput = montarWhereListagem(
       SPEC,
@@ -506,14 +614,24 @@ export default async function SociosPage({
   // Solicitações quando há pedidos pendentes.
   const tabHrefs: Record<string, string> = Object.fromEntries(
     (
-      ['solicitacoes', 'aguardando', 'todos', 'ativos', 'vencendo', 'vencidos'] as const
+      [
+        'todos',
+        'solicitacoes',
+        'aguardando',
+        'emitidas',
+        'ativos',
+        'vencendo',
+        'vencidos',
+      ] as const
     ).map((status) => {
         const specTab =
-          status === 'solicitacoes'
-            ? LISTAGEM_SOCIOS_SOLICITACOES
-            : status === 'aguardando'
-              ? LISTAGEM_SOCIOS_AGUARDANDO
-              : LISTAGEM_SOCIOS_EMITIDAS
+          status === 'todos'
+            ? LISTAGEM_SOCIOS_TODOS
+            : status === 'solicitacoes'
+              ? LISTAGEM_SOCIOS_SOLICITACOES
+              : status === 'aguardando'
+                ? LISTAGEM_SOCIOS_AGUARDANDO
+                : LISTAGEM_SOCIOS_EMITIDAS
         // Re-parse com o spec destino: sort/dir inválidos caem no padrão.
         const paramsTab = parseListagemParams(
           {
@@ -538,12 +656,23 @@ export default async function SociosPage({
       }),
   )
 
-  const COLUNA_CLASSE: Record<string, string> = isSolicitacoes
+  const COLUNA_CLASSE: Record<string, string> = isTodos
     ? {
         departamento: 'hidden sm:table-cell',
         sede: 'hidden md:table-cell',
+        areaUnidade: 'hidden lg:table-cell',
         cidade: 'hidden lg:table-cell',
         criadoEm: 'hidden xl:table-cell',
+        situacao: 'hidden sm:table-cell',
+      }
+    : isSolicitacoes
+    ? {
+        departamento: 'hidden sm:table-cell',
+        sede: 'hidden md:table-cell',
+        areaUnidade: 'hidden lg:table-cell',
+        cidade: 'hidden lg:table-cell',
+        criadoEm: 'hidden xl:table-cell',
+        situacao: 'hidden lg:table-cell',
       }
     : isAguardando
       ? {
@@ -576,9 +705,9 @@ export default async function SociosPage({
       paginacao={paginacao}
       dinamicas={dinamicas}
       extras={extrasDaRota}
-      escopoChave={`${tenant.id}:${isSolicitacoes ? 'solicitacoes' : isAguardando ? 'aguardando' : 'emitidas'}`}
+      escopoChave={`${tenant.id}:${isTodos ? 'todos' : isSolicitacoes ? 'solicitacoes' : isAguardando ? 'aguardando' : 'emitidas'}`}
       filtrosCompactos={
-        isSolicitacoes || isAguardando
+        isTodos || isSolicitacoes || isAguardando
           ? [{ filtroId: 'sede', classe: 'md:hidden' }]
           : [{ filtroId: 'sede' }]
       }
@@ -601,6 +730,7 @@ export default async function SociosPage({
       )}
 
       <AdminSociosClient
+        todosItens={todosItens}
         solicitacoes={solicitacoesItens}
         solicitacoesTabela={
           isSolicitacoes ? (
@@ -613,6 +743,7 @@ export default async function SociosPage({
               podeBloquear={podeBloquear}
               podeApagar={podeApagar}
               bloqueadosUserIds={bloqueadosUserIds}
+              isAdministracaoSede={isAdministracaoSede}
               membros={solicitacoesItens}
             />
           ) : null
@@ -670,7 +801,10 @@ export default async function SociosPage({
             : null,
           detalhe: null,
         }))}
-        contagens={contagens}
+        contagens={{
+          ...contagens,
+          todos: contagens.solicitacoes + contagens.aguardando + contagens.emitidas,
+        }}
         statusFiltro={statusFiltro}
         tabHrefs={tabHrefs}
         podeEmitir={podeEmitir}

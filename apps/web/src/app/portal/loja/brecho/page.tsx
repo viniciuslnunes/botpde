@@ -11,9 +11,10 @@ import { resolverContextoBrecho } from '@/lib/brecho-escopo'
 import { getMinhaLojaBrecho, listarFeedBrecho, anuncioParaGridItem } from '@/lib/brecho'
 import { LojaProdutoGridAnimated, type LojaProdutoGridItem } from '@/components/portal/loja-produto-grid-animated'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { Recycle } from 'lucide-react'
+import { Filter, Recycle } from 'lucide-react'
 import { BrechoAviso, BrechoChrome } from './_components/brecho-chrome'
 import type { Metadata } from 'next'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Brechó da torcida' }
 
@@ -132,9 +133,9 @@ export default async function PortalBrechoFeedPage({
           <option value="confiaveis">Confiáveis primeiro</option>
           <option value="recentes">Recentes</option>
         </select>
-        <button type="submit" className="app-action rounded-xl border border-[rgb(var(--border))] px-4 font-medium">
+        <AppButton variant="none" icon={Filter} type="submit" className="app-action rounded-xl border border-[rgb(var(--border))] px-4 font-medium">
           Filtrar
-        </button>
+        </AppButton>
       </form>
 
       <div className="flex gap-2 font-mono text-[11px] uppercase tracking-wider">

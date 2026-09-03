@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
-import { DEPARTAMENTOS_CANONICOS_SLUGS } from '@torcida/types'
+import { DEPARTAMENTOS_CANONICOS_SLUGS, resumirConformidadeLge } from '@torcida/types'
 import {
   ADMIN_DIRECAO_TTL,
   tagAdminDirecao,
@@ -27,6 +27,9 @@ export type DiretoriaOpsResumo = {
   pedidosLojaPendentes: number
   deptosSemGestor: DiretoriaDeptoSaude[]
   deptosOk: number
+  lgeIncompletos: number
+  lgeSemCpf: number
+  lgeSemRg: number
   pendencias: AdminInboxItem[]
 }
 
@@ -53,6 +56,29 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
     select: { id: true, slug: true },
   })
 
+  type SocioLgeRow = {
+    userId: string
+    nome: string
+    tipo: string
+    idade: number | null
+    cpf: string | null
+    rg: string | null
+    dataNascimento: Date | null
+    logradouro: string | null
+    bairro: string | null
+    cep: string | null
+    uf: string | null
+    termoResponsabilidadeAceitoEm: Date | null
+    imagemProva: string | null
+    responsavelNome: string | null
+    responsavelDocumento: string | null
+    autorizacaoMenorAceitaEm: Date | null
+    fotoDocumentoUrl: string | null
+    comprovanteResidenciaUrl: string | null
+    dataExpedicaoCarteirinha: Date | null
+    numeroAssociado: string | null
+  }
+
   const [
     membrosPendentes,
     sociosAtivos,
@@ -61,7 +87,8 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
     pedidosLojaPendentes,
     deptosCanon,
     filaTop,
-  ]: [number, number, number, number, number, DeptoHealthRow[], MembroPendente[]] =
+    sociosLge,
+  ]: [number, number, number, number, number, DeptoHealthRow[], MembroPendente[], SocioLgeRow[]] =
     await Promise.all([
       db.saasMembro.count({ where: { tenantId, status: 'PENDENTE' } }),
       db.saasSocio.count({ where: { tenantId } }),
@@ -90,6 +117,31 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
           user: { select: { email: true } },
         },
       }),
+      db.saasMembro.findMany({
+        where: { tenantId, tipo: 'SOCIO', status: 'APROVADO', desligadoEm: null },
+        select: {
+          userId: true,
+          nome: true,
+          tipo: true,
+          idade: true,
+          cpf: true,
+          rg: true,
+          dataNascimento: true,
+          logradouro: true,
+          bairro: true,
+          cep: true,
+          uf: true,
+          termoResponsabilidadeAceitoEm: true,
+          imagemProva: true,
+          responsavelNome: true,
+          responsavelDocumento: true,
+          autorizacaoMenorAceitaEm: true,
+          fotoDocumentoUrl: true,
+          comprovanteResidenciaUrl: true,
+          dataExpedicaoCarteirinha: true,
+          numeroAssociado: true,
+        },
+      }),
     ])
 
   const deptosSemGestor: DiretoriaDeptoSaude[] = deptosCanon
@@ -102,6 +154,7 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
     }))
 
   const deptosOk = deptosCanon.length - deptosSemGestor.length
+  const lge = resumirConformidadeLge(sociosLge)
   const pendencias: AdminInboxItem[] = []
 
   if (!depto) {
@@ -144,6 +197,19 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
       detalhe: 'Revise validade LGE em Sócios.',
       href: '/admin/socios',
       tom: 'warning',
+    })
+  }
+
+  if (lge.incompletos > 0) {
+    pendencias.push({
+      id: 'lge-incompletos',
+      titulo: `${lge.incompletos} sócio${lge.incompletos === 1 ? '' : 's'} com cadastro LGE incompleto`,
+      detalhe:
+        lge.semCpf > 0 || lge.semRg > 0
+          ? `${lge.semCpf} sem CPF · ${lge.semRg} sem RG — exigência para manifesto e viagem.`
+          : 'Revise documentos e termo de responsabilidade em Sócios.',
+      href: '/admin/socios',
+      tom: lge.incompletos >= 5 ? 'danger' : 'warning',
     })
   }
 
@@ -191,6 +257,9 @@ async function fetchDirecaoDiretoria(tenantId: string): Promise<DiretoriaOpsResu
     pedidosLojaPendentes,
     deptosSemGestor,
     deptosOk,
+    lgeIncompletos: lge.incompletos,
+    lgeSemCpf: lge.semCpf,
+    lgeSemRg: lge.semRg,
     pendencias: pendencias.slice(0, 12),
   }
 }

@@ -118,23 +118,33 @@ export default async function DepartamentoProjetosListaPage({
       </div>
 
       <KpiGrid cols={4}>
-        <StatCard label="Em aberto" value={abertos.length} icon={<Target className="h-5 w-5" />} />
+        <StatCard compact label="Em aberto" value={abertos.length} icon={<Target className="h-4 w-4" />} />
         <StatCard
+          compact
           label="Atrasados"
           value={atrasados.length}
           tone={atrasados.length > 0 ? 'warning' : 'default'}
-          icon={<AlertTriangle className="h-5 w-5" />}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          badge={atrasados.length > 0 ? 'Fora do prazo' : undefined}
+          badgeTone="warning"
         />
         <StatCard
+          compact
           label="Meta abaixo da metade"
           value={metaRisco.length}
           tone={metaRisco.length > 0 ? 'warning' : 'default'}
+          icon={<Target className="h-4 w-4" />}
+          badge={metaRisco.length > 0 ? 'Acompanhar alcance' : undefined}
+          badgeTone="warning"
         />
         <StatCard
+          compact
           label="Orçamento estourado"
           value={orcamentoEstouro.length}
           tone={orcamentoEstouro.length > 0 ? 'danger' : 'default'}
-          icon={<Wallet className="h-5 w-5" />}
+          icon={<Wallet className="h-4 w-4" />}
+          badge={orcamentoEstouro.length > 0 ? 'Acima do previsto' : undefined}
+          badgeTone="danger"
         />
       </KpiGrid>
 
@@ -152,21 +162,21 @@ export default async function DepartamentoProjetosListaPage({
       ) : (
         <div className="space-y-6">
           {emRisco.length > 0 ? (
-            <ProjetoSaudeGrupo titulo="Pedem atenção">
+            <ProjetoSaudeGrupo titulo="Pedem atenção" contagem={emRisco.length}>
               {emRisco.map((item) => (
                 <ProjetoSaudeRow key={item.id} item={item} />
               ))}
             </ProjetoSaudeGrupo>
           ) : null}
           {noPrazo.length > 0 ? (
-            <ProjetoSaudeGrupo titulo="Em curso">
+            <ProjetoSaudeGrupo titulo="Em curso" contagem={noPrazo.length}>
               {noPrazo.map((item) => (
                 <ProjetoSaudeRow key={item.id} item={item} />
               ))}
             </ProjetoSaudeGrupo>
           ) : null}
           {encerrados.length > 0 ? (
-            <ProjetoSaudeGrupo titulo="Encerrados">
+            <ProjetoSaudeGrupo titulo="Encerrados" contagem={encerrados.length}>
               {encerrados.map((item) => (
                 <ProjetoSaudeRow key={item.id} item={item} />
               ))}

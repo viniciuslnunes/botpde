@@ -865,6 +865,69 @@ Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
   (API-Football pago) — ver §5.26 e `docs/data/integracao-api-football.md`.
 - **Ops:** cron lembretes; ICS; mural `?eventoId=`; QR + fila offline
   (`checkin-offline.ts`); mapa OSM embutido.
+- **Dono operacional (2026-09-02):** `Evento.departamentoId`/`areaId` = quem
+  **opera** (escala, monta, responde), distinto de `projetoId` = prestação de
+  contas. Ordem de resolução: escolha no form → `departamentoSlug` do hub thin →
+  herança do projeto → nulo. Parse puro em `lib/evento-dono.ts` (valor achatado
+  `dep::area`, sem select encadeado); validação de tenant + área↔departamento na
+  action, com `AuditLog`. **Não concede permissão** — como área e projeto.
+  Backfill: `db:repair-evento-dono-operacional`.
+- **Reatividade cross-módulo (2026-09-02):** `revalidateEventoPaths` exige
+  `tenantId` e chama `invalidateAdminDirecao` — quem revalida caminho também
+  acorda o posto de comando dos hubs. Mesma regra aplicada em bar, comanda,
+  financeiro, cobranças, loja e membros: sem isso, ação num módulo só aparecia no
+  vizinho depois do TTL de 45s.
+- **Escala da operação (2026-09-02):** `EventoEscala` = quem **trabalha**
+  (`FuncaoEscala`: coordenação, condução, embarque, bandeira, bateria, bar,
+  portaria, acolhimento, cobertura, apoio). RSVP continua sendo quem *vai*.
+  Unique `[eventoId, userId]` — uma pessoa, um posto, senão a cobertura mente.
+  **Presença não é campo da escala:** vem de `EventoRsvp.checkedInAt`. Não
+  concede permissão; convocar é `events:manage`, responder é da própria pessoa.
+  Regras puras em `packages/types/src/evento-escala.js`; pendências (sem
+  coordenação / silêncio a ≤48h / recusa) entram na inbox de Caravanas e Bateria.
+- **Resultado por operação (2026-09-02):** `FinanceiroLancamento.eventoId` +
+  `sedeId`. A baixa da cobrança de vaga carimba o evento, então a arrecadação
+  entra sozinha e a despesa é rateada no lançamento — `resultadoDaOperacao`
+  responde "a caravana fechou no azul?". Gate é `finance:view`/`manage`, nunca
+  `events:manage`: é caixa, não agenda.
+- **Carga da operação (2026-09-02):** `PatrimonioEmprestimo.eventoId` liga a
+  custódia com foto ao dia; material não devolvido de operação já encerrada
+  vira pendência na Direção do Patrimônio (`lib/carga-operacao.ts`).
+- **Elegibilidade a benefício (2026-09-02):** regra pura em
+  `packages/types/src/elegibilidade.js` — entrada é o estado da pessoa
+  (vínculo, adimplência, carteirinha, bloqueio) e a saída são **bloqueios** e
+  **avisos**, nunca uma ação. **Não é permissão:** responde "pode usar o
+  benefício", e o RBAC segue em `permissions.js`. Inadimplência **avisa** em
+  escala e embarque (barrar quem deve é decisão da liderança, com custo humano
+  no dia da viagem) e **bloqueia** comanda, que é crédito. Leitura em lote em
+  `lib/elegibilidade.ts` (uma consulta por tabela, nunca por pessoa). Aplicado
+  hoje na convocação de escala; bar e loja entram quando a política de bloqueio
+  do tenant estiver decidida.
+- **Dia de Jogo (2026-09-02):** `/admin/eventos/jogo/[partidaId]` — leitura
+  agregada em volta da `Partida` (operações do dia, cobertura da escala,
+  material em campo, setor/portão da arquibancada). **Não é dono de dado
+  nenhum** e não cria calendário paralelo: lê `Evento.partidaId`, `EventoEscala`
+  e `PatrimonioEmprestimo`, e devolve as ações para o módulo de origem. Quatro
+  consultas fixas, nunca uma por operação — a tela é aberta na véspera, com
+  pressa. `lib/dia-de-jogo.ts`.
+- **Frota da caravana (2026-09-02):** `CaravanaVeiculo` (identificação, placa,
+  empresa de fretamento, capacidade, responsável, ponto e horário de embarque)
+  + `EventoRsvp.veiculoId`. A alocação mora na própria inscrição porque o
+  unique `(evento, pessoa)` já garante o que a estrada exige — **uma pessoa, um
+  ônibus** —, e uma tabela de passageiros criaria uma segunda verdade sobre
+  quem está confirmado. Capacidade é do **veículo**, não do evento: alocar além
+  dela é gente em pé, então a checagem é no servidor
+  (`podeAlocarNoVeiculo`), e reduzir a capacidade abaixo dos já alocados é
+  barrado. Excluir veículo **desaloca** os passageiros em vez de apagá-los.
+  Regras puras: `packages/types/src/caravana-veiculo.js` (`resumirFrota`,
+  `pendenciasFrota`); leitura: `lib/caravana-frota.ts`; UI: aba **Frota** no
+  cockpit (só `tipo = CARAVANA`) e pendências no hub de Caravanas.
+- **Manifesto de embarque (2026-09-02):** `/admin/eventos/[id]/manifesto` —
+  lista nominal por veículo, sem JS, pronta para imprimir. É o documento que a
+  empresa de fretamento pede e a prova de organização sob a LGE art. 178
+  §§ 5º e 6º (a torcida responde pelo trajeto de ida e volta). **Minimização de
+  dado:** só nome, contato e caixa de embarque — nunca a ficha do associado; o
+  rodapé diz que o papel contém dado pessoal. Gate `events:manage`.
 - **Não fazer:** scrapar SERP Google Sports; tratar widgets Sofascore como ingestão
   de `Partida`.
 
@@ -2218,6 +2281,163 @@ próxima migração em massa: aqui, formatar não é neutro.
 
 Guia de uso, dicionário de ícones e as exceções: `docs/frontend/botoes.md`.
 
+### 5.37 QR do produto — primitiva com propósito, e o embarque rotativo (2026-09-02)
+
+O produto usava QR desde a carteirinha, mas **nunca desenhou um**: o painel em
+`/portal/carteirinha` era um quadrado tracejado escrito "Abra o link de
+validação", porque mandar um token HMAC para uma API de imagem de terceiro
+entregaria a credencial junto (LGPD). Faltava biblioteca, não decisão.
+`qrcode.react` (ISC, SVG local, sem rede) fecha isso, e o mesmo componente
+serve carteirinha e embarque.
+
+**Extrair, não abstrair.** O HMAC saiu de `carteirinha-qr.ts` para
+`lib/qr-token.ts` com um **propósito** (namespace) na entrada da assinatura, e
+carteirinha virou o primeiro consumidor. O formato é byte a byte o mesmo de
+antes (`carteirinha:<token>`, payload `dados.assinatura`) — mudar isso pararia
+de validar carteirinha já impressa e salva na galeria de quem está na fila do
+portão. O propósito é o que impede um token de um módulo valer em outro. Não se
+construiu "motor de QR para todos os módulos": a generalização espera o
+terceiro caso de uso (loja).
+
+**O QR do embarque rotaciona, e essa é a decisão que sustenta a feature.** A
+ideia original era um QR fixo do evento exibido pelo gestor. Fixo, ele vira
+print no grupo do WhatsApp em segundos e trinta pessoas marcam embarque de
+casa — a única pergunta que o painel existe para responder ("posso fechar a
+porta?") passaria a ter resposta errada. O payload cobre
+`eventoId | trecho | janela de 30s`, derivada do relógio como no TOTP (nada
+gravado para emitir). O servidor aceita a **janela anterior** também: sem isso,
+quem escaneia no estouro leva "expirado" na frente do ônibus, que é o pior
+lugar possível para pedir "tenta de novo". Geofence ficou para a fase 2 —
+`Evento.lat/lng` já existe e `EventoCheckin` já grava as coordenadas, mas GPS é
+burlável e negar permissão de localização travaria o sócio na porta.
+
+**Os dois sentidos de leitura são complementares, não substitutos.** O fluxo
+antigo (gestor bipa a carteirinha) tem fila offline e funciona com o celular do
+sócio sem bateria; o novo (sócio lê o QR do gestor) escala e é lido pela
+**câmera nativa**, o que contorna o `BarcodeDetector` ausente no Safari/iOS —
+hoje o gestor de iPhone só consegue colar o código na mão. Manter os dois é a
+decisão; o painel diz isso na tela ("sem rede? use a carteirinha").
+
+**Ida e volta viraram ledger, não coluna.** `EventoCheckin` (único por
+`evento × pessoa × trecho`) guarda método, quem registrou e override —
+`checkedInAt` continua materializado como presença, e **só a IDA o escreve**.
+Sobrescrever na volta apagaria a hora do embarque real; quem aparece na volta
+sem ter ido é um buraco para o gestor ver, não para o sistema tapar. Mesmo
+padrão de ledger + saldo materializado de §5.32. Confiança e notificação seguem
+coladas na IDA — contar a volta pagaria duas vezes pelo mesmo jogo.
+
+**O gate do auto-embarque não é `EVENTS_MANAGE`.** Quem age é a pessoa sobre si
+mesma: exigir a permissão do admin travaria o fluxo inteiro, e reusar a action
+do admin daria a qualquer sócio o poder de embarcar terceiros. O critério é
+sessão + `assertMembroAtivo` no tenant **do evento** + RSVP `CONFIRMADO` +
+janela válida. E aqui `checkInExigePagamento` bloqueia **sem override**: na
+porta o gestor pode liberar quem não pagou porque ele está ali decidindo; na
+câmera não há ninguém decidindo. Walk-in continua entrando só pelo check-in
+manual, que já tem override e `AuditLog`.
+
+A confirmação é um POST atrás de um botão, nunca o carregamento da página —
+GET não escreve no banco (§5.12), e um prefetch de link ou refresh acidental
+não podem valer como embarque.
+
+Detalhe e tabela dos dois fluxos: `docs/data/modulo-caravanas.md`
+§ embarque por trecho.
+
+**Fase 2 — o que fechou e o que se provou impossível.** O leitor virou
+`lib/use-qr-scanner.ts`, que prefere o `BarcodeDetector` e cai no `jsQR` por
+`import()` dinâmico onde ele não existe (Safari/iOS): quem tem motor nativo não
+baixa os bytes, e o gestor de iPhone deixou de depender de colar o código na
+mão. O geofence entrou como **sinal** — coordenada best-effort gravada no
+ledger, 📍 na lista acima de 300m, nada bloqueado: GPS é falsificável, então
+travar daria sensação de segurança sem segurança, enquanto o falso positivo
+recusa quem está ali na frente. Já a **fila offline no auto-embarque saiu do
+plano por ser incoerente com a rotação**: um token enfileirado sincroniza
+dezenas de janelas depois e é recusado — e se fosse aceito, teria virado o QR
+fixo que a rotação existe para impedir. Rotação e fila offline são mutuamente
+exclusivas; sem rede, o caminho é a carteirinha.
+
+**Fase 3 — o segundo consumidor prova a primitiva.** A retirada de pedido na
+loja assina o próprio `SaasPedido.id` com propósito `pedido-retirada`
+(`lib/pedido-qr.ts`) — **sem coluna nova**. E aqui o QR é **estático**, o
+oposto do embarque: lá o código é do *evento* e serve a quem apontar; aqui é o
+pedido *de uma pessoa*, o balcão confere o nome antes de entregar, o comprador
+pode estar sem sinal dentro da sede e um código que muda não pode ser salvo na
+galeria. O replay fecha do outro lado (pedido `ENTREGUE` recusa a segunda
+leitura). A regra que sobrevive das duas: **o que decide se o QR pode ser
+estático é quem ele identifica** — um recurso coletivo precisa rodar, o
+documento de uma pessoa não.
+
+A transição de status é **delegada** a `atualizarStatusPedido`, que já sabe
+estoque, financeiro, ticket e auditoria; `confirmarRetiradaPorQr` só identifica
+o pedido e julga se cabe entregar agora. Extrair essa transição para uma lib
+fica como follow-up — hoje ela mora num arquivo com trabalho em curso.
+
+**Terceiro consumidor, e a segunda regra que sobrevive: nem todo QR precisa ser
+verificado.** A comanda do bar (`lib/comanda-qr.ts`) é lida **no cliente, sem
+conferir assinatura** (`lib/qr-payload.ts`). Não é atalho: verificar existe para
+impedir que um payload forjado **autorize** algo, e escanear no PDV não autoriza
+nada — as comandas abertas da unidade já estão na tela do operador, então o QR
+só escolhe uma delas, e um código falso no máximo seleciona o que ele já podia
+selecionar no `<select>` ao lado. Em troca, a leitura fica instantânea e
+funciona com a rede caindo no subsolo da sede. O critério para decidir:
+**a leitura decide alguma coisa?** Se sim (embarcar, entregar pedido, validar
+carteirinha), vai para action no servidor com `lerPayload`; se é só um atalho
+para digitar, o cliente basta. `qr-payload.ts` documenta isso no topo, porque é
+a exceção que precisa se justificar toda vez.
+
+Teste que guarda a propriedade central da primitiva:
+`apps/web/src/lib/__tests__/qr-token.test.ts` — um payload de um propósito
+**não** valida em outro, o formato da carteirinha está congelado (se aquele
+teste quebrar, carteirinha impressa parou de validar no portão: é incidente,
+não refactor), e a extração sem verificação concorda com a verificada quando a
+assinatura é boa.
+
+**Quarto consumidor: o QR que identifica um objeto.** A etiqueta do acervo
+(`lib/patrimonio-qr.ts`) é impressa uma vez e colada na bandeira ou no
+instrumento — vive lá por anos, então é estática e assina o próprio
+`PatrimonioItem.id`, sem coluna nova. Ela fecha a matriz que as quatro decisões
+desenharam: **o que o QR identifica manda no desenho.** Recurso coletivo (o
+evento) rotaciona; pessoa (carteirinha), conta (pedido, comanda) e objeto
+(item do acervo) são estáticos. E **verificar depende do que a leitura faz**:
+escolher comanda no PDV não decide nada e lê no cliente; abrir a ficha de um
+item expõe inventário interno — quem está com o quê — e a etiqueta anda pela
+cidade colada num objeto, então a rota `/patrimonio/item` exige sessão, vínculo,
+permissão de acervo e respeita o recorte de categoria de §5.22, tratando item de
+outra torcida como inexistente.
+
+**Registro de propósitos (2026-09-02).** Os cinco namespaces saíram de literais
+espalhados para `packages/types/src/qr.js`, com a decisão de desenho de cada um
+ao lado (o que identifica, se gira, onde verifica). O motivo não é organização:
+dois módulos escolhendo a mesma string sem ninguém notar não é typo, é um token
+de carteirinha abrindo a retirada de um pedido. O teste trava id duplicado,
+`recurso-coletivo` declarado como não-rotativo, e módulo que defina o propósito
+como string crua.
+
+**Presença por QR fora da caravana (2026-09-02).** O painel virou
+`modo: 'caravana' | 'presenca'`. Ensaio e evento na sede têm o mesmo problema de
+lista de chamada, mas **uma perna só** — sem seletor de trecho, sempre `IDA`,
+que é a que materializa `checkedInAt`. Zero schema: era recorte de UI, não de
+modelo.
+
+**Convite por QR (2026-09-02) — e o caso em que a primitiva NÃO se usa.**
+`/convite/<slug>` já é a credencial, com rotação e revogação próprias. Assinar
+por cima criaria um segundo segredo para manter em sincronia com o primeiro, e
+mais um jeito de o cartaz impresso parar de funcionar. O QR ali é só
+`QrCodeVisual` sobre a URL — zero schema, zero action. Foi o item de melhor
+retorno do estudo justamente por isso.
+
+**Expansão para os demais módulos** (estudo, decisões abertas e ordem sugerida):
+`docs/data/plano-qr-multi-modulo.md`. O critério para aceitar ou recusar um
+candidato saiu daí: o QR rende onde o sistema **sabe da intenção mas não sabe da
+entrega** (RSVP × embarcou, pedido pago × retirado, item emprestado × onde
+está). Onde não há transferência de posse ou presença, ele não paga o próprio
+custo — foi por isso que Salas e Confiança ficaram de fora.
+
+**Cobertura contra banco real:** `audit:fluxos-avancados` § `eventos/embarque-qr`
+exercita porta fechada, janela expirada, trecho trocado, ledger, idempotência,
+walk-in recusado, encerramento e — a invariante mais cara — que **a volta não
+sobrescreve o `checkedInAt` da ida**. É a única rede contra payload de escrita
+errado, que o `tsc` não pega.
+
 ## 7. Auditoria funcional — achados abertos (2026-07-29)
 
 Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o
@@ -2515,7 +2735,23 @@ sem achados.
 Rodada 7 (`audit:loja`) fechou **sem achados**, com destaque para a
 **concorrência de estoque**: dois checkouts simultâneos na última unidade
 resolvem sem oversell, apesar de o decremento ser read-modify-write sobre
-coluna JSON. Cupom vencido, de primeira compra e de outra torcida são
+coluna JSON.
+
+> **Correção (2026-09-03): aquele "apesar de" era sorte, não segurança.** Numa
+> rodada posterior a corrida foi vencida e o `audit:loja` reproduziu **oversell
+> real** — 1 unidade em estoque, 2 checkouts concluídos, estoque final 0. Sob
+> READ COMMITTED as duas transações liam o mesmo `estoque` e a segunda
+> sobrescrevia a primeira; não havia trava de linha nem checagem condicional.
+> Corrigido em `finalizarPedido` com `SELECT … FOR UPDATE` nas linhas de
+> produto **antes** da leitura, com `ORDER BY id` (sacolas com os mesmos
+> produtos em ordens diferentes travariam cruzado e dariam deadlock). A segunda
+> transação agora espera, lê o estoque já decrementado e recebe "Estoque
+> insuficiente". Reverificado: `audit:loja` 14 conformes, 0 erros.
+>
+> Lição de método: **auditoria de concorrência que passa não prova ausência de
+> corrida** — prova que ela não foi vencida naquela execução. Quando o próprio
+> achado descreve o mecanismo ("read-modify-write sem trava"), o mecanismo é o
+> bug, independente do resultado do dia. Cupom vencido, de primeira compra e de outra torcida são
 recusados; cancelamento devolve estoque; rivalidade também bloqueia
 seguimento. **Limite de uso de cupom não existe no modelo** — se for
 desejado, é feature nova.

@@ -8,6 +8,7 @@ import {
   Briefcase,
   CreditCard,
   Calendar,
+  Beer,
   ShoppingBag,
   Users,
   MapPin,
@@ -37,6 +38,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { PendenciaBadge } from '@/components/pendencia-badge'
 import { ScrollRail } from '@/components/ui/scroll-rail'
 import type { PortalNavBadges } from '@/lib/notificacoes-menu-badges'
+import { AppButton } from '@/components/ui/button'
 
 function badgeDaNav(href: string, badges: PortalNavBadges): number {
   if (href === '/portal/comunidade') return badges.comunidade
@@ -68,6 +70,7 @@ const LINKS_SOMENTE_TORCIDA = new Set([
   '/portal/eventos',
   '/portal/sedes',
   '/portal/loja',
+  '/portal/bar',
 ])
 
 /** Torcedor vinculado à sede/unidade (convite): sem carteirinha. */
@@ -84,7 +87,18 @@ const LINKS_REATIVOS_CANAL = new Set([
   '/portal/eventos',
   '/portal/sedes',
   '/portal/loja',
+  // Bar é da unidade física (sede/subsede/PDE). CN e canal temático não têm
+  // balcão, caixa nem estoque — o item ali seria porta para sala inexistente.
+  '/portal/bar',
 ])
+
+/** Só entra na lista quando há caixa aberto — ver `barDisponivelNoPortal`. */
+const barLink = {
+  href: '/portal/bar',
+  label: 'Bar',
+  icon: Beer,
+  prefetch: 'hover' as const,
+}
 
 /** Único atalho de departamentos na navbar (não lista cada área). */
 const departamentosLink = {
@@ -127,6 +141,15 @@ interface PortalNavbarProps {
   associeSe?: { href: string; label: string; pendente: boolean } | null
   /** Allowlist de e-mail — atalho para `/super-admin`. Sem isso o item some. */
   isSuperAdmin?: boolean
+  /**
+   * Bar com turno de caixa **aberto** na unidade do membro.
+   *
+   * O item é contextual de propósito: sem caixa aberto não há o que comprar, e
+   * a barra já disputa espaço em 320px. Ele aparecer é o próprio sinal de que o
+   * bar está funcionando agora — e é o que garante que toda compra antecipada
+   * nasça dentro de um turno.
+   */
+  barAberto?: boolean
 }
 
 export function PortalNavbar({
@@ -141,6 +164,7 @@ export function PortalNavbar({
   brandCanal = null,
   associeSe = null,
   isSuperAdmin = false,
+  barAberto = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -222,9 +246,13 @@ export function PortalNavbar({
   const ocultosNacional = temVinculoTorcida
     ? LINKS_OCULTOS_TORCEDOR_VINCULO
     : LINKS_SOMENTE_TORCIDA
+  // O Bar entra na lista ANTES dos filtros de escopo — anexá-lo depois fazia
+  // ele escapar de `LINKS_SOMENTE_TORCIDA` e `LINKS_REATIVOS_CANAL`, e ele
+  // aparecia na Comunidade Nacional e em canal temático.
+  const navLinksComBar = barAberto ? [...navLinks, barLink] : [...navLinks]
   const baseLinks = modoNacional
-    ? navLinks.filter((link) => !ocultosNacional.has(link.href))
-    : [...navLinks]
+    ? navLinksComBar.filter((link) => !ocultosNacional.has(link.href))
+    : navLinksComBar
   // Departamentos: só sócio com área (temDepartamentos) ou SA no tenant.
   // Torcedor do convite nunca entra — layout já passa 0 no modo nacional.
   // CN / temático: o filtro abaixo remove o atalho mesmo com temDepartamentos.
@@ -303,7 +331,7 @@ export function PortalNavbar({
 
   function linkClass(active: boolean) {
     return [
-      'app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors',
+      'app-nav-link app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm normal-case tracking-normal transition-colors',
       active
         ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
         : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -312,7 +340,7 @@ export function PortalNavbar({
 
   function mobileLinkClass(active: boolean) {
     return [
-      'app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+      'app-nav-link app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm normal-case tracking-normal transition-colors',
       active
         ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
         : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -320,7 +348,7 @@ export function PortalNavbar({
   }
 
   const dropItemClass =
-    'app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
+    'app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]'
 
   return (
     <NavPendingProvider>
@@ -434,7 +462,7 @@ export function PortalNavbar({
             <div ref={userDropRef} className="relative hidden xl:block">
               <button
                 onClick={() => setUserDropOpen((v) => !v)}
-                className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
+                className="app-action flex h-9 items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm font-medium normal-case tracking-normal text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
               >
                 {userAvatar ? (
                   canOptimizeImageUrl(userAvatar) ? (
@@ -468,6 +496,7 @@ export function PortalNavbar({
                   <Link
                     href="/portal/perfil"
                     onClick={() => setUserDropOpen(false)}
+                    data-cursor-action=""
                     className={dropItemClass}
                   >
                     <UserCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -478,6 +507,7 @@ export function PortalNavbar({
                       href="/admin"
                       prefetch={false}
                       onClick={() => setUserDropOpen(false)}
+                      data-cursor-action=""
                       className={dropItemClass}
                     >
                       <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -489,6 +519,7 @@ export function PortalNavbar({
                       href="/super-admin"
                       prefetch={false}
                       onClick={() => setUserDropOpen(false)}
+                      data-cursor-action=""
                       className={dropItemClass}
                     >
                       <Shield className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -497,13 +528,15 @@ export function PortalNavbar({
                   )}
                   <ThemeToggle variant="dropdown" />
                   <div className="my-1 border-t border-[rgb(var(--border))]" />
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={LogOut}
+                    textoOriginal
                     onClick={() => signOut({ callbackUrl: '/entrar' })}
-                    className="app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                    className="app-nav-link app-action flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                   >
-                    <LogOut className="h-4 w-4 shrink-0" />
                     Sair
-                  </button>
+                  </AppButton>
                 </div>
               )}
             </div>
@@ -602,13 +635,15 @@ export function PortalNavbar({
                 </Link>
               )}
               <ThemeToggle variant="row" />
-              <button
+              <AppButton
+                variant="none"
+                icon={LogOut}
+                textoOriginal
                 onClick={() => signOut({ callbackUrl: '/entrar' })}
-                className="app-action flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                className="app-nav-link app-action flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
               >
-                <LogOut className="h-4 w-4" />
                 Sair
-              </button>
+              </AppButton>
             </nav>
           </div>
         )}

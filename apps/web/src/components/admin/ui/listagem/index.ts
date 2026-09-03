@@ -11,7 +11,7 @@ export {
 } from './listagem-paginacao'
 export { ListagemVazia, type ListagemVaziaProps } from './listagem-vazia'
 export { ListagemBusca, type ListagemBuscaProps } from './listagem-busca'
-export { ListagemForm, useListagemFormPendente, type ListagemFormProps } from './listagem-form'
+export { ListagemForm, useListagemFormNotificarCampo, useListagemFormPendente, type ListagemFormProps } from './listagem-form'
 export {
   ListagemColunaFiltro,
   ListagemChipFiltro,

@@ -47,6 +47,45 @@ Menu admin: item "Loja" exige `STORE_MANAGE`; item "Pedidos (Loja)" exige `STORE
 
 Portal: exige sessão logada; **não** usa permissão RBAC — qualquer associado autenticado compra.
 
+## QR de retirada no balcão (2026-09-02)
+
+Pedido de **RETIRADA** ainda não entregue mostra um QR no card do comprador em
+`/portal/loja/pedidos` (disclosure — QR aberto em todo card empurraria a lista
+para baixo). O conferente bipa em `/admin/loja/pedidos` (`RetiradaPorQr`, gate
+`store:manage`) e o pedido vai para `ENTREGUE`.
+
+- **Sem coluna nova**: o dado assinado é o próprio `SaasPedido.id`, via
+  `lib/pedido-qr.ts` sobre a primitiva `lib/qr-token.ts` (propósito
+  `pedido-retirada`). O propósito no HMAC é o que impede este token valer como
+  carteirinha ou como embarque de caravana — há teste para isso.
+- **QR estático, ao contrário do embarque.** Lá o QR é do *evento* e vale para
+  quem apontar, então precisa rodar antes de virar print no grupo. Aqui é o
+  pedido *de uma pessoa*: o balcão vê o nome do comprador antes de entregar, o
+  comprador pode estar sem sinal dentro da sede, e um código que muda não pode
+  ser salvo na galeria. Replay é fechado do outro lado — pedido já `ENTREGUE`
+  recusa a segunda leitura.
+- **A transição é delegada** a `atualizarStatusPedido`, que já restaura
+  estoque, lança a receita, fecha o ticket com `motivoFecho: ENTREGUE` e audita.
+  `confirmarRetiradaPorQr` (`admin/loja/retirada-actions.ts`) só identifica o
+  pedido e decide se ele pode ser entregue agora (recusa `ENVIO`, `CANCELADO` e
+  já entregue), mais um `AuditLog` `PEDIDO_RETIRADA_QR`. Duplicar as regras de
+  financeiro aqui garantiria que uma das cópias ficasse para trás.
+  **Follow-up:** extrair a transição para uma lib compartilhada quando o
+  trabalho em curso no `admin/loja/actions.ts` estabilizar.
+- Leitura de câmera pelo hook comum `lib/use-qr-scanner.ts` (nativo + `jsQR`),
+  então o balcão funciona em iPhone.
+
+## Vitrine física (2026-09-02)
+
+QR ao lado do produto exposto na sede abre a página dele no portal — compra ali
+mesmo, sem fila e sem "tem M?". Botão `FolhaEtiquetas` em `/admin/loja/produtos`
+imprime a grade dos **ativos** (etiquetar produto fora do catálogo é papel
+jogado fora).
+
+**Não usa a primitiva HMAC**: o QR carrega a URL pública do produto, que não
+autoriza nada e já é acessível a quem tem o link. Assinar seria cerimônia sem
+ganho — a regra é a mesma do convite por QR.
+
 ## Tickets pós-compra (2026-08-03)
 
 Cada `finalizarPedido` abre um `SaasPedidoTicket` + `Conversa` tipo `GRUPO` (só o comprador como membro). Staff da **unidade dona do pedido** (tenant sede/PDE) com `store:view_orders` ou `store:manage` vê a **fila**; o primeiro que **Atender** faz claim atômico (`ABERTO`→`ATENDENDO`) e entra na conversa.

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, useId } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronDown, Eye, Pencil, Plus, Save, Search, Shield, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, Eye, Pencil, Plus, Save, Shield, Trash2, X } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
   applyPermissionCascade,
@@ -52,6 +52,7 @@ import {
   useUnsavedChangesContext,
 } from '@/lib/unsaved-changes'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 // ── Perfil do Tenant ──────────────────────────────────────────────────────────
 
@@ -1199,15 +1200,15 @@ export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManag
 
       {/* Busca (oculta durante criação/edição, como na referência) */}
       {!editando && roles.length > 3 && (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por cargo ou permissão..."
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          />
-        </div>
+        <SearchFilterInput
+          value={busca}
+          onChange={setBusca}
+          placeholder="Buscar por cargo ou permissão..."
+          ariaLabel="Buscar por cargo ou permissão"
+          exibirDropdown={false}
+          size="sm"
+          inputClassName="rounded-lg"
+        />
       )}
 
       {/* Lista de cargos */}

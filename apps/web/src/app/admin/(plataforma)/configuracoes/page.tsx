@@ -382,6 +382,7 @@ export default async function ConfiguracoesGeralPage({
               slug={convite.slug}
               ativo={convite.ativo}
               canalRestrito={estadoCanal?.restrito ?? false}
+              torcidaNome={formatNomeTorcida(tenant.nome)}
             />
           </ConfigSectionCard>
         ) : null}

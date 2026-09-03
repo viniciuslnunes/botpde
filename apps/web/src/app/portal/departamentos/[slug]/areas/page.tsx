@@ -16,7 +16,10 @@ import {
 } from '../_lib/carregar-cockpit'
 import { AreaSaudeGrupo, AreaSaudeRow } from '@/components/departamentos/area-saude-lista'
 import { KpiGrid, StatCard } from '@/components/admin/ui'
-import { DepartamentoAreaCriar, DepartamentoAreasBlock } from '../_components/departamento-areas-block'
+import {
+  DepartamentoAreasBlock,
+  DepartamentoAreasCabecalho,
+} from '../_components/departamento-areas-block'
 import type { Metadata } from 'next'
 
 type Params = { slug: string }
@@ -90,15 +93,11 @@ export default async function DepartamentoAreasPage({ params }: { params: Promis
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="portal-display text-base text-[rgb(var(--foreground))]">
-          Áreas de atuação
-        </h2>
-        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Frentes deste departamento — quem responde, quem participa, o que falta no
-          checklist. Área organiza gente; não concede permissão.
-        </p>
-      </div>
+      <DepartamentoAreasCabecalho
+        departamentoId={depto.id}
+        slug={depto.slug}
+        podeGerir={isGestor}
+      />
 
       <KpiGrid cols={3}>
         <StatCard label="Áreas ativas" value={ativas.length} icon={<Layers className="h-5 w-5" />} />
@@ -122,16 +121,11 @@ export default async function DepartamentoAreasPage({ params }: { params: Promis
           canaisDisponiveis={canaisDisponiveis}
         />
       ) : (
-        <>
-          <AreaSaudeGrupo nome={depto.nome} cor={depto.cor}>
-            {itens.map((item) => (
-              <AreaSaudeRow key={item.id} item={item} />
-            ))}
-          </AreaSaudeGrupo>
-          {isGestor ? (
-            <DepartamentoAreaCriar departamentoId={depto.id} slug={depto.slug} />
-          ) : null}
-        </>
+        <AreaSaudeGrupo nome={depto.nome} cor={depto.cor}>
+          {itens.map((item) => (
+            <AreaSaudeRow key={item.id} item={item} />
+          ))}
+        </AreaSaudeGrupo>
       )}
     </div>
   )

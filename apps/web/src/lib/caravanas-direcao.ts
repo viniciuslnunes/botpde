@@ -8,6 +8,8 @@ import {
   resumirEmbarqueComPagamento,
   resolverStatusVaga,
   temValorVaga,
+  caravanaProcedimentoEmUrgencia,
+  caravanaProcedimentoProgress,
 } from '@torcida/types'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { diasParaEvento } from '@/lib/eventos'
@@ -28,6 +30,8 @@ import {
 } from '@/lib/departamento-semana'
 import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
 import { dayKeyInZone } from '@/lib/format-datetime'
+import { carregarPendenciasEscala } from '@/lib/escala'
+import { carregarPendenciasFrota } from '@/lib/caravana-frota'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -66,6 +70,7 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<Omit<CaravanaOps
     fotoUrl: string | null
     serieId: string | null
     partidaId: string | null
+    meta: unknown
     valorVaga: { toNumber(): number } | number | null
     capacidade: number | null
     sede: { capacidade: number | null } | null
@@ -95,6 +100,7 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<Omit<CaravanaOps
         fotoUrl: true,
         serieId: true,
         partidaId: true,
+        meta: true,
         valorVaga: true,
         capacidade: true,
         sede: { select: { capacidade: true } },
@@ -122,6 +128,7 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<Omit<CaravanaOps
         fotoUrl: true,
         serieId: true,
         partidaId: true,
+        meta: true,
         valorVaga: true,
         capacidade: true,
         sede: { select: { capacidade: true } },
@@ -265,6 +272,55 @@ async function fetchDirecaoCaravanas(tenantId: string): Promise<Omit<CaravanaOps
         sla: slaAte,
       })
     }
+  }
+
+  // Escala: quem trabalha na viagem. Sem coordenação ninguém responde pela
+  // caravana — e é a torcida que responde pelo trajeto (LGE art. 178 §§ 5º-6º).
+  const pendenciasEscalaViagem = await carregarPendenciasEscala(
+    tenantId,
+    eventos.map((e) => ({ id: e.id, titulo: e.titulo, data: e.data })),
+    { agora, limite: 4 },
+  )
+  for (const p of pendenciasEscalaViagem) {
+    pendencias.push({
+      id: `esc-${p.eventoId}`,
+      titulo: `${p.texto} · ${p.titulo}`,
+      detalhe: 'Escala da operação: coordenação, condução e embarque.',
+      href: `/admin/caravanas/${p.eventoId}?tab=escala`,
+      tom: p.severidade === 'alta' ? 'danger' : 'warning',
+      sla: slaLabel(p.data, { agora, modo: 'ate' }),
+    })
+  }
+
+  // Frota: a caravana sai em mais de um ônibus, e assento que falta só
+  // aparece quando alguém soma a capacidade dos veículos.
+  const pendenciasDaFrota = await carregarPendenciasFrota(
+    tenantId,
+    eventos.map((e) => ({ id: e.id, titulo: e.titulo, data: e.data })),
+    { agora, limite: 4 },
+  )
+  for (const p of pendenciasDaFrota) {
+    pendencias.push({
+      id: `frota-${p.eventoId}`,
+      titulo: `${p.texto} · ${p.titulo}`,
+      detalhe: 'Frota da viagem: veículos, responsáveis e lista de embarque.',
+      href: `/admin/caravanas/${p.eventoId}?tab=frota`,
+      tom: p.severidade === 'alta' ? 'danger' : 'warning',
+      sla: slaLabel(p.data, { agora, modo: 'ate' }),
+    })
+  }
+
+  for (const e of eventos) {
+    if (!caravanaProcedimentoEmUrgencia(e.meta, e.data, agora)) continue
+    const prog = caravanaProcedimentoProgress(e.meta)
+    pendencias.push({
+      id: `proc-${e.id}`,
+      titulo: `Checklist pré-embarque incompleto · ${e.titulo}`,
+      detalhe: `${prog.done}/${prog.total} itens — faltam menos de 72h.`,
+      href: `/admin/caravanas/${e.id}?tab=frota`,
+      tom: 'danger',
+      sla: slaLabel(e.data, { agora, modo: 'ate' }),
+    })
   }
 
   // Inbox: caravana no dia de jogo sem vínculo (quando há partida no mesmo dayKey).

@@ -7,6 +7,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
 import { criarDestaquePerfil } from '@/app/portal/comunidade/actions'
+import { AppButton } from '@/components/ui/button'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { DestaqueViewer } from './destaque-viewer'
 import type { DestaquePerfilItem, PostSocialItem } from '@/lib/feed'
@@ -152,14 +153,15 @@ export function PerfilDestaques({
               </label>
             ))}
           </div>
-          <button
+          <AppButton
+            variant="primary"
+            icon={Plus}
+            loading={pending}
             type="submit"
             disabled={pending || !titulo.trim() || selecionados.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
           >
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Criar destaque
-          </button>
+          </AppButton>
           </m.form>
         </AnimatePresence>
       )}

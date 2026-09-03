@@ -84,7 +84,7 @@ export function CanaisSugeridosAside({
 
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase text-[rgb(var(--foreground))]">
         <Radio className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
         Canais sugeridos
       </h2>

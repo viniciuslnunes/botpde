@@ -44,6 +44,8 @@ export interface AdminMembroItem {
    * pretendida na Sede. Deixa a diretoria da unidade ver o quadro completo.
    */
   departamentoSedeNome?: string | null
+  /** Departamento na unidade territorial (Subsede/PDE), distinto da área na Sede. */
+  departamentoUnidadeNome?: string | null
   /**
    * Sócio já APROVADO cuja área pretendida **neste tenant** ainda não entrou em
    * vigor — acontece quando o outro nível da hierarquia venceu o first-wins da

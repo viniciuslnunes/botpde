@@ -18,6 +18,7 @@ export function NoticiasFeedShell({
   escopo,
   podeGerir,
   userId,
+  currentUser,
   ordem,
   jogos,
   podeEnviarVideo,
@@ -29,6 +30,7 @@ export function NoticiasFeedShell({
   escopo: EscopoComunidade
   podeGerir: boolean
   userId: string
+  currentUser: { id: string; nome: string | null; avatarUrl: string | null }
   ordem: 'acessados' | 'em_alta' | 'recentes'
   jogos: { proximos: PartidaNoticiasCard[]; recentes: PartidaNoticiasCard[] }
   podeEnviarVideo?: boolean
@@ -44,25 +46,12 @@ export function NoticiasFeedShell({
       <div
         className={
           temSidebar
-            ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_19rem]'
+            ? 'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_19rem]'
             : 'space-y-6'
         }
       >
-        <div className={temSidebar ? 'min-w-0 lg:col-start-1 lg:row-start-1' : 'min-w-0'}>
+        <div className="min-w-0 space-y-6">
           <NoticiasJogosCarrossel partidas={carrosselJogos} />
-        </div>
-
-        {temSidebar ? (
-          <NoticiasSidebarJogos proximos={jogos.proximos} recentes={jogos.recentes} />
-        ) : null}
-
-        <div
-          className={
-            temSidebar
-              ? 'min-w-0 space-y-6 lg:col-start-1 lg:row-start-2'
-              : 'min-w-0 space-y-6'
-          }
-        >
           {children}
           <NoticiasVideosCurtos
             itens={videos}
@@ -76,9 +65,14 @@ export function NoticiasFeedShell({
             escopo={escopo}
             podeGerir={podeGerir}
             userId={userId}
+            currentUser={currentUser}
             ordem={ordem}
           />
         </div>
+
+        {temSidebar ? (
+          <NoticiasSidebarJogos proximos={jogos.proximos} recentes={jogos.recentes} />
+        ) : null}
       </div>
     </div>
   )
@@ -90,6 +84,7 @@ function NoticiasFeed({
   escopo,
   podeGerir,
   userId,
+  currentUser,
   ordem,
 }: {
   itens: NoticiaPracaItem[]
@@ -97,6 +92,7 @@ function NoticiasFeed({
   escopo: EscopoComunidade
   podeGerir: boolean
   userId: string
+  currentUser: { id: string; nome: string | null; avatarUrl: string | null }
   ordem: 'acessados' | 'em_alta' | 'recentes'
 }) {
   const { destaques, lista } = particionarNoticiasFeed(itens)
@@ -133,6 +129,7 @@ function NoticiasFeed({
                   escopo={escopo}
                   podeGerir={podeGerir}
                   userId={userId}
+                  currentUser={currentUser}
                   posicao={mostrarPosicao ? offsetPosicao + i + 1 : undefined}
                   sufixo={sufixo}
                 />

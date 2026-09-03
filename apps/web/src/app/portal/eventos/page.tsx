@@ -256,7 +256,7 @@ export default async function EventosPage({ searchParams }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-lg bg-[rgb(var(--border))]" />}>
-            <AgendaBusca key={q} defaultValue={q} />
+            <AgendaBusca defaultValue={q} />
           </Suspense>
           <div
             className="inline-flex rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5 text-xs"

@@ -64,6 +64,7 @@ pnpm --filter @torcida/db seed:forum-praca    # fórum da praça: CN Corinthians
 pnpm --filter @torcida/db seed:noticias-praca # notícias da praça já ranqueadas: Gaviões + PDE FIEL BAIXADA + Camisa 12 (só local)
 pnpm --filter @torcida/db seed:departamento-areas    # áreas de atuação canônicas por departamento
 pnpm --filter @torcida/db db:repair-canais-departamentos # canais internos depto/área + roster
+pnpm --filter @torcida/db db:repair-evento-dono-operacional # dono do evento herdado do projeto (--dry-run simula)
 pnpm --filter @torcida/db seed:torcedores-estimados  # tier PESQUISA (Datafolha×IBGE) > IBOPE > limite
 pnpm --filter @torcida/db seed:clubes-rnc            # Ranking Nacional de Clubes da CBF: cria os ausentes + grava posição
 pnpm --filter @torcida/db coleta:wikidata-clubes     # regenera wikidata-clubes-br.json (tipos, descrição, extinção)
@@ -402,6 +403,14 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   `db:repair-owner-heranca-promocao`. Ver `ARCHITECTURE.md` §5.21.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
+- **Bar — compra antecipada (2026-09-02)** — sócio paga por PIX em `/portal/bar`
+  e retira com QR no balcão (`origem: PORTAL` em `BarVenda` + `retiradoEm`;
+  **`PAGA` ≠ retirado**). **Só existe com turno de caixa aberto** — foi assim
+  que se resolveu "em qual turno entra venda feita fora do turno": eliminando o
+  caso. Por isso o item Bar na top bar é contextual. Operador da venda é quem
+  abriu o turno (não o comprador); estoque baixa na compra. Gate é sessão +
+  `assertMembroAtivo`, nunca `bar:operate`. Ver `docs/data/modulo-bar.md`
+  § compra antecipada.
 - **Bar** — PDV do bar da sede (`/admin/bar`): catálogo, estoque, venda rápida com
   PIX real (gateway reusado) ou Dinheiro/Cartão; estoque isolado por torcida e
   por unidade (SEDE/SUBSEDE/PDE via `sedeId`); integra o Financeiro (categoria
@@ -423,6 +432,46 @@ backlog de tirar os bots Discord daqui): `docs/ops/custo-railway-projetos.md`.
   `docs/data/modulo-bateria.md`. Caravana paga: lotação por `PAGA`, cobrança
   auto ao confirmar, hard-block opcional (`checkInExigePagamento`); ver
   `ARCHITECTURE.md` §5.17.
+  **Embarque ida/volta + QR (2026-09-02):** `EventoCheckin` é ledger por
+  `(evento, pessoa, trecho)`; `EventoRsvp.checkedInAt` continua materializado e
+  **só a IDA o escreve** (confiança/notificação idem). Porta aberta =
+  `Evento.embarqueTrechoAtivo`; fechada, o QR não existe. O QR do evento é
+  **rotativo** (30s, HMAC sobre `eventoId|trecho|janela`, aceita a janela
+  anterior) — fixo viraria print no grupo. Auto-embarque do sócio
+  (`/embarque?t=`) tem **gate próprio** (sessão + `assertMembroAtivo` + RSVP
+  `CONFIRMADO`), nunca `events:manage`, e **sem override** de pagamento; walk-in
+  só pelo check-in manual do gestor. Os dois sentidos de leitura convivem: o do
+  sócio usa a câmera nativa (funciona em iOS), o do gestor tem fila offline.
+  Ver `ARCHITECTURE.md` §5.37 e `docs/data/modulo-caravanas.md`.
+- **QR (primitiva, 2026-09-02)** — `apps/web/src/lib/qr-token.ts`: HMAC com
+  **propósito** (namespace) + `montarPayload`/`lerPayload`. Propósito novo entra
+  em `packages/types/src/qr.js` (`QR_PROPOSITOS`) — **nunca** como string crua
+  no módulo; o teste `qr-propositos.test.ts` trava id duplicado e literal solto.
+  Expansão para outros módulos, com o que foi recusado e por quê:
+  `docs/data/plano-qr-multi-modulo.md`. Nunca gerar QR por
+  API externa (o payload é credencial): desenhe com `QrCodeVisual`
+  (`components/ui/qr-code.tsx`, `qrcode.react`). O formato da carteirinha é
+  congelado — mudar quebra carteirinha já impressa.
+  **Rotativo ou estático depende de QUEM o QR identifica:** recurso coletivo
+  (o QR do *evento*, que serve a quem apontar) tem de rodar, senão vira print
+  no grupo; documento de **uma pessoa** (carteirinha, pedido) é estático — o
+  conferente vê o nome antes de liberar, e o dono pode estar sem sinal.
+  Leitura de câmera: `lib/use-qr-scanner.ts` (nativo + `jsQR` dinâmico —
+  Safari/iOS não tem `BarcodeDetector`; o callback devolve `true` para encerrar
+  a câmera). Consumidores: carteirinha, embarque (`lib/embarque-qr.ts`),
+  retirada da loja (`lib/pedido-qr.ts`), comanda do bar (`lib/comanda-qr.ts`) e
+  etiqueta do acervo (`lib/patrimonio-qr.ts`). Invariante testada em
+  `__tests__/qr-token.test.ts`: token de um propósito **não** vale em outro.
+  **Verificar assinatura só é obrigatório quando a leitura DECIDE algo.**
+  Embarcar, entregar pedido e validar carteirinha vão para action no servidor
+  com `lerPayload`. Escolher comanda no PDV não autoriza nada (as abertas já
+  estão na tela do operador), então lê no cliente com `lib/qr-payload.ts` — que
+  é a exceção, não o padrão.
+- **Loja — QR de retirada (2026-09-02)** — pedido `RETIRADA` não entregue mostra
+  QR no portal; balcão bipa em `/admin/loja/pedidos` (`store:manage`). Assina o
+  próprio `SaasPedido.id`, **sem coluna nova**. A transição é delegada a
+  `atualizarStatusPedido` (estoque + financeiro + ticket + auditoria) — não
+  duplicar. Ver `docs/data/modulo-loja.md` § QR de retirada.
 - **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos` (lista/semana/mês);
   `Partida` global por `Afiliacao`; série/waitlist/mapa/QR offline; ver
   `docs/data/modulo-eventos.md` e `ARCHITECTURE.md` §5.11. Fontes de jogos:

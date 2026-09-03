@@ -8,7 +8,7 @@ import { excluirPost, fixarPostPerfil, ocultarPostGrupo } from '@/app/portal/com
 import { useConfirmAction } from '@/lib/confirm-action'
 import { emitirPostExcluido } from '@/lib/feed-live-refresh'
 import { usePostEditActions } from './post-edit-provider'
-import { FloatingMenu } from './floating-menu'
+import { FloatingMenu, FLOATING_MENU_ITEM, FLOATING_MENU_ITEM_DANGER } from './floating-menu'
 import { menuItemStagger, springSnappy } from '@/lib/motion-presets'
 
 interface FeedPostMenuProps {
@@ -66,7 +66,7 @@ export function FeedPostMenu({ postId, fixado = false, modo = 'autor' }: FeedPos
                 success: 'Post removido do mural.',
               })
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
+            className={FLOATING_MENU_ITEM_DANGER}
           >
             <Trash2 className="h-3.5 w-3.5" /> Remover do mural
           </m.button>
@@ -115,7 +115,7 @@ export function FeedPostMenu({ postId, fixado = false, modo = 'autor' }: FeedPos
               }
             })
           }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
+          className={FLOATING_MENU_ITEM}
         >
           {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
           {pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
@@ -132,7 +132,7 @@ export function FeedPostMenu({ postId, fixado = false, modo = 'autor' }: FeedPos
               setOpen(false)
               edicao.abrirEdicao()
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
+            className={FLOATING_MENU_ITEM}
           >
             <Pencil className="h-3.5 w-3.5" /> Editar
           </m.button>
@@ -160,7 +160,7 @@ export function FeedPostMenu({ postId, fixado = false, modo = 'autor' }: FeedPos
               success: 'Post excluído.',
             })
           }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
+          className={FLOATING_MENU_ITEM_DANGER}
         >
           <Trash2 className="h-3.5 w-3.5" /> Excluir
         </m.button>

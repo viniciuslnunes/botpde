@@ -97,6 +97,24 @@ function pintarSilhuetaIrregular(data: Uint8ClampedArray) {
   }
 }
 
+/** Escudo heráldico centrado em fundo branco (Corinthians, São Paulo…). */
+function pintarEscudoHeraldicoEmBranco(data: Uint8ClampedArray) {
+  pintarFundoBranco(data)
+  const cx = (SAMPLE - 1) / 2
+  for (let y = 8; y < 56; y++) {
+    const t = (y - 8) / 48
+    const halfWidth = 22 * (1 - t * 0.88)
+    for (let x = Math.floor(cx - halfWidth); x <= Math.ceil(cx + halfWidth); x++) {
+      if (x < 0 || x >= SAMPLE) continue
+      const i = (y * SAMPLE + x) * 4
+      data[i] = 180
+      data[i + 1] = 20
+      data[i + 2] = 20
+      data[i + 3] = 255
+    }
+  }
+}
+
 describe('escudo-forma', () => {
   it('não mascara disco com fundo transparente', () => {
     const data = canvasVazio()
@@ -151,6 +169,12 @@ describe('escudo-forma', () => {
         data[i + 3] = 255
       }
     }
+    expect(analisarEscudoCircularDeImageData(data)).toBe(false)
+  })
+
+  it('não mascara escudo heráldico em fundo branco', () => {
+    const data = canvasVazio()
+    pintarEscudoHeraldicoEmBranco(data)
     expect(analisarEscudoCircularDeImageData(data)).toBe(false)
   })
 })

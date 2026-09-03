@@ -117,6 +117,13 @@ export interface ListagemSpec {
    * Travado por teste de invariante.
    */
   camposProibidos?: readonly string[]
+  /**
+   * Params do contrato que não entram no snapshot (`localStorage`). Abas
+   * (`?status=` em Torcedores) e busca/offset já são efêmeros por padrão —
+   * use isto quando o filtro aparece na URL mas a entrada pela rota nua deve
+   * voltar ao default da página.
+   */
+  paramsEphemeros?: readonly string[]
 }
 
 export interface ListagemParams {

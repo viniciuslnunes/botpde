@@ -7,6 +7,7 @@ import {
   parseJanelaRanking,
   parseOrdemTopico,
 } from '@torcida/types'
+import { AppButtonLink } from '@/components/ui/button'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import { ComunidadeForumComposerSection } from '../_components/comunidade-forum-composer-section'
 import { ForumAbas } from '../_components/forum-abas'
@@ -69,8 +70,14 @@ export default async function ForumPage({
       : Promise.resolve(vazioTopicos),
     aba === 'ranking' ? listarRankingPraca(ancora, janela) : Promise.resolve(vazioRanking),
     aba === 'ranking' ? scorePracaDoUsuario(session.user.id, ancora) : Promise.resolve(null),
-    aba === 'novo' ? getAvatarAtualDoUsuario(session.user.id) : Promise.resolve(null),
+    getAvatarAtualDoUsuario(session.user.id),
   ])
+
+  const currentUser = {
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl,
+  }
 
   const composerTenantId =
     escopo === 'nacional'
@@ -164,13 +171,9 @@ export default async function ForumPage({
                 },
               ]}
             />
-            <Link
-              href={hrefNovo}
-              className="app-action inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--primary))] px-3 text-sm font-semibold text-primary-on"
-            >
-              <Plus className="h-4 w-4" aria-hidden />
+            <AppButtonLink href={hrefNovo} variant="primary" icon={Plus} className="rounded-xl">
               Novo tópico
-            </Link>
+            </AppButtonLink>
           </div>
 
           {topicos.length === 0 ? (
@@ -180,12 +183,14 @@ export default async function ForumPage({
               description="Abra o primeiro assunto deste canal — foto ou vídeo ajudam o tópico a subir."
             />
           ) : (
-            <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
+            <ul className="mx-auto w-full max-w-[40rem] space-y-3">
               {topicos.map((t, i) => (
                 <li key={t.id} className="min-w-0">
                   <ForumTopicoRow
                     topico={t}
                     href={`/portal/comunidade/forum/${t.id}${sufixo}`}
+                    escopo={escopo}
+                    currentUser={currentUser}
                     posicao={ordem === 'em_alta' && t.status === 'VISIVEL' ? i + 1 - fila.length : undefined}
                   />
                 </li>

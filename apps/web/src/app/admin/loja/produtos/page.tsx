@@ -7,6 +7,7 @@ import { CriarProdutoForm } from '@/components/admin/produto-forms'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { AdminLojaProdutosGrid, type AdminProdutoItem } from '../admin-loja-produtos-grid'
+import { FolhaEtiquetas } from '@/components/ui/folha-etiquetas'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Catálogo — Loja' }
@@ -80,6 +81,19 @@ export default async function AdminLojaProdutosPage() {
           Categorias
         </Link>
       </p>
+
+      {/* Vitrine física: QR ao lado do produto exposto na sede abre a página
+          dele no portal — compra ali mesmo, sem fila e sem "tem M?". Só os
+          ativos: etiquetar produto fora do catálogo é papel jogado fora. */}
+      <FolhaEtiquetas
+        rotuloBotao="Imprimir etiquetas da vitrine"
+        etiquetas={ativos.map((p: Produto) => ({
+          id: p.id,
+          titulo: p.nome,
+          subtitulo: formatarPreco(p.preco),
+          valor: `/portal/loja/${tenant.id}/${p.id}`,
+        }))}
+      />
 
       <MotionReveal>
         <CriarProdutoForm

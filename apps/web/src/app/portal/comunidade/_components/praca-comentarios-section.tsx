@@ -2,20 +2,41 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
+import { ChevronDown, ChevronUp, MessageSquare, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   aplicarVotoPracaLocal,
   contagemExibidaVotoPraca,
   proximoVotoPraca,
   rankComentariosPraca,
+  PRACA_COMENTARIO_MAX,
 } from '@torcida/types/portal-noticias-forum'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 import type { PracaComentarioItem } from '@/lib/praca'
-import { comentarPracaAction, votarPracaAction } from '../praca-actions'
+import {
+  comentarPracaAction,
+  editarComentarioPraca,
+  excluirComentarioPraca,
+  votarPracaAction,
+} from '../praca-actions'
 import { PracaDenunciarBotao } from './praca-denuncia-modal'
 import { Avatar } from '@/components/portal/avatar'
+import { ComentarioMenu } from '@/components/portal/comentario-menu'
 import { formatRelative } from '@/lib/format-datetime'
+import { AppButton } from '@/components/ui/button'
+import {
+  ComentarioRespostasBloco,
+  comentarioEstaNaThread,
+} from '@/components/portal/comentario-respostas-bloco'
+import {
+  achatarRespostasDaArvore,
+  contarRespostasNaArvore,
+  montarArvoreComentarios,
+  type NoComentario,
+} from '@/lib/comentario-thread'
+
+const btnResponderClass =
+  'app-touch-line inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
 
 function campoClass() {
   return 'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]'
@@ -114,6 +135,7 @@ function FormularioComentario({
   placeholder,
   compacto = false,
   onEnviado,
+  onCancelar,
 }: {
   escopo: EscopoComunidade
   alvoTipo: 'ARTIGO' | 'NOTICIA'
@@ -122,6 +144,7 @@ function FormularioComentario({
   placeholder: string
   compacto?: boolean
   onEnviado?: () => void
+  onCancelar?: () => void
 }) {
   const formRef = useRef<HTMLFormElement>(null)
   const router = useRouter()
@@ -130,7 +153,14 @@ function FormularioComentario({
   return (
     <form
       ref={formRef}
-      className="space-y-2"
+      className={[
+        'space-y-2',
+        parentId
+          ? 'rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-2.5'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       action={(fd) => {
         fd.set('escopo', escopo)
         fd.set('alvoTipo', alvoTipo)
@@ -148,6 +178,19 @@ function FormularioComentario({
         })
       }}
     >
+      {parentId && onCancelar ? (
+        <div className="flex items-center justify-between gap-2 px-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          <span>Respondendo na thread</span>
+          <button
+            type="button"
+            onClick={onCancelar}
+            aria-label="Cancelar resposta"
+            className="app-touch-target inline-flex rounded-lg p-1 hover:bg-[rgb(var(--surface))]"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
       <textarea
         name="conteudo"
         required
@@ -155,6 +198,7 @@ function FormularioComentario({
         maxLength={2000}
         placeholder={placeholder}
         className={campoClass()}
+        autoFocus={Boolean(parentId)}
       />
       <button
         type="submit"
@@ -167,44 +211,79 @@ function FormularioComentario({
   )
 }
 
-function LinhaComentario({
+function CorpoComentarioPraca({
   comentario,
   escopo,
-  alvoTipo,
-  alvoId,
   viewerId,
-  respostas,
-  indent = false,
+  compacto = false,
+  onResponder,
 }: {
   comentario: PracaComentarioItem
   escopo: EscopoComunidade
-  alvoTipo: 'ARTIGO' | 'NOTICIA'
-  alvoId: string
   viewerId: string
-  respostas: PracaComentarioItem[]
-  indent?: boolean
+  compacto?: boolean
+  onResponder?: () => void
 }) {
-  const [respondendo, setRespondendo] = useState(false)
+  const router = useRouter()
+  const proprio = comentario.autorId === viewerId
+  const cabecalho = (
+    <>
+      {proprio ? 'Você' : (comentario.autorNome ?? 'Alguém')}{' '}
+      <span className="font-normal text-[rgb(var(--foreground-muted))]">
+        · {formatRelative(comentario.criadoEm)}
+      </span>
+    </>
+  )
+  const corpo = (
+    <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
+      {comentario.conteudo}
+    </p>
+  )
 
   return (
-    <li className={indent ? 'ml-8 sm:ml-10' : undefined}>
-      <div className="flex items-start gap-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
+    <div className={compacto ? 'py-2.5 pr-3' : undefined}>
+      <div
+        className={
+          compacto
+            ? 'flex items-start gap-2.5'
+            : 'flex items-start gap-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3'
+        }
+      >
         <Avatar
           nome={comentario.autorNome}
           avatarUrl={comentario.autorAvatarUrl}
-          size="sm"
+          size={compacto ? 'xs' : 'sm'}
           className="mt-0.5 shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-[rgb(var(--foreground))]">
-            {comentario.autorNome ?? 'Alguém'}{' '}
-            <span className="font-normal text-[rgb(var(--foreground-muted))]">
-              · {formatRelative(comentario.criadoEm)}
-            </span>
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
-            {comentario.conteudo}
-          </p>
+          {proprio ? (
+            <ComentarioMenu
+              comentarioId={comentario.id}
+              conteudoInicial={comentario.conteudo}
+              autorLabel={cabecalho}
+              variant="bare"
+              comMencoes={false}
+              maxLength={PRACA_COMENTARIO_MAX}
+              editarAction={async (id, next) => {
+                const r = await editarComentarioPraca(id, next, escopo)
+                if ('error' in r) throw new Error(r.error)
+                return r.conteudo
+              }}
+              excluirAction={async (id) => {
+                const r = await excluirComentarioPraca(id, escopo)
+                if ('error' in r) throw new Error(r.error)
+              }}
+              onEditado={() => router.refresh()}
+              onExcluido={() => router.refresh()}
+            >
+              {corpo}
+            </ComentarioMenu>
+          ) : (
+            <>
+              <p className="text-xs font-medium text-[rgb(var(--foreground))]">{cabecalho}</p>
+              {corpo}
+            </>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <VotarComentario
               escopo={escopo}
@@ -213,51 +292,107 @@ function LinhaComentario({
               naoGostei={comentario.naoGostei}
               meuVoto={comentario.meuVoto}
             />
-            {!indent ? (
-              <button
+            {onResponder ? (
+              <AppButton
+                variant="none"
+                icon={MessageSquare}
                 type="button"
-                onClick={() => setRespondendo((v) => !v)}
-                className="app-touch-line inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+                onClick={onResponder}
+                className={btnResponderClass}
               >
-                <MessageSquare className="h-3.5 w-3.5" />
                 Responder
-              </button>
+              </AppButton>
             ) : null}
             {comentario.autorId !== viewerId ? (
               <PracaDenunciarBotao escopo={escopo} alvoTipo="PRACA_COMENTARIO" alvoId={comentario.id} />
             ) : null}
           </div>
-          {respondendo ? (
-            <div className="mt-3">
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LinhaComentario({
+  no,
+  escopo,
+  alvoTipo,
+  alvoId,
+  viewerId,
+  respondendoId,
+  onResponder,
+}: {
+  no: NoComentario<PracaComentarioItem>
+  escopo: EscopoComunidade
+  alvoTipo: 'ARTIGO' | 'NOTICIA'
+  alvoId: string
+  viewerId: string
+  respondendoId: string | null
+  onResponder: (id: string | null) => void
+}) {
+  const totalRespostas = contarRespostasNaArvore(no)
+  const respostas = achatarRespostasDaArvore(no)
+  const naThread = comentarioEstaNaThread(
+    no.comentario.id,
+    respostas.map((r) => r.id),
+    respondendoId,
+  )
+  const alvo =
+    respondendoId === null
+      ? null
+      : respondendoId === no.comentario.id
+        ? no.comentario
+        : (respostas.find((r) => r.id === respondendoId) ?? null)
+
+  return (
+    <li>
+      <CorpoComentarioPraca
+        comentario={no.comentario}
+        escopo={escopo}
+        viewerId={viewerId}
+      />
+      <div className="px-1">
+        <ComentarioRespostasBloco
+          total={totalRespostas}
+          forcarAberto={naThread}
+          acaoResponder={
+            <AppButton
+              variant="none"
+              icon={MessageSquare}
+              type="button"
+              onClick={() => onResponder(no.comentario.id)}
+              className={btnResponderClass}
+            >
+              Responder
+            </AppButton>
+          }
+          composer={
+            alvo ? (
               <FormularioComentario
                 escopo={escopo}
                 alvoTipo={alvoTipo}
                 alvoId={alvoId}
-                parentId={comentario.id}
-                placeholder="Escreva sua resposta…"
+                parentId={alvo.id}
+                placeholder={`Resposta a ${alvo.autorNome ?? 'este comentário'}…`}
                 compacto
-                onEnviado={() => setRespondendo(false)}
+                onEnviado={() => onResponder(null)}
+                onCancelar={() => onResponder(null)}
               />
-            </div>
-          ) : null}
-        </div>
-      </div>
-      {respostas.length > 0 ? (
-        <ul className="mt-2 space-y-2">
+            ) : null
+          }
+        >
           {respostas.map((r) => (
-            <LinhaComentario
+            <CorpoComentarioPraca
               key={r.id}
               comentario={r}
               escopo={escopo}
-              alvoTipo={alvoTipo}
-              alvoId={alvoId}
               viewerId={viewerId}
-              respostas={[]}
-              indent
+              compacto
+              onResponder={() => onResponder(r.id)}
             />
           ))}
-        </ul>
-      ) : null}
+        </ComentarioRespostasBloco>
+      </div>
     </li>
   )
 }
@@ -275,19 +410,15 @@ export function PracaComentariosSection({
   comentarios: PracaComentarioItem[]
   viewerId: string
 }) {
+  const [respondendoId, setRespondendoId] = useState<string | null>(null)
   const arvore = useMemo(() => {
-    const porPai = new Map<string | null, PracaComentarioItem[]>()
-    for (const c of comentarios) {
-      const chave = c.parentId
-      const lista = porPai.get(chave) ?? []
-      lista.push(c)
-      porPai.set(chave, lista)
-    }
-    const raiz = rankComentariosPraca(porPai.get(null) ?? [])
-    return raiz.map((c) => ({
-      comentario: c,
-      respostas: porPai.get(c.id) ?? [],
-    }))
+    const nos = montarArvoreComentarios(comentarios)
+    const raizRanqueada = rankComentariosPraca(nos.map((n) => n.comentario))
+    const porId = new Map(nos.map((n) => [n.comentario.id, n]))
+    return raizRanqueada.flatMap((c) => {
+      const no = porId.get(c.id)
+      return no ? [no] : []
+    })
   }, [comentarios])
 
   return (
@@ -297,25 +428,28 @@ export function PracaComentariosSection({
         <p className="text-xs text-[rgb(var(--foreground-muted))]">Nenhum comentário ainda.</p>
       ) : (
         <ul className="space-y-3">
-          {arvore.map(({ comentario, respostas }) => (
+          {arvore.map((no) => (
             <LinhaComentario
-              key={comentario.id}
-              comentario={comentario}
+              key={no.comentario.id}
+              no={no}
               escopo={escopo}
               alvoTipo={alvoTipo}
               alvoId={alvoId}
               viewerId={viewerId}
-              respostas={respostas}
+              respondendoId={respondendoId}
+              onResponder={setRespondendoId}
             />
           ))}
         </ul>
       )}
-      <FormularioComentario
-        escopo={escopo}
-        alvoTipo={alvoTipo}
-        alvoId={alvoId}
-        placeholder="Comente neste card…"
-      />
+      {!respondendoId ? (
+        <FormularioComentario
+          escopo={escopo}
+          alvoTipo={alvoTipo}
+          alvoId={alvoId}
+          placeholder="Comente neste card…"
+        />
+      ) : null}
     </section>
   )
 }

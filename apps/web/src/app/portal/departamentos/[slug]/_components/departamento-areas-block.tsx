@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Archive, Check, Layers, ListChecks, Loader2, MessageCircle, Plus, RotateCcw, Star, Target, Trash2, UserMinus, UserPlus } from 'lucide-react'
+import { Archive, Check, Layers, ListChecks, Loader2, MessageCircle, Pencil, Plus, RotateCcw, Star, Target, Trash2, UserMinus, UserPlus, X } from 'lucide-react'
 import {
   adicionarMembroAreaDepartamento,
   adicionarChecklistItemArea,
@@ -32,6 +32,9 @@ import {
   checklistItemsFromMeta,
   checklistProgress,
 } from '@torcida/types'
+import { DepartamentoOpcaoPicker } from '@/components/departamentos/departamento-opcao-picker'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 export type AreaMembroResumo = {
   userId: string
@@ -89,6 +92,61 @@ function Avatar({
   )
 }
 
+const BTN_NOVA_AREA =
+  'shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]'
+
+/**
+ * Título da aba Áreas + “Nova área” no canto superior direito da mesma
+ * linha. O formulário abre abaixo (largura total), não no lugar do botão.
+ */
+export function DepartamentoAreasCabecalho({
+  departamentoId,
+  slug,
+  podeGerir,
+}: {
+  departamentoId: string
+  slug: string
+  podeGerir: boolean
+}) {
+  const [criando, setCriando] = useState(false)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="portal-display text-base text-[rgb(var(--foreground))]">
+            Áreas de atuação
+          </h2>
+          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
+            Frentes deste departamento — quem responde, quem participa, o que falta no
+            checklist. Área organiza gente; não concede permissão.
+          </p>
+        </div>
+        {podeGerir && !criando ? (
+          <AppButton
+            variant="none"
+            icon={Plus}
+            type="button"
+            onClick={() => setCriando(true)}
+            className={BTN_NOVA_AREA}
+          >
+            Nova área
+          </AppButton>
+        ) : null}
+      </div>
+      {criando ? (
+        <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-4">
+          <DepartamentoAreaForm
+            departamentoId={departamentoId}
+            slug={slug}
+            onDone={() => setCriando(false)}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function DepartamentoAreasBlock({
   departamentoId,
   slug,
@@ -105,97 +163,34 @@ export function DepartamentoAreasBlock({
   /** Deep-link `?area=` — destaca o card e abre gente se faltar responsável. */
   focoAreaId?: string
 }) {
-  const [criando, setCriando] = useState(false)
-
   if (areas.length === 0) {
     return (
-      <div>
-        <MotionEmptyState
-          icon={<Layers className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
-          title="Este departamento ainda não organizou áreas."
-          description={
-            podeGerir
-              ? 'Áreas agrupam gente e trabalho dentro do departamento (ex.: Campanha do Agasalho, Ensaios). Crie a primeira.'
-              : 'Quando o gestor organizar as frentes de trabalho, elas aparecem aqui.'
-          }
-        />
-        {podeGerir && (
-          <div className="mt-4 flex justify-center">
-            {criando ? (
-              <DepartamentoAreaForm
-                departamentoId={departamentoId}
-                slug={slug}
-                onDone={() => setCriando(false)}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCriando(true)}
-                className="app-action inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" />
-                Criar área
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <MotionEmptyState
+        icon={<Layers className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+        title="Este departamento ainda não organizou áreas."
+        description={
+          podeGerir
+            ? 'Áreas agrupam gente e trabalho dentro do departamento (ex.: Campanha do Agasalho, Ensaios). Use Nova área acima para criar a primeira.'
+            : 'Quando o gestor organizar as frentes de trabalho, elas aparecem aqui.'
+        }
+      />
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {areas.map((area) => (
-          <DepartamentoAreaCard
-            key={area.id}
-            departamentoId={departamentoId}
-            slug={slug}
-            area={area}
-            podeGerir={podeGerir}
-            canaisDisponiveis={canaisDisponiveis}
-            foco={area.id === focoAreaId}
-          />
-        ))}
-      </div>
-
-      {podeGerir &&
-        (criando ? (
-          <DepartamentoAreaForm departamentoId={departamentoId} slug={slug} onDone={() => setCriando(false)} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCriando(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
-          >
-            <Plus className="h-4 w-4" />
-            Nova área
-          </button>
-        ))}
+    <div className="grid gap-3 sm:grid-cols-2">
+      {areas.map((area) => (
+        <DepartamentoAreaCard
+          key={area.id}
+          departamentoId={departamentoId}
+          slug={slug}
+          area={area}
+          podeGerir={podeGerir}
+          canaisDisponiveis={canaisDisponiveis}
+          foco={area.id === focoAreaId}
+        />
+      ))}
     </div>
-  )
-}
-
-export function DepartamentoAreaCriar({
-  departamentoId,
-  slug,
-}: {
-  departamentoId: string
-  slug: string
-}) {
-  const [criando, setCriando] = useState(false)
-  if (criando) {
-    return <DepartamentoAreaForm departamentoId={departamentoId} slug={slug} onDone={() => setCriando(false)} />
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => setCriando(true)}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--primary))] hover:text-[rgb(var(--foreground))]"
-    >
-      <Plus className="h-4 w-4" />
-      Nova área
-    </button>
   )
 }
 
@@ -281,7 +276,9 @@ export function DepartamentoAreaCard({
       </div>
 
       {podeAbrirCampanha && (
-        <button
+        <AppButton
+          variant="none"
+          icon={Target}
           type="button"
           disabled={pendingCampanha}
           onClick={() =>
@@ -303,9 +300,8 @@ export function DepartamentoAreaCard({
           }
           className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--primary))] disabled:opacity-60"
         >
-          <Target className="h-3.5 w-3.5" aria-hidden />
           Abrir campanha {ano}
-        </button>
+        </AppButton>
       )}
 
       <div className="mt-3 flex items-center justify-between gap-2">
@@ -336,13 +332,15 @@ export function DepartamentoAreaCard({
             >
               <UserPlus className="h-3.5 w-3.5" />
             </button>
-            <button
+            <AppButton
+              variant="none"
+              icon={Pencil}
               type="button"
               onClick={() => setEditando((v) => !v)}
               className="app-action rounded-md px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
             >
               Editar
-            </button>
+            </AppButton>
             <button
               type="button"
               onClick={() =>
@@ -478,45 +476,37 @@ function AreaCanalPainel({
       <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
         Vincule um canal existente — não cria canal novo (evita spam).
       </p>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          const fd = new FormData(e.currentTarget)
-          setError(null)
-          startTransition(async () => {
-            const res = await vincularCanalDepartamentoArea({}, fd)
-            if (res.error) {
-              setError(res.error)
-              return
-            }
-            toast.success(fd.get('conversaId') === '__none__' ? 'Canal removido' : 'Canal vinculado')
-          })
-        }}
-      >
-        <input type="hidden" name="departamentoId" value={departamentoId} />
-        <input type="hidden" name="areaId" value={area.id} />
-        <input type="hidden" name="slug" value={slug} />
-        <select
-          name="conversaId"
-          defaultValue={canalId ?? '__none__'}
-          className="min-w-[10rem] flex-1 rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-xs"
-        >
-          <option value="__none__">Sem canal</option>
-          {canaisDisponiveis.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome?.trim() || c.id.slice(0, 8)}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md border border-[rgb(var(--border))] px-2 py-1.5 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-        >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Salvar'}
-        </button>
-      </form>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <DepartamentoOpcaoPicker
+            opcoes={canaisDisponiveis.map((c) => ({
+              id: c.id,
+              nome: c.nome?.trim() || c.id.slice(0, 8),
+            }))}
+            value={canalId ?? '__none__'}
+            onChange={(id) => {
+              setError(null)
+              startTransition(async () => {
+                const fd = new FormData()
+                fd.set('departamentoId', departamentoId)
+                fd.set('slug', slug)
+                fd.set('areaId', area.id)
+                fd.set('conversaId', id)
+                const res = await vincularCanalDepartamentoArea({}, fd)
+                if (res.error) {
+                  setError(res.error)
+                  return
+                }
+                toast.success(id === '__none__' ? 'Canal removido' : 'Canal vinculado')
+              })
+            }}
+            vazio={{ id: '__none__', nome: 'Sem canal' }}
+            disabled={pending}
+            ariaLabel="Canal da área"
+            menuAriaLabel="Canais disponíveis"
+          />
+        </div>
+      </div>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       {canalId ? (
         <CanalDepartamentoAvatarField
@@ -587,14 +577,16 @@ function AreaChecklistPainel({
           ) : null}
         </p>
         {podeGerir && temModelo && (
-          <button
+          <AppButton
+            variant="none"
+            icon={Check}
             type="button"
             disabled={pending}
             onClick={() => runFd(aplicarModeloChecklistArea, {}, 'Modelo aplicado')}
             className="text-[11px] font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-60"
           >
             Usar modelo
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -705,14 +697,15 @@ function AreaChecklistPainel({
             placeholder="Nova etapa…"
             className="min-w-0 flex-1 rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-xs text-[rgb(var(--foreground))]"
           />
-          <button
+          <AppButton
+            variant="primary"
+            icon={Plus}
             type="submit"
             disabled={pending || label.trim().length < 2}
-            className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--primary))] px-2 py-1.5 text-xs font-medium text-primary-on disabled:opacity-50"
+            className="gap-1 rounded-md px-2 py-1.5 text-xs font-medium"
           >
-            <Plus className="h-3.5 w-3.5" />
             Add
-          </button>
+          </AppButton>
         </form>
       )}
     </div>
@@ -779,13 +772,15 @@ export function DepartamentoAreaForm({
         >
           {area ? 'Salvar' : 'Criar área'}
         </button>
-        <button
+        <AppButton
+          variant="none"
+          icon={X}
           type="button"
           onClick={onDone}
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
         >
           Cancelar
-        </button>
+        </AppButton>
       </div>
     </form>
   )
@@ -802,30 +797,26 @@ function AreaPessoasPainel({
 }) {
   const confirmAction = useConfirmAction()
   const [q, setQ] = useState('')
-  /** Última busca concluída — o termo junto evita mostrar resultado de outro. */
-  const [busca, setBusca] = useState<{
-    termo: string
-    itens: Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
-  }>({ termo: '', itens: [] })
-  const [pendingSearch, startSearch] = useTransition()
-  const qBusca = q.trim().length >= 2 ? q.trim() : ''
-  const candidatos = busca.termo === qBusca ? busca.itens : []
+  const [resultados, setResultados] = useState<
+    Array<{ id: string; nome: string | null; email: string; nickname: string | null }>
+  >([])
+  const [ultimoTermo, setUltimoTermo] = useState('')
 
-  useEffect(() => {
-    if (!qBusca) return
-    let cancelled = false
-    const t = setTimeout(() => {
-      startSearch(() => {
-        void buscarCandidatosParaArea(area.id, departamentoId, qBusca).then((rows) => {
-          if (!cancelled) setBusca({ termo: qBusca, itens: rows })
-        })
-      })
-    }, 280)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
-  }, [qBusca, area.id, departamentoId])
+  async function buscarPessoas(termo: string): Promise<ReactiveSearchOption[]> {
+    const rows = await buscarCandidatosParaArea(area.id, departamentoId, termo)
+    setResultados(rows)
+    setUltimoTermo(termo)
+    return rows.map((c) => ({
+      id: c.id,
+      label: c.nome?.trim() || c.email,
+      sublabel: c.nickname ? `@${c.nickname}` : c.email,
+      searchText: [c.nome, c.email, c.nickname].filter(Boolean).join(' '),
+      payload: c,
+    }))
+  }
+
+  const qBusca = q.trim().length >= 2 ? q.trim() : ''
+  const candidatos = ultimoTermo === qBusca && qBusca ? resultados : []
 
   return (
     <div className="space-y-3">
@@ -860,24 +851,28 @@ function AreaPessoasPainel({
         </ul>
       )}
 
-      <label className="block">
-        <span className="sr-only">Buscar pessoa do departamento</span>
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar pessoa já no departamento"
-          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-        />
-      </label>
-      {pendingSearch && qBusca && (
-        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">Buscando…</p>
-      )}
-      {!pendingSearch && qBusca && candidatos.length === 0 && (
+      <SearchFilterInput
+        value={q}
+        onChange={(next) => {
+          setQ(next)
+          if (next.trim().length < 2) {
+            setResultados([])
+            setUltimoTermo('')
+          }
+        }}
+        placeholder="Buscar pessoa já no departamento"
+        ariaLabel="Buscar pessoa do departamento"
+        onSearch={buscarPessoas}
+        onSelectSuggestion={(item) => setQ(item.label)}
+        minChars={2}
+        size="sm"
+        noResultsMessage="Ninguém do departamento encontrado."
+      />
+      {qBusca && candidatos.length === 0 && ultimoTermo === qBusca ? (
         <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
           Ninguém do departamento encontrado para “{qBusca}”.
         </p>
-      )}
+      ) : null}
       {candidatos.length > 0 && (
         <ul className="divide-y divide-[rgb(var(--border))] rounded-lg border border-[rgb(var(--border))]">
           {candidatos.map((c) => (
@@ -890,12 +885,7 @@ function AreaPessoasPainel({
                 slug={slug}
                 areaId={area.id}
                 targetUserId={c.id}
-                onDone={() =>
-                  setBusca((prev) => ({
-                    ...prev,
-                    itens: prev.itens.filter((p) => p.id !== c.id),
-                  }))
-                }
+                onDone={() => setResultados((prev) => prev.filter((p) => p.id !== c.id))}
               />
             </li>
           ))}
@@ -971,14 +961,15 @@ function AdicionarPessoaBotao({
       <input type="hidden" name="departamentoId" value={departamentoId} />
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="targetUserId" value={targetUserId} />
-      <button
+      <AppButton
+        variant="primary"
+        icon={UserPlus}
         type="submit"
         disabled={pending}
-        className="app-action inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2 py-1 text-[11px] font-medium text-primary-on disabled:opacity-50"
+        className="gap-1 rounded-lg px-2 py-1 text-[11px] font-medium"
       >
-        <UserPlus className="h-3 w-3" />
         Incluir
-      </button>
+      </AppButton>
     </form>
   )
 }

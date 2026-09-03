@@ -39,6 +39,7 @@ export async function responderRsvp(
       capacidade: true,
       valorVaga: true,
       sede: { select: { capacidade: true } },
+      departamento: { select: { slug: true } },
       projeto: { select: { departamento: { select: { slug: true } } } },
     },
   })

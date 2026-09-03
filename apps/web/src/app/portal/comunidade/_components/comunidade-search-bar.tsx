@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import { Search, Loader2, Hash, X, ArrowRight } from 'lucide-react'
+import { Loader2, Hash, ArrowRight } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import type { MembroBuscaItem } from '@/lib/comunidade-busca'
 import type { PostSocialItem } from '@/lib/feed'
@@ -140,13 +141,10 @@ export function ComunidadeSearchBar({
         transition={springSnappy}
         className={['relative rounded-xl', aberto ? 'z-30' : 'z-0'].join(' ')}
       >
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <input
-          ref={inputRef}
-          type="search"
+        <SearchFilterInput
           value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
+          onChange={(next) => {
+            setQ(next)
             setAberto(true)
           }}
           onFocus={() => setAberto(true)}
@@ -174,42 +172,24 @@ export function ComunidadeSearchBar({
               inputRef.current?.blur()
             }
           }}
+          onClear={() => {
+            setQ('')
+            setDebounced('')
+            setErro(null)
+            setResultado({ membros: [], hashtags: [], posts: [] })
+          }}
           placeholder="Buscar membros, hashtags, posts"
-          aria-label="Buscar na comunidade"
-          role="combobox"
-          aria-haspopup="listbox"
-          aria-expanded={aberto}
-          aria-controls="comunidade-busca-rapida"
-          aria-activedescendant={ativo >= 0 ? flatItems[ativo]?.optionId : undefined}
-          className={[
-            'h-11 w-full rounded-xl border bg-[rgb(var(--surface))] pl-10 pr-10 text-sm text-[rgb(var(--foreground))] outline-none transition-colors duration-200',
+          ariaLabel="Buscar na comunidade"
+          exibirDropdown={false}
+          loading={carregando}
+          inputRef={inputRef}
+          inputClassName={[
+            'h-11 rounded-xl bg-[rgb(var(--surface))] pl-10 text-sm transition-colors duration-200',
             aberto
               ? 'border-[rgb(var(--primary))]'
               : 'border-[rgb(var(--border))] hover:border-[rgb(var(--border-strong))]',
           ].join(' ')}
         />
-        <AnimatePresence>
-          {q.length > 0 && (
-            <m.button
-              type="button"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={springSnappy}
-              onClick={() => {
-                setQ('')
-                setDebounced('')
-                setErro(null)
-                setResultado({ membros: [], hashtags: [], posts: [] })
-                inputRef.current?.focus()
-              }}
-              aria-label="Limpar busca"
-              className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-            >
-              <X className="h-3.5 w-3.5" />
-            </m.button>
-          )}
-        </AnimatePresence>
       </m.div>
 
       <AnimatePresence>
@@ -236,7 +216,7 @@ export function ComunidadeSearchBar({
                   className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-[rgb(var(--foreground-muted))]"
                 >
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Buscando�
+                  Buscando…
                 </m.div>
               ) : debounced.length < 2 ? (
                 <m.p

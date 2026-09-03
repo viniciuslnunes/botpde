@@ -1,5 +1,5 @@
 import { Repeat2, Megaphone } from 'lucide-react'
-import { formatRelative } from '@/lib/format-datetime'
+import { formatFeedPublicadoEm } from '@/lib/format-datetime'
 import { linkPostComunidade, linkTopicoForum } from '@/lib/comunidade-social'
 import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
@@ -64,6 +64,7 @@ export function FeedPostCard({
     ? linkTorcidaComunidadePublica(post.tenantId)
     : `/portal/comunidade/perfil/${post.autor.id}`
   const headerNome = isComunicadoOficial ? post.tenant.nome : (post.autor.nome ?? 'Membro')
+  const publicadoEmLabel = formatFeedPublicadoEm(post.criadoEm)
   const torcidaLinha =
     showTenantBadge && !isComunicadoOficial
       ? formatTorcidaNoFeed(post.tenant.nome, contextoComunidadeNome)
@@ -113,44 +114,37 @@ export function FeedPostCard({
         </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 w-full flex-col leading-tight">
-            <ComunidadePrefetchLink
-              href={headerHref}
-              className="app-sem-piso-toque block truncate text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
-            >
-              {headerNome}
-              {unidadeBadge ? (
-                <span className="font-medium text-[rgb(var(--foreground-muted))]">
-                  {' '}
-                  - {unidadeBadge}
-                </span>
-              ) : null}
-            </ComunidadePrefetchLink>
+            {isComunicadoOficial ? (
+              <ComunidadePrefetchLink
+                href={headerHref}
+                className="app-sem-piso-toque block truncate text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
+              >
+                {headerNome}
+              </ComunidadePrefetchLink>
+            ) : (
+              <ComunidadePrefetchLink
+                href={headerHref}
+                className="app-sem-piso-toque block truncate text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
+              >
+                {headerNome}
+                {unidadeBadge ? (
+                  <span className="font-medium text-[rgb(var(--foreground-muted))]">
+                    {' '}
+                    - {unidadeBadge}
+                  </span>
+                ) : null}
+              </ComunidadePrefetchLink>
+            )}
+            {cargoBadge ? (
+              <span className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                {cargoBadge}
+              </span>
+            ) : null}
             {torcidaLinha ? (
               <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
                 {torcidaLinha}
               </span>
             ) : null}
-            {cargoBadge && (
-              <span className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                {cargoBadge}
-              </span>
-            )}
-            {!isComunicadoOficial && post.autor.nickname && (
-              <ComunidadePrefetchLink
-                href={`/portal/comunidade/perfil/${post.autor.id}`}
-                className="app-sem-piso-toque block truncate text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-              >
-                @{post.autor.nickname}
-              </ComunidadePrefetchLink>
-            )}
-            <ComunidadePrefetchLink
-              href={permalink}
-              className="app-sem-piso-toque block text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-            >
-              <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
-                {formatRelative(post.criadoEm)}
-              </time>
-            </ComunidadePrefetchLink>
             {post.grupo && (
               <ComunidadePrefetchLink
                 href={`/portal/comunidade/grupos/${post.grupo.id}`}
@@ -263,6 +257,7 @@ export function FeedPostCard({
           meuVoto={forum.meuVoto}
           totalRespostas={post.totalComentarios}
           currentUser={currentUser}
+          publicadoEm={publicadoEmLabel}
         />
       ) : (
         <PostEngagement
@@ -275,6 +270,7 @@ export function FeedPostCard({
           isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
           salvoInicial={salvo}
           podeCompartilhar={podeCompartilhar}
+          publicadoEm={publicadoEmLabel}
         />
       )}
 

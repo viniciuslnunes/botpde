@@ -6,6 +6,8 @@ import {
   resolverPeriodoChip,
   type BalancoPeriodoChipId,
 } from '@/lib/financeiro-filtros'
+import { AppButton } from '@/components/ui/button'
+import { Filter } from 'lucide-react'
 
 const CHIPS: { id: BalancoPeriodoChipId; label: string }[] = [
   { id: 'hoje', label: 'Hoje' },
@@ -94,12 +96,14 @@ export function BalancoPeriodoFiltros({
             </select>
           </label>
         )}
-        <button
+        <AppButton
+          variant="primary"
+          icon={Filter}
           type="submit"
-          className="app-action rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on"
+          className="rounded-lg px-3 py-2 text-sm font-medium"
         >
           Filtrar
-        </button>
+        </AppButton>
         {hasCustom && (
           <Link
             href="/portal/balanco"

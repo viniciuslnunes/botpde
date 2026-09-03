@@ -11,18 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { m } from 'motion/react'
-import {
-  ChevronDown,
-  ChevronUp,
-  ImageIcon,
-  Link2,
-  Loader2,
-  Newspaper,
-  Play,
-  Type,
-  Video,
-  X,
-} from 'lucide-react'
+import { ChevronDown, ChevronUp, ImageIcon, Link2, Loader2, Newspaper, Play, Type, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ARTIGO_BLOCO_LEGENDA_MAX,
@@ -49,6 +38,7 @@ import {
   type ArtigoComposerState,
 } from '@/app/portal/comunidade/praca-actions'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import { AppButton } from '@/components/ui/button'
 
 const MAX_IMG_MB = 10
 const MAX_VIDEO_MB = 100
@@ -565,27 +555,27 @@ export function NoticiaStoryComposer({
         </button>
 
         <div className="ml-auto flex min-w-0 items-center gap-2">
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={cancelar}
             className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
           >
             Cancelar
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="primary"
+            icon={Newspaper}
+            loading={pending || enviando}
             type="submit"
             disabled={!podePublicar}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
+            className="h-9 shrink-0 gap-1.5 rounded-lg px-3 text-sm font-semibold sm:px-4"
           >
-            {pending || enviando ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Newspaper className="h-4 w-4" />
-            )}
             <span className="max-sm:sr-only">
               {enviando ? 'Enviando…' : pending ? 'Publicando…' : 'Publicar notícia'}
             </span>
-          </button>
+          </AppButton>
         </div>
       </div>
 

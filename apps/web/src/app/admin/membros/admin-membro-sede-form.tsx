@@ -5,6 +5,7 @@ import { MapPin, Save } from 'lucide-react'
 import { reatribuirSedeMembro } from '@/app/admin/membros/actions'
 import { runPersistAction } from '@/lib/toast-action'
 import { AppButton } from '@/components/ui/button'
+import { espelhoSomenteLeituraNoAdmin } from '@/lib/admin-membro-espelho'
 
 type SedeOption = { id: string; nome: string; tipo: string }
 
@@ -20,6 +21,7 @@ export function AdminMembroSedeForm({
   sedes,
   canEdit,
   espelhado,
+  isAdministracaoSede = false,
   aprovadoNaUnidadeNome,
 }: {
   membroId: string
@@ -27,13 +29,15 @@ export function AdminMembroSedeForm({
   sedes: SedeOption[]
   canEdit: boolean
   espelhado?: boolean
+  isAdministracaoSede?: boolean
   aprovadoNaUnidadeNome?: string | null
 }) {
   const [sedeId, setSedeId] = useState(sedeIdAtual ?? '')
   const [pending, startTransition] = useTransition()
   const dirty = (sedeId || null) !== (sedeIdAtual ?? null)
+  const espelhoSoLeitura = espelhado && !isAdministracaoSede
 
-  if (espelhado || !canEdit) {
+  if (espelhoSoLeitura || !canEdit) {
     const atual = sedes.find((s) => s.id === sedeIdAtual)
     const via = aprovadoNaUnidadeNome?.trim()
     return (

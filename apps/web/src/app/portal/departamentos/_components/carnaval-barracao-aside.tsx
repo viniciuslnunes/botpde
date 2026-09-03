@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { PartyPopper, Loader2, Check, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, PartyPopper, Save } from 'lucide-react'
 import {
   BARRACAO_CHECKLIST,
   BARRACAO_URGENCIA_DIAS,
@@ -13,6 +13,7 @@ import {
 } from '@torcida/types'
 import { DatePicker } from '@/components/ui/date-picker'
 import { salvarDesfileEm, toggleBarracaoItem } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 export function CarnavalBarracaoAside({
   departamentoId,
@@ -81,7 +82,10 @@ export function CarnavalBarracaoAside({
                 aria-label="Data do desfile"
                 className="min-w-[11rem] flex-1"
               />
-              <button
+              <AppButton
+                variant="none"
+                icon={Save}
+                loading={desfilePending}
                 type="button"
                 disabled={desfilePending}
                 onClick={() => {
@@ -95,11 +99,8 @@ export function CarnavalBarracaoAside({
                 }}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 text-xs font-semibold text-[rgb(var(--foreground))] disabled:opacity-60"
               >
-                {desfilePending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                ) : null}
                 Salvar
-              </button>
+              </AppButton>
             </div>
           ) : (
             <p className="mt-1 text-sm text-[rgb(var(--foreground))]">

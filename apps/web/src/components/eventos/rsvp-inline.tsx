@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { responderRsvp } from '@/app/portal/eventos/actions'
-import { Loader2, UserCheck, UserX, Hourglass } from 'lucide-react'
+import { Hourglass, UserCheck, UserX } from 'lucide-react'
+import { AppButton } from '@/components/ui/button'
 
 /** RSVP compacto para cards da lista — não navega ao clicar. */
 export function RsvpInline({
@@ -38,7 +39,10 @@ export function RsvpInline({
       onKeyDown={(e) => e.stopPropagation()}
     >
       {!mostrarEspera || status === 'CONFIRMADO' ? (
-        <button
+        <AppButton
+          variant="none"
+          icon={UserCheck}
+          loading={pending}
           type="button"
           disabled={pending}
           onClick={(e) => responder(e, 'CONFIRMADO')}
@@ -49,11 +53,13 @@ export function RsvpInline({
               : 'btn-success-soft',
           ].join(' ')}
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           {status === 'CONFIRMADO' ? 'Vou' : 'Confirmar'}
-        </button>
+        </AppButton>
       ) : (
-        <button
+        <AppButton
+          variant="none"
+          icon={Hourglass}
+          loading={pending}
           type="button"
           disabled={pending || status === 'LISTA_ESPERA'}
           onClick={(e) => responder(e, 'LISTA_ESPERA')}
@@ -64,11 +70,13 @@ export function RsvpInline({
               : 'border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300',
           ].join(' ')}
         >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Hourglass className="h-3 w-3" />}
           {status === 'LISTA_ESPERA' ? 'Espera' : 'Fila'}
-        </button>
+        </AppButton>
       )}
-      <button
+      <AppButton
+        variant="none"
+        icon={UserX}
+        loading={pending}
         type="button"
         disabled={pending}
         onClick={(e) => responder(e, 'RECUSADO')}
@@ -79,9 +87,8 @@ export function RsvpInline({
             : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
         ].join(' ')}
       >
-        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserX className="h-3 w-3" />}
         {status === 'RECUSADO' ? 'Não' : 'Recusar'}
-      </button>
+      </AppButton>
     </div>
   )
 }

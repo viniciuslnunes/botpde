@@ -143,6 +143,19 @@ export const ItemVendaBarSchema = z.object({
   quantidade: z.coerce.number().int('Quantidade deve ser inteira').min(1, 'Quantidade mínima é 1').max(99, 'Quantidade máxima é 99'),
 })
 
+/**
+ * Compra antecipada pelo portal — o sócio paga pelo celular e retira no balcão.
+ *
+ * Deliberadamente mais pobre que `VendaBarSchema`: **sem método de pagamento**
+ * (é sempre PIX; não existe dinheiro pela internet), **sem desconto** (quem
+ * concede desconto é o operador, na frente da pessoa) e **sem fiado** (crédito
+ * é decisão de gestor, não de formulário). Cada campo ausente aqui é uma
+ * decisão de gestão que não pode escapar para o cliente.
+ */
+export const CompraBarPortalSchema = z.object({
+  itens: z.array(ItemVendaBarSchema).min(1, 'Escolha pelo menos um item').max(20, 'Muitos itens'),
+})
+
 export const VendaBarSchema = z
   .object({
     itens: z.array(ItemVendaBarSchema).min(1, 'Adicione pelo menos um item'),

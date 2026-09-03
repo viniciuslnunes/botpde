@@ -121,6 +121,9 @@ function ComunidadeRedeInfiniteView({
   useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
+    // Ver comunidade-feed-infinite: IO só notifica transição; re-observar
+    // quando hasMore/tamanho mudam evita trava com sentinel já intersectando.
+    if (!pageInfo.hasMore) return
 
     const obs = new IntersectionObserver(
       (entries) => {
@@ -132,7 +135,7 @@ function ComunidadeRedeInfiniteView({
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [loadMoreRef])
+  }, [loadMoreRef, pageInfo.hasMore, posts.length])
 
   // Um único retorno: o rodapé é dono da sentinela do observer e precisa ficar
   // montado em todos os estados, senão a paginação não volta depois do vazio.

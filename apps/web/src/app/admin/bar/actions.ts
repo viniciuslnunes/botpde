@@ -40,6 +40,7 @@ import {
   getPixProvider,
   verificarWebhookMockBar,
 } from '@/lib/pix-gateway'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 export type BarActionState = {
   success?: boolean
@@ -57,7 +58,8 @@ export type RegistrarVendaBarResult =
     }
   | { success: false; error: string }
 
-function revalidateBar() {
+function revalidateBar(tenantId: string) {
+  invalidateAdminDirecao(tenantId)
   revalidatePath('/admin/bar')
   revalidatePath('/admin/bar/pdv')
   revalidatePath('/admin/bar/produtos')
@@ -142,7 +144,7 @@ export async function criarProdutoBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao criar produto' }
@@ -200,7 +202,7 @@ export async function editarProdutoBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao editar produto' }
@@ -228,7 +230,7 @@ export async function alterarStatusProdutoBar(id: string, ativo: boolean): Promi
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao alterar status' }
@@ -271,7 +273,7 @@ export async function excluirProdutoBar(id: string): Promise<BarActionState> {
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao excluir produto' }
@@ -326,7 +328,7 @@ export async function criarCategoriaBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao criar categoria' }
@@ -358,7 +360,7 @@ export async function excluirCategoriaBar(id: string): Promise<BarActionState> {
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao excluir categoria' }
@@ -399,7 +401,7 @@ export async function criarFornecedorBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao criar fornecedor' }
@@ -444,7 +446,7 @@ export async function editarFornecedorBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao editar fornecedor' }
@@ -474,7 +476,7 @@ export async function alternarAtivoFornecedorBar(id: string): Promise<BarActionS
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao alterar fornecedor' }
@@ -570,7 +572,7 @@ export async function registrarCompraBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     revalidateFinanceiro()
     await reconciliarAlertaEstoqueSeRegularizado(tenant.id, produtoId)
     return { success: true }
@@ -825,7 +827,7 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
           session.user.id ?? null,
           'Falha ao gerar cobrança PIX',
         )
-        revalidateBar()
+        revalidateBar(tenant.id)
         return {
           success: false,
           error: 'Não foi possível gerar a cobrança PIX. A venda foi cancelada.',
@@ -862,7 +864,7 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
       })
     }
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     if (criada.status === 'PAGA' && !isFiado) revalidateFinanceiro()
 
     if (pix) return { success: true, vendaId: criada.vendaId, pago: false, pix }
@@ -985,7 +987,7 @@ export async function confirmarPixMockBar(vendaId: string): Promise<BarActionSta
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     revalidateFinanceiro()
     return { success: true }
   } catch (e) {
@@ -1030,7 +1032,7 @@ export async function cancelarVendaBar(vendaId: string): Promise<BarActionState>
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao cancelar venda' }
@@ -1120,7 +1122,7 @@ export async function quitarFiadoBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     revalidateFinanceiro()
     await reconciliarNotificacoesDoEvento(tenant.id, {
       tipo: 'BAR_FIADO_VENCIDO',
@@ -1193,7 +1195,7 @@ export async function cancelarFiadoBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     await reconciliarNotificacoesDoEvento(tenant.id, {
       tipo: 'BAR_FIADO_VENCIDO',
       link: `/admin/bar/comandas?fiado=${fiado.id}`,
@@ -1260,7 +1262,7 @@ export async function registrarAjusteEstoqueBar(
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     await reconciliarAlertaEstoqueSeRegularizado(tenant.id, parsed.data.produtoId)
     return { success: true }
   } catch (e) {
@@ -1298,7 +1300,7 @@ export async function abrirTurnoBar(): Promise<BarActionState> {
       },
     })
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao abrir turno' }
@@ -1398,7 +1400,7 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
       })
     }
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao fechar turno' }
@@ -1578,7 +1580,7 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
       }
     }
 
-    revalidateBar()
+    revalidateBar(tenant.id)
     revalidateFinanceiro()
     return { success: true }
   } catch (e) {

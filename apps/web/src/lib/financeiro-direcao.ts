@@ -6,6 +6,7 @@ import { db } from '@torcida/db'
 import {
   formatarMoedaBRL,
   formatDataCompetenciaInput,
+  parseFinanceiroCiclo,
   saudeOrcamento,
   STATUS_PROJETO_ABERTOS,
   hrefHomeDepartamento,
@@ -64,13 +65,14 @@ async function fetchDirecaoFinanceiro(tenantId: string): Promise<FinanceiroDirec
   type SomaProjeto = { projetoId: string | null; _sum: { valor: unknown } }
   type ResumoLite = { saldo: number }
 
-  const [resumo7d, resumo30d, inad, cobrancasVencidas, projetosAbertos, orfaosRateio]: [
+  const [resumo7d, resumo30d, inad, cobrancasVencidas, projetosAbertos, orfaosRateio, tenantCiclo]: [
     ResumoLite,
     ResumoLite,
     Awaited<ReturnType<typeof resumirInadimplencia>>,
     Awaited<ReturnType<typeof listarCobrancasTenant>>,
     ProjetoRow[],
     number,
+    { financeiroCiclo: unknown } | null,
   ] = await Promise.all([
     resumirFinanceiro(tenantId, { dataDe: dataDe7, dataAte }),
     resumirFinanceiro(tenantId, { dataDe: dataDe30, dataAte }),
@@ -98,6 +100,10 @@ async function fetchDirecaoFinanceiro(tenantId: string): Promise<FinanceiroDirec
         departamentoId: null,
         data: { gte: desdeOrfaos },
       },
+    }),
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { financeiroCiclo: true },
     }),
   ])
 
@@ -188,6 +194,17 @@ async function fetchDirecaoFinanceiro(tenantId: string): Promise<FinanceiroDirec
       detalhe: `Últimos ${JANELA_ORFAOS_DIAS} dias — rateie para ver gasto por área.`,
       href: '/admin/financeiro/lancamentos?tipo=DESPESA',
       tom: 'warning',
+    })
+  }
+
+  const ciclo = parseFinanceiroCiclo(tenantCiclo?.financeiroCiclo)
+  if (ciclo.ativo && inad.quantidadeEmAtraso > 0) {
+    pendencias.push({
+      id: 'ciclo-inadimplencia',
+      titulo: `${inad.quantidadeEmAtraso} cobrança${inad.quantidadeEmAtraso === 1 ? '' : 's'} em atraso com régua ativa`,
+      detalhe: `Régua em D+${ciclo.diasRegua.join(', D+')} — confira cobranças vencidas.`,
+      href: '/admin/financeiro/cobrancas?status=VENCIDA',
+      tom: inad.quantidadeEmAtraso >= 5 ? 'danger' : 'warning',
     })
   }
 

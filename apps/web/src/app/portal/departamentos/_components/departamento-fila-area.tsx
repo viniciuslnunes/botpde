@@ -3,6 +3,7 @@
 import { Clock, UserPlus } from 'lucide-react'
 import { efetivarAreaPretendida } from '@/app/admin/membros/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { AppButton } from '@/components/ui/button'
 
 export type PedidoAreaLite = {
   membroId: string
@@ -81,14 +82,15 @@ export function DepartamentoFilaArea({
                   {p.viaUnidade ? ` · via ${p.viaUnidade}` : ''}
                 </p>
               </div>
-              <button
+              <AppButton
+                variant="success"
+                icon={UserPlus}
                 type="button"
                 onClick={() => void incluir(p)}
-                className="btn-success app-action flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
+                className="flex shrink-0 gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
               >
-                <UserPlus className="h-3.5 w-3.5" />
                 Incluir na área
-              </button>
+              </AppButton>
             </li>
           ))}
         </ul>

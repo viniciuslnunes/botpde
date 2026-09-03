@@ -2,9 +2,12 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
+  Briefcase,
   Building2,
   ClipboardList,
   IdCard,
+  LayoutDashboard,
+  ScrollText,
   Shield,
   Users,
 } from 'lucide-react'
@@ -14,6 +17,7 @@ import { carregarDirecaoDiretoria } from '@/lib/diretoria-direcao'
 import {
   AdminInboxList,
   AdminPageHeader,
+  AdminHeaderActionLink,
   DirecaoInboxSkeleton,
   DirecaoKpisSkeleton,
   DirecaoListaSkeleton,
@@ -38,7 +42,7 @@ function filtrarPendenciasVisiveis(
   perm: DiretoriaPermissoes,
 ) {
   return pendencias.filter((p) => {
-    if (p.id.startsWith('mem-') || p.id === 'fila-mais' || p.id === 'lge-vencida') {
+    if (p.id.startsWith('mem-') || p.id === 'fila-mais' || p.id === 'lge-vencida' || p.id === 'lge-incompletos') {
       return perm.podeMembros
     }
     if (p.id === 'deptos-sem-gestor' || p.id === 'sem-depto') return perm.podeRoles
@@ -63,7 +67,7 @@ async function DiretoriaKpis({
         value={ops.membrosPendentes}
         tone={ops.membrosPendentes > 0 ? 'warning' : 'default'}
         icon={<Users className="h-5 w-5" />}
-        href={perm.podeMembros ? '/admin/membros?status=PENDENTE' : undefined}
+        href={perm.podeMembros ? '/admin/socios?status=solicitacoes' : undefined}
       />
       <StatCard
         label="Sócios"
@@ -77,6 +81,19 @@ async function DiretoriaKpis({
         tone={ops.carteirinhasVencidas > 0 ? 'warning' : 'default'}
         icon={<Shield className="h-5 w-5" />}
         href={perm.podeMembros ? '/admin/socios' : undefined}
+      />
+      <StatCard
+        label="Cadastro LGE incompleto"
+        value={ops.lgeIncompletos}
+        tone={ops.lgeIncompletos > 0 ? 'warning' : 'default'}
+        icon={<ScrollText className="h-5 w-5" />}
+        href={perm.podeMembros ? '/admin/socios' : undefined}
+        badge={
+          ops.lgeSemCpf > 0 || ops.lgeSemRg > 0
+            ? `${ops.lgeSemCpf} CPF · ${ops.lgeSemRg} RG`
+            : undefined
+        }
+        badgeTone="default"
       />
       <StatCard
         label="Deptos com gestor"
@@ -142,12 +159,12 @@ async function DiretoriaInboxELista({
 async function DiretoriaHeaderLinks({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoDiretoria(tenantId)
   return (
-    <Link
+    <AdminHeaderActionLink
       href={`/portal/departamentos/${ops.departamentoSlug}`}
-      className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+      icon={LayoutDashboard}
     >
       Cockpit no portal
-    </Link>
+    </AdminHeaderActionLink>
   )
 }
 
@@ -192,28 +209,19 @@ export default async function AdminDiretoriaPage() {
               <DiretoriaHeaderLinks tenantId={tenant.id} />
             </Suspense>
             {perm.podeMembros ? (
-              <Link
-                href="/admin/membros"
-                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-              >
+              <AdminHeaderActionLink href="/admin/membros" icon={Users}>
                 Membros
-              </Link>
+              </AdminHeaderActionLink>
             ) : null}
             {perm.podeRoles ? (
-              <Link
-                href="/admin/departamentos"
-                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-              >
+              <AdminHeaderActionLink href="/admin/departamentos" icon={Briefcase}>
                 Departamentos
-              </Link>
+              </AdminHeaderActionLink>
             ) : null}
             {isSuperAdmin || hasPermission(effective, PERMISSIONS.AUDIT_VIEW) ? (
-              <Link
-                href="/admin/auditoria"
-                className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-              >
+              <AdminHeaderActionLink href="/admin/auditoria" icon={ScrollText}>
                 Auditoria
-              </Link>
+              </AdminHeaderActionLink>
             ) : null}
           </div>
         }

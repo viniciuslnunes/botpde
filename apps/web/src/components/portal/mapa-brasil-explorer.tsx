@@ -3,15 +3,16 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Globe2, Search, X } from 'lucide-react'
-import { Input } from '@torcida/ui'
+import { ArrowLeft, Globe2 } from 'lucide-react'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { buscarAfiliacoes } from '@/app/onboarding/actions'
 import { listarTorcidasVitrineNacional } from '@/app/portal/mapa-brasil/actions'
 import type { AfiliacaoOnboarding, RegiaoOnboarding, TorcidaOnboarding } from '@/lib/onboarding'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   afiliacoesIniciais: AfiliacaoOnboarding[]
@@ -85,14 +86,15 @@ export function MapaBrasilExplorer({
     return (
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <button
+          <AppButton
+            variant="none"
+            icon={ArrowLeft}
             type="button"
             onClick={voltarAoMapa}
             className="app-action inline-flex w-fit items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
             Voltar ao mapa
-          </button>
+          </AppButton>
 
           <header className="flex flex-wrap items-start gap-3">
             <EscudoClube
@@ -176,26 +178,15 @@ export function MapaBrasilExplorer({
         </div>
       </header>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <Input
-          value={busca}
-          onChange={(e) => onBusca(e.target.value)}
-          placeholder="Buscar clube por nome..."
-          className="pl-9 pr-9"
-          aria-label="Buscar clube"
-        />
-        {busca ? (
-          <button
-            type="button"
-            onClick={() => onBusca('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface-raised))]"
-            aria-label="Limpar busca"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
+      <SearchFilterInput
+        value={busca}
+        onChange={onBusca}
+        placeholder="Buscar clube por nome..."
+        ariaLabel="Buscar clube"
+        exibirDropdown={false}
+        loading={buscando}
+        onClear={() => onBusca('')}
+      />
 
       <MapaBrasilEstados
         afiliacoes={afiliacoesIniciais}

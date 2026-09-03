@@ -1,6 +1,7 @@
 // Kit admin: compõe primitivos de @torcida/ui; nunca duplica.
 // Componentes com Motion vivem aqui (packages/ui não depende de motion).
 export { AdminPageHeader, type AdminPageHeaderProps } from './admin-page-header'
+export { AdminHeaderActionLink, type AdminHeaderActionLinkProps } from './admin-header-action-link'
 export { AdminDetailHeader, type AdminDetailHeaderProps } from './admin-detail-header'
 export { StatCard, type StatCardProps, type StatCardTone } from './stat-card'
 export { KpiGrid, type KpiGridProps } from './kpi-grid'
@@ -61,6 +62,7 @@ export {
   ListagemColunaFiltro,
   ListagemChipFiltro,
   ListagemPersistencia,
+  useListagemFormNotificarCampo,
   useListagemFormPendente,
   type ListagemToolbarProps,
   type ListagemThProps,

@@ -7,7 +7,7 @@ import { Flag, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { excluirTopico } from '../praca-actions'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { usePostEditActions } from '@/components/portal/post-edit-provider'
-import { FloatingMenu } from '@/components/portal/floating-menu'
+import { FloatingMenu, FLOATING_MENU_ITEM, FLOATING_MENU_ITEM_DANGER } from '@/components/portal/floating-menu'
 import { PracaDenunciaModal } from './praca-denuncia-modal'
 import { menuItemStagger, springSnappy } from '@/lib/motion-presets'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
@@ -64,7 +64,7 @@ export function ForumTopicoMenu({
               setOpen(false)
               edicao.abrirEdicao()
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
+            className={FLOATING_MENU_ITEM}
           >
             <Pencil className="h-3.5 w-3.5" /> Editar
           </m.button>
@@ -92,7 +92,7 @@ export function ForumTopicoMenu({
                 success: 'Tópico excluído.',
               })
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
+            className={FLOATING_MENU_ITEM_DANGER}
           >
             <Trash2 className="h-3.5 w-3.5" /> Excluir
           </m.button>
@@ -109,7 +109,7 @@ export function ForumTopicoMenu({
               setOpen(false)
               setDenunciando(true)
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
+            className={FLOATING_MENU_ITEM_DANGER}
           >
             <Flag className="h-3.5 w-3.5" /> Denunciar
           </m.button>

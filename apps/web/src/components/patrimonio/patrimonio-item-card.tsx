@@ -10,6 +10,7 @@ import {
   ImageOff,
   Landmark,
   Pencil,
+  QrCode,
   Trash2,
 } from 'lucide-react'
 import {
@@ -18,6 +19,7 @@ import {
   formatarMoedaBRL,
 } from '@torcida/types'
 import { StatusBadge } from '@/components/admin/ui'
+import { QrCodeVisual } from '@/components/ui/qr-code'
 import { resolveProdutoImagemUrl } from '@/lib/produto-imagem'
 import { springSnappy } from '@/lib/motion-presets'
 import type { PatrimonioFormInitial } from '@/components/patrimonio/patrimonio-item-form'
@@ -40,6 +42,11 @@ export type PatrimonioRow = PatrimonioFormInitial & {
   temVistoria?: boolean
   vistoriaVencendo?: boolean
   vistoria?: PatrimonioCardVistoria
+  /**
+   * Payload da etiqueta QR do item — assinado no servidor
+   * (`lib/patrimonio-qr.ts`), porque o segredo não vai ao browser.
+   */
+  qrEtiqueta?: string | null
 }
 
 function IconeCategoria({ categoria }: { categoria: string }) {
@@ -208,6 +215,27 @@ export function PatrimonioItemCard({
           {categoriaLabel}
           {detalhes.length > 0 ? ` · ${detalhes.join(' · ')}` : ''}
         </p>
+
+        {/* Disclosure, não ícone: a etiqueta é impressa uma vez e colada no
+            item — não compete por espaço com as ações do dia a dia. */}
+        {podeGerir && item.qrEtiqueta ? (
+          <details className="mt-2">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
+              <QrCode className="h-3.5 w-3.5" aria-hidden />
+              Etiqueta QR
+            </summary>
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <QrCodeVisual
+                value={item.qrEtiqueta}
+                size={140}
+                label={`Etiqueta QR de ${item.nome}`}
+              />
+              <p className="text-center text-[10px] text-[rgb(var(--foreground-muted))]">
+                Imprima e cole no item
+              </p>
+            </div>
+          </details>
+        ) : null}
         {podeGerir ? (
           // Ícones 40px: em 320px o card cabe ~112px úteis e quatro ações
           // não entram numa linha. `flex-wrap` + `overflow-hidden` no

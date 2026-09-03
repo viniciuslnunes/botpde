@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Loader2, MessageSquare, Pin, Send, Trash2, Pencil } from 'lucide-react'
+import { Loader2, MessageSquare, Pencil, Pin, Save, Send, Trash2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Avatar } from '@/components/portal/avatar'
 import { collapsePanel, fadeUp, springSnappy } from '@/lib/motion-presets'
+import { AppButton } from '@/components/ui/button'
 
 export type SalaMensagem = {
   id: string
@@ -451,9 +452,9 @@ export function SalaChat({
                               maxLength={800}
                               className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
                             />
-                            <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
+                            <AppButton variant="none" icon={Save} type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
                               Salvar
-                            </button>
+                            </AppButton>
                           </m.form>
                         ) : (
                           <m.p

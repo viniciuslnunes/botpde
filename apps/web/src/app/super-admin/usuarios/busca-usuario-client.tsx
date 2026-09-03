@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Search, Trash2, UserCheck } from 'lucide-react'
+import { Loader2, Trash2, UserCheck } from 'lucide-react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -11,6 +11,7 @@ import type {
   UsuarioVinculo,
 } from '@/app/api/super-admin/usuarios/[id]/route'
 import { ExportarDadosButton } from './exportar-dados-button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 const STATUS_VARIANT: Record<'PENDENTE' | 'APROVADO' | 'REPROVADO', BadgeVariant> = {
   PENDENTE: 'warning',
@@ -37,8 +38,6 @@ function formatarData(iso: string) {
 
 export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
   const [q, setQ] = useState('')
-  const [debounced, setDebounced] = useState('')
-  /** Última busca concluída — o termo junto deriva a lista e o "carregando". */
   const [busca, setBusca] = useState<{ termo: string; itens: UsuarioBuscaItem[] }>({
     termo: '',
     itens: [],
@@ -50,21 +49,13 @@ export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
   const abortRef = useRef<AbortController | null>(null)
   const detalhePedidoRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(q.trim()), 300)
-    return () => clearTimeout(t)
-  }, [q])
-
-  const termoBusca = debounced.length >= 2 ? debounced : ''
+  const termoBusca = q.trim().length >= 2 ? q.trim() : ''
   const resultados = busca.termo === termoBusca ? busca.itens : []
-  const carregando = termoBusca !== '' && busca.termo !== termoBusca
 
-  const buscar = useCallback(async (termo: string) => {
+  async function buscarUsuarios(termo: string): Promise<ReactiveSearchOption[]> {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    // Grava sempre com o termo — inclusive em falha — senão o "carregando",
-    // que é derivado, nunca desligaria.
     let itens: UsuarioBuscaItem[] = []
     try {
       const res = await fetch(`/api/super-admin/usuarios/busca?q=${encodeURIComponent(termo)}`, {
@@ -74,17 +65,18 @@ export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
       if (!res.ok) throw new Error(data.error ?? 'Erro na busca')
       itens = data.usuarios ?? []
     } catch (e) {
-      // Abort é troca de termo: quem assumiu a busca é que vai gravar.
-      if (e instanceof DOMException && e.name === 'AbortError') return
+      if (e instanceof DOMException && e.name === 'AbortError') return []
       toast.error(e instanceof Error ? e.message : 'Erro na busca')
     }
     setBusca({ termo, itens })
-  }, [])
-
-  useEffect(() => {
-    if (!termoBusca) return
-    void buscar(termoBusca)
-  }, [termoBusca, buscar])
+    return itens.map((u) => ({
+      id: u.id,
+      label: u.nome ?? u.email ?? u.nickname ?? 'Usuário',
+      sublabel: [u.email, u.nickname ? `@${u.nickname}` : null].filter(Boolean).join(' · '),
+      searchText: [u.nome, u.email, u.nickname].filter(Boolean).join(' '),
+      payload: u,
+    }))
+  }
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -141,31 +133,27 @@ export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por e-mail, nome ou @nickname…"
-          className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pl-10 pr-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--color-primary))]"
-        />
-      </div>
+      <SearchFilterInput
+        value={q}
+        onChange={(next) => {
+          setQ(next)
+          if (next.trim().length < 2) setBusca({ termo: '', itens: [] })
+        }}
+        placeholder="Buscar por e-mail, nome ou @nickname…"
+        ariaLabel="Buscar usuários"
+        onSearch={buscarUsuarios}
+        onSelectSuggestion={(item) => void selecionar(item.id)}
+        minChars={2}
+        noResultsMessage="Nenhum usuário encontrado."
+      />
 
-      {carregando && (
-        <p className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Buscando…
-        </p>
-      )}
-
-      {!carregando && debounced.length >= 2 && resultados.length === 0 && (
+      {termoBusca && resultados.length === 0 && busca.termo === termoBusca ? (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhum usuário encontrado para &quot;{debounced}&quot;.
+          Nenhum usuário encontrado para &quot;{termoBusca}&quot;.
         </p>
-      )}
+      ) : null}
 
-      {!carregando && resultados.length > 0 && (
+      {resultados.length > 0 ? (
         <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
           {resultados.map((u) => (
             <li key={u.id}>
@@ -190,7 +178,7 @@ export function BuscaUsuarioClient({ idInicial }: { idInicial?: string }) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
       {carregandoDetalhe && (
         <p className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">

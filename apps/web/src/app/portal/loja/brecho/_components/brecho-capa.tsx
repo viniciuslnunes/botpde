@@ -8,6 +8,7 @@ import { LOJA_CAPA_ASPECT } from '@/lib/image-crop'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import { atualizarCapaBrecho } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 const OVERLAY_VIS =
   'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100'
@@ -104,7 +105,10 @@ export function BrechoCapaControles({
 
       {!capaUrl ? (
         <div className="pointer-events-none absolute right-2 top-2 z-10 p-0">
-          <button
+          <AppButton
+            variant="none"
+            icon={ImagePlus}
+            loading={crop.busy}
             type="button"
             onClick={(e) => {
               e.preventDefault()
@@ -114,9 +118,8 @@ export function BrechoCapaControles({
             disabled={crop.busy}
             className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-black/55 px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm transition-colors hover:bg-black/75 disabled:opacity-50"
           >
-            {crop.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             Adicionar capa
-          </button>
+          </AppButton>
         </div>
       ) : (
         <div

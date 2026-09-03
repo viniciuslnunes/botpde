@@ -60,6 +60,7 @@ export function TenantSwitcher({
       items={items}
       valueId={torcidaAtualSlug}
       getLabel={(t) => (omitirSubtituloClube ? t.nome : labelTorcidaComClube(t))}
+      getLogoUrl={(t) => t.logoUrl}
       getSubLabel={(t) => (omitirSubtituloClube ? null : (labelClubeComUf(t) ?? t.slug))}
       getSearchText={(t) =>
         [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug].join(' ')

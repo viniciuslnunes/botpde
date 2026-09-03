@@ -39,6 +39,7 @@ import {
   getPixProvider,
   verificarWebhookMockComandaBar,
 } from '@/lib/pix-gateway'
+import { invalidateAdminDirecao } from '@/lib/admin-direcao-cache'
 
 export type BarComandaActionState = {
   success?: boolean
@@ -46,7 +47,8 @@ export type BarComandaActionState = {
   fieldErrors?: Partial<Record<string, string[]>>
 }
 
-function revalidateBarComanda() {
+function revalidateBarComanda(tenantId: string) {
+  invalidateAdminDirecao(tenantId)
   revalidatePath('/admin/bar')
   revalidatePath('/admin/bar/pdv')
   revalidatePath('/admin/bar/comandas')
@@ -187,7 +189,7 @@ export async function abrirComandaBar(input: unknown): Promise<AbrirComandaBarRe
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     return { success: true, comandaId }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Erro ao abrir comanda' }
@@ -346,7 +348,7 @@ export async function lancarItensComandaBar(
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     return {
       success: true,
       vendaId: result.vendaId,
@@ -490,7 +492,7 @@ export async function removerLancamentoComandaBar(
       })
     }
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     return { success: true, totalComanda: result.totalComanda }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao remover lançamento' }
@@ -808,7 +810,7 @@ export async function fecharComandaBar(input: unknown): Promise<FecharComandaBar
       })
     }
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     if (txResult.totalPagoConfirmado > 0) revalidateFinanceiro()
 
     if (pixOut.length > 0) {
@@ -928,7 +930,7 @@ export async function quitarComandaBar(input: unknown): Promise<QuitarComandaBar
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     revalidateFinanceiro()
     if (result.status === 'QUITADA') {
       await reconciliarNotificacoesDoEvento(tenant.id, {
@@ -1002,7 +1004,7 @@ export async function cancelarComandaBar(input: unknown): Promise<BarComandaActi
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     await reconciliarNotificacoesDoEvento(tenant.id, {
       tipo: 'BAR_COMANDA_VENCIDA',
       link: `/admin/bar/comandas?comanda=${comandaId}`,
@@ -1058,7 +1060,7 @@ export async function liberarLimiteComandaBar(input: unknown): Promise<BarComand
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao liberar limite' }
@@ -1124,7 +1126,7 @@ export async function confirmarPixMockComandaBar(
       },
     })
 
-    revalidateBarComanda()
+    revalidateBarComanda(tenant.id)
     revalidateFinanceiro()
     return { success: true }
   } catch (e) {

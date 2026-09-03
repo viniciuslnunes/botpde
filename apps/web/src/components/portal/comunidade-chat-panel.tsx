@@ -9,6 +9,7 @@ import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { useInboxStream } from '@/lib/use-mensagem-stream'
 import { springGentle, springSnappy } from '@/lib/motion-presets'
 import { MensagensShell } from './mensagens-shell'
+import { AppButton } from '@/components/ui/button'
 
 /** Só altura — opacity no collapse multiplicava e podia deixar a thread “em branco”. */
 const collapsePanelHeight: Variants = {
@@ -163,14 +164,15 @@ export function ComunidadeChatPanel({
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
       <div className="flex items-center gap-2 border-b border-[rgb(var(--border))] px-3 py-2">
-        <button
+        <AppButton
+          variant="none"
+          icon={MessageCircle}
           type="button"
           onClick={toggleExpanded}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]"
           aria-expanded={expanded}
         >
-          <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-          <span className="portal-display text-sm text-[rgb(var(--foreground))]">Mensagens</span>
+          <span className="text-sm font-semibold uppercase text-[rgb(var(--foreground))]">Mensagens</span>
           <AnimatePresence initial={false}>
             {naoLidas > 0 && (
               <m.span
@@ -192,7 +194,7 @@ export function ComunidadeChatPanel({
           >
             <ChevronDown className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
           </m.span>
-        </button>
+        </AppButton>
         <Link
           href="/portal/mensagens"
           prefetch={false}

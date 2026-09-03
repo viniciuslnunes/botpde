@@ -3,13 +3,14 @@
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Clock } from 'lucide-react'
 import { toast } from '@torcida/ui/services/toast'
 import { isRedirectError } from '@/lib/toast-action'
 import {
   adiarFluxoDepartamento,
   ativarFluxoDepartamento,
 } from '@/app/portal/departamentos/fluxos-actions'
+import { AppButton } from '@/components/ui/button'
 
 const ADIAR_DIAS = 7
 
@@ -112,14 +113,16 @@ export function DepartamentoFluxoCta({
           <ArrowRight className={destaque ? 'h-4 w-4' : 'h-3.5 w-3.5'} aria-hidden />
         </Link>
       )}
-      <button
+      <AppButton
+        variant="none"
+        icon={Clock}
         type="button"
         disabled={pending}
         onClick={onAdiar}
         className="app-touch-target inline-flex items-center text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-60"
       >
         Agora não
-      </button>
+      </AppButton>
     </div>
   )
 }

@@ -20,6 +20,10 @@ export default async function MembrosLegadoPage({
   if (query.get('status') === 'PENDENTE' && query.get('tipo') === 'SOCIO') {
     permanentRedirect('/admin/socios?status=solicitacoes')
   }
+  // Torcedores abre em Todos — Pendentes só quando a aba/link pede explicitamente.
+  if (query.get('status') === 'PENDENTE' && query.get('tipo') !== 'SOCIO') {
+    query.delete('status')
+  }
   const qs = query.toString()
   permanentRedirect(`/admin/torcedores${qs ? `?${qs}` : ''}`)
 }

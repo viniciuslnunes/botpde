@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
@@ -37,6 +36,7 @@ import {
 import {
   AdminInboxList,
   AdminPageHeader,
+  AdminHeaderActionLink,
   AdminPendingTabs,
   adminTabIds,
   DirecaoInboxSkeleton,
@@ -297,7 +297,8 @@ async function BateriaActions({
       partidas={partidas}
       projetos={projetos}
       temAfiliacao={Boolean(afiliacaoId)}
-      redirectTo="/admin/bateria"
+      departamentoSlug="bateria"
+        redirectTo="/admin/bateria"
     />
   )
 }
@@ -350,13 +351,9 @@ export default async function AdminBateriaPage({
         icon={<Drum className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/admin/eventos?vista=semana&tipo=ENSAIO"
-              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              <CalendarRange className="h-4 w-4" aria-hidden />
+            <AdminHeaderActionLink href="/admin/eventos?vista=semana&tipo=ENSAIO" icon={CalendarRange}>
               Agenda da semana
-            </Link>
+            </AdminHeaderActionLink>
             <Suspense fallback={null}>
               <BateriaActions tenantId={tenant.id} podeGerir={podeGerir} />
             </Suspense>

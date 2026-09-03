@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { MessageCircle, Loader2, ChevronDown } from 'lucide-react'
+import { ChevronDown, MessageCircle } from 'lucide-react'
 import { toast } from '@torcida/ui/services/toast'
 import { Avatar } from '@/components/portal/avatar'
+import { DepartamentoOpcaoPicker } from '@/components/departamentos/departamento-opcao-picker'
 import { vincularCanalArea, type ActionState } from '../actions'
 import { CanalDepartamentoAvatarField } from './canal-departamento-avatar-field'
 
@@ -145,36 +146,36 @@ function CanalVincularForm({
   error: string | null
   onSubmit: (fd: FormData) => void
 }) {
+  const [conversaId, setConversaId] = useState(canal?.id ?? '__none__')
+
+  function salvar(id: string) {
+    setConversaId(id)
+    const fd = new FormData()
+    fd.set('departamentoId', departamentoId)
+    fd.set('slug', slug)
+    fd.set('conversaId', id)
+    onSubmit(fd)
+  }
+
   return (
-    <form className="mt-3 flex flex-wrap items-end gap-2" action={onSubmit}>
-      <input type="hidden" name="departamentoId" value={departamentoId} />
-      <input type="hidden" name="slug" value={slug} />
-      <div className="min-w-[12rem] flex-1">
-        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
-          Canal
-        </label>
-        <select
-          name="conversaId"
-          defaultValue={canal?.id ?? '__none__'}
-          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-        >
-          <option value="__none__">Sem canal</option>
-          {canaisDisponiveis.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome?.trim() || c.id.slice(0, 8)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button
-        type="submit"
+    <div className="mt-3 space-y-2">
+      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
+        Canal
+      </label>
+      <DepartamentoOpcaoPicker
+        opcoes={canaisDisponiveis.map((c) => ({
+          id: c.id,
+          nome: c.nome?.trim() || c.id.slice(0, 8),
+        }))}
+        value={conversaId}
+        onChange={salvar}
+        vazio={{ id: '__none__', nome: 'Sem canal' }}
         disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-      >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Salvar
-      </button>
-      {error && <p className="w-full text-xs text-red-600 dark:text-red-400">{error}</p>}
-    </form>
+        ariaLabel="Canal do departamento"
+        menuAriaLabel="Canais disponíveis"
+        size="md"
+      />
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </div>
   )
 }

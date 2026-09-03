@@ -13,6 +13,8 @@ import {
 } from '@/app/admin/financeiro/actions'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useActionStateToast } from '@/lib/toast-action'
+import { AppButton } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 const CATEGORIAS = Object.keys(CATEGORIA_FINANCEIRO_LABEL)
 const TIPOS = Object.keys(TIPO_FINANCEIRO_LABEL)
@@ -27,12 +29,21 @@ export type LancamentoFormInitial = {
   observacao: string | null
   departamentoId?: string | null
   projetoId?: string | null
+  eventoId?: string | null
 }
 
 /** Opções de rateio — carregadas na página, já escopadas por tenant. */
 export type RateioOpcoes = {
   departamentos: Array<{ id: string; nome: string }>
   projetos: Array<{ id: string; titulo: string; departamentoId: string }>
+  /** Operações da janela (caravana, festa, ensaio) para fechar o resultado. */
+  eventos?: Array<{ id: string; titulo: string; data: Date | string; tipo: string }>
+}
+
+function formatarOperacao(evento: { titulo: string; data: Date | string }): string {
+  const data = new Date(evento.data)
+  const dia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(data)
+  return `${dia} · ${evento.titulo}`
 }
 
 function hojeISODate() {
@@ -205,6 +216,28 @@ export function FinanceiroLancamentoForm({
             </select>
             <FieldError messages={state.errors?.projetoId} />
           </label>
+
+          {(rateio.eventos?.length ?? 0) > 0 && (
+            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))] sm:col-span-2">
+              Operação (opcional)
+              <select
+                name="eventoId"
+                defaultValue={initial?.eventoId ?? ''}
+                className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+              >
+                <option value="">Nenhuma</option>
+                {rateio.eventos?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {formatarOperacao(e)}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px] font-normal text-[rgb(var(--foreground-muted))]">
+                Amarra o lançamento ao dia — é o que fecha o resultado da caravana ou da festa.
+              </span>
+              <FieldError messages={state.errors?.eventoId} />
+            </label>
+          )}
         </div>
       )}
 
@@ -231,13 +264,15 @@ export function FinanceiroLancamentoForm({
           {pending ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Registrar'}
         </button>
         {onCancel && (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))]"
           >
             Cancelar
-          </button>
+          </AppButton>
         )}
       </div>
     </form>

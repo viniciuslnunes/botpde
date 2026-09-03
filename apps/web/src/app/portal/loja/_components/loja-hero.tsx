@@ -49,7 +49,12 @@ export function LojaHero({
   return (
     <MotionReveal>
       <section className="group relative isolate -mx-4 min-h-[13.5rem] overflow-hidden bg-[rgb(var(--background-subtle))] sm:-mx-6 sm:min-h-[20rem] lg:-mx-8 lg:min-h-[24rem]">
-        <LojaCapaMidia src={capaUrl} alt="" />
+        <LojaCapaMidia
+          src={capaUrl}
+          alt=""
+          logoUrl={!capaCustom ? logoUrl : null}
+          logoAlt={nome}
+        />
         <div
           className="absolute inset-0 bg-gradient-to-t from-[rgb(var(--background)_/_0.88)] from-0% via-[rgb(var(--background)_/_0.28)] via-45% to-transparent to-75%"
           aria-hidden

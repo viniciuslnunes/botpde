@@ -4,10 +4,11 @@ import { useEffect, useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import { Ban, Loader2, MessageCircle, X } from 'lucide-react'
+import { Ban, MessageCircle, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { lightboxBackdrop, lightboxContent, springGentle } from '@/lib/motion-presets'
 import { PERFIL_ACAO, PERFIL_ACAO_ICON } from './perfil/perfil-acao'
+import { AppButton } from '@/components/ui/button'
 
 interface PerfilMensagemActionsProps {
   userId: string
@@ -185,26 +186,26 @@ export function PerfilMensagemActions({
                   className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm leading-relaxed text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
                 />
                 <div className="flex items-center justify-between gap-3">
-                  <button
+                  <AppButton
+                    variant="none"
+                    icon={X}
                     type="button"
                     onClick={fecharSolicitacao}
                     className="rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
                   >
                     Cancelar
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
+                    variant="primary"
+                    icon={MessageCircle}
+                    loading={abrindo}
                     type="button"
                     disabled={abrindo || !mensagemPronta}
                     onClick={() => void abrirConversa(mensagemInicial.trim())}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-primary-on transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold"
                   >
-                    {abrindo ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <MessageCircle className="h-4 w-4" />
-                    )}
                     {abrindo ? 'Enviando…' : 'Enviar solicitação'}
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             </m.div>
@@ -217,7 +218,10 @@ export function PerfilMensagemActions({
   return (
     <>
       {podeAcionarMensagem && (
-        <button
+        <AppButton
+          variant="none"
+          icon={MessageCircle}
+          loading={abrindo && !mostrarSolicitacao}
           type="button"
           disabled={abrindo}
           onClick={() => {
@@ -229,15 +233,13 @@ export function PerfilMensagemActions({
           }}
           className={`${PERFIL_ACAO} bg-[rgb(var(--primary))] text-primary-on transition-opacity hover:opacity-90 disabled:opacity-60`}
         >
-          {abrindo && !mostrarSolicitacao ? (
-            <Loader2 className={`${PERFIL_ACAO_ICON} animate-spin`} />
-          ) : (
-            <MessageCircle className={PERFIL_ACAO_ICON} />
-          )}
           {precisaSolicitacao ? 'Solicitar conversa' : 'Mensagem'}
-        </button>
+        </AppButton>
       )}
-      <button
+      <AppButton
+        variant="none"
+        icon={Ban}
+        loading={alternando}
         type="button"
         disabled={alternando}
         onClick={() => void alternarBloqueio()}
@@ -248,13 +250,8 @@ export function PerfilMensagemActions({
             : 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30',
         ].join(' ')}
       >
-        {alternando ? (
-          <Loader2 className={`${PERFIL_ACAO_ICON} animate-spin`} />
-        ) : (
-          <Ban className={PERFIL_ACAO_ICON} />
-        )}
         {bloqueado ? 'Desbloquear' : 'Bloquear'}
-      </button>
+      </AppButton>
       {dialog}
     </>
   )

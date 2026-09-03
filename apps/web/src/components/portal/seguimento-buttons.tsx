@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { ChevronDown, UserMinus, UserPlus } from 'lucide-react'
+import { ChevronDown, Clock, UserMinus, UserPlus } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { deixarDeSeguir, solicitarSeguir } from '@/app/portal/comunidade/actions'
 import { fadeScale, springSnappy, menuItemStagger } from '@/lib/motion-presets'
 import { PERFIL_ACAO, PERFIL_ACAO_ICON } from './perfil/perfil-acao'
 import { FloatingMenu } from './floating-menu'
+import { AppButton } from '@/components/ui/button'
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' | null
 
@@ -230,14 +231,16 @@ export function SeguimentoReviewButtons({
               >
                 Seguir de volta
               </m.button>
-              <button
+              <AppButton
+                variant="none"
+                icon={Clock}
                 type="button"
                 disabled={pending}
                 onClick={concluir}
                 className="text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
               >
                 Agora não
-              </button>
+              </AppButton>
             </div>
           </m.div>
         ) : (

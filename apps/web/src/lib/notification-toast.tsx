@@ -94,6 +94,7 @@ export function criarVigiaDeNotificacoes(verTodasHref: string) {
       toast.custom(
         (id) => (
           <button
+            // lint-botoes: nao-e-acao — toast clicável (conteúdo da notificação)
             type="button"
             onClick={() => {
               toast.dismiss(id)
@@ -142,6 +143,7 @@ export function criarVigiaDeNotificacoes(verTodasHref: string) {
       toast.custom(
         (id) => (
           <button
+            // lint-botoes: nao-e-acao — toast clicável (conteúdo da notificação)
             type="button"
             onClick={() => {
               toast.dismiss(id)

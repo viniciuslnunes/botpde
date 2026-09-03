@@ -144,6 +144,22 @@ export function ComunidadeFeedShell({
     />
   )
 
+  // Abaixo do indicador de refresh (não acima): no Nacional a praça não pode
+  // empurrar o "Atualizando publicações…" para fora da 1ª dobra.
+  const pracaHeader = (
+    <Suspense fallback={null}>
+      <ComunidadePracaFeedCards
+        escopo={escopo}
+        ancora={
+          modoNacional
+            ? { tenantId: null, afiliacaoId: tenant.afiliacaoId }
+            : { tenantId: tenant.id, afiliacaoId: tenant.afiliacaoId }
+        }
+        currentUser={currentUser}
+      />
+    </Suspense>
+  )
+
   const navMobile = (
     <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
       {[
@@ -302,17 +318,6 @@ export function ComunidadeFeedShell({
                 afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
               />
 
-              <Suspense fallback={null}>
-                <ComunidadePracaFeedCards
-                  escopo={escopo}
-                  ancora={
-                    modoNacional
-                      ? { tenantId: null, afiliacaoId: tenant.afiliacaoId }
-                      : { tenantId: tenant.id, afiliacaoId: tenant.afiliacaoId }
-                  }
-                />
-              </Suspense>
-
               <Suspense
                 fallback={
                   <ComunidadeFeedBootstrap
@@ -323,6 +328,7 @@ export function ComunidadeFeedShell({
                     escopo={escopo}
                     afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
                     contextoComunidadeNome={contextoComunidadeNome}
+                    header={pracaHeader}
                   />
                 }
               >
@@ -336,6 +342,7 @@ export function ComunidadeFeedShell({
                   afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
                   podeCompartilhar={modoContexto === 'torcida'}
                   contextoComunidadeNome={contextoComunidadeNome}
+                  header={pracaHeader}
                 />
               </Suspense>
             </div>

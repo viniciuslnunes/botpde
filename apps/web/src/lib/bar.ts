@@ -1014,3 +1014,43 @@ export const listarEstornosBar = cache(async function listarEstornosBar(
     porProduto: Array.from(porProdutoMap.values()).sort((a, b) => b.quantidade - a.quantidade),
   }
 })
+
+/**
+ * O bar deve aparecer no portal desta pessoa, agora?
+ *
+ * Três condições, e nenhuma é cosmética:
+ *
+ * 1. **Tenant real, não sintético.** A Comunidade Nacional do clube é um tenant
+ *    sintético — ela não tem sede, não tem caixa e não vende nada. Bar ali seria
+ *    uma porta para uma sala que não existe.
+ * 2. **A unidade é sede, subsede ou PDE** com bar montado. `resolveUnidadeBar`
+ *    já só devolve `Sede`, mas ele lança quando não há nenhuma ativa — e tenant
+ *    sem unidade nenhuma não opera PDV.
+ * 3. **Turno de caixa aberto.** É o que garante que toda compra antecipada nasça
+ *    dentro de um turno (ver `app/portal/bar/actions.ts`) e, de quebra, é o
+ *    sinal honesto de "o bar está funcionando agora".
+ *
+ * O escopo de **canal** (temático, público, CN) é resolvido no cliente pela
+ * navbar — `LINKS_REATIVOS_CANAL`. Esta função responde pelo tenant; aquela
+ * lista responde pelo canal que a pessoa está lendo.
+ */
+export async function barDisponivelNoPortal(
+  tenantId: string,
+  userId: string,
+): Promise<boolean> {
+  const tenant: { sintetico: boolean } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { sintetico: true },
+  })
+  if (!tenant || tenant.sintetico) return false
+
+  try {
+    const unidade = await resolveUnidadeBar(tenantId, userId)
+    if (!unidade) return false
+    return Boolean(await getTurnoAbertoBar(tenantId, unidade.id))
+  } catch {
+    // `resolveUnidadeBar` lança quando o tenant não tem unidade ativa — que é
+    // exatamente "não opera PDV". Atalho opcional nunca derruba o portal.
+    return false
+  }
+}

@@ -1,29 +1,36 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarHeart, CalendarRange, PartyPopper, Wallet } from 'lucide-react'
+import { AlertTriangle, CalendarHeart, CalendarRange, PartyPopper, Wallet } from 'lucide-react'
 import { hasPermission, hrefHomeDepartamento, PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
 import { carregarDirecaoSocial } from '@/lib/social-direcao'
+import { parseAcervoTab } from '@/lib/acervo-tab'
 import { AdminEventosList } from '@/app/admin/eventos/admin-eventos-list'
 import { NovoEventoButton } from '@/components/eventos/novo-evento-button'
 import { DepartamentoSemanaOps } from '@/components/admin/departamento-semana-ops'
 import {
   AdminInboxList,
   AdminPageHeader,
+  AdminHeaderActionLink,
+  AdminPendingTabs,
+  adminTabIds,
   DirecaoInboxSkeleton,
   DirecaoKpisSkeleton,
   DirecaoListaSkeleton,
   KpiGrid,
   StatCard,
+  type AdminTabItem,
 } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Social — Admin' }
+
+const SOCIAL_TABS = ['acoes', 'pendencias'] as const
+const ICONE_TAB = 'h-4 w-4 shrink-0'
 
 async function SocialKpis({
   tenantId,
@@ -67,67 +74,104 @@ async function SocialKpis({
   )
 }
 
-async function SocialInboxELista({
+async function SocialTabs({
+  tenantId,
+  podeVerFinanceiro,
+  tab,
+}: {
+  tenantId: string
+  podeVerFinanceiro: boolean
+  tab: (typeof SOCIAL_TABS)[number]
+}) {
+  const ops = await carregarDirecaoSocial(tenantId, { incluirOrcamento: podeVerFinanceiro })
+  const tabs: AdminTabItem[] = [
+    {
+      id: 'acoes',
+      label: 'Ações',
+      icon: <CalendarHeart className={ICONE_TAB} />,
+      count: ops.lista.length,
+    },
+    {
+      id: 'pendencias',
+      label: 'Precisa de você',
+      icon: <AlertTriangle className={ICONE_TAB} />,
+      count: ops.pendencias.length,
+      countClass:
+        ops.pendencias.length > 0
+          ? 'bg-amber-500/16 text-amber-700 dark:text-amber-400'
+          : undefined,
+    },
+  ]
+
+  return <AdminPendingTabs tabs={tabs} basePath="/admin/social" activeId={tab} paramKey="tab" />
+}
+
+async function SocialCorpo({
   tenantId,
   podeVerFinanceiro,
   podeVincular,
+  tab,
 }: {
   tenantId: string
   podeVerFinanceiro: boolean
   podeVincular: boolean
+  tab: (typeof SOCIAL_TABS)[number]
 }) {
   const ops = await carregarDirecaoSocial(tenantId, { incluirOrcamento: podeVerFinanceiro })
-  return (
-    <>
-      <DepartamentoSemanaOps
-        itens={ops.semana}
-        partidas={ops.partidasSemana}
-        semanaHref="/admin/eventos?vista=semana"
-        podeVincularPartida={podeVincular}
-        titulo="Semana do Social"
-      />
+  const { tabId, panelId } = adminTabIds('tab', tab)
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Precisa de você
-          </h2>
-          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Campanhas, orçamento e vínculo de eventos.
-          </p>
-        </div>
+  return (
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
+      {tab === 'acoes' ? (
+        <>
+          <MotionReveal>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Posto de comando do Social — vincule eventos a projetos para esta lista refletir as
+              campanhas.
+            </p>
+          </MotionReveal>
+
+          <SocialKpis tenantId={tenantId} podeVerFinanceiro={podeVerFinanceiro} />
+
+          <DepartamentoSemanaOps
+            itens={ops.semana}
+            partidas={ops.partidasSemana}
+            semanaHref="/admin/eventos?vista=semana"
+            podeVincularPartida={podeVincular}
+            titulo="Semana do Social"
+          />
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Próximas ações do Social
+            </h2>
+            <AdminEventosList
+              eventos={ops.lista}
+              emptyTitle="Nenhuma ação com projeto do Social"
+              emptyDescription="Crie o evento e vincule a uma campanha/projeto do departamento."
+              detailBasePath="/admin/social"
+            />
+          </section>
+        </>
+      ) : null}
+
+      {tab === 'pendencias' ? (
         <AdminInboxList
           itens={ops.pendencias}
           podeAgir={false}
           emptyTitle="Social em dia."
         />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-          Próximas ações do Social
-        </h2>
-        <AdminEventosList
-          eventos={ops.lista}
-          emptyTitle="Nenhuma ação com projeto do Social"
-          emptyDescription="Crie o evento e vincule a uma campanha/projeto do departamento."
-          detailBasePath="/admin/social"
-        />
-      </section>
-    </>
+      ) : null}
+    </div>
   )
 }
 
 async function SocialHeaderLinks({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoSocial(tenantId, { incluirOrcamento: false })
   return (
-    <Link
-      href={hrefHomeDepartamento(ops.departamentoSlug, 'projetos')}
-      className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-    >
-      <PartyPopper className="h-4 w-4" aria-hidden />
+    <AdminHeaderActionLink href={hrefHomeDepartamento(ops.departamentoSlug, 'projetos')} icon={PartyPopper}>
       Campanhas no portal
-    </Link>
+    </AdminHeaderActionLink>
   )
 }
 
@@ -152,12 +196,17 @@ async function SocialActions({
       partidas={partidas}
       projetos={projetos}
       temAfiliacao={Boolean(afiliacaoId)}
-      redirectTo="/admin/social"
+      departamentoSlug="social-e-eventos"
+        redirectTo="/admin/social"
     />
   )
 }
 
-export default async function AdminSocialPage() {
+export default async function AdminSocialPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   let session: Awaited<ReturnType<typeof assertAnyPermission>>['session']
   let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
   let podeGerir = false
@@ -187,6 +236,9 @@ export default async function AdminSocialPage() {
   }
   if (!session.user?.id) redirect('/portal')
 
+  const sp = await searchParams
+  const tab = parseAcervoTab(sp.tab, SOCIAL_TABS, 'acoes')
+
   return (
     <>
       <AdminPageHeader
@@ -198,44 +250,35 @@ export default async function AdminSocialPage() {
             <Suspense fallback={null}>
               <SocialHeaderLinks tenantId={tenant.id} />
             </Suspense>
-            <Link
-              href="/admin/eventos?vista=semana"
-              className="app-touch-line inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              <CalendarRange className="h-4 w-4" aria-hidden />
+            <AdminHeaderActionLink href="/admin/eventos?vista=semana" icon={CalendarRange}>
               Agenda da semana
-            </Link>
+            </AdminHeaderActionLink>
             <Suspense fallback={null}>
               <SocialActions tenantId={tenant.id} podeGerir={podeGerir} />
             </Suspense>
           </div>
         }
-      />
+      >
+        <Suspense fallback={<div className="h-9 w-full max-w-lg animate-pulse rounded-lg bg-[rgb(var(--border)_/_0.45)]" />}>
+          <SocialTabs tenantId={tenant.id} podeVerFinanceiro={podeVerFinanceiro} tab={tab} />
+        </Suspense>
+      </AdminPageHeader>
 
       <div className="app-container space-y-6 py-6">
-        <MotionReveal>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Posto de comando do Social — vincule eventos a projetos para esta lista refletir as
-            campanhas.
-          </p>
-        </MotionReveal>
-
-        <Suspense fallback={<DirecaoKpisSkeleton cols={3} />}>
-          <SocialKpis tenantId={tenant.id} podeVerFinanceiro={podeVerFinanceiro} />
-        </Suspense>
-
         <Suspense
           fallback={
             <div className="space-y-6">
+              <DirecaoKpisSkeleton cols={3} />
               <DirecaoInboxSkeleton />
               <DirecaoListaSkeleton />
             </div>
           }
         >
-          <SocialInboxELista
+          <SocialCorpo
             tenantId={tenant.id}
             podeVerFinanceiro={podeVerFinanceiro}
             podeVincular={podeVincular}
+            tab={tab}
           />
         </Suspense>
       </div>

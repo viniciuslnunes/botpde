@@ -11,7 +11,9 @@ import {
 import { TIPO_EVENTO_LABEL, thinCopyPorSlug, THIN_COM_AGENDA } from '@torcida/types'
 import type { TipoEvento } from '@torcida/db'
 import { db } from '@torcida/db'
+import { auth } from '@/lib/auth'
 import { listarProximosEventosTenant } from '@/lib/eventos-tipo'
+import { podeVerLojaTenant } from '@/lib/loja-lojas'
 
 const ICONS: Record<string, typeof Users> = {
   'social-e-eventos': Calendar,
@@ -202,15 +204,22 @@ export async function DepartamentoThinAside({
   }
 
   if (slug === 'materiais-loja') {
+    const session = await auth()
+    const podeVerLoja =
+      session?.user?.id != null
+        ? await podeVerLojaTenant(session.user.id, tenantId, session.user.email)
+        : false
     const [pedidos, destaque]: [number, { id: string; nome: string } | null] = await Promise.all([
       podeVerPedidos
         ? db.saasPedido.count({ where: { tenantId, status: 'PENDENTE' } })
         : Promise.resolve(0),
-      db.saasProduto.findFirst({
-        where: { tenantId, ativo: true, destaque: true },
-        orderBy: { atualizadoEm: 'desc' },
-        select: { id: true, nome: true },
-      }),
+      podeVerLoja
+        ? db.saasProduto.findFirst({
+            where: { tenantId, ativo: true, destaque: true },
+            orderBy: { atualizadoEm: 'desc' },
+            select: { id: true, nome: true },
+          })
+        : Promise.resolve(null),
     ])
     pedidosAbertos = pedidos
     produtoDestaque = destaque

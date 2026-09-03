@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Landmark, ShieldAlert, Timer, History } from 'lucide-react'
+import { ExternalLink, Landmark, ShieldAlert, Timer, History } from 'lucide-react'
 import { PERMISSIONS, PATRIMONIO_ACERVO_PAGE_SIZE } from '@torcida/types'
 import { assertManageOrOversightView } from '@/lib/authz'
 import {
@@ -18,11 +17,13 @@ import { parseAcervoTab } from '@/lib/acervo-tab'
 import { listarAuditoriaInventario } from '@/lib/patrimonio-auditoria'
 import { PatrimonioItensLista, type PatrimonioRow } from '@/components/patrimonio/patrimonio-itens-lista'
 import { fichaVistoriaDoItem } from '@/lib/patrimonio-vistoria-ficha'
+import { montarQrItemPatrimonio } from '@/lib/patrimonio-qr'
+import { FolhaEtiquetas } from '@/components/ui/folha-etiquetas'
 import { PatrimonioAuditoriaTimeline } from '@/components/patrimonio/patrimonio-auditoria-timeline'
 import { PatrimonioResumoCards } from '@/components/patrimonio/patrimonio-resumo-cards'
 import { PatrimonioFiltros } from '@/components/patrimonio/patrimonio-filtros'
 import { MarcarDanoEmprestimoForm } from '@/components/patrimonio/marcar-dano-emprestimo-form'
-import { AdminInboxList, AdminPageHeader, AdminPendingTabs, adminTabIds, type AdminTabItem } from '@/components/admin/ui'
+import { AdminInboxList, AdminPageHeader, AdminHeaderActionLink, AdminPendingTabs, adminTabIds, type AdminTabItem } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Patrimônio — Admin' }
@@ -66,6 +67,7 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
     fotoPreviewUrl: i.fotoPreviewUrl,
     responsavelId: i.responsavel?.id ?? null,
     responsavelNome: i.responsavel?.nome ?? null,
+    qrEtiqueta: montarQrItemPatrimonio(i.id),
     ...fichaVistoriaDoItem(i.meta),
   }))
 
@@ -123,12 +125,9 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
         }
         icon={<Landmark className="h-5 w-5" />}
         actions={
-          <Link
-            href="/portal/patrimonio"
-            className="app-touch-line text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-          >
+          <AdminHeaderActionLink href="/portal/patrimonio" icon={ExternalLink}>
             Ver no portal
-          </Link>
+          </AdminHeaderActionLink>
         }
       >
         <AdminPendingTabs
@@ -158,9 +157,23 @@ export default async function PatrimonioAdminPage({ searchParams }: Props) {
         {tab === 'acervo' ? (
           <>
             <PatrimonioResumoCards resumo={resumo} />
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              A foto diferencia peças parecidas no inventário.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                A foto diferencia peças parecidas no inventário.
+              </p>
+              {podeGerir && (
+                // Etiquetas da página atual: imprimir o acervo inteiro de uma vez
+                // gastaria papel com item que ninguém vai etiquetar hoje.
+                <FolhaEtiquetas
+                  etiquetas={itens.map((i) => ({
+                    id: i.id,
+                    titulo: i.nome,
+                    subtitulo: i.localizacao ?? null,
+                    valor: i.qrEtiqueta ?? '',
+                  }))}
+                />
+              )}
+            </div>
             <PatrimonioItensLista
               itens={itens}
               podeGerir={podeGerir}

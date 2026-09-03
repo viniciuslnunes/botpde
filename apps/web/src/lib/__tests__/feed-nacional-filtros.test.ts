@@ -36,6 +36,7 @@ vi.mock('@/lib/feed-timeline', () => ({ garantirTimelineDaRedeDoViewer: vi.fn() 
 vi.mock('next/cache', () => ({ unstable_cache: (fn: () => unknown) => fn }))
 
 import {
+  encodeCursorNacional,
   getPostsFeedNacional,
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
@@ -71,6 +72,19 @@ const postRaw = {
   _count: { reacoes: 0, comentarios: 0 },
 }
 
+function whereDoBaldeTorcida(): {
+  AND?: unknown[]
+  OR?: unknown
+} {
+  const call = findManyPost.mock.calls.find((args) => {
+    const arg = args[0] as { where?: { tenantId?: { in?: unknown } } }
+    return Array.isArray(arg?.where?.tenantId?.in)
+  })
+  const where = (call?.[0] as { where?: { AND?: unknown[]; OR?: unknown } } | undefined)?.where
+  if (!where) throw new Error('balde torcida não consultado')
+  return where
+}
+
 describe('getPostsFeedNacional', () => {
   beforeEach(() => {
     findManySeguimento.mockReset()
@@ -92,13 +106,37 @@ describe('getPostsFeedNacional', () => {
 
     await getPostsFeedNacional('af-1', 'u1')
 
-    expect(findManyPost).toHaveBeenCalledWith(
+    const torcidaWhere = whereDoBaldeTorcida()
+    expect(torcidaWhere.AND).toEqual([
+      { OR: [{ tenant: { sintetico: true } }, { alcanceNacional: true }] },
+    ])
+    expect(torcidaWhere).not.toHaveProperty('OR')
+  })
+
+  it('não deixa o OR do filtro apagar o cursor da página seguinte', async () => {
+    findManySeguimento.mockResolvedValue([])
+    findManyPost.mockResolvedValue([])
+
+    const cursor = encodeCursorNacional({
+      torcedor: { id: 'p-old', criadoEmIso: '2026-08-01T12:00:00.000Z' },
+      torcida: { id: 'p-old-t', criadoEmIso: '2026-08-01T11:00:00.000Z' },
+    })
+    await getPostsFeedNacional('af-1', 'u1', { cursor })
+
+    const torcidaWhere = whereDoBaldeTorcida()
+    const clausulas = torcidaWhere.AND ?? []
+    expect(clausulas).toHaveLength(2)
+    expect(clausulas[0]).toEqual({
+      OR: [{ tenant: { sintetico: true } }, { alcanceNacional: true }],
+    })
+    expect(clausulas[1]).toEqual(
       expect.objectContaining({
-        where: expect.objectContaining({
-          OR: [{ tenant: { sintetico: true } }, { alcanceNacional: true }],
-        }),
+        OR: expect.arrayContaining([
+          expect.objectContaining({ criadoEm: expect.objectContaining({ lt: expect.any(Date) }) }),
+        ]),
       }),
     )
+    expect(torcidaWhere).not.toHaveProperty('OR')
   })
 })
 

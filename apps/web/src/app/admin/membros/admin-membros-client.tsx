@@ -24,6 +24,7 @@ import {
 } from '@/lib/admin-listagem-format'
 import { MembroDetalheModal } from './membro-detalhe-modal'
 import type { AdminMembroItem } from './admin-membro-item'
+import { espelhoSomenteLeituraNoAdmin } from '@/lib/admin-membro-espelho'
 
 export type { AdminMembroItem } from './admin-membro-item'
 
@@ -107,6 +108,11 @@ const CELULA: Record<
       {formatCaixaAltaListagem(membro.sedeNome) ?? '—'}
     </span>
   ),
+  areaUnidade: (membro) => (
+    <span className="text-xs text-[rgb(var(--foreground-muted))]">
+      {formatCaixaAltaListagem(membro.departamentoUnidadeNome) ?? '—'}
+    </span>
+  ),
   origem: (membro) => <MembroOrigemCell membro={membro} />,
   cidade: (membro) => (
     <span className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -134,6 +140,22 @@ const CELULA: Record<
       {membro.aprovadoEmLabel ?? '—'}
     </span>
   ),
+  situacao: (membro) => {
+    const espelhoAnalisado = Boolean(membro.espelhado && membro.status !== 'PENDENTE')
+    if (!espelhoAnalisado) {
+      return <span className="text-xs text-[rgb(var(--foreground-muted))]">—</span>
+    }
+    const quem = membro.aprovadoPorNome?.trim()
+    const quando = membro.aprovadoEmLabel?.trim()
+    const texto = quem
+      ? `Analisada por ${quem}${quando ? ` em ${quando}` : ''}`
+      : 'Espelho da Sede'
+    return (
+      <span className="block max-w-[14rem] text-xs leading-snug text-[rgb(var(--foreground-muted))]">
+        {texto}
+      </span>
+    )
+  },
 }
 
 interface AdminMembrosTableProps {
@@ -158,6 +180,8 @@ interface AdminMembrosTableProps {
   podeApagar: boolean
   /** userIds bloqueados neste tenant (ou herdado da Sede). Carregado em lote. */
   bloqueadosUserIds: string[]
+  /** Tenant com `Sede.tipo = SEDE` — libera gestão de espelhos já analisados. */
+  isAdministracaoSede?: boolean
 }
 
 export function AdminMembrosTable({
@@ -170,6 +194,7 @@ export function AdminMembrosTable({
   podeApagar,
   bloqueadosUserIds,
   classesPorColuna = {},
+  isAdministracaoSede = false,
 }: AdminMembrosTableProps) {
   const bloqueados = useMemo(() => new Set(bloqueadosUserIds), [bloqueadosUserIds])
   // Guarda o id, não o objeto: quando a decisão revalida a lista, o card
@@ -280,9 +305,8 @@ export function AdminMembrosTable({
                       status={membro.status}
                       departamentoNome={membro.departamentoNome}
                       espelhado={membro.espelhado}
+                      isAdministracaoSede={isAdministracaoSede}
                       aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
-                      aprovadoPorNome={membro.aprovadoPorNome}
-                      aprovadoEmLabel={membro.aprovadoEmLabel}
                       nomeMembro={membro.nome}
                       isSocio={membro.isSocio}
                       areaPendenteEfetivacao={membro.areaPendenteEfetivacao}
@@ -307,6 +331,7 @@ export function AdminMembrosTable({
         podeBloquear={podeBloquear}
         bloqueado={selecionado ? bloqueados.has(selecionado.userId) : false}
         podeApagar={podeApagar}
+        isAdministracaoSede={isAdministracaoSede}
       />
     </>
   )

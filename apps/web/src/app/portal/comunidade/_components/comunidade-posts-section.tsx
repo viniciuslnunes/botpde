@@ -10,6 +10,7 @@ import {
 import { getPostsDoCanal } from '@/lib/canais'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
+import type { ReactNode } from 'react'
 
 interface CurrentUser {
   id: string
@@ -40,6 +41,8 @@ interface ComunidadePostsSectionProps {
   /** Sócio compartilha; torcedor só curte/comenta/salva. */
   podeCompartilhar?: boolean
   contextoComunidadeNome?: string | null
+  /** Faixa «Na praça» etc. — renderizada abaixo do indicador de refresh. */
+  header?: ReactNode
 }
 
 export async function ComunidadePostsSection({
@@ -54,6 +57,7 @@ export async function ComunidadePostsSection({
   afiliacaoId,
   podeCompartilhar = true,
   contextoComunidadeNome = null,
+  header = null,
 }: ComunidadePostsSectionProps) {
   if (escopo === 'nacional' && afiliacaoId) {
     const feedOpts = { cursor, take: 20 }
@@ -80,6 +84,7 @@ export async function ComunidadePostsSection({
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
         contextoComunidadeNome={contextoComunidadeNome}
+        header={header}
       />
     )
   }
@@ -110,6 +115,7 @@ export async function ComunidadePostsSection({
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
         contextoComunidadeNome={contextoComunidadeNome}
+        header={header}
       />
     )
   }
@@ -128,6 +134,7 @@ export async function ComunidadePostsSection({
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
         contextoComunidadeNome={contextoComunidadeNome}
+        header={header}
       />
     )
   }
@@ -146,6 +153,7 @@ export async function ComunidadePostsSection({
         salvoIds={[...salvoIds]}
         podeCompartilhar={podeCompartilhar}
         contextoComunidadeNome={contextoComunidadeNome}
+        header={header}
       />
     )
   }
@@ -168,6 +176,7 @@ export async function ComunidadePostsSection({
       salvoIds={[...salvoIds]}
       podeCompartilhar={podeCompartilhar}
       contextoComunidadeNome={contextoComunidadeNome}
+      header={header}
     />
   )
 }

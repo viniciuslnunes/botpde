@@ -1,4 +1,5 @@
 import type { TipoNotificacao } from '@torcida/db'
+import { db } from '@torcida/db'
 import { hrefHomeDepartamento, labelCategoriaViolacao, PERMISSIONS } from '@torcida/types'
 import {
   criarNotificacoesEmLote,
@@ -89,6 +90,14 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   EVENTO_CANCELADO: { escopo: 'social' },
   EVENTO_ALTERADO: { escopo: 'social' },
   EVENTO_CHECKIN: { escopo: 'social' },
+  // Convocação chega para a pessoa (portal); a recusa sobe para quem monta a
+  // operação e precisa cobrir o posto.
+  ESCALA_CONVOCADO: { escopo: 'social' },
+  ESCALA_RESPONDIDA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
+    rota: '/admin/eventos',
+  },
   DENUNCIA_NOVA: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
@@ -443,6 +452,48 @@ export async function notificarComunicado(destino: DestinoNotificacao): Promise<
         PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
         PERMISSIONS.COMMUNITY_MANAGE,
       ]),
+    ])
+    const targets = new Set<string>([...membroIds, ...adminIds])
+    if (destino.excetoUserId) targets.delete(destino.excetoUserId)
+    return criarNotificacoesEmLote(
+      Array.from(targets).map((userId) => ({
+        userId,
+        tenantId: destino.tenantId,
+        tipo: destino.tipo,
+        titulo: destino.titulo,
+        corpo: destino.corpo,
+        link: destino.link,
+        atorId: destino.atorId,
+      })),
+    )
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Comunicado segmentado — fan-out só para quem está no escopo.
+ * @param {import('@torcida/types').ComunicadoAudiencia} audiencia
+ */
+export async function notificarComunicadoSegmentado(
+  destino: DestinoNotificacao,
+  audiencia: import('@torcida/types').ComunicadoAudiencia,
+): Promise<number> {
+  try {
+    const { filtrarMembrosPorAudiencia } = await import('@torcida/types')
+    const membros = await db.saasMembro.findMany({
+      where: { tenantId: destino.tenantId, status: 'APROVADO', desligadoEm: null },
+      select: {
+        userId: true,
+        tipo: true,
+        adimplente: true,
+        departamentoId: true,
+      },
+    })
+    const membroIds = filtrarMembrosPorAudiencia(audiencia, membros)
+    const adminIds = await listarDestinatariosPorPermissoes(destino.tenantId, [
+      PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+      PERMISSIONS.COMMUNITY_MANAGE,
     ])
     const targets = new Set<string>([...membroIds, ...adminIds])
     if (destino.excetoUserId) targets.delete(destino.excetoUserId)

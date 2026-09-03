@@ -1,17 +1,11 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
-import { redirect } from 'next/navigation'
-import { Package, ShoppingBag, Ticket } from 'lucide-react'
 import { carregarDirecaoLoja } from '@/lib/loja-direcao'
-import {
-  AdminInboxList,
-  DirecaoInboxSkeleton,
-  DirecaoKpisSkeleton,
-  KpiGrid,
-  StatCard,
-} from '@/components/admin/ui'
+import { AdminInboxList, DirecaoInboxSkeleton, DirecaoKpisSkeleton, KpiGrid, StatCard } from '@/components/admin/ui'
+import { Package, ShoppingBag, Ticket } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Comando — Loja' }
@@ -32,7 +26,7 @@ async function LojaKpis({ tenantId }: { tenantId: string }) {
         value={ops.ticketsAbertos}
         tone={ops.ticketsAbertos > 0 ? 'warning' : 'default'}
         icon={<Ticket className="h-5 w-5" />}
-        href="/admin/loja/tickets?filtro=abertos"
+        href="/admin/loja/atendimento"
       />
       <StatCard
         label="Sem estoque"
@@ -45,17 +39,15 @@ async function LojaKpis({ tenantId }: { tenantId: string }) {
   )
 }
 
-async function LojaInbox({ tenantId }: { tenantId: string }) {
+async function LojaPendenciasInbox({ tenantId }: { tenantId: string }) {
   const ops = await carregarDirecaoLoja(tenantId)
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Precisa de você
-          </h2>
-          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Confirme pedidos na fila — catálogo fica na aba Catálogo.
+          <h2 className="text-base font-semibold text-[rgb(var(--foreground))]">Precisa de você</h2>
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            Confirme pedidos pendentes, acompanhe tickets abertos e repõe rupturas de estoque.
           </p>
         </div>
         <Link
@@ -89,7 +81,7 @@ export default async function AdminLojaComandoPage() {
         <LojaKpis tenantId={tenant.id} />
       </Suspense>
       <Suspense fallback={<DirecaoInboxSkeleton />}>
-        <LojaInbox tenantId={tenant.id} />
+        <LojaPendenciasInbox tenantId={tenant.id} />
       </Suspense>
     </div>
   )

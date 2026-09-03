@@ -1,29 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import {
-  MessageCircle,
-  Users,
-  Loader2,
-  Globe,
-  Lock,
-  BellOff,
-  Bell,
-  LogOut,
-  Check,
-  X,
-  Settings,
-  Inbox,
-  UserMinus,
-  Link2,
-  Copy,
-  RefreshCw,
-  Search,
-} from 'lucide-react'
+import { Bell, BellOff, Check, Copy, Globe, Inbox, Link2, Loader2, Lock, LogIn, LogOut, MailQuestion, MessageCircle, RefreshCw, Save, Settings, ShieldCheck, Trash2, UserMinus, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
 import {
@@ -52,6 +34,8 @@ import type {
   MembroGrupoPendenteItem,
   PostSocialItem,
 } from '@/lib/feed'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 interface CurrentUser {
   id: string
@@ -400,6 +384,17 @@ export function GrupoDetalheClient({
   }
 
   const pedidosCount = pedidos?.length ?? 0
+  const sugestoesMembros = useMemo((): ReactiveSearchOption[] | null => {
+    if (membros === null) return null
+    return membros.map((m) => ({
+      id: m.userId,
+      label: m.nome ?? m.nickname ?? 'Membro',
+      sublabel: m.nickname && m.nome ? `@${m.nickname}` : null,
+      searchText: [m.nome, m.nickname].filter(Boolean).join(' '),
+      leading: <Avatar nome={m.nome} avatarUrl={m.avatarUrl} size="sm" className="h-8 w-8 shrink-0 rounded-md" />,
+    }))
+  }, [membros])
+
   const qMembros = buscaMembros.trim().toLowerCase()
   const membrosFiltrados =
     membros === null
@@ -484,24 +479,28 @@ export function GrupoDetalheClient({
 
         <div className="flex flex-wrap items-center gap-2">
           {!grupo.souMembro && !grupo.pedidoPendente && grupo.publica && (
-            <button
+            <AppButton
+              variant="primary"
+              icon={LogIn}
               type="button"
               disabled={pendingMembership}
               onClick={entrar}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm font-semibold"
             >
               Entrar
-            </button>
+            </AppButton>
           )}
           {!grupo.souMembro && !grupo.pedidoPendente && !grupo.publica && (
-            <button
+            <AppButton
+              variant="primary"
+              icon={MailQuestion}
               type="button"
               disabled={pendingMembership}
               onClick={pedir}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm font-semibold"
             >
               Pedir entrada
-            </button>
+            </AppButton>
           )}
           {grupo.pedidoPendente && (
             <span className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
@@ -526,15 +525,16 @@ export function GrupoDetalheClient({
                   </>
                 )}
               </button>
-              <button
+              <AppButton
+                variant="none"
+                icon={LogOut}
                 type="button"
                 disabled={pendingMembership}
                 onClick={sair}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
               >
-                <LogOut className="h-4 w-4" />
                 Sair
-              </button>
+              </AppButton>
             </>
           )}
         </div>
@@ -597,20 +597,16 @@ export function GrupoDetalheClient({
             ) : (
               <div className="space-y-3">
                 {membros.length > 8 && (
-                  <div className="relative">
-                    <Search
-                      aria-hidden
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
-                    />
-                    <input
-                      type="search"
-                      value={buscaMembros}
-                      onChange={(e) => setBuscaMembros(e.target.value)}
-                      placeholder="Buscar membro por nome ou @"
-                      aria-label="Buscar membros"
-                      className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))]"
-                    />
-                  </div>
+                  <SearchFilterInput
+                    value={buscaMembros}
+                    onChange={setBuscaMembros}
+                    placeholder="Buscar membro por nome ou @"
+                    ariaLabel="Buscar membros"
+                    suggestions={sugestoesMembros ?? []}
+                    onSelectSuggestion={(item) => setBuscaMembros(item.label)}
+                    minChars={1}
+                    size="sm"
+                  />
                 )}
                 {membrosFiltrados !== null && membrosFiltrados.length === 0 ? (
                   <p className="py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -642,16 +638,17 @@ export function GrupoDetalheClient({
                           )}
                         </Link>
                         {grupo.souAdmin && membro.userId !== currentUser.id && (
-                          <button
+                          <AppButton
+                            variant="none"
+                            icon={UserMinus}
                             type="button"
                             disabled={pendingMembros && busyUserId === membro.userId}
                             title="Remover do grupo"
                             onClick={() => removerMembro(membro.userId)}
                             className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                           >
-                            <UserMinus className="h-3.5 w-3.5" />
                             Remover
-                          </button>
+                          </AppButton>
                         )}
                       </li>
                     ))}
@@ -701,24 +698,26 @@ export function GrupoDetalheClient({
                       <span className="truncate text-sm font-medium">{p.nome ?? 'Membro'}</span>
                     </Link>
                     <div className="flex shrink-0 gap-1.5">
-                      <button
+                      <AppButton
+                        variant="primary"
+                        icon={Check}
                         type="button"
                         disabled={pendingPedidos && busyUserId === p.userId}
                         onClick={() => decidir(p.userId, true)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-primary-on disabled:opacity-50"
+                        className="gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold"
                       >
-                        <Check className="h-3.5 w-3.5" />
                         Aprovar
-                      </button>
-                      <button
+                      </AppButton>
+                      <AppButton
+                        variant="none"
+                        icon={X}
                         type="button"
                         disabled={pendingPedidos && busyUserId === p.userId}
                         onClick={() => decidir(p.userId, false)}
                         className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium disabled:opacity-50"
                       >
-                        <X className="h-3.5 w-3.5" />
                         Recusar
-                      </button>
+                      </AppButton>
                     </div>
                   </li>
                 ))}
@@ -849,14 +848,16 @@ export function GrupoDetalheClient({
               </span>
             </label>
 
-              <button
+              <AppButton
+                variant="primary"
+                icon={Save}
+                loading={pendingConfig}
                 type="submit"
                 disabled={pendingConfig || nomeEdit.trim().length < 3}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+                className="rounded-full"
               >
-                {pendingConfig && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar alterações
-              </button>
+              </AppButton>
             </form>
 
             <div className="space-y-3 border-t border-[rgb(var(--border))] pt-5">
@@ -875,21 +876,18 @@ export function GrupoDetalheClient({
                     /portal/comunidade/grupos/convite/{codigoConvite}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={pendingConfig} onClick={() => void copiarConvite()} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
-                      <Copy className="h-4 w-4" /> Copiar
-                    </button>
-                    <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
-                      <RefreshCw className="h-4 w-4" /> Regenerar
-                    </button>
-                    <button type="button" disabled={pendingConfig} onClick={revogarConvite} className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                    <AppButton variant="none" icon={Copy} type="button" disabled={pendingConfig} onClick={() => void copiarConvite()} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"> Copiar
+                    </AppButton>
+                    <AppButton variant="none" icon={RefreshCw} type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"> Regenerar
+                    </AppButton>
+                    <AppButton variant="none" icon={UserMinus} type="button" disabled={pendingConfig} onClick={revogarConvite} className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                       Revogar
-                    </button>
+                    </AppButton>
                   </div>
                 </div>
               ) : (
-                <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-primary-on disabled:opacity-50">
-                  <Link2 className="h-4 w-4" /> Gerar link de convite
-                </button>
+                <AppButton variant="primary" icon={Link2} type="button" disabled={pendingConfig} onClick={gerarConvite} className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"> Gerar link de convite
+                </AppButton>
               )}
             </div>
 
@@ -920,13 +918,13 @@ export function GrupoDetalheClient({
                         </div>
                       </div>
                       {membro.papel === 'MEMBRO' ? (
-                        <button type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'ADMIN')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                        <AppButton variant="none" icon={ShieldCheck} type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'ADMIN')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                           Tornar admin
-                        </button>
+                        </AppButton>
                       ) : podeRebaixar ? (
-                        <button type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'MEMBRO')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                        <AppButton variant="none" icon={Trash2} type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'MEMBRO')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                           Remover admin
-                        </button>
+                        </AppButton>
                       ) : (
                         <span className="shrink-0 text-[10px] text-[rgb(var(--foreground-muted))]">Único admin</span>
                       )}

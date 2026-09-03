@@ -1,10 +1,12 @@
 import 'server-only'
-import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import { env } from '@/lib/env'
+import { lerPayload, montarPayload } from '@/lib/qr-token'
 import { novoQrTokenSocio } from '@/lib/pix-gateway'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, QR_CARTEIRINHA } from '@torcida/types'
+
+/** Namespace do HMAC. Não mude: carteirinha já emitida pararia de validar. */
+const PROPOSITO = QR_CARTEIRINHA
 
 export type ValidacaoCarteirinha = {
   ok: boolean
@@ -18,27 +20,13 @@ export type ValidacaoCarteirinha = {
   desligado?: boolean
 }
 
-function assinaturaToken(token: string): string {
-  return createHmac('sha256', env.AUTH_SECRET).update(`carteirinha:${token}`).digest('base64url')
-}
-
 /** Payload URL-safe: token.assinatura — verificado sem DB round-trip de crypto. */
 export function montarPayloadQr(qrToken: string): string {
-  return `${qrToken}.${assinaturaToken(qrToken)}`
+  return montarPayload(PROPOSITO, qrToken)
 }
 
 export function parsePayloadQr(payload: string): string | null {
-  const [token, sig] = payload.split('.')
-  if (!token || !sig) return null
-  const expected = assinaturaToken(token)
-  try {
-    const a = Buffer.from(expected)
-    const b = Buffer.from(sig)
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return null
-  } catch {
-    return null
-  }
-  return token
+  return lerPayload(PROPOSITO, payload)
 }
 
 export async function garantirQrTokenSocio(socioId: string, tenantId: string): Promise<string> {

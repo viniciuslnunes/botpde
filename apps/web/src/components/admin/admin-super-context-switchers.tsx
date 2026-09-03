@@ -292,6 +292,7 @@ export function AdminSuperContextSwitchers({
         items={clubesItems}
         valueId={clubeId}
         getLabel={labelClubeOpcao}
+        getLogoUrl={(c) => c.logoUrl}
         getSearchText={(c) => [c.nome, c.apelido ?? '', c.estado ?? ''].join(' ')}
         recentNamespace="clube"
         variant={variant}
@@ -312,6 +313,7 @@ export function AdminSuperContextSwitchers({
         buscaRemota={buscaRemotaTorcidas}
         valueId={torcidaValueId}
         getLabel={(t) => t.nome}
+        getLogoUrl={(t) => t.logoUrl}
         getSearchText={(t) =>
           [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug].join(' ')
         }
@@ -355,6 +357,7 @@ export function AdminSuperContextSwitchers({
             items={afiliacoesProntas ? unidadeItems : []}
             valueId={afiliacoesProntas ? unidadeAtualId : null}
             getLabel={(u) => u.nome}
+            getLogoUrl={(u) => u.logoUrl}
             getSubLabel={labelUnidadeSub}
             getSearchText={(u) =>
               [u.nome, u.tipo, u.cidade ?? '', u.tenantSlug].join(' ')

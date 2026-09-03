@@ -23,6 +23,7 @@ import {
 } from '@/lib/departamento-semana'
 import type { AgendaSemanaCompactItem, AgendaSemanaPartidaItem } from '@/components/eventos/agenda-semana-compact'
 import { addCalendarDays, dayKeyInZone, zonedDateParts } from '@/lib/format-datetime'
+import { carregarPendenciasEscala } from '@/lib/escala'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -208,6 +209,23 @@ async function fetchDirecaoBateria(
       })
       break
     }
+  }
+
+  // Naipe descoberto aparece aqui: escala do ensaio (quem toca o quê).
+  const pendenciasEscalaEnsaio = await carregarPendenciasEscala(
+    tenantId,
+    proximos.map((e) => ({ id: e.id, titulo: e.titulo, data: e.data })),
+    { agora, limite: 3 },
+  )
+  for (const p of pendenciasEscalaEnsaio) {
+    pendencias.push({
+      id: `esc-${p.eventoId}`,
+      titulo: `${p.texto} · ${p.titulo}`,
+      detalhe: 'Escala do ensaio: coordenação e naipes.',
+      href: `/admin/bateria/${p.eventoId}?tab=escala`,
+      tom: p.severidade === 'alta' ? 'danger' : 'warning',
+      sla: slaLabel(p.data, { agora, modo: 'ate' }),
+    })
   }
 
   return {

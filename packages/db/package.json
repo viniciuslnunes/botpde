@@ -16,6 +16,7 @@
     "db:senha-teste": "node scripts/repair-senha-teste.js",
     "test:repair-system-roles": "node scripts/test-repair-system-role-permissions.js",
     "db:repair-departamento-orfaos": "node scripts/repair-departamento-orfaos.js",
+    "db:repair-evento-dono-operacional": "node scripts/repair-evento-dono-operacional.js",
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
     "seed:agenda-demo": "node scripts/seed-agenda-demo.js",
     "seed:loja-gavioes": "node --use-system-ca scripts/seed-loja-gavioes.js",

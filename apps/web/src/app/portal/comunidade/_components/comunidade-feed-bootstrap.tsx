@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
 import type { EscopoComunidade } from '@/lib/comunidade-escopo'
 
@@ -22,6 +23,7 @@ export function ComunidadeFeedBootstrap({
   escopo,
   afiliacaoId,
   contextoComunidadeNome = null,
+  header = null,
 }: {
   tenantId: string
   currentUser: CurrentUser
@@ -30,6 +32,7 @@ export function ComunidadeFeedBootstrap({
   escopo?: EscopoComunidade
   afiliacaoId?: string
   contextoComunidadeNome?: string | null
+  header?: ReactNode
 }) {
   return (
     <ComunidadeFeedInfinite
@@ -44,6 +47,7 @@ export function ComunidadeFeedBootstrap({
       salvoIds={[]}
       seedFromSsr={false}
       contextoComunidadeNome={contextoComunidadeNome}
+      header={header}
     />
   )
 }

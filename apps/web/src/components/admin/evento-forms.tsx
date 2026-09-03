@@ -20,6 +20,7 @@ import { PartidaFields } from '@/components/eventos/partida-fields'
 import { ImageUploadField } from '@/components/media/image-upload-field'
 import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import type { PartidaOption } from '@/lib/partidas'
+import { formatarDonoValor, type DonoOperacionalOption } from '@/lib/evento-dono'
 import { AppButton } from '@/components/ui/button'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
@@ -31,6 +32,47 @@ export type ProjetoOption = {
   id: string
   titulo: string
   departamentoNome: string
+}
+
+function DonoSelect({
+  donos,
+  defaultValue,
+  errors,
+}: {
+  donos: DonoOperacionalOption[]
+  defaultValue?: string | null
+  errors?: string[]
+}) {
+  if (donos.length === 0) return null
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Departamento responsável (opcional)
+      </label>
+      <select
+        name="donoOperacional"
+        defaultValue={defaultValue ?? ''}
+        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+      >
+        <option value="">Evento da torcida (sem departamento)</option>
+        {donos.map((d) => (
+          <optgroup key={d.id} label={d.nome}>
+            <option value={formatarDonoValor(d.id)}>{d.nome} — departamento inteiro</option>
+            {d.areas.map((a) => (
+              <option key={a.id} value={formatarDonoValor(d.id, a.id)}>
+                {d.nome} · {a.nome}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Quem escala, monta e responde pela operação. Diferente do projeto, que é a
+        prestação de contas.
+      </p>
+      <FieldError errors={errors} />
+    </div>
+  )
 }
 
 /** Valor datetime-local no formato esperado pelo input */
@@ -298,6 +340,8 @@ export function CriarEventoForm({
   sedes = [],
   partidas = [],
   projetos = [],
+  donos = [],
+  departamentoSlug,
   temAfiliacao = true,
   onCancel,
 }: {
@@ -308,6 +352,10 @@ export function CriarEventoForm({
   sedes?: SedeOption[]
   partidas?: PartidaOption[]
   projetos?: ProjetoOption[]
+  /** Departamentos + frentes para escolher o dono da operação (Agenda). */
+  donos?: DonoOperacionalOption[]
+  /** Hub thin: a criação já nasce do departamento da tela, sem select. */
+  departamentoSlug?: string
   temAfiliacao?: boolean
   onCancel?: () => void
 }) {
@@ -399,6 +447,10 @@ export function CriarEventoForm({
         errorsLng={state.errors?.lng}
       />
       <RecorrenciaField errors={state.errors?.recorrenciasSemanas} />
+      {departamentoSlug && (
+        <input type="hidden" name="departamentoSlug" value={departamentoSlug} />
+      )}
+      <DonoSelect donos={donos} errors={state.errors?.donoOperacional} />
       <ProjetoSelect projetos={projetos} errors={state.errors?.projetoId} />
 
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
@@ -455,6 +507,8 @@ type EventoData = {
   serieId?: string | null
   partidaId?: string | null
   projetoId?: string | null
+  departamentoId?: string | null
+  areaId?: string | null
   valorVaga?: number | { toNumber(): number } | null
   checkInExigePagamento?: boolean
 }
@@ -464,6 +518,7 @@ export function EditarEventoForm({
   sedes = [],
   partidas = [],
   projetos = [],
+  donos = [],
   temAfiliacao = true,
   redirectTo,
 }: {
@@ -471,6 +526,7 @@ export function EditarEventoForm({
   sedes?: SedeOption[]
   partidas?: PartidaOption[]
   projetos?: ProjetoOption[]
+  donos?: DonoOperacionalOption[]
   temAfiliacao?: boolean
   redirectTo?: string
 }) {
@@ -583,6 +639,11 @@ export function EditarEventoForm({
         </div>
       )}
 
+      <DonoSelect
+        donos={donos}
+        defaultValue={formatarDonoValor(evento.departamentoId, evento.areaId)}
+        errors={state.errors?.donoOperacional}
+      />
       <ProjetoSelect
         projetos={projetos}
         defaultValue={evento.projetoId}

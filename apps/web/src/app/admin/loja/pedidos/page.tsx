@@ -30,6 +30,7 @@ import {
   hasPermission,
 } from '@torcida/types'
 import { AdminPedidosList } from './admin-pedidos-list'
+import { RetiradaPorQr } from '@/components/loja/retirada-por-qr'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Pedidos — Loja Admin' }
@@ -70,7 +71,11 @@ export default async function AdminPedidosPage({
 
   const params = await searchParams
   const listagem = parseListagemParams(params, SPEC)
-  const ticketView = firstParam(params.ticket) // fila | historico | undefined
+  const ticketView = firstParam(params.ticket)
+
+  if (ticketView === 'fila') {
+    redirect('/admin/loja/atendimento')
+  }
 
   let podeGerir = false
   if (isSuperAdminEmail(session.user?.email)) {
@@ -127,7 +132,7 @@ export default async function AdminPedidosPage({
     } | null
   }
 
-  const [pedidos, total, filaCount]: [PedidoRow[], number, number] = await Promise.all([
+  const [pedidos, total]: [PedidoRow[], number] = await Promise.all([
     db.saasPedido.findMany({
       where,
       orderBy: montarOrderByListagem(SPEC, listagem),
@@ -146,9 +151,6 @@ export default async function AdminPedidosPage({
       },
     }),
     db.saasPedido.count({ where }),
-    db.saasPedidoTicket.count({
-      where: { tenantId: tenant.id, status: { in: ['ABERTO', 'ATENDENDO'] } },
-    }),
   ])
 
   const paginacao = resumirPaginacao(total, listagem)
@@ -208,70 +210,63 @@ export default async function AdminPedidosPage({
         <Link href="/admin/loja/pedidos" className={tabClass(!ticketView)}>
           Todos
         </Link>
-        <Link href="/admin/loja/pedidos?ticket=fila" className={tabClass(ticketView === 'fila')}>
-          Fila{filaCount > 0 ? ` (${filaCount})` : ''}
-        </Link>
-        <Link href="/admin/loja/tickets" className={tabClass(false)}>
+        <Link href="/admin/loja/atendimento?v=arquivo" className={tabClass(ticketView === 'historico')}>
           Arquivo de conversas
         </Link>
       </div>
 
-      <ListagemToolbar
-        spec={SPEC}
-        params={listagem}
-        paginacao={paginacao}
-        facetas={facetas}
-        escopoChave={tenant.id}
-        filtrosCompactos={[{ filtroId: 'status' }, { filtroId: 'criadoEm', classe: 'lg:hidden' }]}
-      />
+      {podeGerir && <RetiradaPorQr />}
 
-      {pedidosSerializados.length === 0 ? (
-        <ListagemVazia
-          spec={SPEC}
-          params={listagem}
-          vazio={{
-            icon: (
-              <Package
-                className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]"
-                aria-hidden
-              />
-            ),
-            title:
-              ticketView === 'fila'
-                ? 'Fila vazia'
-                : ticketView === 'historico'
-                  ? 'Nenhum ticket fechado'
-                  : 'Nenhum pedido ainda',
-            description:
-              ticketView === 'fila'
-                ? 'Quando houver pedidos aguardando atendimento, eles aparecem aqui.'
-                : 'Quando a loja receber pedidos, eles aparecem aqui.',
-          }}
-        />
-      ) : (
-        <AdminPedidosList
-          pedidos={pedidosSerializados}
-          podeGerir={podeGerir}
-          cabecalho={SPEC.colunas.map((coluna) => (
-            <ListagemTh
-              key={coluna.id}
+      <>
+          <ListagemToolbar
+            spec={SPEC}
+            params={listagem}
+            paginacao={paginacao}
+            facetas={facetas}
+            escopoChave={tenant.id}
+            filtrosCompactos={[{ filtroId: 'status' }, { filtroId: 'criadoEm', classe: 'lg:hidden' }]}
+          />
+
+          {pedidosSerializados.length === 0 ? (
+            <ListagemVazia
               spec={SPEC}
               params={listagem}
-              coluna={coluna}
-              facetas={facetas}
-              className={
-                coluna.id === 'criadoEm'
-                  ? 'hidden lg:table-cell'
-                  : coluna.id === 'itens'
-                    ? 'hidden sm:table-cell'
-                    : undefined
-              }
+              vazio={{
+                icon: (
+                  <Package
+                    className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]"
+                    aria-hidden
+                  />
+                ),
+                title: 'Nenhum pedido ainda',
+                description: 'Quando a loja receber pedidos, eles aparecem aqui.',
+              }}
             />
-          ))}
-        />
-      )}
+          ) : (
+            <AdminPedidosList
+              pedidos={pedidosSerializados}
+              podeGerir={podeGerir}
+              cabecalho={SPEC.colunas.map((coluna) => (
+                <ListagemTh
+                  key={coluna.id}
+                  spec={SPEC}
+                  params={listagem}
+                  coluna={coluna}
+                  facetas={facetas}
+                  className={
+                    coluna.id === 'criadoEm'
+                      ? 'hidden lg:table-cell'
+                      : coluna.id === 'itens'
+                        ? 'hidden sm:table-cell'
+                        : undefined
+                  }
+                />
+              ))}
+            />
+          )}
 
-      <ListagemPaginacao spec={SPEC} params={listagem} paginacao={paginacao} />
+          <ListagemPaginacao spec={SPEC} params={listagem} paginacao={paginacao} />
+      </>
     </div>
   )
 }

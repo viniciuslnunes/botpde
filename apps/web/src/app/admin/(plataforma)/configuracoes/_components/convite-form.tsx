@@ -6,20 +6,25 @@ import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import { alternarConviteTenant, gerarConviteTenant } from '../actions'
 import { AppButton } from '@/components/ui/button'
+import { useHidratado } from '@/lib/use-hidratado'
+import { ConviteQr } from './convite-qr'
 
 interface ConviteFormProps {
   slug: string | null
   ativo: boolean
   /** Unidade com canal restrito: o convite deixa de ser atalho e vira a porta. */
   canalRestrito: boolean
+  /** Nome da torcida no cartaz imprimível. */
+  torcidaNome: string
 }
 
-export function ConviteForm({ slug, ativo, canalRestrito }: ConviteFormProps) {
+export function ConviteForm({ slug, ativo, canalRestrito, torcidaNome }: ConviteFormProps) {
   const confirmarAcao = useConfirmAction()
   const [pending, startTransition] = useTransition()
   const [copiado, setCopiado] = useState(false)
+  const hidratado = useHidratado()
 
-  const link = slug && typeof window !== 'undefined' ? `${window.location.origin}/convite/${slug}` : null
+  const link = slug && hidratado ? `${window.location.origin}/convite/${slug}` : null
 
   /**
    * Rotacionar pede confirmação. O diálogo NÃO pode ser esperado dentro de
@@ -117,6 +122,8 @@ export function ConviteForm({ slug, ativo, canalRestrito }: ConviteFormProps) {
               </span>
             </span>
           </label>
+
+          <ConviteQr link={link} torcidaNome={torcidaNome} ativo={ativo} />
         </div>
       ) : null}
 

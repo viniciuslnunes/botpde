@@ -9,6 +9,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import type { ListagemFiltroTipo } from '@/lib/listagem'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 export interface ListagemFiltroOpcaoUI {
   valor: string
@@ -78,6 +79,12 @@ export function ListagemColunaFiltro({
   const [aberto, setAberto] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [pendente, startTransition] = useTransition()
+  const [textoFiltro, setTextoFiltro] = useState(valorTexto)
+  const [textoSincronizado, setTextoSincronizado] = useState(valorTexto)
+  if (valorTexto !== textoSincronizado) {
+    setTextoSincronizado(valorTexto)
+    setTextoFiltro(valorTexto)
+  }
   const ativo = quantidadeAtiva > 0
 
   const posicionar = useCallback(() => {
@@ -237,12 +244,15 @@ export function ListagemColunaFiltro({
                 </label>
               </>
             ) : (
-              <input
-                type="search"
+              <SearchFilterInput
                 name={filtroId}
-                defaultValue={valorTexto}
+                value={textoFiltro}
+                onChange={setTextoFiltro}
                 placeholder={`Filtrar ${label.toLowerCase()}…`}
-                className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1.5 text-sm text-[rgb(var(--foreground))]"
+                ariaLabel={`Filtrar ${label.toLowerCase()}`}
+                exibirDropdown={false}
+                size="sm"
+                inputClassName="rounded-lg px-2 py-1.5"
               />
             )}
             <AppButton

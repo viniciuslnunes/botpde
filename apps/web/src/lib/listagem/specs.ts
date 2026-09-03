@@ -22,6 +22,8 @@ const CAMPOS_SENSIVEIS_MEMBRO = [
 export const LISTAGEM_TORCEDORES: ListagemSpec = {
   id: 'admin-torcedores',
   basePath: '/admin/torcedores',
+  /** Aba de situação — não ressuscitar Pendentes ao entrar pelo menu. */
+  paramsEphemeros: ['status'],
   sortPadrao: 'criadoEm',
   dirPadrao: 'desc',
   porPaginaPadrao: 25,
@@ -66,6 +68,7 @@ export const LISTAGEM_TORCEDORES: ListagemSpec = {
         valorNulo: 'nenhuma',
       },
     },
+    { id: 'areaUnidade', label: 'Área na unidade' },
     {
       id: 'origem',
       label: 'Origem',
@@ -86,6 +89,8 @@ export const LISTAGEM_TORCEDORES: ListagemSpec = {
       dirPadrao: 'desc',
       filtro: { id: 'criadoEm', label: 'Data de cadastro', tipo: 'data', campo: 'criadoEm' },
     },
+    // Quem analisou o espelho da Sede (Caso B) — antes ocupava a coluna Ações.
+    { id: 'situacao', label: 'Situação' },
   ],
   filtrosAvulsos: [
     {
@@ -449,6 +454,7 @@ export const LISTAGEM_SOCIOS_SOLICITACOES: ListagemSpec = {
         valorNulo: 'nenhuma',
       },
     },
+    { id: 'areaUnidade', label: 'Área na unidade' },
     {
       id: 'origem',
       label: 'Origem',
@@ -465,6 +471,64 @@ export const LISTAGEM_SOCIOS_SOLICITACOES: ListagemSpec = {
       ordenarPor: 'criadoEm',
       dirPadrao: 'desc',
     },
+    { id: 'situacao', label: 'Situação' },
+  ],
+}
+
+/** Visão unificada — todo o funil de sócio (`SaasMembro` + estágio da carteirinha). */
+export const LISTAGEM_SOCIOS_TODOS: ListagemSpec = {
+  id: 'admin-socios-todos',
+  basePath: '/admin/socios',
+  sortPadrao: 'nome',
+  dirPadrao: 'asc',
+  porPaginaPadrao: 25,
+  buscaPlaceholder: 'Buscar sócio por nome, nº, cidade ou telefone…',
+  buscaEm: [
+    { campo: 'nome' },
+    { campo: 'cidade' },
+    { campo: 'telefone', modo: 'digitos' },
+    { campo: 'discordTag' },
+    { campo: 'numeroAssociado', modo: 'digitos' },
+  ],
+  camposProibidos: CAMPOS_SENSIVEIS_MEMBRO,
+  colunas: [
+    { id: 'numero', label: 'Nº', ordenarPor: 'numeroAssociado', dirPadrao: 'asc' },
+    { id: 'nome', label: 'Sócio', ordenarPor: 'nome', dirPadrao: 'asc' },
+    {
+      id: 'departamento',
+      label: 'Área',
+      ordenarPor: 'departamento.nome',
+      dirPadrao: 'asc',
+    },
+    {
+      id: 'sede',
+      label: 'Unidade',
+      ordenarPor: 'sede.nome',
+      dirPadrao: 'asc',
+      filtro: {
+        id: 'sede',
+        label: 'Unidade',
+        tipo: 'enum',
+        campo: 'sedeId',
+        multiplo: true,
+        valorNulo: 'nenhuma',
+      },
+    },
+    { id: 'areaUnidade', label: 'Área na unidade' },
+    { id: 'origem', label: 'Origem' },
+    {
+      id: 'cidade',
+      label: 'Cidade',
+      ordenarPor: 'cidade',
+      dirPadrao: 'asc',
+    },
+    {
+      id: 'criadoEm',
+      label: 'Cadastro',
+      ordenarPor: 'criadoEm',
+      dirPadrao: 'desc',
+    },
+    { id: 'situacao', label: 'Status' },
   ],
 }
 
@@ -856,6 +920,7 @@ export const LISTAGENS: readonly ListagemSpec[] = [
   LISTAGEM_DEPARTAMENTO_PROJETOS,
   LISTAGEM_SOCIOS_EMITIDAS,
   LISTAGEM_SOCIOS_AGUARDANDO,
+  LISTAGEM_SOCIOS_TODOS,
   LISTAGEM_LOJA_PEDIDOS,
   LISTAGEM_SUPER_ADMIN_SETUP,
   LISTAGEM_SUPER_ADMIN_LIDERANCAS,

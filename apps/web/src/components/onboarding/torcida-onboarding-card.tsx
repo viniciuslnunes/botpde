@@ -24,6 +24,7 @@ export function TorcidaOnboardingCard({
 }: Props) {
   return (
     <button
+      // lint-botoes: nao-e-acao — card clicável de torcida no onboarding
       type="button"
       onClick={() => onEscolher(torcida)}
       disabled={disabled}

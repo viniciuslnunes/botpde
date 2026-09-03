@@ -1,5 +1,6 @@
 import type { TipoNotificacao } from '@torcida/db'
 import {
+  ClipboardList,
   AtSign,
   Handshake,
   Heart,
@@ -65,6 +66,8 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   EVENTO_CANCELADO: Calendar,
   EVENTO_ALTERADO: Calendar,
   EVENTO_CHECKIN: ScanLine,
+  ESCALA_CONVOCADO: ClipboardList,
+  ESCALA_RESPONDIDA: ClipboardList,
   GRUPO_PEDIDO: Users,
   GRUPO_APROVADO: UserCheck,
   GRUPO_REJEITADO: UserX,
@@ -117,7 +120,6 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   SEGUIMENTO_PENDENTE: (nome) => `${nome} quer seguir você`,
   SEGUIMENTO_APROVADO: (nome) => `${nome} aceitou você`,
   SEGUIMENTO_REJEITADO: (nome) => `${nome} não aceitou seu pedido para seguir`,
-  NOVO_COMENTARIO: (nome) => `${nome} comentou no seu post`,
   NOVA_REACAO: (nome) => `${nome} curtiu seu post`,
   MENCAO: (nome) => `${nome} mencionou você`,
   REPOST: (nome) => `${nome} compartilhou seu post`,
@@ -148,6 +150,12 @@ export function formatarTituloNotificacao(item: {
 }): string {
   const nome = item.ator?.nome?.trim()
   if (!nome) return item.titulo
+
+  if (item.tipo === 'NOVO_COMENTARIO') {
+    return item.titulo.startsWith('Resposta')
+      ? `${nome} respondeu ao seu comentário`
+      : `${nome} comentou no seu post`
+  }
 
   const formatar = TITULO_COM_ATOR[item.tipo]
   return formatar ? formatar(nome) : item.titulo

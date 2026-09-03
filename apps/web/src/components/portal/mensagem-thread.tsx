@@ -2,24 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import {
-  ArrowLeft,
-  Building2,
-  ChevronDown,
-  Flag,
-  ImagePlus,
-  Loader2,
-  LogOut,
-  Pencil,
-  Plus,
-  Send,
-  Smile,
-  Sticker as StickerIcon,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, Building2, ChevronDown, Flag, ImagePlus, Loader2, LogOut, Pencil, Plus, Send, Smile, Sticker as StickerIcon, Trash2, Upload, UserPlus, Users, X, XCircle } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatNomeTorcida, hrefDepartamentoDoCanal } from '@torcida/types'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -62,6 +45,7 @@ import { ComunidadePrefetchLink } from './comunidade-prefetch-link'
 import { PedidoTicketBanner } from './pedido-ticket-banner'
 import { CanalDepartamentoAvatarField } from '@/app/portal/departamentos/_components/canal-departamento-avatar-field'
 import { useLatestRef } from '@/lib/use-latest-ref'
+import { AppButton } from '@/components/ui/button'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -810,14 +794,16 @@ export function MensagemThread({
             >
               {processandoSolicitacao ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aprovar'}
             </button>
-            <button
+            <AppButton
+              variant="none"
+              icon={XCircle}
               type="button"
               disabled={processandoSolicitacao}
               onClick={() => void responderSolicitacao('rejeitar')}
               className="inline-flex flex-1 items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] disabled:opacity-60"
             >
               Recusar
-            </button>
+            </AppButton>
           </div>
         </div>
       )}
@@ -858,13 +844,15 @@ export function MensagemThread({
                   {carregandoHistorico ? (
                     <Loader2 className="h-4 w-4 animate-spin text-[rgb(var(--foreground-muted))]" />
                   ) : (
-                    <button
+                    <AppButton
+                      variant="none"
+                      icon={Upload}
                       type="button"
                       onClick={() => void carregarHistorico()}
                       className="rounded-lg px-3 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.08)]"
                     >
                       Carregar mensagens anteriores
-                    </button>
+                    </AppButton>
                   )}
                 </div>
               )}
@@ -1281,7 +1269,9 @@ function MensagemBubble({
               />
               {midias.length > 0 && <PostMedia urls={midias} />}
               <div className="flex items-center justify-end gap-2">
-                <button
+                <AppButton
+                  variant="none"
+                  icon={X}
                   type="button"
                   disabled={salvandoEdicao}
                   onClick={() => {
@@ -1294,7 +1284,7 @@ function MensagemBubble({
                   ].join(' ')}
                 >
                   Cancelar
-                </button>
+                </AppButton>
                 <button
                   type="submit"
                   disabled={salvandoEdicao || !editandoTexto.trim()}
@@ -1393,9 +1383,9 @@ function MensagemBubble({
                 placeholder="Motivo da denúncia"
                 className="w-52 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
               />
-              <button type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
+              <AppButton variant="none" icon={Send} type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
                 Enviar
-              </button>
+              </AppButton>
             </m.form>
           )}
         </AnimatePresence>
@@ -1596,21 +1586,23 @@ function PainelMembros({
 
       <div className="flex items-center gap-2 pt-1">
         {isAdmin && (
-          <button
+          <AppButton
+            variant="none"
+            icon={UserPlus}
             type="button"
             onClick={() => setAdicionando((v) => !v)}
             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.08)]"
-          >
-            <UserPlus className="h-3.5 w-3.5" /> Adicionar participante
-          </button>
+          > Adicionar participante
+          </AppButton>
         )}
-        <button
+        <AppButton
+          variant="none"
+          icon={LogOut}
           type="button"
           onClick={() => void remover(currentUserId)}
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Sair do grupo
-        </button>
+        > Sair do grupo
+        </AppButton>
       </div>
 
       {adicionando && (

@@ -7,6 +7,8 @@ import {
 } from '@/app/admin/bandeiras/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { AppButton } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 export type VistoriaInicial = {
   larguraM?: number | null
@@ -223,13 +225,15 @@ export function VistoriaBandeiraForm({
           </p>
         ) : null}
         {onCancel ? (
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={onCancel}
             className="app-action rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
           >
             Cancelar
-          </button>
+          </AppButton>
         ) : null}
         <button
           type="submit"

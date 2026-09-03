@@ -4,13 +4,17 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { CriarEventoForm, type SedeOption } from '@/components/admin/evento-forms'
 import { EventoFormDrawer } from '@/components/eventos/evento-form-drawer'
+import { AppButton } from '@/components/ui/button'
 import type { PartidaOption } from '@/lib/partidas'
+import type { DonoOperacionalOption } from '@/lib/evento-dono'
 
 export function NovoEventoButton({
   defaultTipo,
   sedes,
   partidas = [],
   projetos = [],
+  donos = [],
+  departamentoSlug,
   temAfiliacao = true,
   redirectTo = '/admin/eventos',
   label = 'Novo evento',
@@ -19,6 +23,10 @@ export function NovoEventoButton({
   sedes: SedeOption[]
   partidas?: PartidaOption[]
   projetos?: Array<{ id: string; titulo: string; departamentoNome: string }>
+  /** Departamentos + frentes para escolher o dono da operação (Agenda). */
+  donos?: DonoOperacionalOption[]
+  /** Hub thin: o evento já nasce do departamento desta tela. */
+  departamentoSlug?: string
   temAfiliacao?: boolean
   redirectTo?: string
   label?: string
@@ -27,20 +35,17 @@ export function NovoEventoButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="app-touch-target inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
-      >
-        <Plus className="h-4 w-4" />
+      <AppButton variant="primary" icon={Plus} type="button" onClick={() => setOpen(true)}>
         {label}
-      </button>
+      </AppButton>
       <EventoFormDrawer open={open} onClose={() => setOpen(false)} title={label}>
         <CriarEventoForm
           defaultTipo={defaultTipo ?? 'GERAL'}
           sedes={sedes}
           partidas={partidas}
           projetos={projetos}
+          donos={donos}
+          departamentoSlug={departamentoSlug}
           temAfiliacao={temAfiliacao}
           redirectTo={redirectTo}
           onCancel={() => setOpen(false)}

@@ -3,16 +3,7 @@
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { m } from 'motion/react'
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Database,
-  Loader2,
-  MapPin,
-  Shield,
-  Sparkles,
-} from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Database, Loader2, MapPin, Shield, Sparkles, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   CAMPOS_COMPLETUDE_CLUBE,
@@ -35,6 +26,7 @@ import { formatTorcedoresEstimados } from '@/lib/format-contagem'
 import { NOME_UF } from '@/lib/regioes-brasil'
 import { springSnappy } from '@/lib/motion-presets'
 import { atualizarClubeAction, criarClubeAction, type ResultadoAcao } from '../actions'
+import { AppButton } from '@/components/ui/button'
 
 export interface ClubeFormValores {
   id?: string
@@ -701,16 +693,18 @@ export function ClubeForm({ inicial, aoCriar }: Props) {
                     </p>
                   </div>
                   {slugManual && valores.slug !== slugSugerido ? (
-                    <button
+                    <AppButton
+                      variant="primary"
+                      icon={Check}
                       type="button"
                       onClick={() => {
                         setSlugManual(false)
                         definir('slug', slugSugerido)
                       }}
-                      className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
+                      className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold"
                     >
                       Usar sugestão
-                    </button>
+                    </AppButton>
                   ) : !slugManual ? (
                     <span className="shrink-0 rounded-md bg-[rgb(var(--color-primary)_/_0.16)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
                       Aplicada
@@ -874,13 +868,15 @@ export function ClubeForm({ inicial, aoCriar }: Props) {
 
       {sujo ? (
         <StickyPersistBar locked hint={editando ? 'Alterações não salvas' : 'Clube novo'}>
-          <button
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={descartar}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             Descartar
-          </button>
+          </AppButton>
           <button
             type="submit"
             form={formId}

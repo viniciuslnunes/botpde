@@ -223,3 +223,51 @@ e estilhaça a grade. Faixa de PIX pendente é chip de uma linha (h-9), não car
 Sheet e drawer usam `absolute` dentro da raiz: `container-type: inline-size`
 implica `contain: layout`, então `fixed` passaria a se posicionar pela raiz —
 melhor assumir isso explicitamente do que depender do efeito colateral.
+
+## Compra antecipada pelo portal (2026-09-02)
+
+Mata a fila do intervalo: o sócio escolhe em `/portal/bar`, paga por PIX e retira
+mostrando o QR no balcão. Quinze minutos de intervalo com fila única significam
+perder o segundo tempo.
+
+**Só existe com turno de caixa aberto**, e isso não é detalhe de UI — foi a
+resposta para a pergunta que travava a feature: *em qual turno entra uma venda
+feita fora do turno?* (compra às 14h, retira às 21h). Nos dois caminhos a
+conferência de caixa quebrava: no turno do pagamento pode não haver turno aberto;
+no da retirada, o dinheiro aparece num turno diferente do que o recebeu.
+Restringindo a compra ao caixa aberto, **o caso deixa de existir**. Por isso o
+item "Bar" na top bar do portal é **contextual** — ele aparecer já é o sinal de
+que o bar está funcionando agora.
+
+- Modelo: reusa `BarVenda` com quatro campos novos — `origem` (`PDV | PORTAL`),
+  `compradorUserId`, `retiradoEm`, `retiradoPorId`. **`PAGA` diz que o dinheiro
+  entrou, não que a bebida saiu** — mesma distinção de RSVP × embarque e de
+  pedido × retirada.
+- **Operador da venda é quem abriu o turno**, não o comprador: é ele quem
+  responde pela entrega e em cujo caixa o dinheiro entra. O comprador fica em
+  campo próprio para não poluir o relatório por operador.
+- **Estoque baixa na compra** (decisão de produto), como o PDV já faz com PIX
+  pendente — a venda reserva a mercadoria, senão o bar vende o que não tem.
+  Falha ao gerar a cobrança cancela a venda e devolve o estoque.
+- `CompraBarPortalSchema` é **deliberadamente mais pobre** que `VendaBarSchema`:
+  sem método de pagamento (é sempre PIX), sem desconto e sem fiado. Cada campo
+  ausente é uma decisão de gestão que não pode escapar para o cliente.
+- Gate: sessão + `assertMembroAtivo`, **nunca** `BAR_OPERATE` — reusar a action
+  do PDV daria a qualquer sócio o poder de registrar venda, conceder desconto e
+  lançar fiado. Retirada no balcão: `BAR_OPERATE | BAR_MANAGE`.
+- QR: propósito `bar-venda`, estático, **verificado no servidor** (libera
+  mercadoria). Não confundir com o QR da comanda, lido no cliente porque só
+  escolhe entre o que já está na tela do operador. O vale só nasce depois do PIX
+  confirmado — mostrar código de compra pendente faria o sócio esticar o celular
+  para ouvir "não caiu".
+- Superfícies: `BarCompraAntecipada` + `BarValesRetirada` em `/portal/bar`;
+  `BarRetiradaScan` no PDV. Actions: `app/portal/bar/actions.ts` e
+  `app/admin/bar/retirada-actions.ts`.
+
+**Retirada parcial (2026-09-03):** `BarVendaItem.retiradoQtd` é o ledger por item;
+`BarVenda.retiradoEm` só é carimbado quando **todos** fecham. Quem compra quatro
+cervejas leva duas agora e volta no intervalo — um booleano obrigaria o operador
+a mentir (dar tudo por entregue) ou a recusar. O balcão lê o vale primeiro e
+confirma depois, com a quantidade preenchida no que falta: entregar direto na
+leitura seria mais rápido e erraria mais, e a mercadoria sai da mão para nunca
+mais voltar. O portal mostra **o que falta**, não o que foi comprado.

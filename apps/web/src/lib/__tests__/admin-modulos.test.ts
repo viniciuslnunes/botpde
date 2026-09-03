@@ -234,16 +234,18 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
 describe('tabsPermitidasDoModulo', () => {
   it('esconde etapas sem permissão e mantém a ordem declarada', () => {
     const tabs = tabsPermitidasDoModulo('loja', [PERMISSIONS.STORE_VIEW_ORDERS])
-    expect(tabs.map((t) => t.id)).toEqual(['pedidos', 'tickets', 'brecho'])
+    // `comando`, `catalogo`, `cupons` e `desempenho` são STORE_MANAGE — quem
+    // só lê pedidos não os vê. Arquivo de tickets mora na aba Atendimento.
+    expect(tabs.map((t) => t.id)).toEqual(['atendimento', 'pedidos', 'brecho'])
   })
 
   it('dá ao gestor o módulo inteiro', () => {
     const tabs = tabsPermitidasDoModulo('loja', [PERMISSIONS.STORE_MANAGE])
     expect(tabs.map((t) => t.id)).toEqual([
       'comando',
+      'atendimento',
       'catalogo',
       'pedidos',
-      'tickets',
       'brecho',
       'cupons',
       'desempenho',

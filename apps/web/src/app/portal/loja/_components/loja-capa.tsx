@@ -8,6 +8,8 @@ import { LOJA_CAPA_ASPECT } from '@/lib/image-crop'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { runPersistAction } from '@/lib/toast-action'
 import { atualizarCapaLoja } from '../actions'
+import { LogoImage } from '@/components/media/logo-image'
+import { AppButton } from '@/components/ui/button'
 
 const OVERLAY_VIS =
   'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100'
@@ -45,10 +47,15 @@ export function LojaCapaMidia({
   src,
   alt,
   corPrimaria,
+  logoUrl,
+  logoAlt,
 }: {
   src: string | null
   alt: string
   corPrimaria?: string
+  /** Escudo centralizado no placeholder — só quando não há capa. */
+  logoUrl?: string | null
+  logoAlt?: string
 }) {
   if (src) {
     return (
@@ -63,17 +70,29 @@ export function LojaCapaMidia({
   }
 
   return (
-    <div
-      className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgb(var(--color-primary)_/_0.45),transparent_55%),linear-gradient(160deg,rgb(var(--color-primary)_/_0.35),rgb(var(--background))_70%)]"
-      style={
-        corPrimaria
-          ? {
-              background: `radial-gradient(ellipse at 30% 20%, ${corPrimaria}99, transparent 55%), linear-gradient(160deg, ${corPrimaria}80, rgb(var(--background)) 72%)`,
-            }
-          : undefined
-      }
-      aria-hidden
-    />
+    <div className="absolute inset-0" aria-hidden>
+      <div
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgb(var(--color-primary)_/_0.45),transparent_55%),linear-gradient(160deg,rgb(var(--color-primary)_/_0.35),rgb(var(--background))_70%)]"
+        style={
+          corPrimaria
+            ? {
+                background: `radial-gradient(ellipse at 30% 20%, ${corPrimaria}99, transparent 55%), linear-gradient(160deg, ${corPrimaria}80, rgb(var(--background)) 72%)`,
+              }
+            : undefined
+        }
+      />
+      {logoUrl ? (
+        <div className="absolute inset-0 flex items-center justify-center p-6">
+          <LogoImage
+            src={logoUrl}
+            alt={logoAlt ?? ''}
+            size={96}
+            unoptimized
+            className="h-[4.5rem] w-[4.5rem] object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] sm:h-20 sm:w-20"
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -142,7 +161,10 @@ export function LojaCapaControles({
 
       {!capaUrl ? (
         <div className="pointer-events-none absolute right-2 top-2 z-10 p-0">
-          <button
+          <AppButton
+            variant="none"
+            icon={ImagePlus}
+            loading={crop.busy}
             type="button"
             onClick={(e) => {
               e.preventDefault()
@@ -152,9 +174,8 @@ export function LojaCapaControles({
             disabled={crop.busy}
             className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-black/55 px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm transition-colors hover:bg-black/75 disabled:opacity-50"
           >
-            {crop.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             Adicionar capa
-          </button>
+          </AppButton>
         </div>
       ) : (
         <div

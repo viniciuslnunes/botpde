@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Loader2 } from 'lucide-react'
 import { atualizarCorDepartamento } from '../actions'
 import { runPersistAction } from '@/lib/toast-action'
 import { DepartamentoIcone } from './departamento-icone'
@@ -55,11 +54,7 @@ export function DepartamentoCorPicker({
         className="app-touch-target relative flex h-10 w-10 items-center justify-center rounded-xl text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))] disabled:opacity-70"
         style={{ backgroundColor: corAtual }}
       >
-        {pending ? (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        ) : (
-          <DepartamentoIcone slug={slug} className="h-5 w-5" />
-        )}
+        <DepartamentoIcone slug={slug} className="h-5 w-5" aria-hidden />
       </button>
       <input
         ref={inputRef}

@@ -15,9 +15,10 @@ export type StatusMembroAdmin = 'PENDENTE' | 'APROVADO' | 'REPROVADO'
 
 /** Abas de `/admin/socios` — o default da página (solicitações) é o errado para sócio emitido. */
 export type AbaSociosAdmin =
+  | 'todos'
   | 'solicitacoes'
   | 'aguardando'
-  | 'todos'
+  | 'emitidas'
   | 'ativos'
   | 'vencendo'
   | 'vencidos'
@@ -63,7 +64,7 @@ export function abaSociosAdmin(args: {
 }): AbaSociosAdmin {
   const status = statusMembro(args.status)
   if (status === 'PENDENTE') return 'solicitacoes'
-  if (args.temCarteirinha) return 'todos'
+  if (args.temCarteirinha) return 'emitidas'
   if (status === 'APROVADO') return 'aguardando'
   return 'solicitacoes'
 }

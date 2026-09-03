@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import { Crop, Crosshair, Link2, Loader2, MapPin, Search } from 'lucide-react'
+import { Crop, Crosshair, Link2, MapPin, Search } from 'lucide-react'
 import { FieldError, Input, toast } from '@torcida/ui'
 import {
   buildGeocodeQuery,
@@ -17,6 +17,8 @@ import {
   resolverCoordsDeLinkMaps,
 } from '@/lib/maps-actions'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 const MapLocationPicker = dynamic(
   () =>
@@ -218,19 +220,17 @@ export function LocationPickerFields({
           Localização no mapa
         </h3>
         {mapsConfigured && formId && (
-          <button
+          <AppButton
+            variant="none"
+            icon={Crosshair}
+            loading={geoStatus === 'loading'}
             type="button"
             onClick={() => void geocodificar()}
             disabled={geoStatus === 'loading'}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
           >
-            {geoStatus === 'loading' ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Crosshair className="h-3 w-3" />
-            )}
             Geocodificar endereço
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -255,19 +255,17 @@ export function LocationPickerFields({
               placeholder="https://maps.app.goo.gl/… ou maps.google.com/…"
             />
           </div>
-          <button
+          <AppButton
+            variant="none"
+            icon={Link2}
+            loading={linkStatus === 'loading'}
             type="button"
             onClick={() => void aplicarLinkMaps()}
             disabled={linkStatus === 'loading' || !mapsLink.trim()}
             className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
           >
-            {linkStatus === 'loading' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Link2 className="h-3.5 w-3.5" />
-            )}
             Aplicar link
-          </button>
+          </AppButton>
         </div>
 
         {mapsConfigured && (
@@ -276,11 +274,10 @@ export function LocationPickerFields({
               <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
                 Buscar no mapa
               </label>
-              <Input
-                type="search"
+              <SearchFilterInput
                 value={mapSearch}
-                onChange={(e) => {
-                  setMapSearch(e.target.value)
+                onChange={(next) => {
+                  setMapSearch(next)
                   setSearchStatus('idle')
                 }}
                 onKeyDown={(e) => {
@@ -290,21 +287,23 @@ export function LocationPickerFields({
                   }
                 }}
                 placeholder="Ex: Neo Química Arena, São Paulo"
+                ariaLabel="Buscar no mapa"
+                exibirDropdown={false}
+                loading={searchStatus === 'loading'}
+                inputClassName="rounded-lg"
               />
             </div>
-            <button
+            <AppButton
+              variant="none"
+              icon={Search}
+              loading={searchStatus === 'loading'}
               type="button"
               onClick={() => void buscarNoMapa()}
               disabled={searchStatus === 'loading' || !mapSearch.trim()}
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
             >
-              {searchStatus === 'loading' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Search className="h-3.5 w-3.5" />
-              )}
               Buscar
-            </button>
+            </AppButton>
           </div>
         )}
 
@@ -372,19 +371,17 @@ export function LocationPickerFields({
               Ajustar Street View
             </p>
             {onStreetViewPhoto && (
-              <button
+              <AppButton
+                variant="none"
+                icon={Crop}
+                loading={svBusy || crop.busy}
                 type="button"
                 disabled={svBusy || crop.busy}
                 onClick={() => void usarStreetViewComoFoto()}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-50"
               >
-                {svBusy || crop.busy ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Crop className="h-3.5 w-3.5" />
-                )}
                 Usar como foto
-              </button>
+              </AppButton>
             )}
           </div>
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">

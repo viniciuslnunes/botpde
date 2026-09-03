@@ -29,6 +29,10 @@
 - `status`: `ABERTO` | `DEVOLVIDO` | `COM_DANO`
 - `fotoSaidaUrl` (obrigatória na retirada), `fotoGuardaUrl` (obrigatória na devolução)
 - Colaborador conclui sozinho (`patrimony:view`); gestor marca dano (`manage`)
+- `eventoId?` (2026-09-02) — **carga da operação**: para qual jogo/ensaio/festa
+  o item saiu. Sem isso a custódia com foto era avulsa e ninguém sabia dizer se
+  o bandeirão voltou. Leitura em `lib/carga-operacao.ts`; material não devolvido
+  de operação já encerrada vira pendência na Direção do Patrimônio.
 
 Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-departamentos.md) §4.1.
 
@@ -60,6 +64,28 @@ Programa: [`programa-cockpit-admin-departamentos.md`](./programa-cockpit-admin-d
   exclusões permanentes: quem / quando, via `AuditLog`); edição/exclusão no
   modal (unsaved-changes + confirmação). Baixa e exclusão gravam
   `PATRIMONIO_ITEM_BAIXADO` / `PATRIMONIO_ITEM_EXCLUIDO` na mesma transação.
+- **Etiqueta QR do item (2026-09-02):** cada card do acervo traz um QR
+  (disclosure) para imprimir e colar no objeto — bandeira, instrumento, caixa de
+  som. Escanear abre `/patrimonio/item?t=…`, a ficha que responde a pergunta do
+  barracão: **"de quem é isso e onde deveria estar?"** (situação, onde é
+  guardado e, se estiver em empréstimo aberto, com quem e para qual operação).
+  Payload por `lib/patrimonio-qr.ts` (propósito `patrimonio-item`) sobre a
+  primitiva `lib/qr-token.ts`.
+
+  **Estático e sem coluna nova** — o dado assinado é o próprio
+  `PatrimonioItem.id`. Reemitir etiqueta de acervo inteiro porque o formato
+  mudou é caro de um jeito que ninguém aceita depois de a cola secar.
+
+  **Aqui a leitura é verificada no servidor**, ao contrário da comanda do bar:
+  ficha de acervo é dado interno (quem está com o quê), e a etiqueta vive colada
+  num objeto que anda pela cidade — bandeira esquecida na arquibancada tem o QR
+  à vista de qualquer um. A rota exige sessão, vínculo e permissão de leitura do
+  acervo, respeita o recorte de categoria (`flags:view` não abre ficha de
+  projetor, §5.22) e trata item de outra torcida como **inexistente**.
+  **Etiquetas em lote (2026-09-02):** botão `FolhaEtiquetas` na aba Acervo
+  imprime uma grade de QR da **página atual** — colar etiqueta em 200 bandeiras
+  uma a uma é inviável, e imprimir o inventário inteiro gasta papel com item que
+  ninguém vai etiquetar hoje.
 - Schemas: `packages/types/src/patrimonio.js`
 - Lib: `apps/web/src/lib/patrimonio.ts`
 

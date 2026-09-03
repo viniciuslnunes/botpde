@@ -119,7 +119,12 @@ async function fetchDirecaoCarnaval(tenantId: string): Promise<CarnavalOpsResumo
     where: {
       tenantId,
       data: { gte: agora, lte: horizonte },
-      projeto: { departamentoId: depto.id },
+      // Dono operacional OU herança do projeto: evento avulso da frente
+      // (ensaio, escala) deixou de ficar órfão do hub.
+      OR: [
+        { departamentoId: depto.id },
+        { projeto: { departamentoId: depto.id } },
+      ],
     },
     orderBy: { data: 'asc' },
     take: 40,

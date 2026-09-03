@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { criarTenantInicial, atribuirOwnerAction, type SetupState } from './actions'
 import { Loader2, ShieldCheck } from 'lucide-react'
+import { AppButton } from '@/components/ui/button'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -44,14 +45,16 @@ export function AtribuirOwnerButton({ tenantId }: { tenantId: string }) {
       {state.message && !state.tenantId && (
         <p className="mb-1 text-xs text-red-600 dark:text-red-400">{state.message}</p>
       )}
-      <button
+      <AppButton
+        variant="primary"
+        icon={ShieldCheck}
+        loading={pending}
         type="submit"
         disabled={pending}
-        className="flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-3 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] transition-opacity hover:opacity-80 disabled:opacity-50"
+        className="flex gap-1.5 rounded-full px-3 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:opacity-80"
       >
-        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
         {pending ? 'Atribuindo...' : 'Tornar-me owner'}
-      </button>
+      </AppButton>
     </form>
   )
 }

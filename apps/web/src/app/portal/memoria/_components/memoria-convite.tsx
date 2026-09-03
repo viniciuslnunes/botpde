@@ -1,7 +1,8 @@
 'use client'
 
-import { Sparkles } from 'lucide-react'
+import { Eye, Sparkles } from 'lucide-react'
 import type { MemoriaConvite } from '@/lib/memoria-acervo'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   convite: MemoriaConvite
@@ -20,13 +21,15 @@ export function MemoriaConviteBloco({ convite, onAceitar }: Props) {
           {convite.descricao}
         </p>
         {convite.abrirComposer && (
-          <button
+          <AppButton
+            variant="none"
+            icon={Eye}
             type="button"
             onClick={onAceitar}
             className="app-touch-line mt-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--color-primary-fg))]"
           >
             Abrir editor
-          </button>
+          </AppButton>
         )}
       </div>
     </div>

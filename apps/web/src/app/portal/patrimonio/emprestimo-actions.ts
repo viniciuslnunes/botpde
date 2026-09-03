@@ -48,13 +48,14 @@ export async function abrirEmprestimoPatrimonio(
   const parsed = AbrirEmprestimoPatrimonioSchema.safeParse({
     itemId: formData.get('itemId'),
     fotoSaidaUrl: formData.get('fotoSaidaUrl'),
+    eventoId: formData.get('eventoId') ?? undefined,
     observacao: formData.get('observacao') ?? undefined,
   })
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { itemId, fotoSaidaUrl, observacao } = parsed.data
+  const { itemId, fotoSaidaUrl, eventoId, observacao } = parsed.data
 
   type ItemRow = {
     id: string
@@ -83,6 +84,17 @@ export async function abrirEmprestimoPatrimonio(
   })
   if (abertoExistente) return { error: 'Já existe empréstimo aberto deste item' }
 
+  // A operação tem de ser desta torcida — o mesmo cuidado do rateio no caixa.
+  let operacaoId: string | null = null
+  if (eventoId) {
+    const evento: { id: string } | null = await db.evento.findFirst({
+      where: { id: eventoId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!evento) return { errors: { eventoId: ['Operação não encontrada nesta torcida'] } }
+    operacaoId = evento.id
+  }
+
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const emp = await tx.patrimonioEmprestimo.create({
       data: {
@@ -91,6 +103,7 @@ export async function abrirEmprestimoPatrimonio(
         userId,
         status: 'ABERTO',
         fotoSaidaUrl,
+        eventoId: operacaoId,
         observacao: observacao ?? null,
       },
       select: { id: true },
@@ -106,7 +119,7 @@ export async function abrirEmprestimoPatrimonio(
         acao: 'PATRIMONIO_EMPRESTIMO_ABERTO',
         entidade: 'PatrimonioEmprestimo',
         entidadeId: emp.id,
-        detalhes: { itemId: item.id, nome: item.nome },
+        detalhes: { itemId: item.id, nome: item.nome, eventoId: operacaoId },
       },
     })
   })

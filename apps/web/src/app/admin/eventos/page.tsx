@@ -25,6 +25,7 @@ import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasNaJanela, listPartidasParaEvento } from '@/lib/partidas'
 import { listarProjetosParaEvento } from '@/lib/eventos-tipo'
+import { listarDonosOperacionais } from '@/lib/eventos'
 import {
   listarPresencaPorEvento,
   resumirComparecimento,
@@ -212,7 +213,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
       ? semanaListaJanela
       : calJanela
 
-  const [proximos, passados, sedes, calEventos, semanaListaEventos, partidas, partidasSemana, afiliacaoId, projetos]: [
+  const [proximos, passados, sedes, calEventos, semanaListaEventos, partidas, partidasSemana, afiliacaoId, projetos, donos]: [
     EventoAdminRow[],
     EventoAdminRow[],
     Awaited<ReturnType<typeof listSedesAtivasParaEvento>>,
@@ -222,6 +223,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     Awaited<ReturnType<typeof listPartidasNaJanela>>,
     string | null,
     Awaited<ReturnType<typeof listarProjetosParaEvento>>,
+    Awaited<ReturnType<typeof listarDonosOperacionais>>,
   ] = await Promise.all([
     vista !== 'lista'
       ? Promise.resolve([] as EventoAdminRow[])
@@ -309,6 +311,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
       : Promise.resolve([]),
     getAfiliacaoIdDoTenant(tenant.id),
     podeGerir ? listarProjetosParaEvento(tenant.id) : Promise.resolve([]),
+    podeGerir ? listarDonosOperacionais(tenant.id) : Promise.resolve([]),
   ])
 
   function serializar(evento: EventoAdminRow, passado: boolean): AdminEventoItem {
@@ -426,6 +429,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
               sedes={sedes}
               partidas={partidas}
               projetos={projetos}
+              donos={donos}
               temAfiliacao={Boolean(afiliacaoId)}
               redirectTo="/admin/eventos"
             />
@@ -471,7 +475,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Suspense fallback={<div className="h-10 min-w-0 flex-1 animate-pulse rounded-lg bg-[rgb(var(--border))]" />}>
-              <AgendaBusca key={sp.q ?? ''} defaultValue={sp.q ?? ''} />
+              <AgendaBusca defaultValue={sp.q ?? ''} />
             </Suspense>
             {totalVista != null ? (
               <p className="shrink-0 text-sm tabular-nums text-[rgb(var(--foreground-muted))]">

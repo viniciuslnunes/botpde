@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react'
 import type { UnsavedChangeEntry } from './types'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ArrowRight, X } from 'lucide-react'
+import { AppButton } from '@/components/ui/button'
 
 type Props = {
   entries: UnsavedChangeEntry[]
@@ -88,20 +89,24 @@ export function UnsavedChangesDialog({ entries, onConfirm, onCancel, onClose }: 
         </ul>
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-          <button
+          <AppButton
+            variant="none"
+            icon={ArrowRight}
             type="button"
             onClick={handleCancel}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] sm:py-2"
           >
             Continuar editando
-          </button>
-          <button
+          </AppButton>
+          <AppButton
+            variant="none"
+            icon={X}
             type="button"
             onClick={handleConfirm}
             className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 sm:py-2"
           >
             Descartar e sair
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

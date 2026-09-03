@@ -4,6 +4,7 @@ import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { RsvpButtons } from './rsvp-buttons'
+import { EscalaConvocacao } from './escala-convocacao'
 import { criarSalaDeEvento } from '@/app/portal/comunidade/salas/actions'
 import {
   ArrowLeft,
@@ -31,12 +32,14 @@ import {
 } from '@/components/portal/evento-detail-motion'
 import { EventoTipoBadge } from '@/components/eventos/evento-tipo-badge'
 import { ListaEmbarque, type EmbarqueRow } from '@/components/eventos/lista-embarque'
+import { carregarCheckinsEvento } from '@/lib/embarque'
 import { CaravanaVagaPagamento } from '@/app/portal/caravanas/_components/caravana-vaga-pagamento'
 import { EventoAcoesRapidas } from '@/components/eventos/evento-acoes-rapidas'
 import { EventoMapaLinks } from '@/components/eventos/evento-mapa-links'
 import { EventoPartidaCard } from '@/components/eventos/evento-partida-card'
 import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
 import { getEventoEmbarque } from '@/lib/eventos-tipo'
+import { AppButton } from '@/components/ui/button'
 
 export const metadata: Metadata = { title: 'Evento' }
 
@@ -83,11 +86,19 @@ export default async function EventoDetailPage({
   const evento = await getEventoEmbarque(tenant.id, id, undefined, session?.user?.id)
   if (!evento) notFound()
 
-  const [meuRsvp, cobrancaEPerms] = await Promise.all([
+  const [meuRsvp, minhaEscala, cobrancaEPerms] = await Promise.all([
     session?.user?.id
       ? db.eventoRsvp.findUnique({
           where: { eventoId_userId: { eventoId: id, userId: session.user.id } },
           select: { status: true },
+        })
+      : Promise.resolve(null),
+    // Convocação da própria pessoa — RSVP responde "vou", escala responde
+    // "assumo o posto".
+    session?.user?.id
+      ? db.eventoEscala.findUnique({
+          where: { eventoId_userId: { eventoId: id, userId: session.user.id } },
+          select: { id: true, funcao: true, observacao: true, status: true },
         })
       : Promise.resolve(null),
     session?.user?.id
@@ -152,12 +163,18 @@ export default async function EventoDetailPage({
       avatarUrl: r.user.avatarUrl,
     }))
 
+  // Ida/volta também no portal: quem viajou confere a própria lista. O sinal de
+  // "embarcou longe" fica SÓ no admin — é contexto para quem opera, e exibir
+  // localização de terceiros para toda a caravana é outro assunto.
+  const checkinsPorUsuario = await carregarCheckinsEvento(evento.id)
+
   const itens: EmbarqueRow[] = evento.rsvps.map((r) => {
     const statusVaga = resolverStatusVaga({
       valorVaga: valorVagaNum,
       cobrancaStatus: evento.cobrancasPorUserId[r.user.id] ?? null,
       checkedInAt: r.checkedInAt,
     })
+    const trechos = checkinsPorUsuario[r.user.id] ?? {}
     return {
       id: r.id,
       userId: r.user.id,
@@ -165,6 +182,8 @@ export default async function EventoDetailPage({
       email: r.user.email,
       status: r.status,
       checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
+      embarcouIda: Boolean(trechos.IDA),
+      embarcouVolta: Boolean(trechos.VOLTA),
       pagamento: statusVaga.pagamento,
       labelPagamento: statusVaga.labelPagamento,
       alertaPagamento: statusVaga.alerta,
@@ -289,6 +308,14 @@ export default async function EventoDetailPage({
                     statusAtual={meuRsvp?.status ?? null}
                     lotacaoEsgotada={esgotada && meuRsvp?.status !== 'CONFIRMADO'}
                   />
+                  {minhaEscala && minhaEscala.status !== 'SUBSTITUIDO' && (
+                    <EscalaConvocacao
+                      escalaId={minhaEscala.id}
+                      funcao={minhaEscala.funcao}
+                      observacao={minhaEscala.observacao}
+                      statusInicial={minhaEscala.status}
+                    />
+                  )}
                 </div>
               )}
 
@@ -341,10 +368,9 @@ export default async function EventoDetailPage({
           <form action={criarSalaDeEvento}>
             <input type="hidden" name="titulo" value={`Sala: ${evento.titulo}`} />
             <input type="hidden" name="eventoId" value={evento.id} />
-            <button className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]">
-              <Video className="h-4 w-4" />
+            <AppButton variant="none" icon={Video} className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]">
               Criar sala de vídeo
-            </button>
+            </AppButton>
           </form>
         </EventoDetailReveal>
       )}
@@ -370,6 +396,7 @@ export default async function EventoDetailPage({
             labelCheckin={labelCheckin}
             tituloEvento={evento.titulo}
             mostrarPagamento={evento.tipo === 'CARAVANA' && temValorVaga(valorVagaNum)}
+            mostrarTrechos={evento.tipo === 'CARAVANA'}
           />
         </EventoDetailReveal>
       )}

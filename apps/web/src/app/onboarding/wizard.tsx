@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, ExternalLink, FileText, Loader2, LocateFixed, LogIn, Mail, MapPin, Search, Shield, User, X } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { LogoImage } from '@/components/media/logo-image'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
@@ -77,6 +77,8 @@ import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-chang
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { useLatestRef } from '@/lib/use-latest-ref'
+import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
@@ -834,26 +836,16 @@ function PassoClube({
         Comece pelo mapa — cada estado revela os clubes da região. Ou busque direto pelo nome.
       </p>
 
-      <div className="relative mt-5">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <Input
-          value={busca}
-          onChange={(e) => onBusca(e.target.value)}
-          placeholder="Buscar clube por nome..."
-          className="pl-9 pr-9"
-          aria-label="Buscar clube"
-        />
-        {busca && (
-          <button
-            type="button"
-            onClick={() => onBusca('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--surface-raised))] hover:text-[rgb(var(--foreground))]"
-            aria-label="Limpar busca"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      <SearchFilterInput
+        value={busca}
+        onChange={onBusca}
+        placeholder="Buscar clube por nome..."
+        ariaLabel="Buscar clube"
+        exibirDropdown={false}
+        loading={buscando}
+        className="mt-5"
+        onClear={() => onBusca('')}
+      />
 
       {regioes.length > 0 && (
         <div className="mt-5">
@@ -990,19 +982,17 @@ function PassoRegiao({
           Prioriza subsedes e pontos de encontro próximos, com distância em km.
         </p>
 
-        <button
+        <AppButton
+          variant="none"
+          icon={LocateFixed}
+          loading={localizando}
           type="button"
           onClick={usarLocalizacao}
           disabled={pending || localizando}
           className="mt-3 inline-flex items-center gap-2 rounded-lg px-1 py-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
         >
-          {localizando ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <LocateFixed className="h-4 w-4" aria-hidden="true" />
-          )}
           {localizando ? 'Localizando...' : 'Usar minha localização'}
-        </button>
+        </AppButton>
 
         {localizacaoDetectada && uf && cidade && (
           <p
@@ -1066,6 +1056,7 @@ function PassoTorcida({
       <ul className="mt-6 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         <li className="min-w-0">
           <button
+            // lint-botoes: nao-e-acao — card de escolha de caminho no onboarding
             type="button"
             onClick={onTorcedorGlobal}
             disabled={pending}
@@ -1541,7 +1532,9 @@ function PassoUnidade({
           <p className="min-w-0 text-xs text-[rgb(var(--foreground-muted))]">
             Não encontrou sua unidade?
           </p>
-          <button
+          <AppButton
+            variant="none"
+            icon={Mail}
             type="button"
             onClick={() => {
               setModoNaoListada(true)
@@ -1550,9 +1543,8 @@ function PassoUnidade({
             }}
             className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
-            <Mail className="h-3.5 w-3.5" />
             Solicitar cadastro
-          </button>
+          </AppButton>
         </div>
       ) : (
         <form
@@ -1574,7 +1566,9 @@ function PassoUnidade({
                 </p>
               </div>
             </div>
-            <button
+            <AppButton
+              variant="none"
+              icon={X}
               type="button"
               onClick={() => {
                 setModoNaoListada(false)
@@ -1583,7 +1577,7 @@ function PassoUnidade({
               className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
             >
               Cancelar
-            </button>
+            </AppButton>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -2941,6 +2935,7 @@ function PassoVinculo({
           {/* Card 1: Torcedor da torcida — oculto no Associe-se (só pedido de sócio). */}
           {modo === 'escolha' ? (
           <button
+            // lint-botoes: nao-e-acao — card de escolha de caminho no onboarding
             type="button"
             onClick={() => enviar('TORCEDOR')}
             disabled={pending || unidadePendente}
@@ -2988,6 +2983,7 @@ function PassoVinculo({
 
           {/* Card 2: Já sou sócio */}
           <button
+            // lint-botoes: nao-e-acao — card de escolha de caminho no onboarding
             type="button"
             onClick={() => abrirSocio('EXISTENTE')}
             disabled={pending}
@@ -3052,6 +3048,7 @@ function PassoVinculo({
 
           {/* Card 3: Quero me associar */}
           <button
+            // lint-botoes: nao-e-acao — card de escolha de caminho no onboarding
             type="button"
             onClick={() => abrirSocio('NOVO')}
             disabled={pending}
@@ -3357,19 +3354,17 @@ function PassoVinculo({
 
           {isGoogleMapsConfigured() && (
             <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3">
-              <button
+              <AppButton
+                variant="none"
+                icon={LocateFixed}
+                loading={buscandoLocalizacao}
                 type="button"
                 onClick={() => void preencherEnderecoPelaLocalizacao()}
                 disabled={buscandoLocalizacao}
                 className="inline-flex items-center gap-2 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:underline disabled:opacity-50"
               >
-                {buscandoLocalizacao ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <LocateFixed className="h-4 w-4" aria-hidden="true" />
-                )}
                 {buscandoLocalizacao ? 'Buscando endereço…' : 'Preencher pela minha localização'}
-              </button>
+              </AppButton>
               <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
                 Usa GPS atual com alta precisão. Preenche só o que der para
                 confirmar — número só quando a posição for exata. Confira antes de seguir.
@@ -3421,20 +3416,18 @@ function PassoVinculo({
                 placeholder="00000-000"
                 className="min-w-0 flex-1"
               />
-              <button
+              <AppButton
+                variant="none"
+                icon={Search}
+                loading={buscandoCep}
                 type="button"
                 onClick={() => void buscarEndereco(cep, { manual: true })}
                 disabled={buscandoCep || cep.replace(/\D/g, '').length !== 8}
                 className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Buscar endereço pelo CEP"
               >
-                {buscandoCep ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
                 Buscar
-              </button>
+              </AppButton>
             </div>
             {buscandoCep && (
               <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">Buscando endereço…</p>
@@ -3837,14 +3830,16 @@ function PassoVinculo({
         {!origemAssocieSe ? (
         <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
           Não é sócio da organizada?{' '}
-          <button
+          <AppButton
+            variant="none"
+            icon={LogIn}
             type="button"
             onClick={() => enviar('TORCEDOR')}
             disabled={pending || unidadePendente}
             className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline disabled:opacity-50"
           >
             Entrar só como torcedor da torcida
-          </button>
+          </AppButton>
           {' '}
           — comunidade aberta agora, sem mural exclusivo nem carteirinha.
         </p>

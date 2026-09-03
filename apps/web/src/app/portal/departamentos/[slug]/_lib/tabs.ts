@@ -11,6 +11,7 @@ export const DEPARTAMENTO_TABS = [
   'equipe',
   'fila',
   'pedidos',
+  'atendimento',
 ] as const
 
 export type DepartamentoTab = (typeof DEPARTAMENTO_TABS)[number]
@@ -36,11 +37,13 @@ export const HASH_PARA_TAB: Readonly<Record<string, DepartamentoTab>> = {
   fila: 'fila',
   'pedidos-area': 'pedidos',
   pedidos: 'pedidos',
+  atendimento: 'atendimento',
 }
 
 export type DepartamentoTabOpcoes = {
   temFila: boolean
   temPedidos: boolean
+  temAtendimentoLoja?: boolean
 }
 
 export function isDepartamentoTab(valor: string): valor is DepartamentoTab {
@@ -61,6 +64,7 @@ export function parseDepartamentoTab(
   const tab = HASH_PARA_TAB[bruto] ?? (isDepartamentoTab(bruto) ? bruto : 'painel')
   if (tab === 'fila' && !opts.temFila) return 'painel'
   if (tab === 'pedidos' && !opts.temPedidos) return 'painel'
+  if (tab === 'atendimento' && !opts.temAtendimentoLoja) return 'painel'
   return tab
 }
 

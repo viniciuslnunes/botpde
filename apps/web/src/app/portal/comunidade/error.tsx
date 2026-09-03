@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { AppButton } from '@/components/ui/button'
+import { RotateCcw } from 'lucide-react'
 
 export default function ComunidadeError({
   error,
@@ -29,13 +31,15 @@ export default function ComunidadeError({
         </p>
       )}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <button
+        <AppButton
+          variant="primary"
+          icon={RotateCcw}
           type="button"
           onClick={() => reset()}
-          className="rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-primary-on"
+          className="rounded-full px-5 py-2 text-sm font-semibold"
         >
           Tentar de novo
-        </button>
+        </AppButton>
         <Link
           href="/portal/comunidade"
           className="rounded-full border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))]"

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { AppButton } from '@/components/ui/button'
 
 export function ExportarDadosButton({ userId, nome }: { userId: string; nome: string | null }) {
   const [pending, setPending] = useState(false)
@@ -34,14 +35,16 @@ export function ExportarDadosButton({ userId, nome }: { userId: string; nome: st
   }
 
   return (
-    <button
+    <AppButton
+      variant="none"
+      icon={Download}
+      loading={pending}
       type="button"
       disabled={pending}
       onClick={exportar}
       className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
     >
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
       Exportar dados (LGPD)
-    </button>
+    </AppButton>
   )
 }

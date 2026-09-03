@@ -16,18 +16,19 @@ import { useConfirmAction } from '@/lib/confirm-action'
 import { AdminRowActions, type AdminRowActionItem } from '@/components/admin/ui'
 import { BloquearMembroDialog } from './bloquear-membro-dialog'
 import { ReprovarMembroDialog } from './reprovar-membro-dialog'
+import { espelhoSomenteLeituraNoAdmin } from '@/lib/admin-membro-espelho'
 
 interface MemberActionsProps {
   membroId: string
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
   /** Departamento pretendido no onboarding (sócio); exibido no diálogo de aprovação. */
   departamentoNome?: string | null
-  /** Espelho na Sede — PENDENTE pode ser decidido pela Sede (exceção R1); demais só leitura. */
+  /** Espelho na Sede (Caso B). */
   espelhado?: boolean
+  /** Administração central — espelho analisado continua gerenciável. */
+  isAdministracaoSede?: boolean
   /** Nome da unidade de origem (Caso B). */
   aprovadoNaUnidadeNome?: string | null
-  aprovadoPorNome?: string | null
-  aprovadoEmLabel?: string | null
   /** Contexto do diálogo de reprovação (quando quem chama tem o cadastro em mãos). */
   nomeMembro?: string | null
   isSocio?: boolean
@@ -56,9 +57,8 @@ export function MemberActions({
   status,
   departamentoNome,
   espelhado,
+  isAdministracaoSede = false,
   aprovadoNaUnidadeNome,
-  aprovadoPorNome,
-  aprovadoEmLabel,
   nomeMembro,
   isSocio,
   pontosIncompletos,
@@ -75,8 +75,6 @@ export function MemberActions({
   const [bloquearAberto, setBloquearAberto] = useState(false)
   const depto = departamentoNome?.trim() || null
   const via = aprovadoNaUnidadeNome?.trim()
-  const quem = aprovadoPorNome?.trim()
-  const quando = aprovadoEmLabel?.trim()
   const podeEfetivarArea = status === 'APROVADO' && areaPendenteEfetivacao === true && !!depto
 
   async function handleEfetivarArea() {
@@ -173,7 +171,11 @@ export function MemberActions({
     })
   }
 
-  const espelhoSoLeitura = Boolean(espelhado && status !== 'PENDENTE')
+  const espelhoSoLeitura = espelhoSomenteLeituraNoAdmin(
+    espelhado,
+    status,
+    isAdministracaoSede,
+  )
   if (!espelhoSoLeitura) {
     if (status === 'PENDENTE' || status === 'REPROVADO') {
       itens.push({
@@ -264,12 +266,6 @@ export function MemberActions({
           ariaLabel={`Ações de ${nomeMembro?.trim() || 'cadastro'}`}
           items={itens}
         />
-      ) : espelhoSoLeitura ? (
-        <span className="max-w-[12rem] text-right text-xs text-[rgb(var(--foreground-muted))]">
-          {quem
-            ? `Analisada por ${quem}${quando ? ` em ${quando}` : ''}`
-            : 'Espelho da Sede'}
-        </span>
       ) : (
         <span className="text-xs text-[rgb(var(--foreground-muted))]">—</span>
       )}

@@ -817,6 +817,7 @@ export function MembroDetalheModal({
   podeBloquear = false,
   bloqueado = false,
   podeApagar = false,
+  isAdministracaoSede = false,
 }: {
   membro: AdminMembroItem | null
   onClose: () => void
@@ -826,6 +827,8 @@ export function MembroDetalheModal({
   bloqueado?: boolean
   /** `members:purge` do admin logado — libera apagar de vez. */
   podeApagar?: boolean
+  /** Administração central — espelho analisado continua gerenciável. */
+  isAdministracaoSede?: boolean
   /**
    * `roles:manage` do admin logado — resolvido no servidor pela página que
    * monta a lista. Só esconde a aba; o gate de verdade está em
@@ -1078,9 +1081,8 @@ export function MembroDetalheModal({
                 status={membro.status}
                 departamentoNome={membro.departamentoNome}
                 espelhado={membro.espelhado}
+                isAdministracaoSede={isAdministracaoSede}
                 aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
-                aprovadoPorNome={membro.aprovadoPorNome}
-                aprovadoEmLabel={membro.aprovadoEmLabel}
                 nomeMembro={membro.nome}
                 isSocio={membro.isSocio}
                 areaPendenteEfetivacao={membro.areaPendenteEfetivacao}

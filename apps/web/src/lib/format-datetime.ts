@@ -13,6 +13,17 @@ export function formatDateTimeShort(value: string | Date): string {
   }).format(date)
 }
 
+/** Data + hora compactas no feed da Comunidade ("27 de jul. · 14:32"). */
+export function formatFeedPublicadoEm(value: string | Date): string {
+  const date = typeof value === 'string' ? new Date(value) : value
+  const data = new Intl.DateTimeFormat(LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: APP_TIME_ZONE,
+  }).format(date)
+  return `${data} · ${formatTimeShort(date)}`
+}
+
 /** Hora curta (HH:mm) no fuso da app — usada no calendário da Agenda. */
 export function formatTimeShort(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value

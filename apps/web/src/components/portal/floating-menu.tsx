@@ -5,6 +5,13 @@ import { m } from 'motion/react'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 import { AnchoredPopover, type AnchoredPlacement } from './anchored-popover'
 
+/** Item de menu de ações no portal — caixa alta como `AdminRowActions`. */
+export const FLOATING_MENU_ITEM =
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide hover:bg-[rgb(var(--background-subtle))]'
+
+export const FLOATING_MENU_ITEM_DANGER =
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-red-600 hover:bg-[rgb(var(--background-subtle))]'
+
 /**
  * Menu dropdown em portal (`document.body`): escapa overflow de rails/cards e
  * fica acima do chrome sticky da Comunidade (z-20) sem perder pro navbar (z-40).

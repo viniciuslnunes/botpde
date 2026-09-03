@@ -142,14 +142,40 @@ describe('lint-botoes — ignora o que não é ação', () => {
     expect(rodar(atributo).codigo).toBe(0)
   })
 
-  it('não olha área ainda não migrada', () => {
-    const raiz = path.join(dir, 'fora')
-    const area = path.join(raiz, 'app', 'portal')
-    fs.mkdirSync(area, { recursive: true })
-    fs.writeFileSync(
-      path.join(area, 'fixture.tsx'),
-      `export const A = () => <button type="submit">Excluir</button>\n`,
+  it('ignora <button> citado dentro de comentário', () => {
+    // Regressão real: o JSDoc de `scroll-rail.tsx` explica que "as setas são
+    // `<button>` e não podem morar dentro de um `role=tablist`". Não há botão
+    // ali, há prosa — o lint acusava a frase como rótulo.
+    const raiz = escrever(
+      'comentario',
+      `/**\n * As setas são \`<button>\` e não podem morar num role="tablist".\n */\nexport const A = () => <div />\n`,
     )
     expect(rodar(raiz).codigo).toBe(0)
+  })
+})
+
+describe('lint-botoes — cobertura', () => {
+  it('cobre o src inteiro, não só as pastas do admin', () => {
+    // O primeiro recorte era `components/admin` + `app/admin`, e deixou passar
+    // o "Novo evento" do admin — que mora em `components/eventos`. Caminho de
+    // pasta não é proxy para área do produto.
+    const raiz = path.join(dir, 'cobertura')
+    for (const area of [
+      ['app', 'portal'],
+      ['components', 'eventos'],
+      ['components', 'financeiro'],
+    ]) {
+      const d = path.join(raiz, ...area)
+      fs.mkdirSync(d, { recursive: true })
+      fs.writeFileSync(
+        path.join(d, 'fixture.tsx'),
+        `export const A = () => <button type="submit">Excluir</button>\n`,
+      )
+    }
+    const { saida, codigo } = rodar(raiz)
+    expect(codigo).toBe(1)
+    for (const esperado of ['app/portal', 'components/eventos', 'components/financeiro']) {
+      expect(saida).toContain(esperado)
+    }
   })
 })

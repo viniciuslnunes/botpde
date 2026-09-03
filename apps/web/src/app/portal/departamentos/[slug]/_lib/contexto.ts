@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   calculateEffectivePermissions,
@@ -36,7 +36,7 @@ export type DeptoRow = {
 
 export interface DepartamentoContexto {
   userId: string
-  tenant: NonNullable<Awaited<ReturnType<typeof getTenantFromHost>>>
+  tenant: NonNullable<Awaited<ReturnType<typeof getActiveTenant>>>
   departamento: DeptoRow
   capability: ReturnType<typeof capabilityPorSlug>
   isSuperAdmin: boolean
@@ -75,8 +75,9 @@ export interface DepartamentoContexto {
 export const getDepartamentoContexto = cache(async function getDepartamentoContexto(
   slug: string,
 ): Promise<DepartamentoContexto | null> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
   if (!tenant) redirect('/')
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)

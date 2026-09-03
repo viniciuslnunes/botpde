@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Ticket } from 'lucide-react'
+import { Ticket, Wallet } from 'lucide-react'
 import { formatarMoedaBRL } from '@torcida/types'
 import { solicitarCobrancaVagaCaravana } from '@/app/portal/caravanas/actions'
+import { AppButton } from '@/components/ui/button'
 
 export function CaravanaVagaPagamento({
   eventoId,
@@ -53,9 +54,12 @@ export function CaravanaVagaPagamento({
           Confirme presença para gerar a cobrança automaticamente.
         </p>
       ) : (
-        <button
+        <AppButton
+          variant="primary"
+          icon={Wallet}
+          loading={pending}
           type="button"
-          disabled={pending}
+          block
           onClick={() => {
             setError(null)
             startTransition(async () => {
@@ -63,11 +67,10 @@ export function CaravanaVagaPagamento({
               if (res?.error) setError(res.error)
             })
           }}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-primary-on hover:opacity-90 disabled:opacity-50"
+          className="mt-3"
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Pagar vaga
-        </button>
+        </AppButton>
       )}
       {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>

@@ -1,18 +1,30 @@
 /**
  * Checklist leve por área de atuação — mesmo espírito do barracão Carnaval,
- * sem ERP. Persistência: `DepartamentoArea.meta.checklist.items[]`.
+ * sem ERP. Persistência: `DepartamentoArea.meta.checklist` via `procedimento.js`.
  *
  * Itens são livres (o gestor cria/remove). Modelos sugeridos por slug de área
  * são semente de UX, nunca sobrescrevem meta no seed.
  */
 
 import { slugifyArea } from './departamento-areas-canonicas.js'
+import {
+  PROCEDIMENTO_LABEL_MAX,
+  PROCEDIMENTO_MAX_ITENS,
+  addProcedimentoArrayItem,
+  applyProcedimentoModelo,
+  procedimentoItemsFromArray,
+  procedimentoProgress,
+  removeProcedimentoArrayItem,
+  toggleProcedimentoArray,
+} from './procedimento.js'
 
 /** @typedef {{ id: string, label: string, done: boolean }} AreaChecklistItem */
 
 /** Limite operacional — checklist, não task-tracker. */
-export const AREA_CHECKLIST_MAX_ITENS = 30
-export const AREA_CHECKLIST_LABEL_MAX = 80
+export const AREA_CHECKLIST_MAX_ITENS = PROCEDIMENTO_MAX_ITENS
+export const AREA_CHECKLIST_LABEL_MAX = PROCEDIMENTO_LABEL_MAX
+
+export const AREA_CHECKLIST_PATH = 'checklist'
 
 /**
  * Modelos opcionais por slug canônico — CTA "Usar modelo" no cockpit.
@@ -73,23 +85,7 @@ export function newAreaChecklistItemId(label, suffix) {
  * @returns {AreaChecklistItem[]}
  */
 export function checklistItemsFromMeta(meta) {
-  if (!meta || typeof meta !== 'object') return []
-  const checklist = /** @type {{ checklist?: { items?: unknown } }} */ (meta).checklist
-  if (!checklist?.items || !Array.isArray(checklist.items)) return []
-  /** @type {AreaChecklistItem[]} */
-  const out = []
-  for (const raw of checklist.items) {
-    if (!raw || typeof raw !== 'object') continue
-    const row = /** @type {{ id?: unknown, label?: unknown, done?: unknown }} */ (raw)
-    if (typeof row.id !== 'string' || !row.id.trim()) continue
-    if (typeof row.label !== 'string' || !row.label.trim()) continue
-    out.push({
-      id: row.id.trim().slice(0, 64),
-      label: row.label.trim().slice(0, AREA_CHECKLIST_LABEL_MAX),
-      done: Boolean(row.done),
-    })
-  }
-  return out
+  return procedimentoItemsFromArray(meta, AREA_CHECKLIST_PATH)
 }
 
 /**
@@ -97,26 +93,7 @@ export function checklistItemsFromMeta(meta) {
  * @returns {{ total: number, done: number }}
  */
 export function checklistProgress(meta) {
-  const items = checklistItemsFromMeta(meta)
-  return {
-    total: items.length,
-    done: items.filter((i) => i.done).length,
-  }
-}
-
-/**
- * @param {unknown} meta
- * @param {AreaChecklistItem[]} items
- * @returns {object}
- */
-function writeChecklistItems(meta, items) {
-  const base =
-    meta && typeof meta === 'object' ? { .../** @type {Record<string, unknown>} */ (meta) } : {}
-  const prevChecklist =
-    base.checklist && typeof base.checklist === 'object'
-      ? { .../** @type {Record<string, unknown>} */ (base.checklist) }
-      : {}
-  return { ...base, checklist: { ...prevChecklist, items } }
+  return procedimentoProgress(checklistItemsFromMeta(meta))
 }
 
 /**
@@ -126,10 +103,7 @@ function writeChecklistItems(meta, items) {
  * @returns {object}
  */
 export function toggleAreaChecklistItem(meta, itemId, done) {
-  const items = checklistItemsFromMeta(meta).map((i) =>
-    i.id === itemId ? { ...i, done: Boolean(done) } : i,
-  )
-  return writeChecklistItems(meta, items)
+  return toggleProcedimentoArray(meta, AREA_CHECKLIST_PATH, itemId, done)
 }
 
 /**
@@ -139,24 +113,10 @@ export function toggleAreaChecklistItem(meta, itemId, done) {
  * @returns {{ meta: object, item: AreaChecklistItem } | { error: string }}
  */
 export function addAreaChecklistItem(meta, label, itemId) {
-  const texto = typeof label === 'string' ? label.trim() : ''
-  if (texto.length < 2) return { error: 'Informe um item (mín. 2 caracteres)' }
-  if (texto.length > AREA_CHECKLIST_LABEL_MAX) return { error: 'Item muito longo' }
-
-  const items = checklistItemsFromMeta(meta)
-  if (items.length >= AREA_CHECKLIST_MAX_ITENS) {
-    return { error: `No máximo ${AREA_CHECKLIST_MAX_ITENS} itens na checklist` }
-  }
-
-  const id =
-    typeof itemId === 'string' && itemId.trim()
-      ? itemId.trim().slice(0, 64)
-      : newAreaChecklistItemId(texto)
-  if (items.some((i) => i.id === id)) return { error: 'Item já existe' }
-
-  /** @type {AreaChecklistItem} */
-  const item = { id, label: texto, done: false }
-  return { meta: writeChecklistItems(meta, [...items, item]), item }
+  return addProcedimentoArrayItem(meta, AREA_CHECKLIST_PATH, label, itemId, {
+    maxItens: AREA_CHECKLIST_MAX_ITENS,
+    newId: newAreaChecklistItemId,
+  })
 }
 
 /**
@@ -165,14 +125,10 @@ export function addAreaChecklistItem(meta, label, itemId) {
  * @returns {object}
  */
 export function removeAreaChecklistItem(meta, itemId) {
-  const items = checklistItemsFromMeta(meta).filter((i) => i.id !== itemId)
-  return writeChecklistItems(meta, items)
+  return removeProcedimentoArrayItem(meta, AREA_CHECKLIST_PATH, itemId)
 }
 
 /**
- * Aplica modelo sugerido: acrescenta itens do modelo que ainda não existem
- * (por id). Não apaga itens customizados nem marca done.
- *
  * @param {unknown} meta
  * @param {string} areaSlug
  * @returns {{ meta: object, adicionados: number } | { error: string }}
@@ -180,19 +136,7 @@ export function removeAreaChecklistItem(meta, itemId) {
 export function applyAreaChecklistModelo(meta, areaSlug) {
   const modelo = AREA_CHECKLIST_MODELOS[areaSlug]
   if (!modelo || modelo.length === 0) return { error: 'Esta área não tem modelo sugerido' }
-
-  const items = checklistItemsFromMeta(meta)
-  const ids = new Set(items.map((i) => i.id))
-  /** @type {AreaChecklistItem[]} */
-  const next = [...items]
-  let adicionados = 0
-  for (const def of modelo) {
-    if (ids.has(def.id)) continue
-    if (next.length >= AREA_CHECKLIST_MAX_ITENS) break
-    next.push({ id: def.id, label: def.label, done: false })
-    ids.add(def.id)
-    adicionados += 1
-  }
-  if (adicionados === 0) return { error: 'Modelo já aplicado (ou checklist cheia)' }
-  return { meta: writeChecklistItems(meta, next), adicionados }
+  return applyProcedimentoModelo(meta, AREA_CHECKLIST_PATH, modelo, {
+    maxItens: AREA_CHECKLIST_MAX_ITENS,
+  })
 }

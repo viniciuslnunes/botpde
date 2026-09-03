@@ -2,20 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import {
-  AlertCircle,
-  AppWindow,
-  Bell,
-  Hand,
-  Info,
-  Loader2,
-  LogOut,
-  Maximize2,
-  Minimize2,
-  MonitorUp,
-  MonitorX,
-  X,
-} from 'lucide-react'
+import { AlertCircle, AppWindow, Bell, Check, Hand, Info, Loader2, LogOut, Maximize2, Minimize2, MonitorUp, MonitorX, X, XCircle } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { playSalaModerationAlert } from '@/lib/sala-alert-sound'
 import {
@@ -41,6 +28,7 @@ import {
 import './meet-room.css'
 import { fadeScale, collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { registrarPresencaSala } from '@/lib/sala-participantes-client'
+import { AppButton } from '@/components/ui/button'
 
 type MeetRoomProps = {
   salaId: string
@@ -254,19 +242,17 @@ function ActiveScreenShareBanner({
             <MonitorUp className="h-4 w-4 shrink-0 text-[rgb(var(--color-info-fg))]" />
             <strong>{sharer.userName}</strong> está compartilhando a tela
           </span>
-          <button
+          <AppButton
+            variant="none"
+            icon={MonitorX}
+            loading={revoking === sharer.userId}
             type="button"
             onClick={() => void interromper(sharer.userId)}
             disabled={revoking === sharer.userId}
             className="meet-room-screen-banner__revoke"
           >
-            {revoking === sharer.userId ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <MonitorX className="h-3.5 w-3.5" />
-            )}
             Interromper
-          </button>
+          </AppButton>
         </div>
       ))}
     </div>
@@ -458,20 +444,24 @@ function MeetControls({
                   {request.kind === 'speak' ? 'quer falar' : 'quer compartilhar tela'}
                 </span>
                 <div className="flex gap-2">
-                  <button
+                  <AppButton
+                    variant="success"
+                    icon={Check}
                     type="button"
                     onClick={() => void responderSolicitacao(request, true)}
-                    className="btn-success rounded-lg px-3 py-1 text-xs font-semibold"
+                    className="rounded-lg px-3 py-1 text-xs font-semibold"
                   >
                     Permitir
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
+                    variant="none"
+                    icon={XCircle}
                     type="button"
                     onClick={() => void responderSolicitacao(request, false)}
                     className="rounded-lg border border-zinc-600 px-3 py-1 text-xs font-semibold text-zinc-200 hover:bg-zinc-800"
                   >
                     Negar
-                  </button>
+                  </AppButton>
                 </div>
               </li>
             ))}
@@ -511,16 +501,18 @@ function MeetControls({
           </button>
         )}
 
-        <button
+        <AppButton
+          variant="none"
+          icon={LogOut}
+          loading={saindo}
           type="button"
           onClick={() => void sairDaChamada()}
           disabled={saindo}
           className="meet-room-leave"
           title="Sair da chamada"
         >
-          {saindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
           {compact ? 'Sair' : 'Sair da chamada'}
-        </button>
+        </AppButton>
       </div>
     </div>
   )

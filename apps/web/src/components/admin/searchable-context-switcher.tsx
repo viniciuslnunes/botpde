@@ -8,10 +8,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import Image from 'next/image'
 import { flushSync, useFormStatus } from 'react-dom'
-import { Clock, Loader2, Search } from 'lucide-react'
+import { Clock, Loader2 } from 'lucide-react'
 import { HoverTip, hoverTipFromElement, type HoverTipAnchor } from '@/components/ui/hover-tip'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
+import { useEscudoCircular } from '@/lib/use-escudo-circular'
 import { lerRecentes, registrarRecente } from '@/lib/context-switcher-recentes'
 import { useHidratado } from '@/lib/use-hidratado'
 import { useLatestRef } from '@/lib/use-latest-ref'
@@ -28,6 +32,75 @@ function SubmitSpinner({ pending }: { pending: boolean }) {
   return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-400" aria-hidden />
 }
 
+function ContextSwitcherThumb({
+  logoUrl,
+  alt,
+  variant,
+  size = 'sm',
+}: {
+  logoUrl: string | null | undefined
+  alt: string
+  variant: 'admin' | 'super-admin'
+  size?: 'sm' | 'md'
+}) {
+  const [imagemFalhou, setImagemFalhou] = useState(false)
+  const box = size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'
+  const px = size === 'sm' ? 20 : 24
+  const src = logoUrl && !imagemFalhou ? logoUrl : null
+  const { circular, pronto } = useEscudoCircular(src)
+  const imgClass = [
+    box,
+    'shrink-0 object-contain',
+    pronto && circular ? 'rounded-full overflow-hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  if (src) {
+    if (canOptimizeImageUrl(src)) {
+      return (
+        <Image
+          key={src}
+          src={src}
+          alt=""
+          width={px}
+          height={px}
+          className={imgClass}
+          onError={() => setImagemFalhou(true)}
+        />
+      )
+    }
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={src}
+        src={src}
+        alt=""
+        width={px}
+        height={px}
+        loading="lazy"
+        decoding="async"
+        className={imgClass}
+        onError={() => setImagemFalhou(true)}
+      />
+    )
+  }
+
+  const fallbackClass =
+    variant === 'super-admin'
+      ? 'border-zinc-600 bg-zinc-800 text-zinc-400'
+      : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]'
+
+  return (
+    <span
+      aria-hidden
+      className={`flex ${box} shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${fallbackClass}`}
+    >
+      {(alt.charAt(0) || '?').toUpperCase()}
+    </span>
+  )
+}
+
 export type ContextSwitcherItem = {
   id: string
   /** Chave usada em recentes (default = id). */
@@ -42,6 +115,8 @@ type Props<T extends ContextSwitcherItem> = {
   valueId: string | null
   getLabel: (item: T) => string
   getSubLabel?: (item: T) => string | null
+  /** Escudo/logo à esquerda do rótulo (input fechado e opções da lista). */
+  getLogoUrl?: (item: T) => string | null
   getSearchText?: (item: T) => string
   /** Padding-left extra por item (ex.: depth da worktree). */
   getIndentRem?: (item: T) => number
@@ -88,6 +163,7 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   valueId,
   getLabel,
   getSubLabel,
+  getLogoUrl,
   getSearchText,
   getIndentRem,
   recentNamespace,
@@ -192,12 +268,17 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   const selecionada = porId.get(selectedId) ?? null
   const labelSelecionada = selecionada ? getLabel(selecionada) : ''
 
-  const alvoBusca = useMemo(() => {
+  // Sem `useMemo`: `labelSelecionada` sai de um `Map` que o React Compiler não
+  // consegue provar imutável, então o memo manual fazia ele **desistir de
+  // otimizar o componente inteiro** (`preserve-manual-memoization`, que aqui é
+  // erro). Duas normalizações de string não pagam esse preço — e o compilador
+  // memoiza isto sozinho.
+  const alvoBusca = (() => {
     const n = normalizarTexto(query)
     if (!n) return ''
     if (n === normalizarTexto(labelSelecionada)) return ''
     return n
-  }, [query, labelSelecionada])
+  })()
 
   const { recentes, demais, truncado } = useMemo(() => {
     function coincide(item: T, alvo: string): boolean {
@@ -344,9 +425,8 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
   const sectionClass = isSuper
     ? 'flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500'
     : 'flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]'
-  const iconClass = isSuper
-    ? 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500'
-    : 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]'
+
+  const mostrarEscudoNoInput = Boolean(getLogoUrl && selecionada && !alvoBusca)
 
   function renderItem(item: T, i: number) {
     const ativa = item.id === selectedId
@@ -354,6 +434,7 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
     const rótulo = getLabel(item)
     const subtítulo = getSubLabel?.(item) ?? null
     const indent = getIndentRem?.(item) ?? 0
+    const logoUrl = getLogoUrl?.(item) ?? null
     return (
       <li key={item.id} role="option" aria-selected={ativa} id={`${listId}-opt-${item.id}`}>
         <button
@@ -369,17 +450,27 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
             limparTip()
             selecionar(item)
           }}
-          className={`flex w-full min-w-0 flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors ${
+          className={`flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
             destaqueItem || ativa ? itemActive : itemIdle
           }`}
           style={indent > 0 ? { paddingLeft: `${0.75 + indent * 0.75}rem` } : undefined}
         >
-          <span data-switcher-label className="min-w-0 truncate font-medium">
-            {rótulo}
-          </span>
-          {subtítulo ? (
-            <span className={`truncate text-xs ${mutedClass}`}>{subtítulo}</span>
+          {getLogoUrl ? (
+            <ContextSwitcherThumb
+              logoUrl={logoUrl}
+              alt={rótulo}
+              variant={variant}
+              size="md"
+            />
           ) : null}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span data-switcher-label className="min-w-0 truncate font-medium">
+              {rótulo}
+            </span>
+            {subtítulo ? (
+              <span className={`truncate text-xs ${mutedClass}`}>{subtítulo}</span>
+            ) : null}
+          </span>
         </button>
       </li>
     )
@@ -400,24 +491,15 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
       </label>
       <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <Search className={iconClass} aria-hidden />
-          <input
-            id={`${listId}-input`}
-            type="text"
-            role="combobox"
-            aria-expanded={aberto}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={
-              aberto && sugestoes[destaque]
-                ? `${listId}-opt-${sugestoes[destaque].id}`
-                : undefined
-            }
+          <SearchFilterInput
+            inputId={`${listId}-input`}
+            inputType="text"
             value={query}
-            disabled={disabled || pending}
-            autoComplete="off"
-            placeholder={placeholder}
-            className={inputClass}
+            onChange={(next) => {
+              setQuery(next)
+              setAberto(true)
+              limparTip()
+            }}
             onPointerEnter={(e) => {
               if (!query.trim()) {
                 limparTip()
@@ -426,11 +508,6 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
               mostrarTip(query, e.currentTarget)
             }}
             onPointerLeave={limparTip}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              setAberto(true)
-              limparTip()
-            }}
             onFocus={(e) => {
               setAberto(true)
               limparTip()
@@ -462,6 +539,27 @@ export function SearchableContextSwitcher<T extends ContextSwitcherItem>({
                 limparTip()
               }
             }}
+            placeholder={placeholder}
+            disabled={disabled || pending}
+            exibirDropdown={false}
+            loading={buscandoRemoto}
+            listboxId={listId}
+            comboboxAberto={aberto}
+            ariaActivedescendant={
+              aberto && sugestoes[destaque]
+                ? `${listId}-opt-${sugestoes[destaque].id}`
+                : undefined
+            }
+            leading={
+              mostrarEscudoNoInput ? (
+                <ContextSwitcherThumb
+                  logoUrl={getLogoUrl!(selecionada!)}
+                  alt={labelSelecionada}
+                  variant={variant}
+                />
+              ) : undefined
+            }
+            inputClassName={inputClass}
           />
           {aberto && !disabled && (
             <ul

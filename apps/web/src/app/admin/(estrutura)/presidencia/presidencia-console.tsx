@@ -2,11 +2,12 @@
 
 import { useActionState, useMemo, useState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { AlertTriangle, Crown, Search, UserCheck, UserX } from 'lucide-react'
+import { AlertTriangle, Crown, UserCheck, UserX } from 'lucide-react'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import type { CandidatoLideranca, LiderAtual } from '@/lib/lideranca'
 import { transferirPresidenciaAction, type PresidenciaState } from './actions'
 import { AppButton } from '@/components/ui/button'
+import { SearchFilterInput, type ReactiveSearchOption } from '@/components/ui/reactive-search'
 
 export type UnidadeLideranca = {
   sedeId: string
@@ -246,6 +247,15 @@ function SeletorPessoa({
   name: string
 }) {
   const [busca, setBusca] = useState('')
+  const sugestoes = useMemo((): ReactiveSearchOption[] => {
+    return candidatos.map((c) => ({
+      id: c.userId,
+      label: c.nome,
+      sublabel: [c.email, c.unidade].filter(Boolean).join(' · ') || null,
+      searchText: `${c.nome} ${c.email ?? ''} ${c.unidade ?? ''}`,
+    }))
+  }, [candidatos])
+
   const filtrados = useMemo(() => {
     const alvo = normalizarTexto(busca)
     if (!alvo) return candidatos
@@ -256,17 +266,17 @@ function SeletorPessoa({
 
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-        <input
-          type="search"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar membro por nome, e-mail ou unidade…"
-          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
-          aria-label="Buscar membro"
-        />
-      </div>
+      <SearchFilterInput
+        value={busca}
+        onChange={setBusca}
+        placeholder="Buscar membro por nome, e-mail ou unidade…"
+        ariaLabel="Buscar membro"
+        suggestions={sugestoes}
+        onSelectSuggestion={(item) => setBusca(item.label)}
+        minChars={1}
+        size="sm"
+        inputClassName="[&_input]:rounded-lg [&_input]:focus:ring-1 [&_input]:focus:ring-[rgb(var(--color-primary))]"
+      />
 
       {filtrados.length === 0 ? (
         <p className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4 text-center text-xs text-[rgb(var(--foreground-muted))]">

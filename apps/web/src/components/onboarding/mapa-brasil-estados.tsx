@@ -5,6 +5,7 @@ import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Loader2, MapPin, Search, Sparkles, X, ZoomOut } from 'lucide-react'
 import { BandeiraEstado } from '@/components/onboarding/bandeira-estado'
 import { ClubeOnboardingCard } from '@/components/onboarding/clube-onboarding-card'
+import { SearchFilterInput } from '@/components/ui/reactive-search'
 import { BRASIL_ESTADOS_PATHS } from '@/components/onboarding/brasil-estados-paths'
 import {
   CENTRO_UF,
@@ -29,6 +30,7 @@ import {
   type RegiaoBrasilId,
   type RegiaoBrasilMeta,
 } from '@/lib/regioes-brasil'
+import { AppButton } from '@/components/ui/button'
 
 const VIEWBOX_FULL = '0 0 450 460'
 
@@ -251,16 +253,16 @@ function CabecalhoPainel({
       </div>
 
       {mostrarFiltro && (
-        <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-          <input
-            type="search"
-            value={filtro}
-            onChange={(e) => onFiltro(e.target.value)}
-            placeholder="Filtrar clubes..."
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-8 pr-3 text-xs text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]/50 focus:outline-none focus:ring-1 focus:ring-[rgb(var(--color-primary))]/30"
-          />
-        </div>
+        <SearchFilterInput
+          value={filtro}
+          onChange={onFiltro}
+          placeholder="Filtrar clubes..."
+          ariaLabel="Filtrar clubes"
+          exibirDropdown={false}
+          size="sm"
+          className="mt-3"
+          inputClassName="rounded-lg py-1.5 pl-8 text-xs focus:ring-1 focus:ring-[rgb(var(--color-primary))]/30"
+        />
       )}
     </header>
   )
@@ -563,24 +565,26 @@ export function MapaBrasilEstados({
           </div>
           <div className="flex shrink-0 gap-2">
             {ufSelecionada && (
-              <button
+              <AppButton
+                variant="none"
+                icon={X}
                 type="button"
                 onClick={limparTudo}
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
               >
-                <X className="h-3.5 w-3.5" />
                 Limpar
-              </button>
+              </AppButton>
             )}
             {zoomAtivo && !buscaAtiva && (
-              <button
+              <AppButton
+                variant="none"
+                icon={ZoomOut}
                 type="button"
                 onClick={limparTudo}
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
               >
-                <ZoomOut className="h-3.5 w-3.5" />
                 Ver Brasil
-              </button>
+              </AppButton>
             )}
           </div>
         </div>

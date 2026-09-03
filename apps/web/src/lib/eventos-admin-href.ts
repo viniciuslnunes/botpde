@@ -18,10 +18,15 @@ const SLUG_BATERIA = 'bateria'
 const SLUG_SOCIAL = 'social-e-eventos'
 const SLUG_FEMININO = 'feminino'
 
+/**
+ * Departamento do evento: o dono operacional manda, e o projeto é o fallback
+ * de quem foi criado antes do campo existir (ou de quem só tem projeto).
+ */
 export function slugDepartamentoDoEvento(evento: {
+  departamento?: { slug: string } | null
   projeto?: { departamento?: { slug: string } | null } | null
 }): string | null {
-  return evento.projeto?.departamento?.slug ?? null
+  return evento.departamento?.slug ?? evento.projeto?.departamento?.slug ?? null
 }
 
 export function hrefAdminEvento(fonte: EventoAdminHrefFonte): string {
