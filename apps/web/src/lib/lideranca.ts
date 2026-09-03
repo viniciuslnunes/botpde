@@ -576,6 +576,133 @@ async function transferirLiderancaUnidade(params: {
   return { caso: 'A', tenantId: tenant.id, sedeId, anteriores, novo: toLider(novo) }
 }
 
+/** Lê `detalhes.ownerUserId` do `AuditLog` da promoção de uma unidade. */
+function ownerUserIdDeAuditDetalhes(detalhes: unknown): string | null {
+  if (!detalhes || typeof detalhes !== 'object') return null
+  const valor = (detalhes as { ownerUserId?: unknown }).ownerUserId
+  return typeof valor === 'string' && valor ? valor : null
+}
+
+/**
+ * Vínculo **fabricado** pela herança de owner na promoção — e como reconhecê-lo.
+ *
+ * Até 2026-08-06 `promoverSedeParaTenant` tinha um fallback: unidade sem
+ * `responsavelUserId` fazia o owner do tenant mãe (na prática o super-admin que
+ * provisionou a torcida) virar dono do portal novo. Na mesma transação nasciam,
+ * para essa pessoa, um `SaasMembro` APROVADO com o `sedeId` da unidade e um
+ * `MembroConversa` ADMIN no canal oficial. O fallback foi removido, mas tirar a
+ * presidência só apagava o `UserRole`: o vínculo sobrevivia, e
+ * `resolverUnidadeDoVinculo` elege a aba "Minha unidade" pelo `SaasMembro` mais
+ * recente da worktree, sem olhar liderança — a Comunidade abria no canal de uma
+ * subsede alheia (medido em HML, 2026-09-03).
+ *
+ * A evidência é o `AuditLog` da promoção, não o `UserRole`: quando a
+ * presidência já saiu pela UI não há mais cargo para olhar. Sem as três
+ * condições juntas o vínculo é legítimo e **nada** é removido — presidente da
+ * Sede que também é sócio de verdade da subsede continua sócio.
+ *
+ * Contrapartida em lote (portais já órfãos, e o caso da presidência
+ * transferida em vez de removida): `db:repair-owner-heranca-promocao`.
+ */
+async function limparVinculoHerdadoDaPromocao(params: {
+  tenantId: string
+  userIds: string[]
+  atorId: string
+}): Promise<void> {
+  const { tenantId, userIds, atorId } = params
+  if (userIds.length === 0) return
+
+  // Portal de unidade: Sede deste tenant cujo pai vive no tenant da mãe.
+  const sedesDoPortal: Array<{
+    id: string
+    nome: string
+    responsavelUserId: string | null
+    canalConversaId: string | null
+    sede: { tenantId: string | null } | null
+  }> = await db.sede.findMany({
+    where: { tenantId },
+    select: {
+      id: true,
+      nome: true,
+      responsavelUserId: true,
+      canalConversaId: true,
+      sede: { select: { tenantId: true } },
+    },
+  })
+
+  const unidade = sedesDoPortal.find(
+    (s) => s.sede?.tenantId && s.sede.tenantId !== tenantId,
+  )
+  if (!unidade?.sede?.tenantId) return
+  const tenantMaeId = unidade.sede.tenantId
+
+  const promocao: { detalhes: Prisma.JsonValue } | null = await db.auditLog.findFirst({
+    where: { acao: 'SEDE_PROMOVIDA_TENANT', entidade: 'Sede', entidadeId: unidade.id },
+    orderBy: { criadoEm: 'desc' },
+    select: { detalhes: true },
+  })
+  const herdeiro = ownerUserIdDeAuditDetalhes(promocao?.detalhes)
+  if (!herdeiro || herdeiro === unidade.responsavelUserId) return
+  if (!userIds.includes(herdeiro)) return
+
+  // Só é herança enquanto a pessoa segue dona da mãe. Quem saiu de lá e ficou
+  // sócio daqui construiu vínculo próprio.
+  const aindaOwnerDaMae: { id: string } | null = await db.userRole.findFirst({
+    where: {
+      tenantId: tenantMaeId,
+      userId: herdeiro,
+      role: { isSystem: true, nome: SYSTEM_ROLES.OWNER },
+    },
+    select: { id: true },
+  })
+  if (!aindaOwnerDaMae) return
+
+  const membro: { id: string; status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId: herdeiro } },
+    select: { id: true, status: true },
+  })
+  const canalIds = sedesDoPortal
+    .map((s) => s.canalConversaId)
+    .filter((id): id is string => Boolean(id))
+  const canais: Array<{ id: string }> = canalIds.length
+    ? await db.membroConversa.findMany({
+        where: { userId: herdeiro, conversaId: { in: canalIds } },
+        select: { id: true },
+      })
+    : []
+  if (!membro && canais.length === 0) return
+
+  // Carteirinha é identidade: nunca sai por efeito colateral. Fica registrada
+  // no log para quem for auditar decidir à mão.
+  const socio: { numeroSocio: number } | null = await db.saasSocio.findFirst({
+    where: { tenantId, userId: herdeiro },
+    select: { numeroSocio: true },
+  })
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (canais.length > 0) {
+      await tx.membroConversa.deleteMany({ where: { id: { in: canais.map((c) => c.id) } } })
+    }
+    if (membro) await tx.saasMembro.delete({ where: { id: membro.id } })
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        atorId,
+        acao: 'MEMBRO_REMOVIDO',
+        entidade: 'SaasMembro',
+        entidadeId: membro?.id ?? tenantId,
+        detalhes: {
+          motivo: 'vínculo fabricado pela herança de owner na promoção',
+          userId: herdeiro,
+          sedeId: unidade.id,
+          canaisRemovidos: canais.length,
+          carteirinhaMantida: socio ? socio.numeroSocio : null,
+        },
+      },
+    })
+  })
+}
+
 /**
  * Tira a presidência sem sucessor — a unidade fica sem owner, estado em que o
  * super-admin volta a operar as configurações reservadas
@@ -664,6 +791,16 @@ export async function removerLideranca(params: {
   })
 
   for (const r of removidos) invalidatePermissionsCache(r.userId, alvo.tenantId)
+
+  // Sair da posse de um portal que nunca foi seu tem que levar junto o vínculo
+  // que a promoção fabricou — senão a pessoa segue "sócia" da unidade e a
+  // Comunidade continua abrindo no canal dela. Fora da transação do cargo de
+  // propósito: a presidência sai mesmo que a limpeza não se aplique.
+  await limparVinculoHerdadoDaPromocao({
+    tenantId: alvo.tenantId,
+    userIds: removidos.map((r) => r.userId),
+    atorId,
+  })
 
   const tenantNome: { nome: string } | null = await db.tenant.findUnique({
     where: { id: alvo.tenantId },

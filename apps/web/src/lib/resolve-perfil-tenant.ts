@@ -26,12 +26,45 @@ export async function resolvePerfilTenantForUser(
     if (membroHost?.status === 'APROVADO') return fromHost
   }
 
-  const socio: { tenant: Tenant } | null = await db.saasMembro.findFirst({
-    where: { userId: profileUserId, status: 'APROVADO', tipo: 'SOCIO' },
+  /**
+   * Vínculos SOCIO da pessoa, do mais novo para o mais antigo.
+   *
+   * Era um `findFirst` sem filtro de tenant: elegia a associação **mais
+   * recente** da plataforma inteira como casa do perfil. Numa worktree isso
+   * faz um portal de unidade ganhar da Sede só por ter nascido depois — foi
+   * assim que um vínculo fabricado numa subsede (ver
+   * `limparVinculoHerdadoDaPromocao` em `lib/lideranca.ts`) passou a rotular o
+   * perfil com o nome da unidade, e a renderizar o `PerfilMembro` vazio de lá:
+   * "Perfil privado", "Novato", 0 publicações (medido em HML, 2026-09-03).
+   *
+   * `tenant: { ativo: true }` entra na query em vez de checar depois: com o
+   * teste do lado de fora, um vínculo recente em torcida inativa descartava
+   * **todos** os outros e derrubava o perfil no host.
+   */
+  const socios: Array<{ tenantId: string; tenant: Tenant }> = await db.saasMembro.findMany({
+    where: {
+      userId: profileUserId,
+      status: 'APROVADO',
+      tipo: 'SOCIO',
+      tenant: { ativo: true },
+    },
     orderBy: { criadoEm: 'desc' },
-    select: { tenant: true },
+    select: { tenantId: true, tenant: true },
   })
-  if (socio?.tenant.ativo) return socio.tenant
+
+  if (socios.length === 1) return socios[0].tenant
+  if (socios.length > 1) {
+    // Desempate por conteúdo, não por data: a casa do perfil é o tenant onde o
+    // `PerfilMembro` existe de verdade — é ele que a tela vai ler. Sem nenhum,
+    // cai na recência de antes.
+    const comPerfil: Array<{ tenantId: string }> = await db.perfilMembro.findMany({
+      where: { userId: profileUserId, tenantId: { in: socios.map((s) => s.tenantId) } },
+      select: { tenantId: true },
+    })
+    const tenantsComPerfil = new Set(comPerfil.map((p) => p.tenantId))
+    const escolhido = socios.find((s) => tenantsComPerfil.has(s.tenantId)) ?? socios[0]
+    return escolhido.tenant
+  }
 
   // Torcedor global: CN do clube (não herdar Gaviões do host/cookie).
   // `afiliacaoId` basta — exigir onboarding concluído fazia o visitante cair
