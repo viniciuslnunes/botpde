@@ -1,0 +1,120 @@
+name: Repair deploy
+
+# Repairs/backfills de pós-deploy em HML e produção.
+#
+# Existe porque o DSN de produção NÃO fica no laptop (docs/ops/dev-secrets.md:
+# "Produção — qualquer DSN/chave de prod — Nunca"). O Actions já guarda
+# DATABASE_URL_HML e DATABASE_URL_PROD para o workflow Schema deploy; este
+# reusa o mesmo canal para o passo "Seeds/repairs do módulo" do checklist de
+# release (docs/ops/schema-deploy.md § Checklist).
+#
+# Só scripts idempotentes e com --dry-run entram na lista: o disparo é manual,
+# mas o alvo é banco de produção.
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Repair a executar'
+        type: choice
+        required: true
+        options:
+          - db:repair-evento-dono-operacional
+          - db:repair-system-roles
+      alvo:
+        description: 'Banco alvo'
+        type: choice
+        required: true
+        default: homolog
+        options:
+          - homolog
+          - producao
+          - homolog-e-producao
+      dry_run:
+        description: 'Só simular (não grava)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: repair-deploy-${{ inputs.script }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  repair-hml:
+    name: ${{ inputs.script }} — Homolog
+    if: inputs.alvo == 'homolog' || inputs.alvo == 'homolog-e-producao'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # O repair usa o client Prisma; o install acima pula os postinstall.
+      - name: Gerar Prisma Client
+        run: pnpm --filter @torcida/db db:generate
+
+      - name: Executar em HML
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_HML }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ]; then
+            pnpm --filter @torcida/db ${{ inputs.script }} -- --dry-run
+          else
+            pnpm --filter @torcida/db ${{ inputs.script }}
+          fi
+
+  repair-prod:
+    name: ${{ inputs.script }} — Produção
+    needs: repair-hml
+    # HML primeiro quando os dois forem pedidos; sozinho, roda direto.
+    if: |
+      always() &&
+      (inputs.alvo == 'producao' ||
+       (inputs.alvo == 'homolog-e-producao' && needs.repair-hml.result == 'success'))
+    runs-on: ubuntu-latest
+    # Mesma razão do Schema deploy: isola DATABASE_URL_PROD.
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @torcida/db db:generate
+
+      - name: Executar em produção
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ]; then
+            pnpm --filter @torcida/db ${{ inputs.script }} -- --dry-run
+          else
+            pnpm --filter @torcida/db ${{ inputs.script }}
+          fi

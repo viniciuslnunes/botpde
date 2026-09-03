@@ -123,7 +123,34 @@ estiver ausente, ou para runbook fora do CI.
 - [ ] Após merge em `main`: workflow **Schema deploy** verde em HML
 - [ ] Feature validada em homolog
 - [ ] Approve do environment **production** no GitHub (ou `schema:deploy` manual com `--i-know-prod`)
-- [ ] Seeds/repairs do módulo (se o doc pedir)
+- [ ] Seeds/repairs do módulo (se o doc pedir) — workflow **Repair deploy** (§ abaixo)
+
+## Repair deploy (seeds/backfills em HML e prod)
+
+Arquivo: `.github/workflows/repair-deploy.yml` — `workflow_dispatch`.
+
+Schema é só a forma da tabela; coluna nova nasce vazia e o dado legado precisa
+de backfill. O DSN de produção **não** fica no laptop (§ Anti-padrões e
+[`dev-secrets.md`](dev-secrets.md)), então o canal para rodar repair em prod é
+este workflow, que reusa `DATABASE_URL_HML` / `DATABASE_URL_PROD` do
+**Schema deploy**.
+
+| Input | Valores |
+|-------|---------|
+| `script` | allowlist — só repair idempotente e com `--dry-run` |
+| `alvo` | `homolog` · `producao` · `homolog-e-producao` (HML primeiro) |
+| `dry_run` | **true por padrão**; simula sem gravar |
+
+```bash
+gh workflow run "Repair deploy" \
+  -f script=db:repair-evento-dono-operacional \
+  -f alvo=homolog-e-producao \
+  -f dry_run=false
+```
+
+Rode sempre com `dry_run=true` antes: o resumo diz quantos registros seriam
+tocados. Script **sem** `--dry-run` fica fora da allowlist de propósito — o
+disparo é manual, mas o alvo é banco de produção.
 
 ## Anti-padrões
 
