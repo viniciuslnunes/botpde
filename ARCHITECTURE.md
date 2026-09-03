@@ -1647,6 +1647,26 @@ o `AuditLog SEDE_PROMOVIDA_TENANT` daquela unidade registrou a pessoa em
 Sede que também é sócio real da subsede tem vínculo legítimo. Carteirinha
 (`SaasSocio`) nunca é apagada: é identidade, o script só reporta.
 
+**E a UI recriava o passivo (2026-09-03).** Medido em HML: a presidência dos
+dois portais tinha saído por `/super-admin/liderancas` em 12/08, mas
+`removerLideranca` só apagava o `UserRole` — os `SaasMembro` de 04/08
+continuavam lá, e a Comunidade do presidente da Sede abria em SUBSEDE RIO
+CLARO (a mais recente das duas). O sintoma não para na aba: trocar para ela
+grava `torcida_ctx`, e daí `getTenantFromHost` devolve o portal da unidade
+para todo o resto — inclusive `resolvePerfilTenantForUser`, que passou a
+rotular o perfil com o nome da unidade e a ler o `PerfilMembro` vazio de lá
+("Perfil privado", "Novato", 0 publicações). `removerLideranca` agora limpa o
+vínculo junto, com a mesma evidência do script. Na mesma passada,
+`resolvePerfilTenantForUser` deixou de eleger a casa do perfil por um
+`findFirst` **sem filtro de tenant** (o vínculo SOCIO mais recente da
+plataforma inteira, que faz portal de unidade ganhar da Sede só por ter
+nascido depois): desempata por onde o `PerfilMembro` existe de fato e filtra
+`tenant: { ativo: true }` dentro da query — com o teste do lado de fora, um
+vínculo recente em torcida inativa descartava todos os outros. **Transferir**
+a presidência (em vez de remover) segue só no script: com
+`manterAnteriorComoAdmin` a pessoa fica de propósito, e apagar o vínculo dela
+por efeito colateral contradiria a intenção.
+
 **Regra única.** `lib/lideranca.ts` concentra a decisão nos dois formatos de
 unidade que o produto tem:
 
