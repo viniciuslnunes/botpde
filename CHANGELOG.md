@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.829.832] — 2026-09-03
+
+### Changed
+
+- Versão sincronizada com o histórico Git (`1.<commits_main>.<commits_all>`).
+
 ## [1.825.828] — 2026-09-03
 
 ### Changed
